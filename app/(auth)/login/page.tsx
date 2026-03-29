@@ -67,7 +67,7 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="text-white/30 text-xs">
-            La plateforme tout-en-un pour les artisans du batiment
+            La plateforme tout-en-un pour les artisans du bâtiment
           </p>
         </div>
       </div>
