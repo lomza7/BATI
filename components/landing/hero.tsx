@@ -10,7 +10,7 @@ export function Hero() {
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-sm font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--landing-accent)]" />
-            Nouveau : Agents IA integres
+            Nouveau : Agents IA intégrés
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif leading-[1.1] mb-6 text-[var(--landing-text)]">
