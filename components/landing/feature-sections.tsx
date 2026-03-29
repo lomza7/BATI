@@ -275,10 +275,10 @@ export function PlansSection() {
       titleAccent="toujours accessibles"
       description="Centralisez plans, photos de chantier, rendus 3D et documents techniques. Partagez-les avec vos clients en un lien."
       bulletPoints={[
-        'Stockage illimite de fichiers',
+        'Stockage illimité de fichiers',
         'Organisation par chantier',
-        'Partage client par lien securise',
-        'Visionneuse integree (PDF, images)',
+        'Partage client par lien securisé',
+        'Visionneuse integrée (PDF, images)',
       ]}
       reversed
       visual={
