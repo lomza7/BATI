@@ -14,7 +14,7 @@ export function Hero() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif leading-[1.1] mb-6 text-[var(--landing-text)]">
-            Gèrez votre activité BTP,{' '}
+            Gérez votre activité BTP,{' '}
             <em className="font-serif italic text-[var(--landing-accent)]">simplement</em>
           </h1>
 
