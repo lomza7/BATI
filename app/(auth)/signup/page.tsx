@@ -105,10 +105,10 @@ export default function SignupPage() {
 
           <div className="space-y-2 mb-8">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Creez votre compte
+              Créez votre compte
             </h1>
             <p className="text-muted-foreground">
-              Commencez a gerer vos chantiers en quelques minutes
+              Commencez a gérer vos chantiers en quelques minutes
             </p>
           </div>
 
