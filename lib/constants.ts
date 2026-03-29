@@ -1,0 +1,63 @@
+export const QUOTE_STATUSES = {
+  brouillon: { label: 'Brouillon', color: 'bg-slate-100 text-slate-700' },
+  envoye: { label: 'Envoye', color: 'bg-blue-50 text-blue-700' },
+  accepte: { label: 'Accepte', color: 'bg-emerald-50 text-emerald-700' },
+  refuse: { label: 'Refuse', color: 'bg-red-50 text-red-700' },
+  expire: { label: 'Expire', color: 'bg-amber-50 text-amber-700' },
+} as const;
+
+export const INVOICE_STATUSES = {
+  brouillon: { label: 'Brouillon', color: 'bg-slate-100 text-slate-700' },
+  envoyee: { label: 'Envoyee', color: 'bg-blue-50 text-blue-700' },
+  payee: { label: 'Payee', color: 'bg-emerald-50 text-emerald-700' },
+  en_retard: { label: 'En retard', color: 'bg-red-50 text-red-700' },
+  annulee: { label: 'Annulee', color: 'bg-slate-100 text-slate-500' },
+} as const;
+
+export const PROJECT_STATUSES = {
+  a_planifier: { label: 'A planifier', color: 'bg-slate-100 text-slate-700' },
+  en_cours: { label: 'En cours', color: 'bg-blue-50 text-blue-700' },
+  termine: { label: 'Termine', color: 'bg-emerald-50 text-emerald-700' },
+  en_pause: { label: 'En pause', color: 'bg-amber-50 text-amber-700' },
+} as const;
+
+export const LEAD_STAGES = {
+  nouveau: { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' },
+  contacte: { label: 'Contacte', color: 'bg-blue-50 text-blue-700' },
+  devis_envoye: { label: 'Devis envoye', color: 'bg-amber-50 text-amber-700' },
+  negocie: { label: 'En nego', color: 'bg-orange-50 text-orange-700' },
+  gagne: { label: 'Gagne', color: 'bg-emerald-50 text-emerald-700' },
+  perdu: { label: 'Perdu', color: 'bg-red-50 text-red-700' },
+} as const;
+
+export const CONTRACT_TYPES = {
+  chaudiere: { label: 'Chaudiere', icon: 'Flame' },
+  clim: { label: 'Climatisation', icon: 'Wind' },
+  piscine: { label: 'Piscine', icon: 'Waves' },
+  autre: { label: 'Autre', icon: 'FileText' },
+} as const;
+
+export const EXPENSE_CATEGORIES = {
+  materiaux: { label: 'Materiaux', color: 'bg-blue-50 text-blue-700' },
+  sous_traitance: { label: 'Sous-traitance', color: 'bg-amber-50 text-amber-700' },
+  deplacement: { label: 'Deplacement', color: 'bg-emerald-50 text-emerald-700' },
+  assurance: { label: 'Assurance', color: 'bg-red-50 text-red-700' },
+  autre: { label: 'Autre', color: 'bg-slate-100 text-slate-700' },
+} as const;
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatDate(date: string | Date): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(date));
+}
