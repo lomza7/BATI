@@ -71,12 +71,12 @@ export function SiteWebSection() {
       badge="Site Web"
       title="Votre vitrine en ligne,"
       titleAccent="sans effort"
-      description="Un site professionnel genere automatiquement a partir de vos informations. Presentez vos realisations, recevez des demandes de devis et renforcez votre credibilite."
+      description="Un site professionnel généré automatiquement à partir de vos informations. Présentez vos réalisations, recevez des demandes de devis et renforcez votre credibilité."
       bulletPoints={[
         'Mise en page professionnelle automatique',
-        'Galerie de realisations avec photos',
-        'Formulaire de contact integre',
-        'Optimise pour le referencement (SEO)',
+        'Galerie de réalisations avec photos',
+        'Formulaire de contact integré',
+        'Optimise pour le réferencement (SEO)',
       ]}
       visual={
         <MockBrowser url="www.martin-plomberie.fr">
