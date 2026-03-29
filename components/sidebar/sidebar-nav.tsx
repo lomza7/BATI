@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -35,10 +35,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: 'Developpement',
+    title: 'Commercial',
     items: [
-      { label: 'Site web IA', href: '/site-web', icon: Globe },
+      { label: 'Catalogues', href: '/catalogues', icon: BookOpen },
       { label: 'Prospection', href: '/prospection', icon: Users },
+      { label: 'Site web IA', href: '/site-web', icon: Globe },
     ],
   },
   {
