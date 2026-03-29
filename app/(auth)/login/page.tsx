@@ -58,7 +58,7 @@ export default function LoginPage() {
           </div>
           <div className="space-y-6">
             <blockquote className="text-2xl font-serif italic text-white/90 leading-relaxed">
-              &ldquo;BatiFlow a transforme notre facon de gerer nos chantiers.
+              &ldquo;BatiFlow a transformé notre facon de gèrer nos chantiers.
               On gagne un temps fou sur la facturation.&rdquo;
             </blockquote>
             <div>
