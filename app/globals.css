@@ -37,6 +37,15 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    --landing-white: #ffffff;
+    --landing-off: #faf9f7;
+    --landing-stone: #f3f1ed;
+    --landing-border: #e5e1da;
+    --landing-text: #1a1a1a;
+    --landing-muted: #6b6560;
+    --landing-accent: #d35400;
+    --landing-accent-light: #fdf0e6;
   }
 
   .dark {
@@ -83,4 +92,34 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+@layer utilities {
+  .landing-section {
+    @apply max-w-[1200px] mx-auto px-6;
+  }
+}
+
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-marquee {
+  animation: marquee-scroll 30s linear infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out both;
 }

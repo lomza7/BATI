@@ -11,6 +11,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
+        serif: ['"Instrument Serif"', 'Georgia', 'serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -71,6 +72,16 @@ const config: Config = {
           '3': 'hsl(var(--chart-3))',
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
+        },
+        landing: {
+          white: 'var(--landing-white)',
+          off: 'var(--landing-off)',
+          stone: 'var(--landing-stone)',
+          border: 'var(--landing-border)',
+          text: 'var(--landing-text)',
+          muted: 'var(--landing-muted)',
+          accent: 'var(--landing-accent)',
+          'accent-light': 'var(--landing-accent-light)',
         },
       },
       keyframes: {

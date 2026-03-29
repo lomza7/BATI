@@ -19,8 +19,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={inter.variable}>
-      <body className="font-sans antialiased">
+    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

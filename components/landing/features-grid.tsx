@@ -1,0 +1,130 @@
+'use client';
+
+import {
+  FileText,
+  HardHat,
+  CalendarDays,
+  MapPin,
+  Globe,
+  Target,
+  Mail,
+  Star,
+  FileImage,
+  CreditCard,
+  Bot,
+} from 'lucide-react';
+
+const featureCards = [
+  {
+    icon: FileText,
+    title: 'Devis & Factures',
+    desc: 'Creez, envoyez et suivez vos devis et factures en quelques clics.',
+  },
+  {
+    icon: HardHat,
+    title: 'Suivi chantiers',
+    desc: 'Pilotez vos projets avec un suivi en temps reel.',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Planning',
+    desc: 'Planifiez vos interventions et gerez vos equipes.',
+  },
+  {
+    icon: MapPin,
+    title: 'Carte interactive',
+    desc: 'Visualisez tous vos chantiers et prospects sur une carte.',
+  },
+  {
+    icon: Globe,
+    title: 'Site vitrine',
+    desc: 'Votre site web professionnel genere automatiquement.',
+  },
+  {
+    icon: Target,
+    title: 'Prospection CRM',
+    desc: 'Pipeline commercial avec suivi des leads en kanban.',
+  },
+  {
+    icon: Mail,
+    title: 'Emails integres',
+    desc: 'Envoyez et recevez vos emails directement dans BatiFlow.',
+  },
+  {
+    icon: Star,
+    title: 'Avis Google',
+    desc: 'Collectez et gerez vos avis clients automatiquement.',
+  },
+  {
+    icon: FileImage,
+    title: 'Plans & Rendus',
+    desc: 'Stockez et partagez vos plans, photos et documents.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Paiements Stripe',
+    desc: 'Acceptez les paiements en ligne par carte bancaire.',
+    special: 'stripe',
+  },
+  {
+    icon: Bot,
+    title: 'Agents IA',
+    desc: 'Des assistants intelligents qui automatisent vos taches.',
+    special: 'ai',
+  },
+];
+
+export function FeaturesGrid() {
+  return (
+    <section id="features" className="py-24 bg-[var(--landing-white)]">
+      <div className="max-w-[1200px] mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
+            Tout ce dont vous avez besoin,{' '}
+            <em className="italic text-[var(--landing-accent)]">rien de plus</em>
+          </h2>
+          <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
+            11 modules integres pour couvrir 100% de votre activite, de la prospection a la comptabilite.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {featureCards.map((card) => (
+            <div
+              key={card.title}
+              className={`group p-6 rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                card.special === 'stripe'
+                  ? 'bg-gradient-to-br from-[#635bff]/10 to-[#635bff]/5 border-[#635bff]/20 hover:border-[#635bff]/40'
+                  : card.special === 'ai'
+                  ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
+                  : 'bg-[var(--landing-off)] border-[var(--landing-border)] hover:border-[var(--landing-accent)]/30'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
+                  card.special === 'stripe'
+                    ? 'bg-[#635bff]/20'
+                    : card.special === 'ai'
+                    ? 'bg-emerald-500/20'
+                    : 'bg-[var(--landing-stone)]'
+                }`}
+              >
+                <card.icon
+                  className={`w-5 h-5 ${
+                    card.special === 'stripe'
+                      ? 'text-[#635bff]'
+                      : card.special === 'ai'
+                      ? 'text-emerald-600'
+                      : 'text-[var(--landing-muted)] group-hover:text-[var(--landing-accent)]'
+                  } transition-colors`}
+                />
+              </div>
+              <h3 className="font-semibold text-[var(--landing-text)] mb-1">{card.title}</h3>
+              <p className="text-sm text-[var(--landing-muted)] leading-relaxed">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
