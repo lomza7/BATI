@@ -105,7 +105,7 @@ export function Pricing() {
               </ul>
 
               <Link
-                href="/dashboard"
+                href="/signup"
                 className={`block text-center py-3 rounded-full font-medium text-sm transition-colors ${
                   plan.popular
                     ? 'bg-[var(--landing-accent)] text-white hover:bg-[#b94800]'

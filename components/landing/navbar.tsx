@@ -89,13 +89,13 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-3">
           <Link
-            href="/dashboard"
+            href="/login"
             className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors px-4 py-2"
           >
             Connexion
           </Link>
           <Link
-            href="/dashboard"
+            href="/signup"
             className="text-sm font-medium text-white bg-[var(--landing-accent)] hover:bg-[#b94800] transition-colors px-5 py-2.5 rounded-full"
           >
             Essai gratuit
@@ -138,14 +138,14 @@ export function Navbar() {
               Tarifs
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className="block text-sm text-[var(--landing-muted)] py-2"
               onClick={() => setMobileOpen(false)}
             >
               Connexion
             </Link>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="block text-center text-sm font-medium text-white bg-[var(--landing-accent)] py-3 rounded-full"
               onClick={() => setMobileOpen(false)}
             >

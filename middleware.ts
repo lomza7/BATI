@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export default function middleware(_request: NextRequest) {
+const publicPaths = ['/', '/login', '/signup'];
+
+export default function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (publicPaths.includes(pathname)) {
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 

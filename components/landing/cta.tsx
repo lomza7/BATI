@@ -13,7 +13,7 @@ export function CTA() {
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            href="/dashboard"
+            href="/signup"
             className="inline-flex items-center gap-2 px-8 py-3.5 bg-[var(--landing-accent)] text-white rounded-full font-medium text-sm hover:bg-[#b94800] transition-colors"
           >
             Essai gratuit 30 jours
