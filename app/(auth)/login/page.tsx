@@ -92,7 +92,7 @@ export default function LoginPage() {
               Content de vous revoir
             </h1>
             <p className="text-muted-foreground">
-              Connectez-vous pour acceder a votre espace
+              Connectez-vous pour accèder a votre espace
             </p>
           </div>
 
@@ -168,7 +168,7 @@ export default function LoginPage() {
               href="/signup"
               className="font-medium text-primary hover:text-primary/80 transition-colors"
             >
-              Creer un compte gratuitement
+              Créer un compte gratuitement
             </Link>
           </p>
         </div>
