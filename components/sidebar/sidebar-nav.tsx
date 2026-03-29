@@ -2,23 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import {
-  LayoutDashboard,
-  FileText,
-  Receipt,
-  HardHat,
-  CalendarDays,
-  MapPin,
-  Globe,
-  Users,
-  Mail,
-  Star,
-  Paintbrush,
-  Bot,
-  CreditCard,
-  RefreshCw,
-  Calculator,
-} from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -37,6 +21,7 @@ const navGroups: NavGroup[] = [
     title: 'Principal',
     items: [
       { label: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Mes taches', href: '/taches', icon: CheckSquare },
       { label: 'Devis', href: '/devis', icon: FileText },
       { label: 'Factures', href: '/factures', icon: Receipt },
     ],
