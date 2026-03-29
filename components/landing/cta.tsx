@@ -6,10 +6,10 @@ export function CTA() {
     <section className="py-12 sm:py-20 bg-[var(--landing-text)]">
       <div className="max-w-[800px] mx-auto px-6 text-center">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-white mb-4">
-          Pret a simplifier votre gestion ?
+          Prêt a simplifier votre gestion ?
         </h2>
         <p className="text-[#a0a0a0] mb-8 max-w-md mx-auto">
-          Rejoignez 2 400+ artisans qui gerent leur activite plus efficacement avec BatiFlow.
+          Rejoignez 2 400+ artisans qui gèrent leur activité plus efficacement avec BatiFlow.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
