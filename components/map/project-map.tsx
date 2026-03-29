@@ -41,7 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
-function loadLeaflet(): Promise<typeof import('leaflet')> {
+function loadLeaflet(): Promise<any> {
   if ((window as any).L) return Promise.resolve((window as any).L);
 
   return new Promise((resolve, reject) => {
