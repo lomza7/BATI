@@ -19,8 +19,8 @@ export function Hero() {
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Devis, factures, chantiers, planning, prospection, site web, comptabilite
-            &mdash; tout est reuni dans une seule plateforme pensee pour les artisans.
+            Devis, factures, chantiers, planning, prospection, site web, comptabilité
+            &mdash; tout est reuni dans une seule plateforme pensée pour les artisans.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
