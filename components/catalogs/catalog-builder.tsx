@@ -18,6 +18,7 @@ interface Collection {
   name: string;
   description: string;
   color: string;
+  emoji: string;
 }
 
 interface LinkedCollection extends Collection {
@@ -247,7 +248,11 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
                     className="h-8 w-8 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: col.color + '15' }}
                   >
-                    <Package className="h-4 w-4" style={{ color: col.color }} />
+                    {col.emoji ? (
+                      <span className="text-lg">{col.emoji}</span>
+                    ) : (
+                      <Package className="h-4 w-4" style={{ color: col.color }} />
+                    )}
                   </div>
                   <span className="text-sm font-medium text-foreground">{col.name}</span>
                   <Plus className="h-4 w-4 text-muted-foreground ml-auto" />
@@ -284,7 +289,11 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
                   className="h-8 w-8 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: collection.color + '15' }}
                 >
-                  <Package className="h-4 w-4" style={{ color: collection.color }} />
+                  {collection.emoji ? (
+                    <span className="text-lg">{collection.emoji}</span>
+                  ) : (
+                    <Package className="h-4 w-4" style={{ color: collection.color }} />
+                  )}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-foreground">{collection.name}</p>

@@ -8,12 +8,14 @@ import { CollectionsPanel } from '@/components/catalogs/collections-panel';
 import { CatalogBuilder } from '@/components/catalogs/catalog-builder';
 import { SendCatalogDialog } from '@/components/catalogs/send-catalog-dialog';
 import { SendsHistory } from '@/components/catalogs/sends-history';
+import { EmojiPicker } from '@/components/catalogs/emoji-picker';
 import { formatDate } from '@/lib/constants';
 
 interface Catalog {
   id: string;
   name: string;
   description: string;
+  emoji: string;
   status: string;
   created_at: string;
   collections_count?: number;
@@ -32,6 +34,7 @@ export default function CataloguesPage() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [newEmoji, setNewEmoji] = useState('');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   const fetchCatalogs = useCallback(async () => {
@@ -62,7 +65,7 @@ export default function CataloguesPage() {
     if (!user || !newName.trim()) return;
     const { data } = await supabase
       .from('catalogs')
-      .insert({ user_id: user.id, name: newName.trim(), description: newDesc.trim() })
+      .insert({ user_id: user.id, name: newName.trim(), description: newDesc.trim(), emoji: newEmoji })
       .select()
       .maybeSingle();
     if (data) {
@@ -185,17 +188,20 @@ export default function CataloguesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {showNewDialog && (
             <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 animate-fade-up">
-              <input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Nom du catalogue..."
-                className="w-full text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') createCatalog();
-                  if (e.key === 'Escape') setShowNewDialog(false);
-                }}
-              />
+              <div className="flex items-center gap-3">
+                <EmojiPicker value={newEmoji} onChange={setNewEmoji} size="sm" />
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nom du catalogue..."
+                  className="flex-1 text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') createCatalog();
+                    if (e.key === 'Escape') setShowNewDialog(false);
+                  }}
+                />
+              </div>
               <textarea
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
@@ -229,7 +235,11 @@ export default function CataloguesPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <FolderOpen className="h-5 w-5 text-primary" />
+                  {catalog.emoji ? (
+                    <span className="text-xl">{catalog.emoji}</span>
+                  ) : (
+                    <FolderOpen className="h-5 w-5 text-primary" />
+                  )}
                 </div>
                 <div className="relative">
                   <button

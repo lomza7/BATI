@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Trash2, GripVertical, ImagePlus, Euro, Check, X, Packa
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/constants';
+import { ImageUpload } from './image-upload';
 
 const AVAILABILITY_OPTIONS = [
   { value: 'in_stock', label: 'En stock', color: 'bg-emerald-50 text-emerald-700' },
@@ -223,8 +224,6 @@ function ProductCard({
   const [name, setName] = useState(product.name);
   const [desc, setDesc] = useState(product.description);
   const [price, setPrice] = useState(product.price.toString());
-  const [imageUrl, setImageUrl] = useState(product.image_url);
-  const [showImageInput, setShowImageInput] = useState(false);
 
   const availability = AVAILABILITY_OPTIONS.find((a) => a.value === product.availability) || AVAILABILITY_OPTIONS[0];
 
@@ -246,68 +245,13 @@ function ProductCard({
         isDragging ? 'opacity-40 scale-95' : ''
       } ${isDragOver ? 'border-primary shadow-lg scale-[1.02]' : 'border-border hover:shadow-md hover:border-primary/20'}`}
     >
-      <div className="relative aspect-[4/3] bg-muted/30 overflow-hidden">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <button
-            onClick={() => setShowImageInput(true)}
-            className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/20 transition-all"
-          >
-            <ImagePlus className="h-8 w-8" />
-            <span className="text-xs">Ajouter une photo</span>
-          </button>
-        )}
-
-        {showImageInput && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 gap-3 animate-in fade-in duration-150">
-            <p className="text-xs font-medium text-foreground">URL de l&apos;image</p>
-            <input
-              autoFocus
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full h-9 rounded-lg border border-border px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onUpdate({ image_url: imageUrl });
-                  setShowImageInput(false);
-                }
-                if (e.key === 'Escape') setShowImageInput(false);
-              }}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowImageInput(false)}
-                className="h-7 px-3 rounded-md text-xs text-muted-foreground hover:text-foreground"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => { onUpdate({ image_url: imageUrl }); setShowImageInput(false); }}
-                className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium"
-              >
-                Valider
-              </button>
-            </div>
-          </div>
-        )}
-
-        {imageUrl && (
-          <button
-            onClick={() => setShowImageInput(true)}
-            className="absolute top-2 right-2 h-7 w-7 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-black/70"
-          >
-            <ImagePlus className="h-3.5 w-3.5" />
-          </button>
-        )}
-
+      <div className="relative">
+        <ImageUpload
+          value={product.image_url}
+          onChange={(url) => onUpdate({ image_url: url })}
+        />
         <div
-          className="absolute top-2 left-2 h-7 w-7 rounded-lg bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all"
+          className="absolute top-2 left-2 h-7 w-7 rounded-lg bg-white/80 backdrop-blur-sm flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-all z-10"
         >
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
         </div>

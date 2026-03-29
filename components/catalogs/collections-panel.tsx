@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Palette, Trash2, Package, GripVertical, ChevronRight }
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { ProductsGrid } from './products-grid';
+import { EmojiPicker } from './emoji-picker';
 
 const COLORS = [
   '#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6',
@@ -16,6 +17,7 @@ interface Collection {
   name: string;
   description: string;
   color: string;
+  emoji: string;
   sort_order: number;
   catalog_products: { count: number }[];
 }
@@ -33,6 +35,7 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState('#3b82f6');
+  const [newEmoji, setNewEmoji] = useState('');
   const [activeCollection, setActiveCollection] = useState<Collection | null>(null);
 
   const productCount = useCallback((c: Collection) => {
@@ -47,6 +50,7 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
         user_id: user.id,
         name: newName.trim(),
         color: newColor,
+        emoji: newEmoji,
         sort_order: items.length,
       })
       .select('*, catalog_products(count)')
@@ -111,17 +115,20 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
 
       {showNew && (
         <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 animate-fade-up">
-          <input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nom de la collection..."
-            className="w-full text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') createCollection();
-              if (e.key === 'Escape') setShowNew(false);
-            }}
-          />
+          <div className="flex items-center gap-3">
+            <EmojiPicker value={newEmoji} onChange={setNewEmoji} size="sm" />
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nom de la collection..."
+              className="flex-1 text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') createCollection();
+                if (e.key === 'Escape') setShowNew(false);
+              }}
+            />
+          </div>
           <div className="flex items-center gap-2 mt-3">
             <Palette className="h-4 w-4 text-muted-foreground" />
             <div className="flex gap-1.5">
@@ -187,7 +194,11 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
                 className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: collection.color + '15' }}
               >
-                <Package className="h-5 w-5" style={{ color: collection.color }} />
+                {collection.emoji ? (
+                  <span className="text-xl">{collection.emoji}</span>
+                ) : (
+                  <Package className="h-5 w-5" style={{ color: collection.color }} />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-foreground">{collection.name}</h3>
