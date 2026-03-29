@@ -29,7 +29,7 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="py-16 bg-[var(--landing-off)] border-t border-[var(--landing-border)]">
+    <footer className="py-10 sm:py-16 bg-[var(--landing-off)] border-t border-[var(--landing-border)]">
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">

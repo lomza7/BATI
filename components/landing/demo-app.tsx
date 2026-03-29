@@ -23,10 +23,10 @@ export function DemoApp() {
   const [active, setActive] = useState('devis');
 
   return (
-    <section id="demo" className="py-24 bg-[var(--landing-white)]">
-      <div className="max-w-[1200px] mx-auto px-6">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
+    <section id="demo" className="py-12 sm:py-24 bg-[var(--landing-white)]">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
             Explorez <em className="italic text-[var(--landing-accent)]">l&apos;application</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
@@ -34,17 +34,17 @@ export function DemoApp() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[var(--landing-border)] bg-white shadow-2xl shadow-black/5 overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--landing-border)] bg-[var(--landing-off)]">
+        <div className="rounded-xl sm:rounded-2xl border border-[var(--landing-border)] bg-white shadow-2xl shadow-black/5 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 border-b border-[var(--landing-border)] bg-[var(--landing-off)]">
             <div className="flex gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-[#ff5f57]" />
-              <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
-              <span className="w-3 h-3 rounded-full bg-[#28c840]" />
+              <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#ff5f57]" />
+              <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#febc2e]" />
+              <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#28c840]" />
             </div>
-            <span className="text-xs text-[var(--landing-muted)] ml-3 font-mono">app.batiflow.fr</span>
+            <span className="text-[10px] sm:text-xs text-[var(--landing-muted)] ml-2 sm:ml-3 font-mono">app.batiflow.fr</span>
           </div>
 
-          <div className="flex min-h-[500px]">
+          <div className="flex flex-col md:flex-row md:min-h-[500px]">
             <aside className="w-[200px] shrink-0 border-r border-[var(--landing-border)] bg-[var(--landing-off)] p-3 space-y-0.5 hidden md:block">
               <div className="flex items-center gap-2 px-3 py-2 mb-3">
                 <div className="w-6 h-6 bg-[var(--landing-accent)] rounded-md flex items-center justify-center">
@@ -68,24 +68,26 @@ export function DemoApp() {
               ))}
             </aside>
 
-            <div className="md:hidden px-3 py-2 border-b border-[var(--landing-border)] bg-[var(--landing-off)] overflow-x-auto flex gap-1">
-              {views.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => setActive(v.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
-                    active === v.id
-                      ? 'bg-[var(--landing-accent)] text-white'
-                      : 'bg-white text-[var(--landing-muted)] border border-[var(--landing-border)]'
-                  }`}
-                >
-                  <v.icon className="w-3 h-3" />
-                  {v.label}
-                </button>
-              ))}
+            <div className="md:hidden px-3 py-2 border-b border-[var(--landing-border)] bg-[var(--landing-off)] overflow-x-auto">
+              <div className="flex gap-1 w-max">
+                {views.map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => setActive(v.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
+                      active === v.id
+                        ? 'bg-[var(--landing-accent)] text-white'
+                        : 'bg-white text-[var(--landing-muted)] border border-[var(--landing-border)]'
+                    }`}
+                  >
+                    <v.icon className="w-3 h-3" />
+                    {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex-1 p-6 overflow-auto">
+            <div className="flex-1 p-4 md:p-6 overflow-x-auto min-h-[400px]">
               <DemoViewContent view={active} />
             </div>
           </div>
@@ -130,13 +132,13 @@ function DemoViewContent({ view }: { view: string }) {
 
 function ViewHeader({ title, count }: { title: string; count?: number }) {
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
       <div>
-        <h3 className="text-lg font-semibold text-[var(--landing-text)]">{title}</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-[var(--landing-text)]">{title}</h3>
         {count !== undefined && <span className="text-xs text-[var(--landing-muted)]">{count} elements</span>}
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--landing-border)] bg-white">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--landing-border)] bg-white">
           <Search className="w-3.5 h-3.5 text-[var(--landing-muted)]" />
           <span className="text-[11px] text-[var(--landing-muted)]">Rechercher...</span>
         </div>
@@ -174,13 +176,13 @@ function DevisView() {
   return (
     <div>
       <ViewHeader title="Devis" count={devis.length} />
-      <div className="border border-[var(--landing-border)] rounded-xl overflow-hidden">
+      <div className="hidden sm:block border border-[var(--landing-border)] rounded-xl overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-[var(--landing-off)] text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider">
               <th className="px-4 py-3">Numero</th>
               <th className="px-4 py-3">Client</th>
-              <th className="px-4 py-3 hidden sm:table-cell">Objet</th>
+              <th className="px-4 py-3 hidden md:table-cell">Objet</th>
               <th className="px-4 py-3 text-right">Montant</th>
               <th className="px-4 py-3">Statut</th>
             </tr>
@@ -190,13 +192,27 @@ function DevisView() {
               <tr key={d.num} className="border-t border-[var(--landing-border)] hover:bg-[var(--landing-off)]/50 transition-colors">
                 <td className="px-4 py-3 text-xs font-mono text-[var(--landing-accent)]">{d.num}</td>
                 <td className="px-4 py-3 text-xs font-medium text-[var(--landing-text)]">{d.client}</td>
-                <td className="px-4 py-3 text-xs text-[var(--landing-muted)] hidden sm:table-cell">{d.objet}</td>
+                <td className="px-4 py-3 text-xs text-[var(--landing-muted)] hidden md:table-cell">{d.objet}</td>
                 <td className="px-4 py-3 text-xs font-semibold text-[var(--landing-text)] text-right">{d.montant}</td>
                 <td className="px-4 py-3"><StatusBadge label={d.status} variant={d.variant} /></td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="sm:hidden space-y-2">
+        {devis.map((d) => (
+          <div key={d.num} className="p-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-mono text-[var(--landing-accent)]">{d.num}</span>
+              <StatusBadge label={d.status} variant={d.variant} />
+            </div>
+            <div className="text-xs font-medium text-[var(--landing-text)]">{d.client}</div>
+            <div className="text-[10px] text-[var(--landing-muted)]">{d.objet}</div>
+            <div className="text-xs font-semibold text-[var(--landing-text)] mt-1">{d.montant}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -238,41 +254,27 @@ function ChantiersView() {
 }
 
 function PlanningView() {
-  const days = ['Lun 24', 'Mar 25', 'Mer 26', 'Jeu 27', 'Ven 28'];
-  const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+  const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+  const events = [
+    { name: 'Dupont - Renovation SdB', time: '08:00 - 12:00', color: 'bg-[var(--landing-accent)]', day: 'Lun 24' },
+    { name: 'Bernard - Clim', time: '09:00 - 11:00', color: 'bg-blue-500', day: 'Mar 25' },
+    { name: 'Martin - Toiture', time: '10:00 - 14:00', color: 'bg-emerald-500', day: 'Mer 26' },
+    { name: 'Leroy - Plomberie', time: '14:00 - 17:00', color: 'bg-amber-500', day: 'Jeu 27' },
+  ];
 
   return (
     <div>
       <ViewHeader title="Planning" />
-      <div className="border border-[var(--landing-border)] rounded-xl overflow-hidden">
-        <div className="grid grid-cols-6 text-center bg-[var(--landing-off)]">
-          <div className="p-2 text-[10px] text-[var(--landing-muted)]" />
-          {days.map((d) => (
-            <div key={d} className="p-2 text-[10px] font-medium text-[var(--landing-text)] border-l border-[var(--landing-border)]">{d}</div>
-          ))}
-        </div>
-        <div className="relative">
-          {hours.map((h) => (
-            <div key={h} className="grid grid-cols-6 border-t border-[var(--landing-border)]">
-              <div className="p-2 text-[10px] text-[var(--landing-muted)] text-right pr-3">{h}</div>
-              {days.map((d) => (
-                <div key={d} className="h-8 border-l border-[var(--landing-border)]" />
-              ))}
+      <div className="space-y-2">
+        {events.map((ev) => (
+          <div key={ev.name} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
+            <div className={`w-1 h-10 rounded-full ${ev.color}`} />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-[var(--landing-text)] truncate">{ev.name}</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{ev.day} | {ev.time}</div>
             </div>
-          ))}
-          <div className="absolute top-[24px] left-[calc(16.67%+4px)] right-0 w-[15%] h-[48px] bg-[var(--landing-accent)]/15 border-l-2 border-[var(--landing-accent)] rounded-r-md p-1">
-            <span className="text-[8px] font-medium text-[var(--landing-accent)] block">Dupont</span>
-            <span className="text-[7px] text-[var(--landing-muted)]">08:00 - 12:00</span>
           </div>
-          <div className="absolute top-[56px] left-[calc(33.33%+4px)] right-0 w-[15%] h-[32px] bg-blue-500/15 border-l-2 border-blue-500 rounded-r-md p-1">
-            <span className="text-[8px] font-medium text-blue-600 block">Bernard</span>
-            <span className="text-[7px] text-[var(--landing-muted)]">09:00 - 11:00</span>
-          </div>
-          <div className="absolute top-[88px] left-[calc(50%+4px)] right-0 w-[15%] h-[64px] bg-emerald-500/15 border-l-2 border-emerald-500 rounded-r-md p-1">
-            <span className="text-[8px] font-medium text-emerald-600 block">Martin</span>
-            <span className="text-[7px] text-[var(--landing-muted)]">10:00 - 14:00</span>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -282,7 +284,7 @@ function CarteView() {
   return (
     <div>
       <ViewHeader title="Carte des chantiers" />
-      <div className="h-[380px] rounded-xl bg-[#e8e4da] relative overflow-hidden border border-[var(--landing-border)]">
+      <div className="h-[260px] sm:h-[380px] rounded-xl bg-[#e8e4da] relative overflow-hidden border border-[var(--landing-border)]">
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 30px, #bbb 30px, #bbb 31px), repeating-linear-gradient(90deg, transparent, transparent 30px, #bbb 30px, #bbb 31px)' }} />
         {[
           { top: '15%', left: '25%', color: 'bg-emerald-500', label: 'Dupont' },
@@ -298,9 +300,9 @@ function CarteView() {
             </div>
           </div>
         ))}
-        <div className="absolute top-3 left-3 flex gap-2">
+        <div className="absolute top-3 left-3 flex flex-wrap gap-1 sm:gap-2">
           {['Tous', 'En cours', 'Termines', 'Prospects'].map((f) => (
-            <button key={f} className="px-2 py-1 rounded-md bg-white/90 text-[9px] font-medium text-[var(--landing-text)] shadow-sm border border-[var(--landing-border)]">
+            <button key={f} className="px-2 py-1 rounded-md bg-white/90 text-[8px] sm:text-[9px] font-medium text-[var(--landing-text)] shadow-sm border border-[var(--landing-border)]">
               {f}
             </button>
           ))}
@@ -348,9 +350,9 @@ function ProspectionView() {
   return (
     <div>
       <ViewHeader title="Prospection CRM" count={11} />
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
         {columns.map((col) => (
-          <div key={col.title} className="min-w-[180px] flex-1">
+          <div key={col.title} className="min-w-[140px] sm:min-w-[160px] flex-1">
             <div className="flex items-center gap-2 mb-3">
               <div className={`w-2 h-2 rounded-full ${col.color}`} />
               <span className="text-[10px] font-semibold text-[var(--landing-text)] uppercase tracking-wider">{col.title}</span>
@@ -490,21 +492,22 @@ function PaiementView() {
   return (
     <div>
       <ViewHeader title="Paiements" count={payments.length} />
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="p-3 sm:p-4 rounded-xl bg-emerald-50 border border-emerald-200">
           <div className="text-[10px] text-emerald-600 font-medium mb-1">Encaisse</div>
-          <div className="text-xl font-bold text-emerald-700">14 800 EUR</div>
+          <div className="text-lg sm:text-xl font-bold text-emerald-700">14 800 EUR</div>
         </div>
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+        <div className="p-3 sm:p-4 rounded-xl bg-amber-50 border border-amber-200">
           <div className="text-[10px] text-amber-600 font-medium mb-1">En attente</div>
-          <div className="text-xl font-bold text-amber-700">4 200 EUR</div>
+          <div className="text-lg sm:text-xl font-bold text-amber-700">4 200 EUR</div>
         </div>
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200">
+        <div className="p-3 sm:p-4 rounded-xl bg-red-50 border border-red-200">
           <div className="text-[10px] text-red-600 font-medium mb-1">En retard</div>
-          <div className="text-xl font-bold text-red-700">15 800 EUR</div>
+          <div className="text-lg sm:text-xl font-bold text-red-700">15 800 EUR</div>
         </div>
       </div>
-      <div className="border border-[var(--landing-border)] rounded-xl overflow-hidden">
+
+      <div className="hidden sm:block border border-[var(--landing-border)] rounded-xl overflow-hidden">
         <table className="w-full text-left">
           <thead>
             <tr className="bg-[var(--landing-off)] text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider">
@@ -525,6 +528,21 @@ function PaiementView() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="sm:hidden space-y-2">
+        {payments.map((p) => (
+          <div key={p.client + p.date} className="p-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-[var(--landing-text)]">{p.client}</span>
+              <StatusBadge label={p.status} variant={p.variant} />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-[var(--landing-muted)]">{p.date}</span>
+              <span className="text-xs font-semibold text-[var(--landing-text)]">{p.montant}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

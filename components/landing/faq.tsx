@@ -30,10 +30,10 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="py-24 bg-[var(--landing-off)]">
+    <section id="faq" className="py-12 sm:py-24 bg-[var(--landing-off)]">
       <div className="max-w-[800px] mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
+        <div className="text-center mb-10 sm:mb-16">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
             Questions <em className="italic text-[var(--landing-accent)]">frequentes</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg">

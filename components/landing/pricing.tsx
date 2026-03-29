@@ -59,10 +59,10 @@ const plans = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-24 bg-[var(--landing-off)]">
+    <section id="pricing" className="py-12 sm:py-24 bg-[var(--landing-off)]">
       <div className="max-w-[1200px] mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
+        <div className="text-center mb-10 sm:mb-16">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
             Des tarifs <em className="italic text-[var(--landing-accent)]">transparents</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
@@ -74,9 +74,9 @@ export function Pricing() {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`relative p-8 rounded-2xl border ${
+              className={`relative p-6 sm:p-8 rounded-2xl border ${
                 plan.popular
-                  ? 'border-[var(--landing-accent)] bg-white shadow-xl shadow-[var(--landing-accent)]/10 scale-[1.02]'
+                  ? 'border-[var(--landing-accent)] bg-white shadow-xl shadow-[var(--landing-accent)]/10 md:scale-[1.02]'
                   : 'border-[var(--landing-border)] bg-white'
               }`}
             >

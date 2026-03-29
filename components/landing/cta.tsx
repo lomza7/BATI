@@ -3,9 +3,9 @@ import { ArrowRight } from 'lucide-react';
 
 export function CTA() {
   return (
-    <section className="py-20 bg-[var(--landing-text)]">
+    <section className="py-12 sm:py-20 bg-[var(--landing-text)]">
       <div className="max-w-[800px] mx-auto px-6 text-center">
-        <h2 className="text-3xl md:text-4xl font-serif text-white mb-4">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-white mb-4">
           Pret a simplifier votre gestion ?
         </h2>
         <p className="text-[#a0a0a0] mb-8 max-w-md mx-auto">

@@ -20,14 +20,14 @@ interface FeatureSectionProps {
 
 function FeatureSection({ id, badge, title, titleAccent, description, bulletPoints, reversed, visual }: FeatureSectionProps) {
   return (
-    <section id={id} className="py-24 bg-[var(--landing-off)]">
+    <section id={id} className="py-12 sm:py-24 bg-[var(--landing-off)]">
       <div className="max-w-[1200px] mx-auto px-6">
-        <div className={`flex flex-col ${reversed ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-16`}>
-          <div className="flex-1 space-y-6">
+        <div className={`flex flex-col ${reversed ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-8 sm:gap-16`}>
+          <div className="flex-1 space-y-4 sm:space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-xs font-medium">
               {badge}
             </div>
-            <h2 className="text-3xl md:text-4xl font-serif text-[var(--landing-text)]">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-[var(--landing-text)]">
               {title}{' '}
               <em className="italic text-[var(--landing-accent)]">{titleAccent}</em>
             </h2>
@@ -50,16 +50,16 @@ function FeatureSection({ id, badge, title, titleAccent, description, bulletPoin
 
 function MockBrowser({ children, url }: { children: React.ReactNode; url?: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--landing-border)] bg-white shadow-xl overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--landing-border)] bg-[var(--landing-off)]">
+    <div className="rounded-xl sm:rounded-2xl border border-[var(--landing-border)] bg-white shadow-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 border-b border-[var(--landing-border)] bg-[var(--landing-off)]">
         <div className="flex gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-          <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+          <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ff5f57]" />
+          <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#febc2e]" />
+          <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#28c840]" />
         </div>
-        {url && <span className="text-[10px] text-[var(--landing-muted)] font-mono ml-2">{url}</span>}
+        {url && <span className="text-[9px] sm:text-[10px] text-[var(--landing-muted)] font-mono ml-2">{url}</span>}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-3 sm:p-6">{children}</div>
     </div>
   );
 }
@@ -121,14 +121,14 @@ export function ProspectionSection() {
       reversed
       visual={
         <MockBrowser>
-          <div className="flex gap-3">
+          <div className="flex gap-3 overflow-x-auto pb-1">
             {['Nouveau', 'Contacte', 'Devis envoye', 'Gagne'].map((col) => (
-              <div key={col} className="flex-1 space-y-2">
-                <div className="text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider">{col}</div>
+              <div key={col} className="min-w-[100px] flex-1 space-y-2">
+                <div className="text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider whitespace-nowrap">{col}</div>
                 {[1, 2].map((i) => (
-                  <div key={i} className="p-2.5 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
-                    <div className="h-2 w-16 rounded bg-[var(--landing-border)] mb-1.5" />
-                    <div className="h-1.5 w-10 rounded bg-[var(--landing-stone)]" />
+                  <div key={i} className="p-2 sm:p-2.5 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+                    <div className="h-2 w-12 sm:w-16 rounded bg-[var(--landing-border)] mb-1.5" />
+                    <div className="h-1.5 w-8 sm:w-10 rounded bg-[var(--landing-stone)]" />
                   </div>
                 ))}
               </div>

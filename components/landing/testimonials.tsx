@@ -21,10 +21,10 @@ export function Testimonials() {
   ];
 
   return (
-    <section id="testimonials" className="py-24 bg-[var(--landing-white)]">
+    <section id="testimonials" className="py-12 sm:py-24 bg-[var(--landing-white)]">
       <div className="max-w-[1200px] mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
+        <div className="text-center mb-10 sm:mb-16">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
             Ils nous font <em className="italic text-[var(--landing-accent)]">confiance</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
@@ -34,7 +34,7 @@ export function Testimonials() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {testimonials.map((t) => (
-            <div key={t.name} className="p-8 rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
+            <div key={t.name} className="p-5 sm:p-8 rounded-2xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
               <div className="flex items-center gap-1 mb-4">
                 {[1, 2, 3, 4, 5].map((s) => (
                   <span key={s} className="text-amber-500 text-sm">&#9733;</span>
