@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Hexagon, Eye, EyeOff, ArrowRight, Loader as Loader2 } from 'lucide-react';
+import { Hexagon, Eye, EyeOff, ArrowRight, ArrowLeft, Loader as Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -72,7 +72,13 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[var(--landing-off)]">
+      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-[var(--landing-off)] relative">
+        <Link
+          href="/"
+          className="absolute top-6 left-6 h-9 w-9 rounded-lg border border-border bg-white flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shadow-sm"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
         <div className="w-full max-w-[420px]">
           <div className="lg:hidden flex items-center gap-2.5 mb-12">
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
