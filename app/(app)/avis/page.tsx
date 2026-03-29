@@ -69,7 +69,7 @@ export default function AvisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Avis Google" description="Gerez et repondez a vos avis clients">
+      <PageHeader title="Avis Google" description="Gérez et répondez à vos avis clients">
         <Button onClick={() => setShowRequest(true)} className="gap-2">
           <Send className="h-4 w-4" /> Demander un avis
         </Button>
