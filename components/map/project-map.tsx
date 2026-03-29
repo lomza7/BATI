@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Loader as Loader2 } from 'lucide-react';
 
 export interface MapProject {
   id: string;
@@ -39,46 +38,56 @@ const STATUS_LABELS: Record<string, string> = {
   en_pause: 'En pause',
 };
 
-function createMarkerIcon(status: string, isSelected: boolean) {
-  const color = STATUS_COLORS[status] || '#94a3b8';
-  const size = isSelected ? 18 : 12;
-  const border = isSelected ? 4 : 3;
+const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
-  return L.divIcon({
-    className: 'custom-map-marker',
-    html: `<div style="
-      width: ${size}px;
-      height: ${size}px;
-      background: ${color};
-      border: ${border}px solid white;
-      border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      transition: all 0.2s;
-    "></div>`,
-    iconSize: [size + border * 2, size + border * 2],
-    iconAnchor: [(size + border * 2) / 2, (size + border * 2) / 2],
+function loadLeaflet(): Promise<typeof import('leaflet')> {
+  if ((window as any).L) return Promise.resolve((window as any).L);
+
+  return new Promise((resolve, reject) => {
+    if (!document.querySelector(`link[href="${LEAFLET_CSS}"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = LEAFLET_CSS;
+      document.head.appendChild(link);
+    }
+
+    const script = document.createElement('script');
+    script.src = LEAFLET_JS;
+    script.onload = () => resolve((window as any).L);
+    script.onerror = reject;
+    document.head.appendChild(script);
   });
 }
 
 export function ProjectMap({ projects, selectedId, onSelect, className, height = '500px' }: ProjectMapProps) {
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const markersRef = useRef<Map<string, any>>(new Map());
+  const leafletRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    let cancelled = false;
+    loadLeaflet().then(L => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      leafletRef.current = L;
 
-    mapRef.current = L.map(containerRef.current, {
-      zoomControl: true,
-      attributionControl: true,
-    }).setView([46.603354, 1.888334], 6);
+      mapRef.current = L.map(containerRef.current, {
+        zoomControl: true,
+        attributionControl: true,
+      }).setView([46.603354, 1.888334], 6);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(mapRef.current);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19,
+      }).addTo(mapRef.current);
+
+      setReady(true);
+    });
 
     return () => {
+      cancelled = true;
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -86,7 +95,8 @@ export function ProjectMap({ projects, selectedId, onSelect, className, height =
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    const L = leafletRef.current;
+    if (!map || !L || !ready) return;
 
     markersRef.current.forEach(marker => marker.remove());
     markersRef.current.clear();
@@ -96,23 +106,33 @@ export function ProjectMap({ projects, selectedId, onSelect, className, height =
 
     const bounds = L.latLngBounds([]);
 
-    geoProjects.forEach(project => {
-      const marker = L.marker([project.lat, project.lng], {
-        icon: createMarkerIcon(project.status, project.id === selectedId),
+    geoProjects.forEach((project: MapProject) => {
+      const color = STATUS_COLORS[project.status] || '#94a3b8';
+      const isSelected = project.id === selectedId;
+      const size = isSelected ? 18 : 12;
+      const border = isSelected ? 4 : 3;
+
+      const icon = L.divIcon({
+        className: 'custom-map-marker',
+        html: `<div style="width:${size}px;height:${size}px;background:${color};border:${border}px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [size + border * 2, size + border * 2],
+        iconAnchor: [(size + border * 2) / 2, (size + border * 2) / 2],
       });
+
+      const marker = L.marker([project.lat, project.lng], { icon });
 
       const statusLabel = STATUS_LABELS[project.status] || project.status;
       const popup = `
-        <div style="min-width: 180px; font-family: system-ui, sans-serif;">
-          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${project.name}</div>
-          ${project.clientName ? `<div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">${project.clientName}</div>` : ''}
-          <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
+        <div style="min-width:180px;font-family:system-ui,sans-serif;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${project.name}</div>
+          ${project.clientName ? `<div style="font-size:12px;color:#6b7280;margin-bottom:4px;">${project.clientName}</div>` : ''}
+          <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">
             ${[project.address, project.city].filter(Boolean).join(', ')}
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${STATUS_COLORS[project.status] || '#94a3b8'}"></span>
-            <span style="font-size: 12px; font-weight: 500;">${statusLabel}</span>
-            <span style="font-size: 11px; color: #9ca3af; margin-left: auto;">${project.progress}%</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
+            <span style="font-size:12px;font-weight:500;">${statusLabel}</span>
+            <span style="font-size:11px;color:#9ca3af;margin-left:auto;">${project.progress}%</span>
           </div>
         </div>
       `;
@@ -133,7 +153,7 @@ export function ProjectMap({ projects, selectedId, onSelect, className, height =
     } else {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
     }
-  }, [projects, selectedId, onSelect]);
+  }, [projects, selectedId, onSelect, ready]);
 
   useEffect(() => {
     if (!selectedId || !mapRef.current) return;
@@ -146,10 +166,13 @@ export function ProjectMap({ projects, selectedId, onSelect, className, height =
   }, [selectedId]);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn('rounded-xl overflow-hidden border border-border', className)}
-      style={{ height, width: '100%' }}
-    />
+    <div className={cn('relative rounded-xl overflow-hidden border border-border', className)} style={{ height, width: '100%' }}>
+      <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+      {!ready && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/80">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    </div>
   );
 }
