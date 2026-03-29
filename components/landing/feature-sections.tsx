@@ -229,11 +229,11 @@ export function AvisSection() {
       badge="Avis Google"
       title="Des avis 5 etoiles,"
       titleAccent="automatiquement"
-      description="Envoyez des demandes d'avis automatiques apres chaque chantier et gerez votre e-reputation depuis BatiFlow."
+      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-reputation depuis BatiFlow."
       bulletPoints={[
         'Envoi automatique post-chantier',
         'Suivi de votre note Google',
-        'Reponses aux avis en un clic',
+        'Réponses aux avis en un clic',
         'Widget avis pour votre site',
       ]}
       visual={
