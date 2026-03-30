@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     --background: 40 20% 99%;
     --foreground: 40 14% 9%;
     --card: 0 0% 100%;
