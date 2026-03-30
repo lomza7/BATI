@@ -40,46 +40,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, company_name, company_activity, onboarding_completed')
-      .eq('id', userId)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, company_name, company_activity, onboarding_completed')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (data) {
-      setProfile(data);
-      if (!data.onboarding_completed) {
-        setShowOnboarding(true);
+      if (error) {
+        console.error('Erreur chargement profil:', error.message);
+        setProfile(null);
+        setShowOnboarding(false);
+        return;
       }
+
+      setProfile(data ?? null);
+      setShowOnboarding(Boolean(data && !data.onboarding_completed));
+    } catch (error) {
+      console.error('Erreur inattendue chargement profil:', error);
+      setProfile(null);
+      setShowOnboarding(false);
     }
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        fetchProfile(s.user.id);
-      }
+    let mounted = true;
+    const loadingSafetyTimer = window.setTimeout(() => {
+      if (!mounted) return;
+      console.error('Auth init timeout: sortie de secours du chargement.');
       setLoading(false);
-    });
+    }, 4000);
+
+    async function syncAuthState(nextSession: Session | null) {
+      if (!mounted) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (nextSession?.user) {
+        setLoading(false);
+        void fetchProfile(nextSession.user.id);
+      } else {
+        setProfile(null);
+        setShowOnboarding(false);
+        setLoading(false);
+      }
+    }
+
+    async function initializeAuth() {
+      try {
+        setLoading(true);
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        await syncAuthState(currentSession);
+      } catch (error) {
+        console.error('Erreur initialisation auth:', error);
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setShowOnboarding(false);
+        setLoading(false);
+      }
+    }
+
+    void initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
-        setSession(s);
-        setUser(s?.user ?? null);
-        if (s?.user) {
-          (async () => {
-            await fetchProfile(s.user.id);
-          })();
-        } else {
-          setProfile(null);
-          setShowOnboarding(false);
-        }
+      (_event, nextSession) => {
+        setLoading(true);
+        void syncAuthState(nextSession);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingSafetyTimer);
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const completeOnboarding = useCallback(() => {
@@ -90,11 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile]);
 
   const signOut = useCallback(async () => {
+    setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setProfile(null);
     setShowOnboarding(false);
+    setLoading(false);
   }, []);
 
   return (

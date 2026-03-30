@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { VoiceQuoteStudio, type VoiceQuoteDraft } from '@/components/devis/voice-quote-studio';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -155,16 +156,28 @@ export default function DevisPage() {
     }
   }
 
+  function applyVoiceDraft(draft: VoiceQuoteDraft) {
+    setNewQuote({
+      title: draft.title,
+      clientName: draft.clientName,
+      description: draft.description,
+    });
+    setLines(draft.lines.map((line) => ({ ...line })));
+    setShowCreate(true);
+  }
+
   const linesTotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Devis" description="Creez et gerez vos devis">
+      <PageHeader title="Devis" description="Creez vos devis a la main ou a la voix, puis gerez leur suivi">
         <Button onClick={() => setShowCreate(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis
         </Button>
       </PageHeader>
+
+      <VoiceQuoteStudio onUseDraft={applyVoiceDraft} />
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">

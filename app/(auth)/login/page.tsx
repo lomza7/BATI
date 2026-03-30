@@ -19,7 +19,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -34,7 +34,21 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    if (!data.session) {
+      setError('Connexion reussie, mais la session n a pas pu etre ouverte. Reessayez.');
+      setLoading(false);
+      return;
+    }
+
+    const { data: sessionState } = await supabase.auth.getSession();
+
+    if (!sessionState.session) {
+      setError('La session utilisateur n est pas encore disponible. Reessayez.');
+      setLoading(false);
+      return;
+    }
+
+    router.replace('/dashboard');
     router.refresh();
   }
 
