@@ -10,13 +10,21 @@ import {
   FileImage,
   CreditCard,
   Bot,
+  Contact,
+  UsersRound,
+  BookOpen,
+  Mic,
 } from 'lucide-react';
 
 const items = [
+  { icon: Mic, label: 'Devis IA vocal' },
   { icon: FileText, label: 'Devis & Factures' },
+  { icon: Contact, label: 'Carnet de contacts' },
   { icon: HardHat, label: 'Suivi chantiers' },
-  { icon: CalendarDays, label: 'Planning' },
+  { icon: CalendarDays, label: 'Planning drag & drop' },
+  { icon: UsersRound, label: 'Equipe & sous-traitants' },
   { icon: MapPin, label: 'Carte interactive' },
+  { icon: BookOpen, label: 'Catalogues produits' },
   { icon: Globe, label: 'Site vitrine' },
   { icon: Target, label: 'Prospection CRM' },
   { icon: Mail, label: 'Emails integres' },

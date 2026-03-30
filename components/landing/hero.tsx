@@ -10,7 +10,7 @@ export function Hero() {
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-sm font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--landing-accent)]" />
-            Nouveau : Agents IA intégrés
+            Nouveau : Devis IA par la voix et les photos
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif leading-[1.1] mb-6 text-[var(--landing-text)]">
@@ -19,8 +19,8 @@ export function Hero() {
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Devis, factures, chantiers, planning, prospection, site web, comptabilité
-            &mdash; tout est reuni dans une seule plateforme pensée pour les artisans.
+            Devis IA vocal, factures, chantiers, planning drag &amp; drop, equipe, contacts, carte, catalogues, prospection
+            &mdash; tout est reuni dans une seule plateforme pensee pour les artisans.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

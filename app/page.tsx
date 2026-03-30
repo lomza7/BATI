@@ -4,6 +4,10 @@ import { Marquee } from '@/components/landing/marquee';
 import { FeaturesGrid } from '@/components/landing/features-grid';
 import {
   DevisSection,
+  ContactsSection,
+  PlanningSection,
+  EquipeSection,
+  CataloguesSection,
   SiteWebSection,
   ProspectionSection,
   EmailSection,
@@ -31,13 +35,17 @@ export default function LandingPage() {
       <FeaturesGrid />
       <DemoApp />
       <DevisSection />
+      <ContactsSection />
+      <PlanningSection />
+      <EquipeSection />
+      <CarteSection />
+      <CataloguesSection />
       <SiteWebSection />
       <ProspectionSection />
       <EmailSection />
       <ComptaSection />
       <AvisSection />
       <PlansSection />
-      <CarteSection />
       <PaiementSection />
       <AbonnementsSection />
       <AgentsSection />

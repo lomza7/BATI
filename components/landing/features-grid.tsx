@@ -12,28 +12,53 @@ import {
   FileImage,
   CreditCard,
   Bot,
+  Mic,
+  Contact,
+  UsersRound,
+  BookOpen,
 } from 'lucide-react';
 
 const featureCards = [
   {
+    icon: Mic,
+    title: 'Devis IA vocal',
+    desc: 'Dictez votre devis, ajoutez des photos, et l IA genere le chiffrage pour vous.',
+    special: 'ai',
+  },
+  {
     icon: FileText,
     title: 'Devis & Factures',
-    desc: 'Devis prepares avec la voix, les photos et l analyse IA avant validation.',
+    desc: 'Creez, envoyez et suivez vos devis et factures en quelques clics.',
+  },
+  {
+    icon: Contact,
+    title: 'Carnet de contacts',
+    desc: 'Clients, prospects et prestataires reunis dans un seul repertoire filtre.',
   },
   {
     icon: HardHat,
     title: 'Suivi chantiers',
-    desc: 'Pilotez vos projets avec un suivi en temps reel.',
+    desc: 'Pilotez vos projets avec progression, budget et documents en temps reel.',
   },
   {
     icon: CalendarDays,
-    title: 'Planning',
-    desc: 'Planifiez vos interventions et gerez vos equipes.',
+    title: 'Planning equipe',
+    desc: 'Vue semaine et mois avec drag & drop pour planifier vos interventions.',
+  },
+  {
+    icon: UsersRound,
+    title: 'Equipe & sous-traitants',
+    desc: 'Gerez salaries, interimaires et sous-traitants avec suivi des heures.',
   },
   {
     icon: MapPin,
     title: 'Carte interactive',
-    desc: 'Visualisez tous vos chantiers et prospects sur une carte.',
+    desc: 'Visualisez tous vos chantiers et prospects sur une carte partageable.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Catalogues produits',
+    desc: 'Creez des catalogues visuels et partagez-les par lien magique a vos clients.',
   },
   {
     icon: Globe,
@@ -84,11 +109,11 @@ export function FeaturesGrid() {
             <em className="italic text-[var(--landing-accent)]">rien de plus</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            11 modules integres pour couvrir 100% de votre activite, de la prospection a la comptabilite.
+            15 modules integres pour couvrir 100% de votre activite, de la prospection a la comptabilite.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           {featureCards.map((card) => (
             <div
               key={card.title}
@@ -96,7 +121,7 @@ export function FeaturesGrid() {
                 card.special === 'stripe'
                   ? 'bg-gradient-to-br from-[#635bff]/10 to-[#635bff]/5 border-[#635bff]/20 hover:border-[#635bff]/40'
                   : card.special === 'ai'
-                  ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40'
+                  ? 'bg-gradient-to-br from-[var(--landing-accent)]/10 to-[var(--landing-accent)]/5 border-[var(--landing-accent)]/20 hover:border-[var(--landing-accent)]/40'
                   : 'bg-[var(--landing-off)] border-[var(--landing-border)] hover:border-[var(--landing-accent)]/30'
               }`}
             >
@@ -105,7 +130,7 @@ export function FeaturesGrid() {
                   card.special === 'stripe'
                     ? 'bg-[#635bff]/20'
                     : card.special === 'ai'
-                    ? 'bg-emerald-500/20'
+                    ? 'bg-[var(--landing-accent)]/20'
                     : 'bg-[var(--landing-stone)]'
                 }`}
               >
@@ -114,7 +139,7 @@ export function FeaturesGrid() {
                     card.special === 'stripe'
                       ? 'text-[#635bff]'
                       : card.special === 'ai'
-                      ? 'text-emerald-600'
+                      ? 'text-[var(--landing-accent)]'
                       : 'text-[var(--landing-muted)] group-hover:text-[var(--landing-accent)]'
                   } transition-colors`}
                 />

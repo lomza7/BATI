@@ -13,6 +13,10 @@ const faqs = [
     answer: 'Absolument. BatiFlow permet l\'import de vos contacts, devis et factures depuis Excel, CSV ou depuis d\'autres logiciels de gestion. Notre equipe peut vous accompagner dans la migration.',
   },
   {
+    question: 'Comment fonctionne le devis IA vocal ?',
+    answer: 'Vous dictez la description du chantier sur votre telephone, ajoutez quelques photos, et l IA analyse tout pour proposer un chiffrage avec lignes de devis, quantites et prix. Vous relisez, ajustez si besoin, et envoyez. Ca fonctionne sur Chrome et Edge.',
+  },
+  {
     question: 'Comment fonctionnent les agents IA ?',
     answer: 'Les agents IA analysent vos donnees (demandes clients, historique de devis) pour generer automatiquement des reponses, devis et relances. Vous gardez toujours le controle et validez avant envoi.',
   },

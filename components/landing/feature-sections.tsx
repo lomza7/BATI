@@ -9,6 +9,16 @@ import {
   Bot,
   Check,
   Wand2,
+  Contact,
+  Phone,
+  MapPin,
+  UsersRound,
+  Clock,
+  CalendarDays,
+  GripVertical,
+  BookOpen,
+  Link2,
+  HardHat,
 } from 'lucide-react';
 
 interface FeatureSectionProps {
@@ -404,6 +414,206 @@ export function CarteSection() {
                 <div className={`w-4 h-4 rounded-full ${pin.color} border-2 border-white shadow-md`} />
               </div>
             ))}
+          </div>
+        </MockBrowser>
+      }
+    />
+  );
+}
+
+export function ContactsSection() {
+  return (
+    <FeatureSection
+      id="contacts"
+      badge="Contacts"
+      title="Votre carnet d'adresses,"
+      titleAccent="toujours a jour"
+      description="Clients, prospects et prestataires reunis dans un seul repertoire. Filtrez par type, consultez l'historique des devis, factures et chantiers lies en un clic."
+      bulletPoints={[
+        'Fiches contacts detaillees (telephone, email, adresse, notes)',
+        'Filtrage par type : client, prospect, prestataire',
+        'Historique complet : devis, factures et chantiers lies',
+        'KPI par contact : CA genere, factures payees',
+      ]}
+      reversed
+      visual={
+        <MockBrowser url="app.batiflow.fr/clients">
+          <div className="space-y-3">
+            <div className="flex gap-2 mb-3">
+              {['Tous', 'Clients', 'Prospects', 'Prestataires'].map((f, i) => (
+                <div key={f} className={`px-3 py-1 rounded-full text-[10px] font-medium ${i === 0 ? 'bg-[var(--landing-accent)] text-white' : 'bg-[var(--landing-off)] border border-[var(--landing-border)] text-[var(--landing-muted)]'}`}>
+                  {f}
+                </div>
+              ))}
+            </div>
+            {[
+              { name: 'M. Dupont', type: 'Client', color: 'bg-blue-100 text-blue-700', phone: '06 12 34 56 78', city: 'Lyon' },
+              { name: 'Mme Bernard', type: 'Prospect', color: 'bg-amber-100 text-amber-700', phone: '06 98 76 54 32', city: 'Paris' },
+              { name: 'SAS Martin', type: 'Prestataire', color: 'bg-purple-100 text-purple-700', phone: '01 23 45 67 89', city: 'Marseille' },
+            ].map((c) => (
+              <div key={c.name} className="flex items-center gap-3 p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+                <div className="w-9 h-9 rounded-full bg-[var(--landing-stone)] flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-[var(--landing-muted)]">{c.name.split(' ').map(n => n[0]).join('')}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[var(--landing-text)]">{c.name}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${c.color}`}>{c.type}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[10px] text-[var(--landing-muted)]">
+                    <span className="flex items-center gap-1"><Phone className="w-2.5 h-2.5" />{c.phone}</span>
+                    <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{c.city}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </MockBrowser>
+      }
+    />
+  );
+}
+
+export function EquipeSection() {
+  return (
+    <FeatureSection
+      id="equipe"
+      badge="Equipe"
+      title="Votre equipe,"
+      titleAccent="bien geree"
+      description="Salaries, sous-traitants, interimaires : gerez toute votre equipe au meme endroit. Suivi des heures, specialites, taux horaire et notes internes."
+      bulletPoints={[
+        'Profils avec photo, specialite et type de contrat',
+        'Calcul automatique du taux horaire',
+        'Suivi des heures par chantier',
+        'Notes internes et historique',
+      ]}
+      visual={
+        <MockBrowser url="app.batiflow.fr/equipe">
+          <div className="space-y-3">
+            {[
+              { name: 'Jean Martin', role: 'Salarie', specialty: 'Plomberie', hours: '142h', rate: '28 EUR/h' },
+              { name: 'Ahmed Benali', role: 'Sous-traitant', specialty: 'Electricite', hours: '86h', rate: '35 EUR/h' },
+              { name: 'Lucas Petit', role: 'Interimaire', specialty: 'Maconnerie', hours: '64h', rate: '22 EUR/h' },
+            ].map((m) => (
+              <div key={m.name} className="flex items-center gap-3 p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+                <div className="w-9 h-9 rounded-full bg-[var(--landing-accent)]/10 flex items-center justify-center shrink-0">
+                  <UsersRound className="w-4 h-4 text-[var(--landing-accent)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-[var(--landing-text)]">{m.name}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{m.role}</span>
+                  </div>
+                  <div className="text-[10px] text-[var(--landing-muted)]">{m.specialty}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="flex items-center gap-1 text-[10px] text-[var(--landing-text)] font-medium"><Clock className="w-2.5 h-2.5" />{m.hours}</div>
+                  <div className="text-[9px] text-[var(--landing-muted)]">{m.rate}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </MockBrowser>
+      }
+    />
+  );
+}
+
+export function PlanningSection() {
+  return (
+    <FeatureSection
+      id="planning"
+      badge="Planning"
+      title="Un planning visuel,"
+      titleAccent="drag & drop"
+      description="Planifiez vos interventions avec un planning semaine ou mois interactif. Glissez-deposez les evenements, assignez votre equipe et visualisez la charge de travail."
+      bulletPoints={[
+        'Vue semaine avec colonnes par jour',
+        'Vue mois avec calendrier complet',
+        'Drag & drop pour deplacer les interventions',
+        'Code couleur par type : chantier, conge, reunion',
+      ]}
+      reversed
+      visual={
+        <MockBrowser url="app.batiflow.fr/planning">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="px-3 py-1 rounded-full bg-[var(--landing-accent)] text-white text-[10px] font-medium">Semaine</div>
+              <div className="px-3 py-1 rounded-full bg-[var(--landing-off)] border border-[var(--landing-border)] text-[10px] text-[var(--landing-muted)]">Mois</div>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5 text-center">
+              {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'].map((d) => (
+                <div key={d} className="text-[9px] font-medium text-[var(--landing-muted)] uppercase tracking-wider pb-1">{d}</div>
+              ))}
+              {/* Row 1 - Jean */}
+              <div className="col-span-3 p-1.5 rounded bg-blue-100 border border-blue-200">
+                <div className="flex items-center gap-1">
+                  <GripVertical className="w-2.5 h-2.5 text-blue-400" />
+                  <span className="text-[9px] font-medium text-blue-700 truncate">Renov. Dupont</span>
+                </div>
+              </div>
+              <div className="col-span-1 p-1.5 rounded bg-amber-100 border border-amber-200">
+                <span className="text-[9px] font-medium text-amber-700">Conge</span>
+              </div>
+              <div className="col-span-1 p-1.5 rounded bg-[var(--landing-off)] border border-[var(--landing-border)]" />
+              {/* Row 2 - Ahmed */}
+              <div className="col-span-2 p-1.5 rounded bg-emerald-100 border border-emerald-200">
+                <div className="flex items-center gap-1">
+                  <GripVertical className="w-2.5 h-2.5 text-emerald-400" />
+                  <span className="text-[9px] font-medium text-emerald-700 truncate">SDB Bernard</span>
+                </div>
+              </div>
+              <div className="col-span-1 p-1.5 rounded bg-purple-100 border border-purple-200">
+                <span className="text-[9px] font-medium text-purple-700">Reunion</span>
+              </div>
+              <div className="col-span-2 p-1.5 rounded bg-blue-100 border border-blue-200">
+                <div className="flex items-center gap-1">
+                  <GripVertical className="w-2.5 h-2.5 text-blue-400" />
+                  <span className="text-[9px] font-medium text-blue-700 truncate">Toiture Martin</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </MockBrowser>
+      }
+    />
+  );
+}
+
+export function CataloguesSection() {
+  return (
+    <FeatureSection
+      id="catalogues"
+      badge="Catalogues"
+      title="Vos catalogues produits,"
+      titleAccent="partages en un lien"
+      description="Creez des catalogues visuels avec vos produits et collections. Partagez-les a vos clients via un lien magique sans qu'ils aient besoin de compte."
+      bulletPoints={[
+        'Builder visuel drag & drop',
+        'Organisation par collections',
+        'Partage par lien magique (sans compte client)',
+        'Suivi des consultations et selections',
+      ]}
+      visual={
+        <MockBrowser url="app.batiflow.fr/catalogues">
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {['Robinetterie', 'Carrelage', 'Sanitaires'].map((cat) => (
+                <div key={cat} className="aspect-[4/3] rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)] flex flex-col items-center justify-center p-2">
+                  <BookOpen className="w-5 h-5 text-[var(--landing-muted)] mb-1" />
+                  <span className="text-[9px] font-medium text-[var(--landing-text)]">{cat}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--landing-accent)]/5 border border-[var(--landing-accent)]/20">
+              <Link2 className="w-4 h-4 text-[var(--landing-accent)]" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-medium text-[var(--landing-text)]">Lien magique</div>
+                <div className="text-[9px] text-[var(--landing-muted)] truncate">app.batiflow.fr/c/abc123...</div>
+              </div>
+              <div className="text-[9px] text-[var(--landing-accent)] font-medium shrink-0">Copier</div>
+            </div>
           </div>
         </MockBrowser>
       }
