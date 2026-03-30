@@ -45,6 +45,12 @@ export const EXPENSE_CATEGORIES = {
   autre: { label: 'Autre', color: 'bg-slate-100 text-slate-700' },
 } as const;
 
+export const CONTACT_TYPES = {
+  client: { label: 'Client', color: 'bg-blue-50 text-blue-700' },
+  prospect: { label: 'Prospect', color: 'bg-amber-50 text-amber-700' },
+  prestataire: { label: 'Prestataire', color: 'bg-purple-50 text-purple-700' },
+} as const;
+
 export const MEMBER_TYPES = {
   salarie: { label: 'Salarie', color: 'bg-blue-50 text-blue-700' },
   sous_traitant: { label: 'Sous-traitant', color: 'bg-amber-50 text-amber-700' },

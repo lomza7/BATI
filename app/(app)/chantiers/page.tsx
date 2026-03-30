@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { AddressAutocomplete, AddressResult } from '@/components/shared/address-autocomplete';
+import { ClientPicker } from '@/components/shared/client-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -44,7 +45,8 @@ export default function ChantiersPage() {
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
-  const [form, setForm] = useState({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null as number | null, lng: null as number | null, budget: 0 });
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', address: '', city: '', postal_code: '', lat: null as number | null, lng: null as number | null, budget: 0, start_date: '', notes: '' });
 
   useEffect(() => { loadProjects(); }, []);
 
@@ -58,15 +60,6 @@ export default function ChantiersPage() {
   }
 
   async function createProject() {
-    let clientId: string | null = null;
-    if (form.clientName.trim()) {
-      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
-      if (existing) { clientId = existing.id; }
-      else {
-        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim() }).select('id').single();
-        clientId = newC?.id || null;
-      }
-    }
     await supabase.from('projects').insert({
       name: form.name,
       client_id: clientId,
@@ -76,10 +69,13 @@ export default function ChantiersPage() {
       lat: form.lat,
       lng: form.lng,
       budget: form.budget,
+      start_date: form.start_date || null,
+      notes: form.notes,
     });
     setShowCreate(false);
     setAddressQuery('');
-    setForm({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null, lng: null, budget: 0 });
+    setClientId(null);
+    setForm({ name: '', address: '', city: '', postal_code: '', lat: null, lng: null, budget: 0, start_date: '', notes: '' });
     loadProjects();
   }
 
@@ -176,13 +172,23 @@ export default function ChantiersPage() {
       )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Nouveau chantier</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
-            <div><label className="text-sm font-medium">Nom du chantier</label><Input className="mt-1" placeholder="Ex: Renovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><label className="text-sm font-medium">Client</label><Input className="mt-1" placeholder="Nom du client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })} /></div>
             <div>
-              <label className="text-sm font-medium">Adresse</label>
+              <label className="text-sm font-medium">Nom du chantier *</label>
+              <Input className="mt-1" placeholder="Ex: Renovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Client</label>
+              <ClientPicker
+                value={clientId}
+                onChange={(id) => setClientId(id)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Adresse du chantier</label>
               <AddressAutocomplete
                 value={addressQuery}
                 onChange={setAddressQuery}
@@ -199,7 +205,20 @@ export default function ChantiersPage() {
               />
               {form.city && <p className="mt-1 text-xs text-muted-foreground">{form.address}, {form.postal_code} {form.city}</p>}
             </div>
-            <div><label className="text-sm font-medium">Budget</label><Input className="mt-1" type="number" placeholder="0" value={form.budget || ''} onChange={e => setForm({ ...form, budget: Number(e.target.value) })} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Budget</label>
+                <Input className="mt-1" type="number" placeholder="0" value={form.budget || ''} onChange={e => setForm({ ...form, budget: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Date de debut</label>
+                <Input className="mt-1" type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Notes</label>
+              <Input className="mt-1" placeholder="Informations complementaires..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
               <Button onClick={createProject} disabled={!form.name.trim()}>Creer</Button>
