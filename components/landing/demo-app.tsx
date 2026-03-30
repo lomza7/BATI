@@ -1,22 +1,55 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, HardHat, CalendarDays, MapPin, Globe, Target, Mail, Star, FileImage, CreditCard, Repeat, Bot, Calculator, TrendingUp, MoveHorizontal as MoreHorizontal, Search, Plus, Filter, Send } from 'lucide-react';
+import {
+  LayoutDashboard,
+  SquareCheck as CheckSquare,
+  Contact,
+  FileText,
+  Receipt,
+  HardHat,
+  CalendarDays,
+  MapPin,
+  UsersRound,
+  BookOpen,
+  Globe,
+  Target,
+  Mail,
+  Star,
+  Paintbrush,
+  CreditCard,
+  RefreshCw,
+  Bot,
+  Calculator,
+  FileImage,
+  TrendingUp,
+  MoveHorizontal as MoreHorizontal,
+  Search,
+  Plus,
+  Filter,
+  Send,
+} from 'lucide-react';
 
 const views = [
+  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+  { id: 'taches', label: 'Mes taches', icon: CheckSquare },
+  { id: 'contacts', label: 'Contacts', icon: Contact },
   { id: 'devis', label: 'Devis', icon: FileText },
+  { id: 'factures', label: 'Factures', icon: Receipt },
   { id: 'chantiers', label: 'Chantiers', icon: HardHat },
   { id: 'planning', label: 'Planning', icon: CalendarDays },
   { id: 'carte', label: 'Carte', icon: MapPin },
-  { id: 'siteweb', label: 'Site Web', icon: Globe },
+  { id: 'equipe', label: 'Equipe', icon: UsersRound },
+  { id: 'catalogues', label: 'Catalogues', icon: BookOpen },
   { id: 'prospection', label: 'Prospection', icon: Target },
-  { id: 'emails', label: 'Emails', icon: Mail },
-  { id: 'avis', label: 'Avis', icon: Star },
-  { id: 'plans', label: 'Plans', icon: FileImage },
-  { id: 'paiement', label: 'Paiements', icon: CreditCard },
-  { id: 'abonnements', label: 'Contrats', icon: Repeat },
-  { id: 'agents', label: 'Agents IA', icon: Bot },
-  { id: 'compta', label: 'Compta', icon: Calculator },
+  { id: 'site-web', label: 'Site web IA', icon: Globe },
+  { id: 'mail', label: 'Boite mail', icon: Mail },
+  { id: 'avis', label: 'Avis Google', icon: Star },
+  { id: 'plans-rendus', label: 'Plans & Rendus IA', icon: Paintbrush },
+  { id: 'agents', label: 'Mes Agents', icon: Bot },
+  { id: 'paiements', label: 'Paiement Stripe', icon: CreditCard },
+  { id: 'contrats', label: 'Contrats recurrents', icon: RefreshCw },
+  { id: 'comptabilite', label: 'Comptabilite IA', icon: Calculator },
 ];
 
 export function DemoApp() {
@@ -30,7 +63,7 @@ export function DemoApp() {
             Explorez <em className="italic text-[var(--landing-accent)]">l&apos;application</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            Naviguez entre les 13 modules pour decouvrir toutes les fonctionnalites de BatiFlow.
+            Naviguez dans les principales vues de BatiFlow pour comprendre comment devis, chantier, commercial et finance s&apos;enchainent vraiment.
           </p>
         </div>
 
@@ -99,31 +132,43 @@ export function DemoApp() {
 
 function DemoViewContent({ view }: { view: string }) {
   switch (view) {
+    case 'dashboard':
+      return <DashboardView />;
+    case 'taches':
+      return <TachesView />;
+    case 'contacts':
+      return <ContactsView />;
     case 'devis':
       return <DevisView />;
+    case 'factures':
+      return <FacturesView />;
     case 'chantiers':
       return <ChantiersView />;
     case 'planning':
       return <PlanningView />;
     case 'carte':
       return <CarteView />;
-    case 'siteweb':
+    case 'equipe':
+      return <EquipeView />;
+    case 'catalogues':
+      return <CataloguesView />;
+    case 'site-web':
       return <SiteWebView />;
     case 'prospection':
       return <ProspectionView />;
-    case 'emails':
+    case 'mail':
       return <EmailsView />;
     case 'avis':
       return <AvisView />;
-    case 'plans':
+    case 'plans-rendus':
       return <PlansView />;
-    case 'paiement':
+    case 'paiements':
       return <PaiementView />;
-    case 'abonnements':
+    case 'contrats':
       return <AbonnementsView />;
     case 'agents':
       return <AgentsView />;
-    case 'compta':
+    case 'comptabilite':
       return <ComptaView />;
     default:
       return null;
@@ -161,6 +206,121 @@ function StatusBadge({ label, variant }: { label: string; variant: 'success' | '
   };
   return (
     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${styles[variant]}`}>{label}</span>
+  );
+}
+
+function DashboardView() {
+  const cards = [
+    { label: 'CA ce mois', value: '24 800 EUR', helper: '+12% vs mois dernier' },
+    { label: 'Devis en attente', value: '7', helper: '3 a relancer aujourd hui' },
+    { label: 'Chantiers actifs', value: '4', helper: '2 avec photos a valider' },
+    { label: 'Encaissements', value: '18 200 EUR', helper: '92% deja regles' },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Tableau de bord" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+        {cards.map((card) => (
+          <div key={card.label} className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-3">
+            <div className="text-[10px] font-medium text-[var(--landing-muted)]">{card.label}</div>
+            <div className="mt-2 text-lg font-bold text-[var(--landing-text)]">{card.value}</div>
+            <div className="text-[10px] text-[var(--landing-muted)] mt-1">{card.helper}</div>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-4">
+          <div className="text-xs font-semibold text-[var(--landing-text)] mb-3">Semaine en cours</div>
+          <div className="space-y-2">
+            {[
+              'Lun - Renovation salle de bain Dupont',
+              'Mar - Pose climatisation Bernard',
+              'Jeu - Passage fournisseur + relances devis',
+            ].map((item) => (
+              <div key={item} className="rounded-lg border border-[var(--landing-border)] bg-[var(--landing-off)] px-3 py-2 text-[11px] text-[var(--landing-text)]">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-4">
+          <div className="text-xs font-semibold text-[var(--landing-text)] mb-3">A surveiller</div>
+          <div className="space-y-2">
+            {[
+              '2 factures en retard',
+              '1 chantier sans date de fin',
+              '3 prospects a rappeler',
+            ].map((item) => (
+              <div key={item} className="flex items-center justify-between rounded-lg bg-[var(--landing-off)] px-3 py-2">
+                <span className="text-[11px] text-[var(--landing-text)]">{item}</span>
+                <span className="h-2 w-2 rounded-full bg-[var(--landing-accent)]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TachesView() {
+  const tasks = [
+    { label: 'Relancer DEV-2026-042', done: false, due: 'Aujourd hui' },
+    { label: 'Commander faience chantier Dupont', done: false, due: 'Demain' },
+    { label: 'Envoyer facture Bernard', done: true, due: 'Fait' },
+    { label: 'Verifier photos chantier Martin', done: false, due: 'Cette semaine' },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Mes taches" count={tasks.length} />
+      <div className="space-y-2">
+        {tasks.map((task) => (
+          <div key={task.label} className="flex items-center gap-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] px-4 py-3">
+            <div className={`flex h-5 w-5 items-center justify-center rounded-md border ${task.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[var(--landing-border)] bg-white'}`}>
+              {task.done ? <CheckSquare className="h-3 w-3" /> : null}
+            </div>
+            <div className="flex-1">
+              <div className={`text-xs font-medium ${task.done ? 'text-[var(--landing-muted)] line-through' : 'text-[var(--landing-text)]'}`}>
+                {task.label}
+              </div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{task.due}</div>
+            </div>
+            {!task.done ? <StatusBadge label="A faire" variant="warning" /> : <StatusBadge label="Terminee" variant="success" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContactsView() {
+  const contacts = [
+    { name: 'Mme Bernard', type: 'Client', city: 'Lyon', status: 'Chantier signe', variant: 'success' as const },
+    { name: 'SCI Martin', type: 'Prospect', city: 'Marseille', status: 'Devis envoye', variant: 'info' as const },
+    { name: 'Fournisseur Pro', type: 'Prestataire', city: 'Paris', status: 'Actif', variant: 'muted' as const },
+    { name: 'M. Dupont', type: 'Client', city: 'Paris', status: 'A relancer', variant: 'warning' as const },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Contacts" count={contacts.length} />
+      <div className="space-y-2">
+        {contacts.map((contact) => (
+          <div key={contact.name} className="flex items-center gap-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] px-4 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[var(--landing-accent)]">
+              <Contact className="h-4 w-4" />
+            </div>
+            <div className="flex-1">
+              <div className="text-xs font-semibold text-[var(--landing-text)]">{contact.name}</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{contact.type} - {contact.city}</div>
+            </div>
+            <StatusBadge label={contact.status} variant={contact.variant} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -211,6 +371,33 @@ function DevisView() {
             <div className="text-xs font-medium text-[var(--landing-text)]">{d.client}</div>
             <div className="text-[10px] text-[var(--landing-muted)]">{d.objet}</div>
             <div className="text-xs font-semibold text-[var(--landing-text)] mt-1">{d.montant}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FacturesView() {
+  const invoices = [
+    { num: 'FAC-2026-018', client: 'Mme Bernard', montant: '4 200 EUR', status: 'Envoyee', variant: 'info' as const },
+    { num: 'FAC-2026-017', client: 'M. Dupont', montant: '8 500 EUR', status: 'Payee', variant: 'success' as const },
+    { num: 'FAC-2026-016', client: 'SCI Martin', montant: '15 800 EUR', status: 'En retard', variant: 'danger' as const },
+    { num: 'FAC-2026-015', client: 'M. Leroy', montant: '6 300 EUR', status: 'Brouillon', variant: 'muted' as const },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Factures" count={invoices.length} />
+      <div className="space-y-2">
+        {invoices.map((invoice) => (
+          <div key={invoice.num} className="flex items-center gap-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] px-4 py-3">
+            <div className="min-w-[82px] text-[10px] font-mono text-[var(--landing-accent)]">{invoice.num}</div>
+            <div className="flex-1">
+              <div className="text-xs font-semibold text-[var(--landing-text)]">{invoice.client}</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{invoice.montant}</div>
+            </div>
+            <StatusBadge label={invoice.status} variant={invoice.variant} />
           </div>
         ))}
       </div>
@@ -280,6 +467,34 @@ function PlanningView() {
   );
 }
 
+function EquipeView() {
+  const team = [
+    { name: 'Lucas', role: 'Salarie', hours: '34 h cette semaine', project: 'Renovation Dupont' },
+    { name: 'Sarah', role: 'Sous-traitante', hours: '18 h cette semaine', project: 'Clim Bernard' },
+    { name: 'Mehdi', role: 'Interimaire', hours: '26 h cette semaine', project: 'Toiture Martin' },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Equipe" count={team.length} />
+      <div className="space-y-3">
+        {team.map((member) => (
+          <div key={member.name} className="flex items-center gap-3 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] px-4 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white">
+              <UsersRound className="h-4 w-4 text-[var(--landing-accent)]" />
+            </div>
+            <div className="flex-1">
+              <div className="text-xs font-semibold text-[var(--landing-text)]">{member.name}</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{member.role} - {member.project}</div>
+            </div>
+            <span className="text-[10px] font-medium text-[var(--landing-text)]">{member.hours}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CarteView() {
   return (
     <div>
@@ -334,6 +549,34 @@ function SiteWebView() {
             <button className="flex-1 py-2 rounded-lg border border-[var(--landing-border)] text-xs text-[var(--landing-text)]">Voir nos realisations</button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CataloguesView() {
+  const catalogs = [
+    { name: 'Salle de bain premium', items: 18, status: 'Partage', variant: 'success' as const },
+    { name: 'Chauffage & chaudiere', items: 12, status: 'Pret', variant: 'info' as const },
+    { name: 'Climatisation mono-split', items: 9, status: 'Brouillon', variant: 'muted' as const },
+  ];
+
+  return (
+    <div>
+      <ViewHeader title="Catalogues" count={catalogs.length} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        {catalogs.map((catalog) => (
+          <div key={catalog.name} className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-4">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white">
+              <BookOpen className="h-4 w-4 text-[var(--landing-accent)]" />
+            </div>
+            <div className="text-xs font-semibold text-[var(--landing-text)]">{catalog.name}</div>
+            <div className="mt-1 text-[10px] text-[var(--landing-muted)]">{catalog.items} produits</div>
+            <div className="mt-3">
+              <StatusBadge label={catalog.status} variant={catalog.variant} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -563,7 +806,7 @@ function AbonnementsView() {
         {contracts.map((c) => (
           <div key={c.client} className="flex items-center gap-4 p-4 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] hover:shadow-sm transition-shadow">
             <div className="w-10 h-10 rounded-xl bg-[var(--landing-stone)] flex items-center justify-center">
-              <Repeat className="w-4 h-4 text-[var(--landing-accent)]" />
+              <RefreshCw className="w-4 h-4 text-[var(--landing-accent)]" />
             </div>
             <div className="flex-1">
               <div className="text-xs font-semibold text-[var(--landing-text)]">{c.type} - {c.client}</div>

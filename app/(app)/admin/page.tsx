@@ -6,13 +6,22 @@ import {
   Shield, Users, CreditCard, TrendingUp, FileText, HardHat,
   Receipt, Contact, Target, RefreshCw, Crown, Zap, ChevronDown,
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
+  Save, Check, AlertCircle, ExternalLink, Loader2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import {
+  DEFAULT_PLAN_FEATURES,
+  parsePlanFeatures,
+  stringifyPlanFeatures,
+  type PricingPlanKey,
+} from '@/lib/pricing-plans';
 
 const ADMIN_EMAIL = 'louis@maaza.pro';
 
@@ -85,7 +94,136 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [userSearch, setUserSearch] = useState('');
 
+  // Stripe / pricing config
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configSaved, setConfigSaved] = useState(false);
+  const [configError, setConfigError] = useState('');
+  const [stripeConfig, setStripeConfig] = useState({
+    stripe_price_starter: '',
+    stripe_price_pro: '',
+    stripe_price_business: '',
+    price_starter: '0',
+    price_pro: '49',
+    price_business: '89',
+  });
+  const [stripeInfo, setStripeInfo] = useState<Record<string, { product_name: string; amount: number; interval: string | null; active: boolean } | null>>({});
+  const [stripeFetching, setStripeFetching] = useState<string | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<Record<PricingPlanKey, string>>({
+    starter: DEFAULT_PLAN_FEATURES.starter.join('\n'),
+    pro: DEFAULT_PLAN_FEATURES.pro.join('\n'),
+    business: DEFAULT_PLAN_FEATURES.business.join('\n'),
+  });
+
   const isAdmin = user?.email === ADMIN_EMAIL;
+
+  const loadConfig = useCallback(async () => {
+    setConfigLoading(true);
+    const { data } = await supabase.rpc('get_platform_config');
+    if (data) {
+      const cfg = data as Record<string, string>;
+      setStripeConfig(prev => ({
+        ...prev,
+        stripe_price_starter: cfg.stripe_price_starter || '',
+        stripe_price_pro: cfg.stripe_price_pro || '',
+        stripe_price_business: cfg.stripe_price_business || '',
+        price_starter: cfg.price_starter || '0',
+        price_pro: cfg.price_pro || '49',
+        price_business: cfg.price_business || '89',
+      }));
+      setPlanFeatures({
+        starter: parsePlanFeatures(cfg.features_starter, DEFAULT_PLAN_FEATURES.starter).join('\n'),
+        pro: parsePlanFeatures(cfg.features_pro, DEFAULT_PLAN_FEATURES.pro).join('\n'),
+        business: parsePlanFeatures(cfg.features_business, DEFAULT_PLAN_FEATURES.business).join('\n'),
+      });
+    }
+    setConfigLoading(false);
+  }, []);
+
+  async function saveConfig() {
+    setConfigSaving(true);
+    setConfigSaved(false);
+    setConfigError('');
+    try {
+      const normalizedConfig = {
+        ...stripeConfig,
+        stripe_price_starter: '',
+        price_starter: '0',
+      };
+      const featureConfig = {
+        features_starter: stringifyPlanFeatures(parsePlanFeatures(planFeatures.starter, DEFAULT_PLAN_FEATURES.starter)),
+        features_pro: stringifyPlanFeatures(parsePlanFeatures(planFeatures.pro, DEFAULT_PLAN_FEATURES.pro)),
+        features_business: stringifyPlanFeatures(parsePlanFeatures(planFeatures.business, DEFAULT_PLAN_FEATURES.business)),
+      };
+
+      const results = await Promise.all(
+        Object.entries({ ...normalizedConfig, ...featureConfig }).map(async ([key, value]) => {
+          const result = await supabase.rpc('update_platform_config', {
+            config_key: key,
+            config_value: value,
+          });
+
+          return { key, error: result.error };
+        })
+      );
+
+      const failed = results.find((result) => result.error);
+      if (failed?.error) {
+        throw new Error(failed.error.message);
+      }
+
+      setStripeConfig(normalizedConfig);
+      await loadConfig();
+      setConfigSaved(true);
+      setTimeout(() => setConfigSaved(false), 3000);
+    } catch (error) {
+      setConfigError(
+        error instanceof Error ? error.message : 'Impossible d enregistrer la configuration Stripe.'
+      );
+    } finally {
+      setConfigSaving(false);
+    }
+  }
+
+  async function fetchStripePrice(plan: string) {
+    if (plan === 'starter') {
+      setStripeInfo(prev => ({ ...prev, starter: null }));
+      setStripeConfig(prev => ({
+        ...prev,
+        stripe_price_starter: '',
+        price_starter: '0',
+      }));
+      return;
+    }
+
+    const priceId = stripeConfig[`stripe_price_${plan}` as keyof typeof stripeConfig];
+    const priceKey = `stripe_price_${plan}` as keyof typeof stripeConfig;
+    if (!priceId) return;
+    setStripeFetching(plan);
+    try {
+      const res = await fetch('/api/stripe/prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ price_id: priceId }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setStripeInfo(prev => ({ ...prev, [plan]: null }));
+      } else {
+        setStripeInfo(prev => ({ ...prev, [plan]: data }));
+        // Auto-update displayed price from Stripe
+        setStripeConfig(prev => ({
+          ...prev,
+          [priceKey]: data.price_id,
+          [`price_${plan}`]: String(data.amount),
+        }));
+      }
+    } catch {
+      setStripeInfo(prev => ({ ...prev, [plan]: null }));
+    } finally {
+      setStripeFetching(null);
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -118,7 +256,8 @@ export default function AdminPage() {
       return;
     }
     loadData();
-  }, [authLoading, user, router, loadData]);
+    loadConfig();
+  }, [authLoading, user, router, loadData, loadConfig]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -305,6 +444,156 @@ export default function AdminPage() {
               <MiniKpi icon={Target} label="Leads CRM" value={stats.total_leads} />
               <MiniKpi icon={TrendingUp} label="CA devis acceptes" value={formatCurrency(stats.total_revenue_quotes)} accent />
               <MiniKpi icon={CreditCard} label="CA factures payees" value={formatCurrency(stats.total_revenue_invoices)} accent />
+            </div>
+          </div>
+
+          {/* Configuration Stripe & Tarifs */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-primary" /> Configuration Stripe & Tarifs
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Modifiez ici les prix et les fonctionnalites affichees sur la landing pour chaque plan.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={saveConfig}
+                disabled={configSaving}
+                className="gap-1.5"
+              >
+                {configSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : configSaved ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {configSaved ? 'Enregistre !' : 'Enregistrer'}
+              </Button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-6">
+              {configError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {configError}
+                </div>
+              )}
+
+              {(['starter', 'pro', 'business'] as const).map((plan) => {
+                const conf = planConfig[plan];
+                const priceKey = `stripe_price_${plan}` as keyof typeof stripeConfig;
+                const amountKey = `price_${plan}` as keyof typeof stripeConfig;
+                const info = stripeInfo[plan];
+                return (
+                  <div key={plan} className="rounded-lg border border-border p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={cn('p-2 rounded-lg', conf.color.split(' ')[0])}>
+                        <conf.icon className={cn('h-4 w-4', conf.color.split(' ')[1])} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{conf.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Prix affiche : {stripeConfig[amountKey]} EUR/mois
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Stripe Price ID ou Product ID</label>
+                        <div className="flex gap-2 mt-1">
+                          <Input
+                            placeholder={plan === 'starter' ? 'Aucun ID Stripe requis pour Starter' : 'price_1Abc... ou prod_1Abc...'}
+                            className="text-xs font-mono"
+                            value={plan === 'starter' ? '' : stripeConfig[priceKey]}
+                            onChange={e => setStripeConfig(prev => ({ ...prev, [priceKey]: e.target.value }))}
+                            disabled={plan === 'starter'}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchStripePrice(plan)}
+                            disabled={plan === 'starter' || !stripeConfig[priceKey] || stripeFetching === plan}
+                            className="shrink-0"
+                          >
+                            {stripeFetching === plan ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Prix affiche (EUR/mois)</label>
+                        <Input
+                          type="number"
+                          className="mt-1"
+                          value={plan === 'starter' ? '0' : stripeConfig[amountKey]}
+                          onChange={e => setStripeConfig(prev => ({ ...prev, [amountKey]: e.target.value }))}
+                          disabled={plan === 'starter'}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Fonctionnalites affichees sur la landing
+                      </label>
+                      <Textarea
+                        className="mt-1 min-h-[160px] text-sm"
+                        placeholder="Une fonctionnalite par ligne"
+                        value={planFeatures[plan]}
+                        onChange={(event) =>
+                          setPlanFeatures((prev) => ({
+                            ...prev,
+                            [plan]: event.target.value,
+                          }))
+                        }
+                      />
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Une ligne = une puce visible sur la landing.
+                      </p>
+                    </div>
+
+                    {plan === 'starter' && (
+                      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                        Le plan Starter reste gratuit. Aucun produit Stripe ni carte bancaire n est necessaire.
+                      </div>
+                    )}
+
+                    {info && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                        <div className="text-xs text-emerald-700">
+                          <span className="font-medium">{info.product_name}</span> — {info.amount} {info.interval ? `EUR/${info.interval}` : 'EUR'}
+                          {!info.active && <span className="text-red-600 ml-2">(inactif)</span>}
+                        </div>
+                      </div>
+                    )}
+                    {info === null && stripeConfig[priceKey] && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                        <span className="text-xs text-red-700">ID Stripe invalide, produit sans prix actif ou erreur Stripe</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Pour creer ou modifier un prix, rendez-vous sur{' '}
+                  <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                    dashboard.stripe.com/products
+                  </a>
+                  . Vous pouvez coller un Price ID (price_xxx) ou un Product ID (prod_xxx).
+                </p>
+              </div>
             </div>
           </div>
 

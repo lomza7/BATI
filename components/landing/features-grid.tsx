@@ -109,7 +109,7 @@ export function FeaturesGrid() {
             <em className="italic text-[var(--landing-accent)]">rien de plus</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            15 modules integres pour couvrir 100% de votre activite, de la prospection a la comptabilite.
+            Une seule plateforme pour piloter devis, chantiers, equipe, commercial, communication et finance sans changer d outil.
           </p>
         </div>
 
