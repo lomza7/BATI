@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
-import { VoiceQuoteStudio, type VoiceQuoteDraft } from '@/components/devis/voice-quote-studio';
+import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -42,10 +43,15 @@ interface QuoteLine {
 }
 
 export default function DevisPage() {
+  const AI_INTRO_SESSION_KEY = 'batiflow_ai_quote_intro_seen';
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showCreateOptions, setShowCreateOptions] = useState(false);
+  const [showAiIntro, setShowAiIntro] = useState(false);
+  const [showAiCreate, setShowAiCreate] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [aiPresetRequest, setAiPresetRequest] = useState<{ id: number; mode: 'empty' | 'example' } | null>(null);
   const [newQuote, setNewQuote] = useState({ title: '', clientName: '', description: '' });
   const [lines, setLines] = useState<QuoteLine[]>([
     { description: '', quantity: 1, unit: 'u', unit_price: 0 },
@@ -156,13 +162,42 @@ export default function DevisPage() {
     }
   }
 
-  function applyVoiceDraft(draft: VoiceQuoteDraft) {
+  function openCreateOptions() {
+    setShowCreateOptions(true);
+  }
+
+  function openManualCreate() {
+    setShowCreateOptions(false);
+    setShowCreate(true);
+  }
+
+  function openAiCreate() {
+    setShowCreateOptions(false);
+
+    if (typeof window !== 'undefined' && !window.sessionStorage.getItem(AI_INTRO_SESSION_KEY)) {
+      window.sessionStorage.setItem(AI_INTRO_SESSION_KEY, 'seen');
+      setShowAiIntro(true);
+      return;
+    }
+
+    setAiPresetRequest({ id: Date.now(), mode: 'empty' });
+    setShowAiCreate(true);
+  }
+
+  function startAiCreate() {
+    setShowAiIntro(false);
+    setAiPresetRequest({ id: Date.now(), mode: 'empty' });
+    setShowAiCreate(true);
+  }
+
+  function applyAiDraft(draft: AiQuoteDraft) {
     setNewQuote({
       title: draft.title,
       clientName: draft.clientName,
       description: draft.description,
     });
     setLines(draft.lines.map((line) => ({ ...line })));
+    setShowAiCreate(false);
     setShowCreate(true);
   }
 
@@ -170,14 +205,12 @@ export default function DevisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Devis" description="Creez vos devis a la main ou a la voix, puis gerez leur suivi">
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
+      <PageHeader title="Devis" description="Creez, gerez et envoyez vos devis">
+        <Button onClick={openCreateOptions} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis
         </Button>
       </PageHeader>
-
-      <VoiceQuoteStudio onUseDraft={applyVoiceDraft} />
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -206,7 +239,7 @@ export default function DevisPage() {
           title="Aucun devis"
           description="Creez votre premier devis pour commencer a facturer vos clients."
         >
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Button onClick={openCreateOptions} className="gap-2">
             <Plus className="h-4 w-4" />
             Creer un devis
           </Button>
@@ -299,6 +332,103 @@ export default function DevisPage() {
           </div>
         </>
       )}
+
+      <Dialog open={showCreateOptions} onOpenChange={setShowCreateOptions}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Comment voulez-vous preparer ce devis ?</DialogTitle>
+            <DialogDescription>
+              Choisissez votre point de depart. Vous pourrez toujours reprendre la main avant l&apos;envoi au client.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={openManualCreate}
+              className="rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                <FileText className="h-5 w-5 text-foreground" />
+              </div>
+              <p className="mt-4 text-base font-semibold text-foreground">Devis classique</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Ouvrir le formulaire habituel et saisir les lignes vous-meme.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={openAiCreate}
+              className="rounded-2xl border border-[#d35400]/20 bg-[#fff7f0] p-5 text-left transition-all hover:border-[#d35400]/35 hover:shadow-sm"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#d35400] text-white">
+                <Wand2 className="h-5 w-5" />
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <p className="text-base font-semibold text-foreground">Devis avec IA</p>
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-[#a34700]">
+                  Voix + photos
+                </span>
+              </div>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Decrivez la demande, ajoutez des photos du chantier et laissez l&apos;assistant proposer une base de devis.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#a34700]">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
+                  <Mic className="h-3 w-3" />
+                  Vocal
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
+                  <Wand2 className="h-3 w-3" />
+                  Analyse IA
+                </span>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAiIntro} onOpenChange={setShowAiIntro}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Devis IA</DialogTitle>
+            <DialogDescription>Cette aide ne s&apos;affiche qu&apos;une fois pendant la session.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[#d35400]/15 bg-[#fff7f0] p-4">
+              <p className="text-sm font-medium text-foreground">Allez droit au but</p>
+              <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <p>1. Commencez a parler.</p>
+                <p>2. Ajoutez des photos si besoin.</p>
+                <p>3. Lancez la magie pour generer le brouillon.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setShowAiIntro(false)}>
+                Fermer
+              </Button>
+              <Button onClick={startAiCreate} className="gap-2">
+                <Wand2 className="h-4 w-4" />
+                Commencer
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAiCreate} onOpenChange={setShowAiCreate}>
+        <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Devis avec IA</DialogTitle>
+            <DialogDescription>Parlez, ajoutez des photos, puis lancez la magie.</DialogDescription>
+          </DialogHeader>
+
+          <QuoteAiAssistant onUseDraft={applyAiDraft} presetRequest={aiPresetRequest} />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">

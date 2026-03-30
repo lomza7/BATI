@@ -18,7 +18,7 @@ const featureCards = [
   {
     icon: FileText,
     title: 'Devis & Factures',
-    desc: 'Creez, envoyez et suivez vos devis et factures en quelques clics.',
+    desc: 'Devis prepares avec la voix, les photos et l analyse IA avant validation.',
   },
   {
     icon: HardHat,

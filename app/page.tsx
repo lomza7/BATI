@@ -3,6 +3,7 @@ import { Hero } from '@/components/landing/hero';
 import { Marquee } from '@/components/landing/marquee';
 import { FeaturesGrid } from '@/components/landing/features-grid';
 import {
+  DevisSection,
   SiteWebSection,
   ProspectionSection,
   EmailSection,
@@ -29,6 +30,7 @@ export default function LandingPage() {
       <Marquee />
       <FeaturesGrid />
       <DemoApp />
+      <DevisSection />
       <SiteWebSection />
       <ProspectionSection />
       <EmailSection />
