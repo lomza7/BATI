@@ -183,10 +183,16 @@ export default function EquipePage() {
   }
 
   async function saveMember() {
+    // Calcul auto du taux horaire pour salariés/intérimaires
+    const computedHourlyRate = (form.type === 'salarie' || form.type === 'interimaire')
+      && form.monthly_salary > 0 && form.weekly_hours > 0
+      ? Math.round((form.monthly_salary / (form.weekly_hours * 4.33)) * 100) / 100
+      : form.hourly_rate;
+
     const fullPayload = {
       name: form.name, role: form.role, phone: form.phone, email: form.email,
       color: form.color, type: form.type, specialty: form.specialty,
-      hourly_rate: form.hourly_rate, monthly_salary: form.monthly_salary,
+      hourly_rate: computedHourlyRate, monthly_salary: form.monthly_salary,
       weekly_hours: form.weekly_hours,
       start_date: form.start_date || null, end_date: form.end_date || null,
       company_name: form.company_name, siret: form.siret,
@@ -739,7 +745,7 @@ export default function EquipePage() {
             <div className="border-t border-border pt-4">
               <p className="text-sm font-medium mb-3">{form.type === 'sous_traitant' ? 'Tarification' : 'Remuneration'}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {form.type === 'salarie' && (
+                {(form.type === 'salarie' || form.type === 'interimaire') && (
                   <>
                     <div>
                       <label className="text-sm font-medium">Salaire brut/mois</label>
@@ -749,12 +755,23 @@ export default function EquipePage() {
                       <label className="text-sm font-medium">Heures/semaine</label>
                       <Input className="mt-1" type="number" placeholder="35" value={form.weekly_hours || ''} onChange={e => setForm({ ...form, weekly_hours: Number(e.target.value) })} />
                     </div>
+                    <div>
+                      <label className="text-sm font-medium">Taux horaire</label>
+                      <div className="mt-1 flex h-10 items-center rounded-md border border-input bg-muted/50 px-3 text-sm font-medium">
+                        {form.monthly_salary > 0 && form.weekly_hours > 0
+                          ? `${(form.monthly_salary / (form.weekly_hours * 4.33)).toFixed(2)} €/h`
+                          : '—'}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Calcule automatiquement</p>
+                    </div>
                   </>
                 )}
-                <div>
-                  <label className="text-sm font-medium">Taux horaire</label>
-                  <Input className="mt-1" type="number" placeholder="0" value={form.hourly_rate || ''} onChange={e => setForm({ ...form, hourly_rate: Number(e.target.value) })} />
-                </div>
+                {form.type === 'sous_traitant' && (
+                  <div>
+                    <label className="text-sm font-medium">Taux horaire</label>
+                    <Input className="mt-1" type="number" placeholder="0" value={form.hourly_rate || ''} onChange={e => setForm({ ...form, hourly_rate: Number(e.target.value) })} />
+                  </div>
+                )}
               </div>
             </div>
 
