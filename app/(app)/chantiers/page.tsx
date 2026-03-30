@@ -7,6 +7,7 @@ import { PROJECT_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { AddressAutocomplete, AddressResult } from '@/components/shared/address-autocomplete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -42,7 +43,8 @@ export default function ChantiersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', clientName: '', address: '', city: '', budget: 0 });
+  const [addressQuery, setAddressQuery] = useState('');
+  const [form, setForm] = useState({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null as number | null, lng: null as number | null, budget: 0 });
 
   useEffect(() => { loadProjects(); }, []);
 
@@ -70,10 +72,14 @@ export default function ChantiersPage() {
       client_id: clientId,
       address: form.address,
       city: form.city,
+      postal_code: form.postal_code,
+      lat: form.lat,
+      lng: form.lng,
       budget: form.budget,
     });
     setShowCreate(false);
-    setForm({ name: '', clientName: '', address: '', city: '', budget: 0 });
+    setAddressQuery('');
+    setForm({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null, lng: null, budget: 0 });
     loadProjects();
   }
 
@@ -175,9 +181,23 @@ export default function ChantiersPage() {
           <div className="space-y-4 mt-4">
             <div><label className="text-sm font-medium">Nom du chantier</label><Input className="mt-1" placeholder="Ex: Renovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
             <div><label className="text-sm font-medium">Client</label><Input className="mt-1" placeholder="Nom du client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Adresse</label><Input className="mt-1" placeholder="Adresse" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
-              <div><label className="text-sm font-medium">Ville</label><Input className="mt-1" placeholder="Ville" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
+            <div>
+              <label className="text-sm font-medium">Adresse</label>
+              <AddressAutocomplete
+                value={addressQuery}
+                onChange={setAddressQuery}
+                onSelect={(result: AddressResult) => setForm(f => ({
+                  ...f,
+                  address: [result.housenumber, result.street].filter(Boolean).join(' '),
+                  city: result.city || '',
+                  postal_code: result.postcode || '',
+                  lat: result.lat,
+                  lng: result.lng,
+                }))}
+                placeholder="Tapez une adresse..."
+                className="mt-1"
+              />
+              {form.city && <p className="mt-1 text-xs text-muted-foreground">{form.address}, {form.postal_code} {form.city}</p>}
             </div>
             <div><label className="text-sm font-medium">Budget</label><Input className="mt-1" type="number" placeholder="0" value={form.budget || ''} onChange={e => setForm({ ...form, budget: Number(e.target.value) })} /></div>
             <div className="flex justify-end gap-2">

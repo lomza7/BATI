@@ -1,14 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MapPin, ExternalLink, Navigation } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { MapPin, Plus, Search, Navigation, Share2, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PROJECT_STATUSES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { AddressAutocomplete, AddressResult } from '@/components/shared/address-autocomplete';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
+const MapView = lazy(() => import('@/components/shared/map-view').then(m => ({ default: m.MapView })));
 
 interface Project {
   id: string;
@@ -16,8 +28,11 @@ interface Project {
   address: string;
   city: string;
   postal_code: string;
+  lat: number | null;
+  lng: number | null;
   status: keyof typeof PROJECT_STATUSES;
   progress: number;
+  is_public: boolean;
   clients: { name: string } | null;
 }
 
@@ -33,101 +48,198 @@ export default function CartePage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [addressQuery, setAddressQuery] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    clientName: '',
+    address: '',
+    city: '',
+    postal_code: '',
+    lat: null as number | null,
+    lng: null as number | null,
+  });
 
   useEffect(() => { loadProjects(); }, []);
 
   async function loadProjects() {
     const { data } = await supabase
       .from('projects')
-      .select('id, name, address, city, postal_code, status, progress, clients(name)')
+      .select('id, name, address, city, postal_code, lat, lng, status, progress, is_public, clients(name)')
       .order('created_at', { ascending: false });
     setProjects((data as unknown as Project[]) || []);
     setLoading(false);
   }
 
-  const filtered = filter === 'all' ? projects : projects.filter(p => p.status === filter);
+  async function createProject() {
+    let clientId: string | null = null;
+    if (form.clientName.trim()) {
+      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
+      if (existing) { clientId = existing.id; }
+      else {
+        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim() }).select('id').single();
+        clientId = newC?.id || null;
+      }
+    }
+    await supabase.from('projects').insert({
+      name: form.name,
+      client_id: clientId,
+      address: form.address,
+      city: form.city,
+      postal_code: form.postal_code,
+      lat: form.lat,
+      lng: form.lng,
+    });
+    setShowCreate(false);
+    setForm({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null, lng: null });
+    setAddressQuery('');
+    loadProjects();
+  }
+
+  async function togglePublic(id: string, isPublic: boolean) {
+    await supabase.from('projects').update({ is_public: isPublic }).eq('id', id);
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, is_public: isPublic } : p));
+  }
+
+  function getShareLink() {
+    return `${window.location.origin}/carte/publique`;
+  }
+
+  async function copyShareLink() {
+    await navigator.clipboard.writeText(getShareLink());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleAddressSelect(result: AddressResult) {
+    setForm(f => ({
+      ...f,
+      address: [result.housenumber, result.street].filter(Boolean).join(' '),
+      city: result.city || '',
+      postal_code: result.postcode || '',
+      lat: result.lat,
+      lng: result.lng,
+    }));
+  }
+
+  const filtered = useMemo(() => {
+    let list = filter === 'all' ? projects : projects.filter(p => p.status === filter);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.city?.toLowerCase().includes(q) ||
+        p.clients?.name?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [projects, filter, search]);
+
+  const markers = useMemo(() =>
+    filtered
+      .filter(p => p.lat && p.lng)
+      .map(p => ({
+        id: p.id,
+        lat: p.lat!,
+        lng: p.lng!,
+        label: `${p.name}${p.city ? ` — ${p.city}` : ''}`,
+        color: STATUS_PIN_COLORS[p.status] || 'bg-slate-400',
+      })),
+    [filtered]
+  );
+
+  const handleMarkerClick = useCallback((id: string) => setSelected(id), []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader title="Carte des chantiers" description="Visualisez vos chantiers sur la carte">
-        <Button variant="outline" className="gap-2" onClick={() => {
-          const addr = filtered.map(p => `${p.address} ${p.city}`).join(' / ');
-          if (addr) window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(addr)}`, '_blank');
-        }}>
-          <ExternalLink className="h-4 w-4" /> Ouvrir sur OpenStreetMap
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowShare(true)} className="gap-2">
+            <Share2 className="h-4 w-4" /> Partager
+          </Button>
+          <Button onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Nouveau chantier
+          </Button>
+        </div>
       </PageHeader>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>Tous ({projects.length})</Button>
-        {(['a_planifier', 'en_cours', 'termine', 'en_pause'] as const).map(s => {
-          const st = PROJECT_STATUSES[s];
-          const count = projects.filter(p => p.status === s).length;
-          return (
-            <Button key={s} variant={filter === s ? 'default' : 'outline'} size="sm" onClick={() => setFilter(s)} className="gap-1.5">
-              <div className={cn('h-2 w-2 rounded-full', STATUS_PIN_COLORS[s])} />
-              {st.label} ({count})
-            </Button>
-          );
-        })}
+      {/* Filtres */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+            Tous ({projects.length})
+          </Button>
+          {(['a_planifier', 'en_cours', 'termine', 'en_pause'] as const).map(s => {
+            const st = PROJECT_STATUSES[s];
+            const count = projects.filter(p => p.status === s).length;
+            return (
+              <Button key={s} variant={filter === s ? 'default' : 'outline'} size="sm" onClick={() => setFilter(s)} className="gap-1.5">
+                <div className={cn('h-2 w-2 rounded-full', STATUS_PIN_COLORS[s])} />
+                {st.label} ({count})
+              </Button>
+            );
+          })}
+        </div>
       </div>
 
+      {/* Contenu principal */}
       {loading ? (
-        <div className="h-[500px] animate-pulse rounded-xl bg-muted" />
+        <div className="h-[400px] sm:h-[500px] animate-pulse rounded-xl bg-muted" />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={MapPin} title="Aucun chantier" description="Ajoutez des chantiers avec une adresse pour les voir sur la carte." />
+        <EmptyState icon={MapPin} title="Aucun chantier" description="Ajoutez des chantiers avec une adresse pour les voir sur la carte.">
+          <Button onClick={() => setShowCreate(true)} className="gap-2"><Plus className="h-4 w-4" /> Ajouter un chantier</Button>
+        </EmptyState>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* Carte */}
           <div className="lg:col-span-2 rounded-xl border border-border bg-card overflow-hidden">
-            <div className="relative h-[300px] sm:h-[500px] bg-gradient-to-br from-blue-50 to-emerald-50 flex items-center justify-center">
-              <div className="text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 mx-auto">
-                  <Navigation className="h-8 w-8 text-blue-600" />
+            {markers.length > 0 ? (
+              <Suspense fallback={
+                <div className="h-[350px] sm:h-[500px] flex items-center justify-center bg-muted">
+                  <div className="text-center text-muted-foreground">
+                    <Navigation className="h-8 w-8 mx-auto animate-pulse" />
+                    <p className="mt-2 text-sm">Chargement de la carte...</p>
+                  </div>
                 </div>
-                <p className="mt-4 text-base font-semibold text-foreground">Carte interactive</p>
-                <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-                  {filtered.length} chantier{filtered.length > 1 ? 's' : ''} a afficher.
-                  Cliquez sur un chantier dans la liste pour le localiser.
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-4 gap-2"
-                  onClick={() => {
-                    const query = filtered.map(p => `${p.address}, ${p.postal_code} ${p.city}`).join('; ');
-                    window.open(`https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`, '_blank');
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4" /> Voir sur OpenStreetMap
-                </Button>
+              }>
+                <MapView
+                  markers={markers}
+                  selectedId={selected}
+                  onMarkerClick={handleMarkerClick}
+                  className="h-[350px] sm:h-[500px]"
+                />
+              </Suspense>
+            ) : (
+              <div className="h-[350px] sm:h-[500px] flex items-center justify-center bg-gradient-to-br from-blue-50 to-emerald-50">
+                <div className="text-center px-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 mx-auto">
+                    <Navigation className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <p className="mt-4 text-base font-semibold text-foreground">Aucune coordonnee GPS</p>
+                  <p className="mt-1 text-sm text-muted-foreground max-w-xs">
+                    Vos chantiers n&apos;ont pas de coordonnees. Ajoutez un chantier avec une adresse pour le voir sur la carte.
+                  </p>
+                </div>
               </div>
-              <div className="absolute inset-0 pointer-events-none">
-                {filtered.map((p, i) => {
-                  const angle = (i / filtered.length) * 2 * Math.PI;
-                  const radius = 30;
-                  const cx = 50 + radius * Math.cos(angle);
-                  const cy = 50 + radius * Math.sin(angle);
-                  return (
-                    <div
-                      key={p.id}
-                      className={cn('absolute pointer-events-auto cursor-pointer transition-transform hover:scale-125', selected === p.id && 'scale-125 z-10')}
-                      style={{ left: `${cx}%`, top: `${cy}%`, transform: 'translate(-50%, -50%)' }}
-                      onClick={() => setSelected(p.id)}
-                    >
-                      <div className={cn('h-4 w-4 rounded-full border-2 border-white shadow-md', STATUS_PIN_COLORS[p.status] || 'bg-slate-400')} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </div>
 
+          {/* Liste des chantiers */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
               {filtered.length} chantier{filtered.length > 1 ? 's' : ''}
             </h3>
-            <div className="space-y-2 max-h-[300px] sm:max-h-[480px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[300px] sm:max-h-[460px] overflow-y-auto pr-1">
               {filtered.map(p => {
                 const st = PROJECT_STATUSES[p.status] || PROJECT_STATUSES.a_planifier;
+                const hasCoords = p.lat && p.lng;
                 return (
                   <div
                     key={p.id}
@@ -137,19 +249,34 @@ export default function CartePage() {
                     )}
                     onClick={() => setSelected(p.id)}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.clients?.name}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{p.clients?.name}</p>
                       </div>
                       <StatusBadge label={st.label} color={st.color} />
                     </div>
                     {(p.address || p.city) && (
                       <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {[p.address, p.postal_code, p.city].filter(Boolean).join(', ')}
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{[p.address, p.postal_code, p.city].filter(Boolean).join(', ')}</span>
                       </p>
                     )}
+                    <div className="mt-2 flex items-center justify-between">
+                      {!hasCoords ? (
+                        <p className="text-xs text-amber-600">GPS manquant</p>
+                      ) : <span />}
+                      <button
+                        className={cn(
+                          'flex items-center gap-1 text-xs transition-colors',
+                          p.is_public ? 'text-emerald-600' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                        onClick={(e) => { e.stopPropagation(); togglePublic(p.id, !p.is_public); }}
+                      >
+                        {p.is_public ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                        {p.is_public ? 'Public' : 'Prive'}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -157,6 +284,89 @@ export default function CartePage() {
           </div>
         </div>
       )}
+
+      {/* Dialog partage */}
+      <Dialog open={showShare} onOpenChange={setShowShare}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Partager la carte</DialogTitle>
+            <DialogDescription>
+              Partagez un lien vers vos chantiers publics. Seuls les chantiers marques comme &quot;Public&quot; seront visibles.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm truncate">
+                {typeof window !== 'undefined' ? getShareLink() : ''}
+              </div>
+              <Button size="sm" onClick={copyShareLink} className="gap-2 shrink-0">
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied ? 'Copie !' : 'Copier'}
+              </Button>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Chantiers publics ({projects.filter(p => p.is_public).length}/{projects.length})</p>
+              <p className="text-xs text-muted-foreground">Cliquez sur l&apos;icone oeil dans la liste pour rendre un chantier public ou prive.</p>
+            </div>
+
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {projects.map(p => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.city}</p>
+                  </div>
+                  <Switch
+                    checked={p.is_public}
+                    onCheckedChange={(checked) => togglePublic(p.id, checked)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog creation chantier */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nouveau chantier</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-medium">Nom du chantier</label>
+              <Input className="mt-1" placeholder="Ex: Renovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Client</label>
+              <Input className="mt-1" placeholder="Nom du client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Adresse</label>
+              <AddressAutocomplete
+                value={addressQuery}
+                onChange={setAddressQuery}
+                onSelect={handleAddressSelect}
+                placeholder="Tapez une adresse..."
+                className="mt-1"
+              />
+            </div>
+            {form.city && (
+              <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
+                <p><span className="text-muted-foreground">Adresse :</span> {form.address}</p>
+                <p><span className="text-muted-foreground">Ville :</span> {form.postal_code} {form.city}</p>
+                <p><span className="text-muted-foreground">GPS :</span> {form.lat?.toFixed(5)}, {form.lng?.toFixed(5)}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
+              <Button onClick={createProject} disabled={!form.name.trim()}>Creer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

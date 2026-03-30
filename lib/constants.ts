@@ -45,6 +45,33 @@ export const EXPENSE_CATEGORIES = {
   autre: { label: 'Autre', color: 'bg-slate-100 text-slate-700' },
 } as const;
 
+export const MEMBER_TYPES = {
+  salarie: { label: 'Salarie', color: 'bg-blue-50 text-blue-700' },
+  sous_traitant: { label: 'Sous-traitant', color: 'bg-amber-50 text-amber-700' },
+  interimaire: { label: 'Interimaire', color: 'bg-purple-50 text-purple-700' },
+} as const;
+
+export const MEMBER_STATUSES = {
+  actif: { label: 'Actif', color: 'bg-emerald-50 text-emerald-700' },
+  inactif: { label: 'Inactif', color: 'bg-slate-100 text-slate-500' },
+} as const;
+
+export const SPECIALTIES = [
+  'Maconnerie',
+  'Plomberie',
+  'Electricite',
+  'Peinture',
+  'Carrelage',
+  'Menuiserie',
+  'Couverture',
+  'Placo / Platrerie',
+  'Chauffage / Clim',
+  'Terrassement',
+  'Charpente',
+  'Serrurerie',
+  'Autre',
+] as const;
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',

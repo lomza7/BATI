@@ -123,3 +123,22 @@
 .animate-fade-up {
   animation: fade-up 0.6s ease-out both;
 }
+
+/* Leaflet z-index fix — keep modals/dialogs above the map */
+.leaflet-pane,
+.leaflet-control,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}
+
+.leaflet-tooltip-custom {
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
