@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { aiQuoteAnalysisSchema } from '@/lib/ai/quote-schema';
 
+export const runtime = 'nodejs';
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY est absente. Ajoutez-la dans .env.local puis relancez le serveur.' },
+      { error: "ANTHROPIC_API_KEY est absente dans l'environnement du serveur." },
       { status: 503 }
     );
   }

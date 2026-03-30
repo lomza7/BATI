@@ -115,6 +115,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState('');
+  const [forceManualInput, setForceManualInput] = useState(false);
 
   useEffect(() => {
     photosRef.current = photos;
@@ -147,6 +148,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     setIsRecording(false);
     recognitionRef.current?.abort();
     setRecordSeconds(0);
+    setForceManualInput(false);
 
     if (presetRequest.mode === 'example') {
       setClientName('Mme Petit');
@@ -201,11 +203,13 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
 
     if (!SpeechRecognition) {
       setAnalysisError('La dictee vocale n est pas disponible sur ce navigateur. Essayez Edge ou Chrome.');
+      setForceManualInput(true);
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setAnalysisError("Ce navigateur ne permet pas d'acceder au micro.");
+      setForceManualInput(true);
       return;
     }
 
@@ -216,6 +220,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       setAnalysisError(
         "Le micro n'est pas autorise ou n'est pas disponible. Autorisez l'acces au micro dans le navigateur puis reessayez."
       );
+      setForceManualInput(true);
       return;
     }
 
@@ -248,6 +253,9 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       if (message) {
         setAnalysisError(message);
       }
+      if (event.error && event.error !== 'aborted' && event.error !== 'no-speech') {
+        setForceManualInput(true);
+      }
       setIsRecording(false);
       recognitionRef.current = null;
     };
@@ -262,6 +270,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     setClientName('');
     setRecordSeconds(0);
     setTranscript('');
+    setForceManualInput(false);
     recognitionRef.current = recognition;
     setIsRecording(true);
     recognition.start();
@@ -393,6 +402,18 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
                 {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 {isRecording ? "J'ai fini de parler" : 'Commencer a parler'}
               </button>
+              {!isRecording && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForceManualInput(true);
+                    setAnalysisError('');
+                  }}
+                  className="mt-2 text-xs font-medium text-[#a34700] underline-offset-4 hover:underline"
+                >
+                  Saisir a la main
+                </button>
+              )}
             </div>
             <div className={cn('rounded-2xl border p-4 transition-all duration-300', getStepClasses(2))}>
               <div className="flex items-center justify-between gap-3">
@@ -512,13 +533,13 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
             </div>
           )}
 
-          {transcript.trim() && (
+          {(transcript.trim() || forceManualInput) && (
             <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">Ce que l&apos;IA a compris</p>
                   <p className="text-xs text-muted-foreground">
-                    Vous pourrez toujours corriger avant d&apos;aller plus loin.
+                    Vous pourrez toujours corriger ou saisir votre descriptif avant d&apos;aller plus loin.
                   </p>
                 </div>
                 {clientName && <Badge variant="outline">{clientName}</Badge>}
