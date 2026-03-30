@@ -83,6 +83,11 @@ const planConfig = {
   business: { label: 'Business', color: 'bg-amber-100 text-amber-700', icon: Crown },
 };
 
+function parseMonthlyPrice(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -304,8 +309,15 @@ export default function AdminPage() {
 
   const maxChart = Math.max(...(chart.map(c => c.value) || [1]), 1);
 
+  const monthlyPrices = {
+    starter: 0,
+    pro: parseMonthlyPrice(stripeConfig.price_pro, 49),
+    business: parseMonthlyPrice(stripeConfig.price_business, 89),
+  };
   const payingUsers = (stats?.plan_pro || 0) + (stats?.plan_business || 0);
-  const mrr = (stats?.plan_pro || 0) * 49 + (stats?.plan_business || 0) * 89;
+  const mrr =
+    (stats?.plan_pro || 0) * monthlyPrices.pro +
+    (stats?.plan_business || 0) * monthlyPrices.business;
 
   return (
     <div className="space-y-6">
@@ -375,7 +387,7 @@ export default function AdminPage() {
             {(Object.entries(planConfig) as [keyof typeof planConfig, typeof planConfig[keyof typeof planConfig]][]).map(([key, conf]) => {
               const count = key === 'starter' ? stats.plan_starter : key === 'pro' ? stats.plan_pro : stats.plan_business;
               const pct = stats.total_users > 0 ? Math.round((count / stats.total_users) * 100) : 0;
-              const price = key === 'starter' ? 0 : key === 'pro' ? 49 : 89;
+              const price = monthlyPrices[key];
               return (
                 <div key={key} className="rounded-xl border border-border bg-card p-5">
                   <div className="flex items-center justify-between mb-3">
