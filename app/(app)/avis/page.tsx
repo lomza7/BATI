@@ -256,69 +256,28 @@ export default function AvisPage() {
 
       {!isConnected ? (
         <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                <BadgeCheck className="h-3.5 w-3.5" /> V2 connectee a Google
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-                {status.connected
-                  ? 'Compte Google relie, mais aucune fiche exploitable n a encore ete detectee.'
-                  : 'Branchez une vraie fiche Google et recuperez vos vrais avis dans BatiFlow.'}
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-                {status.connected
-                  ? 'Cela arrive si la fiche n est pas encore creee, pas encore verifiee, ou si Google ne renvoie pas encore de lien d avis. Creez la fiche puis reconnectez-la ici.'
-                  : 'L artisan clique sur connecter, choisit son compte Google, puis BatiFlow recupere les fiches disponibles. Ensuite, il peut choisir sa fiche, lire les avis, y repondre et copier son lien d avis officiel.'}
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                {[
-                  {
-                    title: '1. Connexion Google',
-                    text: 'Une vraie autorisation OAuth, sans que l artisan gere une cle API.',
-                  },
-                  {
-                    title: '2. Choix de la fiche',
-                    text: 'Si plusieurs etablissements existent, il choisit celui a piloter.',
-                  },
-                  {
-                    title: '3. Avis exploitables',
-                    text: 'Le lien officiel Google est pret a copier et les avis remontent dans l app.',
-                  },
-                ].map((step) => (
-                  <div key={step.title} className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
-                    <p className="text-sm font-semibold text-foreground">{step.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.text}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
-                  <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
-                </Button>
-                <Button variant="outline" className="gap-2" onClick={() => window.open(GOOGLE_CREATE_PROFILE_URL, '_blank')}>
-                  <ExternalLink className="h-4 w-4" /> Creer ma fiche Google
-                </Button>
-              </div>
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <BadgeCheck className="h-3.5 w-3.5" /> Avis Google
             </div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+              {status.connected
+                ? 'Votre compte Google est bien relie, mais aucune fiche n a encore ete trouvee.'
+                : 'Connectez votre fiche Google pour envoyer votre lien d avis en un clic.'}
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {status.connected
+                ? 'Si votre fiche vient juste d etre creee, reconnectez Google dans quelques minutes.'
+                : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis BatiFlow.'}
+            </p>
 
-            <div className="rounded-2xl border border-border bg-muted/30 p-5">
-              <p className="text-sm font-semibold text-foreground">Ce que cette V2 fait vraiment</p>
-              <div className="mt-4 space-y-3">
-                {[
-                  'Connexion Google reelle cote serveur',
-                  'Selection de la fiche Google de l artisan',
-                  'Lecture des avis reels et publication des reponses',
-                  'Lien officiel d avis Google pret a envoyer',
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-2 rounded-xl bg-card p-3">
-                    <BadgeCheck className="mt-0.5 h-4 w-4 text-emerald-600" />
-                    <p className="text-sm text-foreground">{item}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
+                <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={() => window.open(GOOGLE_CREATE_PROFILE_URL, '_blank')}>
+                <ExternalLink className="h-4 w-4" /> Creer ma fiche Google
+              </Button>
             </div>
           </div>
         </div>
@@ -531,7 +490,7 @@ export default function AvisPage() {
           <DialogHeader>
             <DialogTitle>Preparer une demande d avis</DialogTitle>
             <DialogDescription>
-              Utilisez le vrai lien Google de votre fiche pour pre-remplir un message client.
+              Remplissez juste le nom du client, puis copiez le message.
             </DialogDescription>
           </DialogHeader>
 
