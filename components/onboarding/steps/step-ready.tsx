@@ -39,13 +39,21 @@ export function StepReady({ data, onBack, onFinish, saving }: Props) {
         Voici un recapitulatif de vos informations.
       </p>
 
-      <div className="mt-6 flex-1 space-y-3">
+      <div className="mt-6 flex-1 space-y-3 max-h-[300px] overflow-y-auto pr-1">
         <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-          <SummaryRow label="Nom" value={data.fullName} />
-          <SummaryRow label="Entreprise" value={data.companyName} />
-          <SummaryRow label="Activite" value={data.companyActivity} />
-          {data.companyCity && <SummaryRow label="Ville" value={data.companyCity} />}
+          {data.fullName && <SummaryRow label="Nom" value={data.fullName} />}
+          {data.companyName && <SummaryRow label="Entreprise" value={data.companyName} />}
+          {data.siren && <SummaryRow label="SIREN" value={data.siren} />}
+          {data.siret && <SummaryRow label="SIRET" value={data.siret} />}
+          {data.legalForm && <SummaryRow label="Forme juridique" value={data.legalForm} />}
+          {data.companyActivity && <SummaryRow label="Activite" value={data.companyActivity} />}
+          {data.nafLabel && <SummaryRow label="Code NAF" value={`${data.nafCode} — ${data.nafLabel}`} />}
+          {data.tvaNumber && <SummaryRow label="N° TVA" value={data.tvaNumber} />}
+          {(data.companyAddress || data.companyCity) && (
+            <SummaryRow label="Adresse" value={[data.companyAddress, data.companyPostalCode, data.companyCity].filter(Boolean).join(', ')} />
+          )}
           {data.companyPhone && <SummaryRow label="Telephone" value={data.companyPhone} />}
+          {data.companyWebsite && <SummaryRow label="Site web" value={data.companyWebsite} />}
           <SummaryRow label="Equipe" value={teamSizeLabel(data.teamSize)} />
           {data.teamMembers.filter((m) => m.name.trim()).length > 0 && (
             <SummaryRow

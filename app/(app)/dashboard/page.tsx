@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -21,7 +21,6 @@ import {
   FileText,
   FolderKanban,
   TrendingUp,
-  Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -103,6 +102,29 @@ interface PlanningEventRow {
   team_members: { name: string; color: string | null } | null;
 }
 
+interface ReminderSettingsRow {
+  legal_form: string;
+  benefit_tax_regime: string;
+  vat_regime: string;
+  vat_frequency: string;
+  vat_reminder_day: number | null;
+  has_employees: boolean;
+  employee_count: number | null;
+  payroll_day: number | null;
+  dsn_due_day: number | null;
+  fiscal_year_end_day: number;
+  fiscal_year_end_month: number;
+  social_contributions_day: number | null;
+  cfe_applicable: boolean;
+  apprenticeship_tax_applicable: boolean;
+}
+
+interface CompanyProfileRow {
+  legal_form: string;
+  naf_label: string;
+  tva_number: string;
+}
+
 type ActivityItem = {
   id: string;
   label: string;
@@ -125,6 +147,7 @@ type ReminderItem = {
   title: string;
   description: string;
   dueLabel: string;
+  dueDate?: string;
   priority: 'high' | 'medium' | 'low';
   href: string;
   actionLabel: string;
@@ -237,6 +260,198 @@ function toNumber(value: number | string | null | undefined) {
   return Number(value || 0);
 }
 
+function mapPappersLegalFormToSetting(legalForm: string) {
+  const value = legalForm.toLowerCase();
+  if (value.includes('micro')) return 'micro';
+  if (value.includes('sasu')) return 'sasu';
+  if (value.includes('sas')) return 'sas';
+  if (value.includes('eurl')) return 'eurl';
+  if (value.includes('sarl')) return 'sarl';
+  if (value.includes('entreprise individuelle')) return 'ei';
+  return '';
+}
+
+function inferBenefitTaxRegime(legalFormSetting: string) {
+  if (legalFormSetting === 'micro') return 'micro';
+  if (legalFormSetting === 'ei') return 'ir';
+  if (legalFormSetting === 'sas' || legalFormSetting === 'sasu') return 'is';
+  return '';
+}
+
+function getNextMonthlyOccurrence(day: number, now = new Date()) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const currentMonthLastDay = new Date(year, month + 1, 0).getDate();
+  const currentCandidate = new Date(year, month, Math.min(day, currentMonthLastDay), 9, 0, 0, 0);
+
+  if (currentCandidate >= now) {
+    return currentCandidate;
+  }
+
+  const nextMonthLastDay = new Date(year, month + 2, 0).getDate();
+  return new Date(year, month + 1, Math.min(day, nextMonthLastDay), 9, 0, 0, 0);
+}
+
+function getNextAnnualOccurrence(month: number, day: number, now = new Date()) {
+  const year = now.getFullYear();
+  const currentYearLastDay = new Date(year, month, 0).getDate();
+  const currentCandidate = new Date(year, month - 1, Math.min(day, currentYearLastDay), 9, 0, 0, 0);
+
+  if (currentCandidate >= now) {
+    return currentCandidate;
+  }
+
+  const nextYearLastDay = new Date(year + 1, month, 0).getDate();
+  return new Date(year + 1, month - 1, Math.min(day, nextYearLastDay), 9, 0, 0, 0);
+}
+
+function createAdminReminders(
+  settings: ReminderSettingsRow | null,
+  companyProfile: CompanyProfileRow | null,
+  now: Date
+) {
+  const reminders: ReminderItem[] = [];
+  const legalForm = settings?.legal_form || mapPappersLegalFormToSetting(companyProfile?.legal_form || '');
+  const benefitTaxRegime = settings?.benefit_tax_regime || inferBenefitTaxRegime(legalForm);
+  const hasEmployees = settings?.has_employees || false;
+
+  if (settings?.vat_regime && settings.vat_regime !== 'franchise_en_base' && settings.vat_reminder_day) {
+    const dueDate = getNextMonthlyOccurrence(settings.vat_reminder_day, now);
+    const days = differenceInDays(dueDate.toISOString(), now);
+    if (days <= 10) {
+      reminders.push({
+        id: 'admin-vat',
+        title: 'TVA a preparer',
+        description: companyProfile?.tva_number
+          ? `Votre numero de TVA est bien renseigne. Preparez votre declaration ${settings.vat_frequency || 'periodique'}.`
+          : 'Pensez a preparer votre declaration de TVA et a verifier vos justificatifs.',
+        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Rappel programme dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: dueDate.toISOString(),
+        priority: days <= 2 ? 'high' : 'medium',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Verifier les reglages',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  if (hasEmployees && settings?.payroll_day) {
+    const dueDate = getNextMonthlyOccurrence(settings.payroll_day, now);
+    const days = differenceInDays(dueDate.toISOString(), now);
+    if (days <= 7) {
+      reminders.push({
+        id: 'admin-payroll',
+        title: 'Paie a lancer',
+        description: `La paie de votre equipe approche${settings.employee_count ? ` pour ${settings.employee_count} personne${settings.employee_count > 1 ? 's' : ''}` : ''}.`,
+        dueLabel: days <= 0 ? 'Paie prevue aujourd’hui' : `Paie dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: dueDate.toISOString(),
+        priority: days <= 2 ? 'high' : 'medium',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Voir les reglages paie',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  if (hasEmployees && settings?.dsn_due_day) {
+    const dueDate = getNextMonthlyOccurrence(settings.dsn_due_day, now);
+    const days = differenceInDays(dueDate.toISOString(), now);
+    if (days <= 10) {
+      reminders.push({
+        id: 'admin-dsn',
+        title: 'DSN a transmettre',
+        description: 'Votre declaration sociale nominative doit etre verifiee avant l echeance.',
+        dueLabel: days <= 0 ? 'DSN due aujourd’hui' : `DSN dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: dueDate.toISOString(),
+        priority: days <= 2 ? 'high' : 'medium',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Verifier la DSN',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  if (settings?.fiscal_year_end_day && settings?.fiscal_year_end_month) {
+    const dueDate = getNextAnnualOccurrence(settings.fiscal_year_end_month, settings.fiscal_year_end_day, now);
+    const days = differenceInDays(dueDate.toISOString(), now);
+    if (days <= 60) {
+      reminders.push({
+        id: 'admin-cloture',
+        title: 'Cloture comptable a anticiper',
+        description: benefitTaxRegime === 'is'
+          ? 'Preparez votre cloture, la liasse fiscale et les prochaines echeances IS.'
+          : 'Preparez vos pieces comptables pour votre prochaine cloture d exercice.',
+        dueLabel: days <= 0 ? 'Cloture prevue aujourd’hui' : `Cloture dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: dueDate.toISOString(),
+        priority: days <= 15 ? 'high' : 'low',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Voir la cloture',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  if (benefitTaxRegime === 'is') {
+    const isInstallments = [
+      { month: 3, day: 15, id: 'is-mars' },
+      { month: 6, day: 15, id: 'is-juin' },
+      { month: 9, day: 15, id: 'is-septembre' },
+      { month: 12, day: 15, id: 'is-decembre' },
+    ];
+    const nextInstallment = isInstallments
+      .map((item) => ({
+        ...item,
+        date: getNextAnnualOccurrence(item.month, item.day, now),
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+
+    const days = differenceInDays(nextInstallment.date.toISOString(), now);
+    if (days <= 20) {
+      reminders.push({
+        id: `admin-${nextInstallment.id}`,
+        title: 'Acompte d IS a verifier',
+        description: 'Votre prochaine echeance d impot sur les societes approche.',
+        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: nextInstallment.date.toISOString(),
+        priority: days <= 5 ? 'high' : 'medium',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Verifier l echeance',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  if (settings?.cfe_applicable) {
+    const cfeDates = [
+      { month: 6, day: 15, label: 'Acompte CFE' },
+      { month: 12, day: 15, label: 'Solde CFE' },
+    ];
+    const nextCfe = cfeDates
+      .map((item) => ({
+        ...item,
+        date: getNextAnnualOccurrence(item.month, item.day, now),
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+
+    const days = differenceInDays(nextCfe.date.toISOString(), now);
+    if (days <= 20) {
+      reminders.push({
+        id: `admin-cfe-${nextCfe.month}`,
+        title: nextCfe.label,
+        description: 'Pensez a verifier votre avis CFE et a anticiper le reglement.',
+        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueDate: nextCfe.date.toISOString(),
+        priority: days <= 5 ? 'high' : 'low',
+        href: '/parametres?tab=parametres',
+        actionLabel: 'Voir la fiscalite',
+        kind: 'administratif',
+      });
+    }
+  }
+
+  return reminders;
+}
+
 function buildMonthlySeries(quotes: QuoteRow[], invoices: InvoiceRow[]) {
   const now = new Date();
   const points: RevenuePoint[] = [];
@@ -268,22 +483,15 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
   const [planningEvents, setPlanningEvents] = useState<PlanningEventRow[]>([]);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettingsRow | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfileRow | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    void loadDashboard();
-  }, [authLoading, user]);
-
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, teamMembersRes, planningEventsRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -304,6 +512,18 @@ export default function DashboardPage() {
         .from('planning_events')
         .select('id, title, event_type, start_date, end_date, team_member_id, team_members(name, color)')
         .order('start_date'),
+      supabase
+        .from('business_reminder_settings')
+        .select(
+          'legal_form, benefit_tax_regime, vat_regime, vat_frequency, vat_reminder_day, has_employees, employee_count, payroll_day, dsn_due_day, fiscal_year_end_day, fiscal_year_end_month, social_contributions_day, cfe_applicable, apprenticeship_tax_applicable'
+        )
+        .eq('user_id', user!.id)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('legal_form, naf_label, tva_number')
+        .eq('id', user!.id)
+        .maybeSingle(),
     ]);
 
     setQuotes(((quotesRes.data as unknown as QuoteRow[]) || []).map((quote) => ({
@@ -320,8 +540,20 @@ export default function DashboardPage() {
     })));
     setTeamMembers((teamMembersRes.data as TeamMemberRow[]) || []);
     setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
+    setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
+    setCompanyProfile((profileRes.data as CompanyProfileRow | null) || null);
     setLoading(false);
-  }
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    void loadDashboard();
+  }, [authLoading, user, loadDashboard]);
 
   const dashboardData = useMemo(() => {
     const now = new Date();
@@ -463,6 +695,7 @@ export default function DashboardPage() {
             description: `${invoice.clients?.name || 'Un client'} n'a pas encore regle cette facture.`,
             dueLabel: `En retard depuis ${daysLate} jour${daysLate > 1 ? 's' : ''}`,
             priority: 'high' as const,
+            dueDate: invoice.due_date as string,
             href: '/factures',
             actionLabel: 'Voir les factures',
             kind: 'facturation' as const,
@@ -480,6 +713,7 @@ export default function DashboardPage() {
             description: `${invoice.clients?.name || 'Ce client'} arrive a l'echeance de paiement.`,
             dueLabel: days === 0 ? 'Echeance aujourd’hui' : `Echeance dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
+            dueDate: invoice.due_date as string,
             href: '/factures',
             actionLabel: 'Ouvrir les factures',
             kind: 'facturation' as const,
@@ -498,6 +732,7 @@ export default function DashboardPage() {
             description: `${quote.clients?.name || 'Ce client'} n'a pas encore repondu au devis.`,
             dueLabel: `Envoye il y a ${sentSinceDays} jour${sentSinceDays > 1 ? 's' : ''}`,
             priority: sentSinceDays >= 7 ? 'high' as const : 'medium' as const,
+            dueDate: quote.valid_until || quote.created_at,
             href: '/devis',
             actionLabel: 'Voir les devis',
             kind: 'commercial' as const,
@@ -516,6 +751,7 @@ export default function DashboardPage() {
             description: `${quote.clients?.name || 'Ce client'} doit etre relance avant expiration.`,
             dueLabel: days === 0 ? 'Expire aujourd’hui' : `Expire dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
+            dueDate: quote.valid_until as string,
             href: '/devis',
             actionLabel: 'Verifier le devis',
             kind: 'commercial' as const,
@@ -534,6 +770,7 @@ export default function DashboardPage() {
             description: `${project.clients?.name || 'Le client'} attend le lancement du chantier.`,
             dueLabel: days === 0 ? 'Demarrage aujourd’hui' : `Demarrage dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
+            dueDate: project.start_date as string,
             href: '/chantiers',
             actionLabel: 'Voir le chantier',
             kind: 'chantier' as const,
@@ -552,16 +789,20 @@ export default function DashboardPage() {
             description: 'Pensez a finaliser le chantier, envoyer la facture et demander un avis client.',
             dueLabel: days === 0 ? 'Fin prevue aujourd’hui' : `Fin prevue dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days === 0 ? 'high' as const : 'low' as const,
+            dueDate: project.end_date as string,
             href: '/chantiers',
             actionLabel: 'Suivre le chantier',
             kind: 'chantier' as const,
           };
         })
         .filter(Boolean) as ReminderItem[],
+      ...createAdminReminders(reminderSettings, companyProfile, now),
     ]
       .sort((a, b) => {
         const priorityWeight = { high: 0, medium: 1, low: 2 };
-        return priorityWeight[a.priority] - priorityWeight[b.priority];
+        const byPriority = priorityWeight[a.priority] - priorityWeight[b.priority];
+        if (byPriority !== 0) return byPriority;
+        return new Date(a.dueDate || now).getTime() - new Date(b.dueDate || now).getTime();
       })
       .slice(0, 6);
 
@@ -627,7 +868,7 @@ export default function DashboardPage() {
         return start >= todayStart && start <= nextWeek;
       }).length,
     };
-  }, [invoices, planningEvents, projects, quotes, teamMembers]);
+  }, [companyProfile, invoices, planningEvents, projects, quotes, reminderSettings, teamMembers]);
 
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
     ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} le mois dernier`
@@ -642,6 +883,16 @@ export default function DashboardPage() {
   const displayName = profile?.company_name || profile?.full_name || 'BatiFlow';
   const topPriorityReminder = dashboardData.reminderItems[0] || null;
   const nextDeadline = dashboardData.deadlineItems[0] || null;
+  const hasConfiguredAdminSignals = Boolean(
+    reminderSettings?.vat_regime ||
+      reminderSettings?.vat_reminder_day ||
+      reminderSettings?.has_employees ||
+      reminderSettings?.payroll_day ||
+      reminderSettings?.dsn_due_day ||
+      reminderSettings?.social_contributions_day ||
+      (reminderSettings &&
+        (reminderSettings.fiscal_year_end_day !== 31 || reminderSettings.fiscal_year_end_month !== 12))
+  );
 
   if (authLoading || loading) {
     return (
@@ -754,48 +1005,6 @@ export default function DashboardPage() {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {nextDeadline ? formatDate(nextDeadline.date) : 'Rien a surveiller cette semaine.'}
-                  </p>
-                </Link>
-                <Link
-                  href="/chantiers"
-                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Chantiers a lancer</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">{dashboardData.projectsToLaunchSoon}</p>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                      <FolderKanban className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {dashboardData.projectsToLaunchSoon > 0
-                      ? 'Des lancements sont a caler dans les 7 prochains jours.'
-                      : 'Aucun demarrage imminent a preparer.'}
-                  </p>
-                </Link>
-                <Link
-                  href="/planning"
-                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipe et planning</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">
-                        {dashboardData.activeTeamMembers.length}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                      <Users className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {dashboardData.activeTeamMembers.filter((member) => member.type === 'salarie').length} salaries actifs,
-                    {' '}
-                    {dashboardData.activeTeamMembers.filter((member) => member.type !== 'salarie').length} prestataires et
-                    {' '}
-                    {dashboardData.planningThisWeekCount} element(s) planifies cette semaine.
                   </p>
                 </Link>
               </div>
@@ -926,11 +1135,11 @@ export default function DashboardPage() {
                   <h2 className="text-base font-semibold text-foreground">Rappels chef d&apos;entreprise</h2>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Vos prochaines actions utiles, generees automatiquement a partir de vos devis, factures et chantiers.
+                  Vos prochaines actions utiles, generees a partir de vos devis, factures, chantiers et reglages entreprise.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit border-primary/20 bg-primary/5 text-primary">
-                V1 automatique
+                Pilote automatiquement
               </Badge>
             </div>
 
@@ -986,8 +1195,15 @@ export default function DashboardPage() {
             )}
 
             <div className="mt-5 rounded-xl border border-dashed border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-              Les rappels administratifs comme la TVA, la paie, la DSN ou la cloture comptable seront encore plus precis
-              des que nous aurons ajoute les parametres entreprise dedies.
+              {reminderSettings
+                ? hasConfiguredAdminSignals
+                  ? 'Vos reglages TVA, paie, DSN et cloture sont maintenant pris en compte ici. Vous pouvez les affiner a tout moment dans Parametres.'
+                  : 'Les rappels administratifs sont prets. Ajoutez vos vraies dates TVA, paie, DSN et cloture pour les rendre encore plus precis.'
+                : 'Ajoutez vos reglages TVA, paie, DSN et cloture dans Parametres pour faire apparaitre aussi les rappels administratifs.'}
+              {' '}
+              <Link href="/parametres?tab=parametres" className="font-medium text-primary underline-offset-2 hover:underline">
+                Ouvrir les parametres
+              </Link>
             </div>
           </div>
 

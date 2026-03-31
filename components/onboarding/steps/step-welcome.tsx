@@ -1,15 +1,16 @@
 'use client';
 
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, SkipForward } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
 
 interface Props {
   data: OnboardingData;
   onChange: (d: Partial<OnboardingData>) => void;
   onNext: () => void;
+  onSkip: () => void;
 }
 
-export function StepWelcome({ data, onChange, onNext }: Props) {
+export function StepWelcome({ data, onChange, onNext, onSkip }: Props) {
   const canProceed = data.fullName.trim().length >= 2;
 
   return (
@@ -48,7 +49,14 @@ export function StepWelcome({ data, onChange, onNext }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-end mt-6">
+      <div className="flex items-center justify-end gap-2 mt-6">
+        <button
+          onClick={onSkip}
+          className="h-11 px-4 rounded-xl text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 hover:bg-muted/30 transition-all"
+        >
+          Passer
+          <SkipForward className="h-3.5 w-3.5" />
+        </button>
         <button
           onClick={onNext}
           disabled={!canProceed}

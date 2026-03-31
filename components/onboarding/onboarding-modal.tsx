@@ -22,6 +22,18 @@ export interface OnboardingData {
   teamSize: string;
   teamMembers: { name: string; role: string }[];
   referralSource: string;
+  // Pappers data
+  siren: string;
+  siret: string;
+  legalForm: string;
+  nafCode: string;
+  nafLabel: string;
+  capital: number | null;
+  tvaNumber: string;
+  companyAddress: string;
+  companyPostalCode: string;
+  companyWebsite: string;
+  rcs: string;
 }
 
 const TOTAL_STEPS = 5;
@@ -44,6 +56,17 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
     teamSize: 'seul',
     teamMembers: [],
     referralSource: '',
+    siren: '',
+    siret: '',
+    legalForm: '',
+    nafCode: '',
+    nafLabel: '',
+    capital: null,
+    tvaNumber: '',
+    companyAddress: '',
+    companyPostalCode: '',
+    companyWebsite: '',
+    rcs: '',
   });
 
   const updateData = useCallback((partial: Partial<OnboardingData>) => {
@@ -56,6 +79,10 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
 
   const back = useCallback(() => {
     setStep((s) => Math.max(s - 1, 0));
+  }, []);
+
+  const skip = useCallback(() => {
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   }, []);
 
   const finish = useCallback(async () => {
@@ -71,6 +98,17 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
         company_phone: data.companyPhone,
         team_size: data.teamSize,
         referral_source: data.referralSource,
+        siren: data.siren,
+        siret: data.siret,
+        legal_form: data.legalForm,
+        naf_code: data.nafCode,
+        naf_label: data.nafLabel,
+        capital: data.capital,
+        tva_number: data.tvaNumber,
+        company_address: data.companyAddress,
+        company_postal_code: data.companyPostalCode,
+        company_website: data.companyWebsite,
+        rcs: data.rcs,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
       })
@@ -131,16 +169,16 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
 
         <div className="px-8 pb-8 min-h-[380px] flex flex-col">
           {step === 0 && (
-            <StepWelcome data={data} onChange={updateData} onNext={next} />
+            <StepWelcome data={data} onChange={updateData} onNext={next} onSkip={skip} />
           )}
           {step === 1 && (
-            <StepCompany data={data} onChange={updateData} onNext={next} onBack={back} />
+            <StepCompany data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
           )}
           {step === 2 && (
-            <StepTeam data={data} onChange={updateData} onNext={next} onBack={back} />
+            <StepTeam data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
           )}
           {step === 3 && (
-            <StepReferral data={data} onChange={updateData} onNext={next} onBack={back} />
+            <StepReferral data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
           )}
           {step === 4 && (
             <StepReady data={data} onBack={back} onFinish={finish} saving={saving} />

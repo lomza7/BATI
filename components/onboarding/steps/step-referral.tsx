@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, ArrowRight, Megaphone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Megaphone, SkipForward } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
 
 const sources = [
@@ -19,9 +19,10 @@ interface Props {
   onChange: (d: Partial<OnboardingData>) => void;
   onNext: () => void;
   onBack: () => void;
+  onSkip: () => void;
 }
 
-export function StepReferral({ data, onChange, onNext, onBack }: Props) {
+export function StepReferral({ data, onChange, onNext, onBack, onSkip }: Props) {
   return (
     <div className="flex flex-col flex-1 animate-fade-up">
       <div className="flex items-center gap-3 mb-2">
@@ -56,7 +57,7 @@ export function StepReferral({ data, onChange, onNext, onBack }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-between mt-6">
+      <div className="flex items-center justify-between mt-6">
         <button
           onClick={onBack}
           className="h-11 px-5 rounded-xl border border-border bg-white text-sm font-medium text-foreground flex items-center gap-2 hover:bg-muted/50 transition-all"
@@ -64,13 +65,22 @@ export function StepReferral({ data, onChange, onNext, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" />
           Retour
         </button>
-        <button
-          onClick={onNext}
-          className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-all"
-        >
-          Continuer
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onSkip}
+            className="h-11 px-4 rounded-xl text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 hover:bg-muted/30 transition-all"
+          >
+            Passer
+            <SkipForward className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={onNext}
+            className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center gap-2 hover:bg-primary/90 transition-all"
+          >
+            Continuer
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
