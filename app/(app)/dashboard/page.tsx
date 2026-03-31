@@ -20,14 +20,14 @@ import {
   Euro,
   FileText,
   FolderKanban,
-  Receipt,
   TrendingUp,
-  Wallet,
+  Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import {
   INVOICE_STATUSES,
+  MEMBER_TYPES,
   PROJECT_STATUSES,
   QUOTE_STATUSES,
   formatCurrency,
@@ -83,6 +83,24 @@ interface ProjectRow {
   created_at: string;
   updated_at: string;
   clients: { name: string } | null;
+}
+
+interface TeamMemberRow {
+  id: string;
+  name: string;
+  type: keyof typeof MEMBER_TYPES;
+  status: string;
+  color: string | null;
+}
+
+interface PlanningEventRow {
+  id: string;
+  title: string;
+  event_type: string;
+  start_date: string;
+  end_date: string;
+  team_member_id: string | null;
+  team_members: { name: string; color: string | null } | null;
 }
 
 type ActivityItem = {
@@ -248,6 +266,8 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
+  const [planningEvents, setPlanningEvents] = useState<PlanningEventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -263,7 +283,7 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, teamMembersRes, planningEventsRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -276,6 +296,14 @@ export default function DashboardPage() {
         .from('projects')
         .select('id, name, status, budget, start_date, end_date, created_at, updated_at, clients(name)')
         .order('created_at', { ascending: false }),
+      supabase
+        .from('team_members')
+        .select('id, name, type, status, color')
+        .order('name'),
+      supabase
+        .from('planning_events')
+        .select('id, title, event_type, start_date, end_date, team_member_id, team_members(name, color)')
+        .order('start_date'),
     ]);
 
     setQuotes(((quotesRes.data as unknown as QuoteRow[]) || []).map((quote) => ({
@@ -290,17 +318,23 @@ export default function DashboardPage() {
       ...project,
       budget: toNumber(project.budget),
     })));
+    setTeamMembers((teamMembersRes.data as TeamMemberRow[]) || []);
+    setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
     setLoading(false);
   }
 
   const dashboardData = useMemo(() => {
     const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
     const currentMonth = getMonthRange(now);
     const previousMonth = getMonthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1));
     const last30Days = new Date(now);
     last30Days.setDate(last30Days.getDate() - 30);
     const previous30Days = new Date(last30Days);
     previous30Days.setDate(previous30Days.getDate() - 30);
+    const nextWeek = new Date(now);
+    nextWeek.setDate(nextWeek.getDate() + 7);
 
     const paidThisMonth = invoices.filter(
       (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, currentMonth.start, currentMonth.end)
@@ -584,8 +618,16 @@ export default function DashboardPage() {
         const days = differenceInDays(project.start_date, now);
         return days >= 0 && days <= 7;
       }).length,
+      activeTeamMembers: teamMembers.filter((member) => member.status === 'actif'),
+      nextPlanningEvents: planningEvents
+        .filter((event) => new Date(event.start_date) >= todayStart)
+        .slice(0, 3),
+      planningThisWeekCount: planningEvents.filter((event) => {
+        const start = new Date(event.start_date);
+        return start >= todayStart && start <= nextWeek;
+      }).length,
     };
-  }, [invoices, projects, quotes]);
+  }, [invoices, planningEvents, projects, quotes, teamMembers]);
 
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
     ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} le mois dernier`
@@ -658,14 +700,10 @@ export default function DashboardPage() {
                 <Badge variant="outline" className="border-primary/20 bg-background/70 text-primary">
                   Vue dirigeant
                 </Badge>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
                     Bonjour {displayName}, voici ce qui merite votre attention aujourd&apos;hui.
                   </h2>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    BatiFlow vous remonte vos encaissements, vos relances prioritaires et les chantiers a surveiller,
-                    sans vous obliger a fouiller dans chaque module.
-                  </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <Button asChild>
@@ -677,7 +715,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-2">
                 <Link
                   href={topPriorityReminder?.href || '/dashboard'}
                   className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
@@ -735,6 +773,29 @@ export default function DashboardPage() {
                     {dashboardData.projectsToLaunchSoon > 0
                       ? 'Des lancements sont a caler dans les 7 prochains jours.'
                       : 'Aucun demarrage imminent a preparer.'}
+                  </p>
+                </Link>
+                <Link
+                  href="/planning"
+                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipe et planning</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">
+                        {dashboardData.activeTeamMembers.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                      <Users className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {dashboardData.activeTeamMembers.filter((member) => member.type === 'salarie').length} salaries actifs,
+                    {' '}
+                    {dashboardData.activeTeamMembers.filter((member) => member.type !== 'salarie').length} prestataires et
+                    {' '}
+                    {dashboardData.planningThisWeekCount} element(s) planifies cette semaine.
                   </p>
                 </Link>
               </div>
@@ -930,7 +991,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -958,6 +1019,57 @@ export default function DashboardPage() {
                       <span className="text-xs text-muted-foreground">{item.time}</span>
                     </Link>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Equipe au travail</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Qui est mobilise sur les prochains jours</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/planning">Ouvrir le planning</Link>
+                </Button>
+              </div>
+
+              {dashboardData.activeTeamMembers.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                  Ajoutez vos salaries et prestataires pour obtenir une vraie vue d&apos;ensemble equipe.
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {dashboardData.activeTeamMembers.slice(0, 4).map((member) => {
+                    const nextEvent = dashboardData.nextPlanningEvents.find((event) => event.team_member_id === member.id);
+                    return (
+                      <Link
+                        key={member.id}
+                        href="/planning"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-transparent px-2 py-2 transition-colors hover:border-border hover:bg-muted/40"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: member.color || '#E97F2A' }}
+                            />
+                            <p className="truncate text-sm font-medium text-foreground">{member.name}</p>
+                            <StatusBadge
+                              label={MEMBER_TYPES[member.type]?.label || 'Equipe'}
+                              color={MEMBER_TYPES[member.type]?.color || 'bg-slate-100 text-slate-700'}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {nextEvent
+                              ? `${nextEvent.title} • ${formatDate(nextEvent.start_date)}`
+                              : 'Aucun evenement planifie prochainement'}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
