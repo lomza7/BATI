@@ -235,8 +235,12 @@ export default function ParametresPage() {
     full_name: '',
     company_name: '',
     company_activity: '',
+    company_address: '',
+    company_postal_code: '',
     company_city: '',
     company_phone: '',
+    company_website: '',
+    tva_number: '',
     team_size: 'seul',
     referral_source: '',
   });
@@ -291,8 +295,12 @@ export default function ParametresPage() {
       full_name: nextProfile?.full_name || '',
       company_name: nextProfile?.company_name || '',
       company_activity: nextProfile?.company_activity || '',
+      company_address: nextProfile?.company_address || '',
+      company_postal_code: nextProfile?.company_postal_code || '',
       company_city: nextProfile?.company_city || '',
       company_phone: nextProfile?.company_phone || '',
+      company_website: nextProfile?.company_website || '',
+      tva_number: nextProfile?.tva_number || '',
       team_size: nextProfile?.team_size || 'seul',
       referral_source: nextProfile?.referral_source || '',
     });
@@ -572,6 +580,24 @@ export default function ParametresPage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="company_address">Adresse</Label>
+                    <Input
+                      id="company_address"
+                      value={form.company_address}
+                      onChange={(e) => setForm((prev) => ({ ...prev, company_address: e.target.value }))}
+                      placeholder="12 rue de la Republique"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_postal_code">Code postal</Label>
+                    <Input
+                      id="company_postal_code"
+                      value={form.company_postal_code}
+                      onChange={(e) => setForm((prev) => ({ ...prev, company_postal_code: e.target.value }))}
+                      placeholder="75011"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="company_city">Ville</Label>
                     <Input
                       id="company_city"
@@ -581,12 +607,30 @@ export default function ParametresPage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="company_website">Site web</Label>
+                    <Input
+                      id="company_website"
+                      value={form.company_website}
+                      onChange={(e) => setForm((prev) => ({ ...prev, company_website: e.target.value }))}
+                      placeholder="https://www.monentreprise.fr"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="company_phone">Telephone</Label>
                     <Input
                       id="company_phone"
                       value={form.company_phone}
                       onChange={(e) => setForm((prev) => ({ ...prev, company_phone: e.target.value }))}
                       placeholder="06 00 00 00 00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tva_number">Numero de TVA</Label>
+                    <Input
+                      id="tva_number"
+                      value={form.tva_number}
+                      onChange={(e) => setForm((prev) => ({ ...prev, tva_number: e.target.value }))}
+                      placeholder="FRXX123456789"
                     />
                   </div>
                 </div>
@@ -666,8 +710,19 @@ export default function ParametresPage() {
                   <div className="flex items-start gap-3">
                     <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-foreground">{form.company_city || 'Ville non renseignee'}</p>
-                      <p className="text-muted-foreground">Zone principale d intervention</p>
+                      <p className="font-medium text-foreground">
+                        {[form.company_address, form.company_postal_code, form.company_city].filter(Boolean).join(', ') || 'Adresse non renseignee'}
+                      </p>
+                      <p className="text-muted-foreground">Adresse principale de l entreprise</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-foreground">{profile?.siren || 'SIREN non renseigne'}</p>
+                      <p className="text-muted-foreground">
+                        {form.tva_number || 'Numero de TVA non renseigne'}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
