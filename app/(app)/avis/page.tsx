@@ -208,6 +208,8 @@ export default function AvisPage() {
 
   const selectedLocation = status.selectedLocation;
   const isConnected = status.connected && !!selectedLocation;
+  const googleAccessPending =
+    /quota exceeded|requests per minute|quota of 0|mybusinessaccountmanagement/i.test(error);
   const pendingReplies = status.reviews.filter((review) => !review.reviewReplyComment).length;
   const requestMessage = isConnected
     ? buildReviewMessage(requestForm.clientName, selectedLocation.title, selectedLocation.newReviewUri)
@@ -249,9 +251,41 @@ export default function AvisPage() {
       </PageHeader>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
+        googleAccessPending ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <p className="text-sm font-semibold text-amber-900">Connexion Google reussie</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Votre compte Google est bien connecte a BatiFlow.
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              Nous attendons maintenant l autorisation officielle de Google pour importer et gerer votre fiche et vos avis depuis l application.
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              Des que Google valide cet acces, votre fiche apparaitra ici automatiquement.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-amber-700">Connexion Google</p>
+                <p className="mt-1 text-sm font-medium text-foreground">Reussie</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-amber-700">Autorisation Google</p>
+                <p className="mt-1 text-sm font-medium text-foreground">En attente</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-amber-700">Import de la fiche</p>
+                <p className="mt-1 text-sm font-medium text-foreground">En attente de validation</p>
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-amber-700">
+              Vous n avez rien d autre a faire pour le moment. Nous finaliserons automatiquement l acces des que Google aura valide notre demande.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )
       )}
 
       {!isConnected ? (
@@ -260,16 +294,20 @@ export default function AvisPage() {
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <BadgeCheck className="h-3.5 w-3.5" /> Avis Google
             </div>
-            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-              {status.connected
-                ? 'Votre compte Google est bien relie, mais aucune fiche n a encore ete trouvee.'
-                : 'Connectez votre fiche Google pour envoyer votre lien d avis en un clic.'}
-            </h2>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {status.connected
-                ? 'Si votre fiche vient juste d etre creee, reconnectez Google dans quelques minutes.'
-                : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis BatiFlow.'}
-            </p>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+              {googleAccessPending
+                ? 'Votre compte Google est bien relie. Nous attendons maintenant la validation de Google.'
+                : status.connected
+                  ? 'Votre compte Google est bien relie, mais aucune fiche n a encore ete trouvee.'
+                  : 'Connectez votre fiche Google pour envoyer votre lien d avis en un clic.'}
+              </h2>
+              <p className="mt-3 text-sm text-muted-foreground">
+              {googleAccessPending
+                ? 'Des que Google nous autorise officiellement a importer et gerer votre fiche, elle apparaitra automatiquement ici.'
+                : status.connected
+                  ? 'Si votre fiche vient juste d etre creee, reconnectez Google dans quelques minutes.'
+                  : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis BatiFlow.'}
+              </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
