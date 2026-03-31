@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  RefreshCw,
   Save,
   Settings2,
   Shield,
@@ -104,6 +105,23 @@ interface ReminderSettings {
   cfe_applicable: boolean;
   apprenticeship_tax_applicable: boolean;
   accountant_notes: string;
+}
+
+interface PappersCompanyPayload {
+  siren: string;
+  siret: string;
+  name: string;
+  legal_form: string;
+  naf_code: string;
+  naf_label: string;
+  capital: number | null;
+  tva_number: string;
+  address: string;
+  postal_code: string;
+  city: string;
+  phone: string;
+  website: string;
+  rcs: string;
 }
 
 const planIcons = {
@@ -252,6 +270,7 @@ export default function ParametresPage() {
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
+  const [pappersRefreshing, setPappersRefreshing] = useState(false);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -371,6 +390,91 @@ export default function ParametresPage() {
     setSaveReminderSuccess(true);
     setSavingReminders(false);
     window.setTimeout(() => setSaveReminderSuccess(false), 2500);
+  }
+
+  async function refreshFromPappers() {
+    if (!user || !profile?.siren) {
+      setError('Aucun SIREN disponible pour relancer Pappers.');
+      return;
+    }
+
+    setPappersRefreshing(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/pappers/company?siren=${encodeURIComponent(profile.siren)}`);
+      const company: PappersCompanyPayload & { error?: string } = await response.json();
+
+      if (!response.ok || company.error || !company.siren) {
+        throw new Error(company.error || 'Impossible de recuperer les donnees Pappers.');
+      }
+
+      const nextCompanyActivity = form.company_activity || company.naf_label || '';
+      const updates = {
+        company_name: company.name || form.company_name,
+        company_activity: nextCompanyActivity,
+        company_city: company.city || form.company_city,
+        company_phone: company.phone || form.company_phone,
+        company_address: company.address || form.company_address,
+        company_postal_code: company.postal_code || form.company_postal_code,
+        company_website: company.website || form.company_website,
+        tva_number: company.tva_number || form.tva_number,
+        siren: company.siren || profile.siren,
+        siret: company.siret || profile.siret,
+        legal_form: company.legal_form || profile.legal_form,
+        naf_code: company.naf_code || profile.naf_code,
+        naf_label: company.naf_label || profile.naf_label,
+        capital: company.capital ?? profile.capital,
+        rcs: company.rcs || profile.rcs,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        company_name: updates.company_name,
+        company_activity: updates.company_activity,
+        company_city: updates.company_city,
+        company_phone: updates.company_phone,
+        company_address: updates.company_address,
+        company_postal_code: updates.company_postal_code,
+        company_website: updates.company_website,
+        tva_number: updates.tva_number,
+      }));
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updates,
+            }
+          : prev
+      );
+
+      setReminderSettings((prev) => {
+        const legalForm = prev.legal_form || mapPappersLegalFormToSetting(updates.legal_form || '');
+        return {
+          ...prev,
+          legal_form: legalForm,
+          benefit_tax_regime: prev.benefit_tax_regime || inferBenefitTaxRegime(
+            { ...profile, legal_form: updates.legal_form } as SettingsProfile,
+            legalForm
+          ),
+        };
+      });
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : 'Erreur Pappers');
+    } finally {
+      setPappersRefreshing(false);
+    }
   }
 
   async function launchCheckout(planKey: PricingPlanKey) {
@@ -1085,9 +1189,26 @@ export default function ParametresPage() {
 
               {(profile?.siren || profile?.siret || profile?.tva_number || profile?.naf_label || profile?.company_address) && (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Check className="h-4 w-4 text-emerald-600" />
-                    <p className="text-sm font-semibold text-emerald-800">Informations detectees via Pappers</p>
+                  <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <p className="text-sm font-semibold text-emerald-800">Informations detectees via Pappers</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshFromPappers}
+                      disabled={!profile?.siren || pappersRefreshing}
+                      className="border-emerald-200 bg-white/80 text-emerald-800 hover:bg-white"
+                    >
+                      {pappersRefreshing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      Rafraichir depuis Pappers
+                    </Button>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {profile?.siren && (
