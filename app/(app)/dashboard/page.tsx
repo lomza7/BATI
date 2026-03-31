@@ -579,6 +579,11 @@ export default function DashboardPage() {
       activePipelineTotal: quotes
         .filter((quote) => quote.status === 'brouillon' || quote.status === 'envoye')
         .reduce((sum, quote) => sum + quote.total_ttc, 0),
+      projectsToLaunchSoon: projects.filter((project) => {
+        if (project.status !== 'a_planifier' || !project.start_date) return false;
+        const days = differenceInDays(project.start_date, now);
+        return days >= 0 && days <= 7;
+      }).length,
     };
   }, [invoices, projects, quotes]);
 
@@ -593,6 +598,8 @@ export default function DashboardPage() {
     : 'Le taux apparaitra des que vous aurez des devis';
 
   const displayName = profile?.company_name || profile?.full_name || 'BatiFlow';
+  const topPriorityReminder = dashboardData.reminderItems[0] || null;
+  const nextDeadline = dashboardData.deadlineItems[0] || null;
 
   if (authLoading || loading) {
     return (
@@ -671,30 +678,65 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
+                <Link
+                  href={topPriorityReminder?.href || '/dashboard'}
+                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tresorerie du mois</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">
-                        {formatCurrency(dashboardData.revenueThisMonth)}
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priorite du jour</p>
+                      <p className="mt-2 text-lg font-semibold text-foreground">
+                        {topPriorityReminder ? topPriorityReminder.title : 'Rien d urgent'}
                       </p>
                     </div>
                     <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                      <Wallet className="h-5 w-5" />
+                      <BellRing className="h-5 w-5" />
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{revenueSubtitle}</p>
-                </div>
-                <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions prioritaires</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">{dashboardData.reminderItems.length}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">Rappels chef d&apos;entreprise en attente</p>
-                </div>
-                <div className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Devis a convertir</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(dashboardData.activePipelineTotal)}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">Pipeline encore ouvert</p>
-                </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {topPriorityReminder
+                      ? topPriorityReminder.dueLabel
+                      : 'Votre tableau est calme pour le moment.'}
+                  </p>
+                </Link>
+                <Link
+                  href={nextDeadline?.href || '/planning'}
+                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prochaine echeance</p>
+                      <p className="mt-2 text-lg font-semibold text-foreground">
+                        {nextDeadline ? nextDeadline.label : 'Aucune urgence planifiee'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                      <CalendarClock className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {nextDeadline ? formatDate(nextDeadline.date) : 'Rien a surveiller cette semaine.'}
+                  </p>
+                </Link>
+                <Link
+                  href="/chantiers"
+                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Chantiers a lancer</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{dashboardData.projectsToLaunchSoon}</p>
+                    </div>
+                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
+                      <FolderKanban className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {dashboardData.projectsToLaunchSoon > 0
+                      ? 'Des lancements sont a caler dans les 7 prochains jours.'
+                      : 'Aucun demarrage imminent a preparer.'}
+                  </p>
+                </Link>
               </div>
             </div>
           </section>
@@ -960,61 +1002,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <Link href="/factures" className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border/80 hover:shadow-md sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">Factures a encaisser</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Montants en attente de paiement</p>
-                  </div>
-                  <Receipt className="mt-1 h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-                  {formatCurrency(dashboardData.unpaidInvoicesTotal)}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {invoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length} facture(s) a suivre
-                </p>
-              </div>
-            </Link>
-
-            <Link href="/chantiers" className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border/80 hover:shadow-md sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">Budget chantier</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Volume des chantiers actifs et a planifier</p>
-                  </div>
-                  <FolderKanban className="mt-1 h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-                  {formatCurrency(dashboardData.openProjectsBudget)}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {projects.filter((project) => project.status !== 'termine').length} chantier(s) encore ouverts
-                </p>
-              </div>
-            </Link>
-
-            <Link href="/devis" className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border/80 hover:shadow-md sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">Pipeline devis</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Valeur des devis encore en jeu</p>
-                  </div>
-                  <FileText className="mt-1 h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
-                  {formatCurrency(dashboardData.activePipelineTotal)}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {quotes.filter((quote) => quote.status === 'brouillon' || quote.status === 'envoye').length} devis a transformer
-                </p>
-              </div>
-            </Link>
-          </div>
         </>
       )}
     </div>
