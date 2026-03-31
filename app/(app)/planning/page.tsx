@@ -6,6 +6,7 @@ import {
   Trash2, Clock, Umbrella, Coffee, Briefcase, X, GripVertical,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
 import { MemberAvatar } from '@/components/shared/member-avatar';
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,7 @@ const EVENT_TYPE_CONFIG: Record<string, { label: string; icon: typeof HardHat; b
 
 // ─── Component ───────────────────────────────────────────────────────
 export default function PlanningPage() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<PlanningEvent[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -137,7 +139,10 @@ export default function PlanningPage() {
 
   // ─── CRUD ──────────────────────────────────────────────────────────
   async function saveEvent() {
+    if (!editingEvent && !user) return;
+
     const payload = {
+      ...(editingEvent ? {} : { user_id: user!.id }),
       title: form.title,
       event_type: form.eventType,
       start_date: form.startDate,
@@ -176,8 +181,9 @@ export default function PlanningPage() {
 
   async function createFromDrop(projectId: string, memberId: string, date: string) {
     const project = projects.find(p => p.id === projectId);
-    if (!project) return;
+    if (!project || !user) return;
     await supabase.from('planning_events').insert({
+      user_id: user.id,
       title: project.name,
       event_type: 'chantier',
       start_date: date,

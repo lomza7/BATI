@@ -328,6 +328,7 @@ export default function ChantiersPage() {
         .getPublicUrl(fileName);
 
       const { error: photoInsertError } = await supabase.from('project_photos').insert({
+        user_id: user.id,
         project_id: projectId,
         url: urlData.publicUrl,
       });
@@ -361,6 +362,11 @@ export default function ChantiersPage() {
   async function saveProject() {
     if (!form.name.trim()) return;
 
+    if (editorMode === 'create' && !user) {
+      setFormError("La session utilisateur est requise pour creer un chantier.");
+      return;
+    }
+
     if (pendingPhotos.length > 0 && !user) {
       setFormError("La session utilisateur est requise pour envoyer des photos.");
       return;
@@ -392,6 +398,7 @@ export default function ChantiersPage() {
           .from('projects')
           .insert({
             ...payload,
+            user_id: user!.id,
             client_id: clientId,
           })
           .select('id')

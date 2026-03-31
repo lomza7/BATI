@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, SquareCheck as CheckSquare, Filter, ListTodo, CalendarDays, CircleCheck as CheckCircle2, Circle, Clock, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { formatDate } from '@/lib/constants';
 import {
   TODO_PRIORITIES,
@@ -43,6 +44,7 @@ const QUICK_TASKS = [
 ];
 
 export default function TachesPage() {
+  const { user } = useAuth();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -73,7 +75,9 @@ export default function TachesPage() {
   }
 
   async function createTodo() {
+    if (!user) return;
     await supabase.from('todos').insert({
+      user_id: user.id,
       title: form.title,
       description: form.description,
       priority: form.priority,
@@ -88,7 +92,9 @@ export default function TachesPage() {
 
   async function quickCreateTodo(title: string) {
     if (!title.trim()) return;
+    if (!user) return;
     await supabase.from('todos').insert({
+      user_id: user.id,
       title: title.trim(),
       priority: 'moyenne',
       category: 'autre',

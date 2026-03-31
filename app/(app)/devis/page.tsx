@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { PageHeader } from '@/components/shared/page-header';
@@ -44,6 +45,7 @@ interface QuoteLine {
 
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'batiflow_ai_quote_intro_seen';
+  const { user } = useAuth();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -71,6 +73,8 @@ export default function DevisPage() {
   }
 
   async function createQuote() {
+    if (!user) return;
+
     let clientId: string | null = null;
     if (newQuote.clientName.trim()) {
       const { data: existingClient } = await supabase
@@ -84,7 +88,7 @@ export default function DevisPage() {
       } else {
         const { data: newClient } = await supabase
           .from('clients')
-          .insert({ name: newQuote.clientName.trim() })
+          .insert({ name: newQuote.clientName.trim(), user_id: user.id })
           .select('id')
           .single();
         clientId = newClient?.id || null;
@@ -104,6 +108,7 @@ export default function DevisPage() {
     const { data: quote } = await supabase
       .from('quotes')
       .insert({
+        user_id: user.id,
         quote_number: quoteNumber,
         client_id: clientId,
         title: newQuote.title,
@@ -118,6 +123,7 @@ export default function DevisPage() {
     if (quote && validLines.length > 0) {
       await supabase.from('quote_lines').insert(
         validLines.map((l, i) => ({
+          user_id: user.id,
           quote_id: quote.id,
           description: l.description,
           quantity: l.quantity,

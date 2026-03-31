@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { MapPin, Plus, Search, Navigation, Share2, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { MapPin, Plus, Search, Navigation, Share2, Copy, Check, Eye, EyeOff, Pencil, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { PROJECT_STATUSES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -44,15 +45,18 @@ const STATUS_PIN_COLORS: Record<string, string> = {
 };
 
 export default function CartePage() {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     clientName: '',
@@ -74,17 +78,19 @@ export default function CartePage() {
     setLoading(false);
   }
 
-  async function createProject() {
+  async function saveProject() {
+    if (!user) return;
+
     let clientId: string | null = null;
     if (form.clientName.trim()) {
       const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
       if (existing) { clientId = existing.id; }
       else {
-        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim() }).select('id').single();
+        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();
         clientId = newC?.id || null;
       }
     }
-    await supabase.from('projects').insert({
+    const payload = {
       name: form.name,
       client_id: clientId,
       address: form.address,
@@ -92,8 +98,16 @@ export default function CartePage() {
       postal_code: form.postal_code,
       lat: form.lat,
       lng: form.lng,
-    });
+    };
+
+    if (editingProjectId) {
+      await supabase.from('projects').update(payload).eq('id', editingProjectId);
+    } else {
+      await supabase.from('projects').insert({ ...payload, user_id: user.id });
+    }
+
     setShowCreate(false);
+    setEditingProjectId(null);
     setForm({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null, lng: null });
     setAddressQuery('');
     loadProjects();
@@ -125,6 +139,34 @@ export default function CartePage() {
     }));
   }
 
+  function openCreateDialog() {
+    setEditingProjectId(null);
+    setForm({ name: '', clientName: '', address: '', city: '', postal_code: '', lat: null, lng: null });
+    setAddressQuery('');
+    setShowCreate(true);
+  }
+
+  function startEditProject(project: Project) {
+    setEditingProjectId(project.id);
+    setForm({
+      name: project.name,
+      clientName: project.clients?.name || '',
+      address: project.address || '',
+      city: project.city || '',
+      postal_code: project.postal_code || '',
+      lat: project.lat,
+      lng: project.lng,
+    });
+    setAddressQuery([project.address, project.postal_code, project.city].filter(Boolean).join(', '));
+    setShowDetails(false);
+    setShowCreate(true);
+  }
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selected) || null,
+    [projects, selected]
+  );
+
   const filtered = useMemo(() => {
     let list = filter === 'all' ? projects : projects.filter(p => p.status === filter);
     if (search) {
@@ -151,7 +193,10 @@ export default function CartePage() {
     [filtered]
   );
 
-  const handleMarkerClick = useCallback((id: string) => setSelected(id), []);
+  const handleMarkerClick = useCallback((id: string) => {
+    setSelected(id);
+    setShowDetails(true);
+  }, []);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -160,7 +205,7 @@ export default function CartePage() {
           <Button variant="outline" onClick={() => setShowShare(true)} className="gap-2">
             <Share2 className="h-4 w-4" /> Partager
           </Button>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Button onClick={openCreateDialog} className="gap-2">
             <Plus className="h-4 w-4" /> Nouveau chantier
           </Button>
         </div>
@@ -194,7 +239,7 @@ export default function CartePage() {
         <div className="h-[400px] sm:h-[500px] animate-pulse rounded-xl bg-muted" />
       ) : filtered.length === 0 ? (
         <EmptyState icon={MapPin} title="Aucun chantier" description="Ajoutez des chantiers avec une adresse pour les voir sur la carte.">
-          <Button onClick={() => setShowCreate(true)} className="gap-2"><Plus className="h-4 w-4" /> Ajouter un chantier</Button>
+          <Button onClick={openCreateDialog} className="gap-2"><Plus className="h-4 w-4" /> Ajouter un chantier</Button>
         </EmptyState>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -247,7 +292,10 @@ export default function CartePage() {
                       'rounded-lg border border-border bg-card p-3 cursor-pointer transition-all hover:shadow-sm',
                       selected === p.id && 'ring-2 ring-primary border-primary'
                     )}
-                    onClick={() => setSelected(p.id)}
+                    onClick={() => {
+                      setSelected(p.id);
+                      setShowDetails(true);
+                    }}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -328,11 +376,98 @@ export default function CartePage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={showDetails && !!selectedProject}
+        onOpenChange={(open) => {
+          setShowDetails(open);
+          if (!open) setSelected(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {selectedProject && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <DialogTitle>{selectedProject.name}</DialogTitle>
+                    <DialogDescription>
+                      Consultez les infos du chantier et modifiez-le directement depuis la carte.
+                    </DialogDescription>
+                  </div>
+                  <Button size="icon" variant="outline" onClick={() => startEditProject(selectedProject)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-2">
+                <div className="flex items-center gap-2">
+                  <StatusBadge
+                    label={(PROJECT_STATUSES[selectedProject.status] || PROJECT_STATUSES.a_planifier).label}
+                    color={(PROJECT_STATUSES[selectedProject.status] || PROJECT_STATUSES.a_planifier).color}
+                  />
+                  <span className="text-sm text-muted-foreground">{selectedProject.progress}% d avancement</span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Client</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{selectedProject.clients?.name || 'Non renseigne'}</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilite</p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground">{selectedProject.is_public ? 'Public' : 'Prive'}</p>
+                      <Switch
+                        checked={selectedProject.is_public}
+                        onCheckedChange={(checked) => togglePublic(selectedProject.id, checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Adresse</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {[selectedProject.address, selectedProject.postal_code, selectedProject.city].filter(Boolean).join(', ') || 'Adresse non renseignee'}
+                  </p>
+                  {selectedProject.lat && selectedProject.lng && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      GPS : {selectedProject.lat.toFixed(5)}, {selectedProject.lng.toFixed(5)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  {selectedProject.lat && selectedProject.lng && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() =>
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${selectedProject.lat},${selectedProject.lng}`,
+                          '_blank'
+                        )
+                      }
+                    >
+                      <ExternalLink className="h-4 w-4" /> Ouvrir dans Maps
+                    </Button>
+                  )}
+                  <Button className="gap-2" onClick={() => startEditProject(selectedProject)}>
+                    <Pencil className="h-4 w-4" /> Modifier le chantier
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog creation chantier */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nouveau chantier</DialogTitle>
+            <DialogTitle>{editingProjectId ? 'Modifier le chantier' : 'Nouveau chantier'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
@@ -361,8 +496,18 @@ export default function CartePage() {
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button onClick={createProject} disabled={!form.name.trim()}>Creer</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreate(false);
+                  setEditingProjectId(null);
+                }}
+              >
+                Annuler
+              </Button>
+              <Button onClick={saveProject} disabled={!form.name.trim()}>
+                {editingProjectId ? 'Enregistrer' : 'Creer'}
+              </Button>
             </div>
           </div>
         </DialogContent>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Users, Search, GripVertical, Phone, Mail, MoveHorizontal as MoreHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { LEAD_STAGES, formatCurrency } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -51,6 +52,7 @@ const SOURCES = [
 const STAGE_ORDER = ['nouveau', 'contacte', 'devis_envoye', 'negocie', 'gagne', 'perdu'];
 
 export default function ProspectionPage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -66,7 +68,8 @@ export default function ProspectionPage() {
   }
 
   async function createLead() {
-    await supabase.from('leads').insert(form);
+    if (!user) return;
+    await supabase.from('leads').insert({ ...form, user_id: user.id });
     setShowCreate(false);
     setForm({ name: '', email: '', phone: '', source: 'autre', value: 0, notes: '' });
     loadLeads();

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, RefreshCw, Flame, Wind, Waves, FileText, TrendingUp, Calendar, MoveHorizontal as MoreHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -56,6 +57,7 @@ const FREQ_LABELS: Record<string, string> = {
 };
 
 export default function ContratsPage() {
+  const { user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -73,17 +75,20 @@ export default function ContratsPage() {
   }
 
   async function createContract() {
+    if (!user) return;
+
     let clientId: string | null = null;
     if (form.clientName.trim()) {
       const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
       if (existing) { clientId = existing.id; }
       else {
-        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim() }).select('id').single();
+        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();
         clientId = newC?.id || null;
       }
     }
     const today = new Date().toISOString().split('T')[0];
     await supabase.from('recurring_contracts').insert({
+      user_id: user.id,
       title: form.title,
       client_id: clientId,
       contract_type: form.contractType,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Calculator, Upload, Search, TrendingUp, TrendingDown, Receipt, Sparkles, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { EXPENSE_CATEGORIES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -35,6 +36,7 @@ interface Expense {
 }
 
 export default function ComptabilitePage() {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -51,7 +53,10 @@ export default function ComptabilitePage() {
   }
 
   async function createExpense() {
+    if (!user) return;
+
     await supabase.from('expenses').insert({
+      user_id: user.id,
       description: form.description,
       amount: form.amount,
       category: form.category,

@@ -12,6 +12,7 @@ import {
   TriangleAlert as AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -75,6 +76,7 @@ type QuoteInvoiceFilter = 'all' | 'to_invoice' | 'already_invoiced';
 type QuoteSortKey = 'recent' | 'oldest' | 'amount_desc' | 'amount_asc' | 'client';
 
 export default function FacturesPage() {
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotes, setQuotes] = useState<QuoteCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,13 +153,15 @@ export default function FacturesPage() {
   }
 
   async function createInvoice() {
+    if (!user) return;
+
     let clientId: string | null = null;
     if (form.clientName.trim()) {
       const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
       if (existing) {
         clientId = existing.id;
       } else {
-        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim() }).select('id').single();
+        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();
         clientId = newC?.id || null;
       }
     }
@@ -167,6 +171,7 @@ export default function FacturesPage() {
     dueDate.setDate(dueDate.getDate() + 30);
 
     await supabase.from('invoices').insert({
+      user_id: user.id,
       invoice_number: invNumber,
       client_id: clientId,
       title: form.title,
@@ -182,6 +187,7 @@ export default function FacturesPage() {
 
   async function createInvoiceFromQuote(quote: QuoteCandidate) {
     if (quote.invoice_id) return;
+    if (!user) return;
 
     setCreatingFromQuoteId(quote.id);
 
@@ -198,6 +204,7 @@ export default function FacturesPage() {
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
+          user_id: user.id,
           invoice_number: invNumber,
           quote_id: quote.id,
           client_id: client?.id || null,
@@ -216,6 +223,7 @@ export default function FacturesPage() {
       if (quote.quote_lines.length > 0) {
         const { error: linesError } = await supabase.from('invoice_lines').insert(
           quote.quote_lines.map((line, index) => ({
+            user_id: user.id,
             invoice_id: invoice.id,
             description: line.description,
             quantity: line.quantity,

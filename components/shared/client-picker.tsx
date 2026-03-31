@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, User, Phone, Mail, MapPin, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ interface ClientPickerProps {
 }
 
 export function ClientPicker({ value, onChange, className }: ClientPickerProps) {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -55,8 +57,9 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
   }
 
   async function createClient() {
-    if (!createForm.name.trim()) return;
+    if (!createForm.name.trim() || !user) return;
     const { data } = await supabase.from('clients').insert({
+      user_id: user.id,
       name: createForm.name.trim(),
       email: createForm.email,
       phone: createForm.phone,

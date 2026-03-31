@@ -6,6 +6,7 @@ import {
   Pencil, Trash2, Clock, Euro, TrendingUp, UserCheck, UserX, ChevronDown,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { MEMBER_TYPES, MEMBER_STATUSES, SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -133,6 +134,7 @@ const emptyForm: {
 };
 
 export default function EquipePage() {
+  const { user } = useAuth();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -183,6 +185,8 @@ export default function EquipePage() {
   }
 
   async function saveMember() {
+    if (!user) return;
+
     // Calcul auto du taux horaire pour salariés/intérimaires
     const computedHourlyRate = (form.type === 'salarie' || form.type === 'interimaire')
       && form.monthly_salary > 0 && form.weekly_hours > 0
@@ -190,6 +194,7 @@ export default function EquipePage() {
       : form.hourly_rate;
 
     const fullPayload = {
+      user_id: user.id,
       name: form.name, role: form.role, phone: form.phone, email: form.email,
       color: form.color, type: form.type, specialty: form.specialty,
       hourly_rate: computedHourlyRate, monthly_salary: form.monthly_salary,
@@ -201,6 +206,7 @@ export default function EquipePage() {
     };
     // Colonnes de base (avant migration)
     const basePayload = {
+      user_id: user.id,
       name: form.name, role: form.role, phone: form.phone, email: form.email, color: form.color,
     };
 
@@ -248,7 +254,8 @@ export default function EquipePage() {
 
   async function addNote() {
     if (!newNote.trim() || !selectedId) return;
-    const { error } = await supabase.from('team_notes').insert({ team_member_id: selectedId, content: newNote.trim() });
+    if (!user) return;
+    const { error } = await supabase.from('team_notes').insert({ user_id: user.id, team_member_id: selectedId, content: newNote.trim() });
     if (error) {
       alert(`Impossible d'ajouter la note. Executez la migration SQL dans Supabase.\n\nErreur: ${error.message}`);
       return;
@@ -264,7 +271,9 @@ export default function EquipePage() {
 
   async function addHours() {
     if (!selectedId || !hoursForm.project_id || hoursForm.hours <= 0) return;
+    if (!user) return;
     await supabase.from('team_assignments').insert({
+      user_id: user.id,
       team_member_id: selectedId,
       project_id: hoursForm.project_id,
       date: hoursForm.date,

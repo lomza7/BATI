@@ -6,6 +6,7 @@ import {
   FileText, HardHat, Receipt, StickyNote, ChevronDown, X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate, CONTACT_TYPES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -47,6 +48,7 @@ interface ClientProject { id: string; name: string; status: string; city: string
 const emptyForm = { name: '', email: '', phone: '', address: '', city: '', postal_code: '', notes: '', contact_type: 'client' as ContactType };
 
 export default function ClientsPage() {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -85,10 +87,12 @@ export default function ClientsPage() {
   }
 
   async function saveClient() {
+    if (!editingId && !user) return;
+
     if (editingId) {
       await supabase.from('clients').update(form).eq('id', editingId);
     } else {
-      await supabase.from('clients').insert(form);
+      await supabase.from('clients').insert({ ...form, user_id: user!.id });
     }
     setShowForm(false);
     setEditingId(null);
