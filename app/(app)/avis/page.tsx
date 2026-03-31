@@ -214,6 +214,7 @@ export default function AvisPage() {
   const requestMessage = isConnected
     ? buildReviewMessage(requestForm.clientName, selectedLocation.title, selectedLocation.newReviewUri)
     : '';
+  const googleApprovalProgress = googleAccessPending ? 78 : 0;
 
   const ratingDistribution = useMemo(
     () =>
@@ -243,6 +244,10 @@ export default function AvisPage() {
               <Send className="h-4 w-4" /> Demander un avis
             </Button>
           </>
+        ) : googleAccessPending ? (
+          <Button className="gap-2" variant="secondary" disabled>
+            <Store className="h-4 w-4" /> Connexion Google en cours
+          </Button>
         ) : (
           <Button className="gap-2" onClick={() => (window.location.href = '/api/google-business/connect')}>
             <Store className="h-4 w-4" /> Connecter Google
@@ -263,6 +268,21 @@ export default function AvisPage() {
             <p className="mt-1 text-sm text-amber-800">
               Des que Google valide cet acces, votre fiche apparaitra ici automatiquement.
             </p>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-white/90 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-foreground">Validation Google en cours</p>
+                <span className="text-xs font-medium text-amber-700">{googleApprovalProgress}%</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-100">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-primary transition-all duration-500"
+                  style={{ width: `${googleApprovalProgress}%` }}
+                />
+              </div>
+              <p className="mt-3 text-xs text-amber-700">
+                Votre connexion est terminee. Il ne reste plus que l autorisation officielle de Google.
+              </p>
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-amber-700">Connexion Google</p>
@@ -310,9 +330,11 @@ export default function AvisPage() {
               </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
-                <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
-              </Button>
+              {!googleAccessPending && (
+                <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
+                  <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
+                </Button>
+              )}
               <Button variant="outline" className="gap-2" onClick={() => window.open(GOOGLE_CREATE_PROFILE_URL, '_blank')}>
                 <ExternalLink className="h-4 w-4" /> Creer ma fiche Google
               </Button>
