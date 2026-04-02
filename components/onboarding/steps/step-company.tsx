@@ -61,6 +61,8 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PappersSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const [loadingCompany, setLoadingCompany] = useState(false);
   const [companyLoaded, setCompanyLoaded] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -74,18 +76,33 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
     if (q.length < 2) {
       setResults([]);
       setShowDropdown(false);
+      setSearchError('');
+      setHasSearched(false);
       return;
     }
     setSearching(true);
+    setSearchError('');
+    setHasSearched(false);
     try {
       const res = await fetch(`/api/pappers/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      if (data.results) {
+      if (!res.ok) {
+        throw new Error(data.error || 'La recherche Pappers est indisponible pour le moment.');
+      }
+
+      if (Array.isArray(data.results)) {
         setResults(data.results);
         setShowDropdown(data.results.length > 0);
+        setHasSearched(true);
+        return;
       }
-    } catch {
+
+      throw new Error('La recherche Pappers a renvoye une reponse inattendue.');
+    } catch (error) {
       setResults([]);
+      setShowDropdown(false);
+      setHasSearched(true);
+      setSearchError(error instanceof Error ? error.message : 'La recherche Pappers est indisponible pour le moment.');
     } finally {
       setSearching(false);
     }
@@ -94,6 +111,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
   function handleQueryChange(value: string) {
     setQuery(value);
     setCompanyLoaded(false);
+    setSearchError('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchPappers(value), 300);
   }
@@ -236,6 +254,20 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
                 </button>
               ))}
             </div>
+          )}
+
+          {!searching && searchError && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              {searchError.includes('PAPPERS_API_KEY manquante')
+                ? 'La recherche d entreprise n est pas encore configuree sur cet environnement. Vous pouvez continuer manuellement ou ajouter PAPPERS_API_KEY.'
+                : searchError}
+            </p>
+          )}
+
+          {!searching && !searchError && hasSearched && query.trim().length >= 2 && results.length === 0 && (
+            <p className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg px-3 py-2">
+              Aucune entreprise trouvee pour cette recherche. Vous pouvez continuer manuellement juste en dessous.
+            </p>
           )}
         </div>
 

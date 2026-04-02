@@ -5,6 +5,9 @@ export const runtime = 'nodejs';
 interface PappersResult {
   siren: string;
   nom_entreprise: string;
+  denomination?: string;
+  nom?: string;
+  prenom?: string;
   siege: {
     adresse_ligne_1?: string;
     code_postal?: string;
@@ -30,7 +33,7 @@ export async function GET(request: Request) {
 
   try {
     const url = `https://api.pappers.fr/v2/recherche?api_token=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(q)}&par_page=5&precision=standard`;
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
 
     if (!res.ok) {
       const text = await res.text();
@@ -40,7 +43,7 @@ export async function GET(request: Request) {
     const data = await res.json();
     const results = (data.resultats || []).map((r: PappersResult) => ({
       siren: r.siren,
-      name: r.nom_entreprise,
+      name: r.nom_entreprise || r.denomination || [r.prenom, r.nom].filter(Boolean).join(' '),
       address: r.siege?.adresse_ligne_1 || '',
       postal_code: r.siege?.code_postal || '',
       city: r.siege?.ville || '',
