@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Archive,
   ArrowRightLeft,
   CircleCheck as CheckCircle,
+  ChevronDown,
   Clock,
   MoveHorizontal as MoreHorizontal,
   Plus,
@@ -30,6 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -42,6 +45,8 @@ interface Invoice {
   total_ttc: number;
   due_date: string | null;
   paid_at: string | null;
+  issued_at: string | null;
+  is_archived: boolean;
   created_at: string;
   clients: { name: string } | null;
 }
@@ -75,6 +80,17 @@ interface QuoteCandidate {
 type QuoteInvoiceFilter = 'all' | 'to_invoice' | 'already_invoiced';
 type QuoteSortKey = 'recent' | 'oldest' | 'amount_desc' | 'amount_asc' | 'client';
 
+function formatDateTime(iso: string | null): string {
+  if (!iso) return '-';
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+}
+
 export default function FacturesPage() {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -86,6 +102,7 @@ export default function FacturesPage() {
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
   const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0 });
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -97,7 +114,7 @@ export default function FacturesPage() {
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, title, status, total_ttc, due_date, paid_at, created_at, clients(name)')
+        .select('id, invoice_number, quote_id, title, status, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, clients(name)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -248,11 +265,37 @@ export default function FacturesPage() {
   async function updateStatus(id: string, status: string) {
     const updates: Record<string, string> = { status, updated_at: new Date().toISOString() };
     if (status === 'payee') updates.paid_at = new Date().toISOString();
+    // Horodatage d'émission officielle (conformité comptable)
+    if (status === 'envoyee') {
+      const inv = invoices.find(i => i.id === id);
+      if (inv && !inv.issued_at) {
+        updates.issued_at = new Date().toISOString();
+      }
+    }
     await supabase.from('invoices').update(updates).eq('id', id);
     loadData();
   }
 
-  const filteredInvoices = invoices.filter((inv) =>
+  async function archiveInvoice(id: string) {
+    await supabase.from('invoices').update({ is_archived: true, updated_at: new Date().toISOString() }).eq('id', id);
+    loadData();
+  }
+
+  async function unarchiveInvoice(id: string) {
+    await supabase.from('invoices').update({ is_archived: false, updated_at: new Date().toISOString() }).eq('id', id);
+    loadData();
+  }
+
+  const activeInvoices = invoices.filter(inv => !inv.is_archived);
+  const archivedInvoices = invoices.filter(inv => inv.is_archived);
+
+  const filteredInvoices = activeInvoices.filter((inv) =>
+    inv.title.toLowerCase().includes(search.toLowerCase()) ||
+    inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
+    inv.clients?.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredArchived = archivedInvoices.filter((inv) =>
     inv.title.toLowerCase().includes(search.toLowerCase()) ||
     inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
     inv.clients?.name?.toLowerCase().includes(search.toLowerCase())
@@ -292,10 +335,108 @@ export default function FacturesPage() {
     return next;
   }, [quotes, quoteFilter, quoteSearchTerm, quoteSort]);
 
-  const totalUnpaid = invoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
-  const totalPaid = invoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
-  const totalLate = invoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
+  const totalUnpaid = activeInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
+  const totalPaid = activeInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
+  const totalLate = activeInvoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
   const quotesToInvoice = quotes.filter((quote) => !quote.invoice_id);
+
+  function renderInvoiceRow(inv: Invoice, archived = false) {
+    const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
+    return (
+      <tr key={inv.id} className={`transition-colors hover:bg-muted/20 ${archived ? 'opacity-60' : ''}`}>
+        <td className="px-4 py-3 text-sm font-medium text-foreground">{inv.invoice_number}</td>
+        <td className="px-4 py-3 text-sm text-muted-foreground">{inv.clients?.name || '-'}</td>
+        <td className="px-4 py-3 text-sm text-foreground">{inv.title}</td>
+        <td className="px-4 py-3 text-sm text-muted-foreground">{inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}</td>
+        <td className="px-4 py-3"><StatusBadge label={st.label} color={st.color} /></td>
+        <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(inv.total_ttc)}</td>
+        <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+          <span title="Date de création">{formatDateTime(inv.created_at)}</span>
+          {inv.issued_at && (
+            <span className="block text-blue-600" title="Date d'émission officielle">
+              Emise le {formatDateTime(inv.issued_at)}
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
+        <td className="px-4 py-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {!archived && (
+                <>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
+                    <Archive className="mr-2 h-4 w-4" /> Archiver
+                  </DropdownMenuItem>
+                </>
+              )}
+              {archived && (
+                <DropdownMenuItem onClick={() => unarchiveInvoice(inv.id)}>
+                  Désarchiver
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </td>
+      </tr>
+    );
+  }
+
+  function renderInvoiceCard(inv: Invoice, archived = false) {
+    const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
+    return (
+      <div key={inv.id} className={`rounded-xl border border-border bg-card p-4 space-y-3 ${archived ? 'opacity-60' : ''}`}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{inv.title}</p>
+            <p className="text-xs text-muted-foreground">{inv.clients?.name || '-'}</p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {!archived && (
+                <>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
+                    <Archive className="mr-2 h-4 w-4" /> Archiver
+                  </DropdownMenuItem>
+                </>
+              )}
+              {archived && (
+                <DropdownMenuItem onClick={() => unarchiveInvoice(inv.id)}>Désarchiver</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">{inv.invoice_number}</span>
+          <StatusBadge label={st.label} color={st.color} />
+          {inv.quote_id && <Badge variant="outline">Depuis devis</Badge>}
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-foreground">{formatCurrency(inv.total_ttc)}</p>
+          <p className="text-xs text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</p>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Créée le {formatDateTime(inv.created_at)}
+          {inv.issued_at && (
+            <span className="block text-blue-600">Emise le {formatDateTime(inv.issued_at)}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -451,77 +592,77 @@ export default function FacturesPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origine</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
                         <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Dates</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Echeance</th>
                         <th className="px-4 py-3 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {filteredInvoices.map(inv => {
-                        const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
-                        return (
-                          <tr key={inv.id} className="transition-colors hover:bg-muted/20">
-                            <td className="px-4 py-3 text-sm font-medium text-foreground">{inv.invoice_number}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">{inv.clients?.name || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-foreground">{inv.title}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">{inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}</td>
-                            <td className="px-4 py-3"><StatusBadge label={st.label} color={st.color} /></td>
-                            <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(inv.total_ttc)}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
-                            <td className="px-4 py-3">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {filteredInvoices.map(inv => renderInvoiceRow(inv, false))}
                     </tbody>
                   </table>
                 </div>
               </div>
 
               <div className="sm:hidden space-y-3">
-                {filteredInvoices.map(inv => {
-                  const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
-                  return (
-                    <div key={inv.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{inv.title}</p>
-                          <p className="text-xs text-muted-foreground">{inv.clients?.name || '-'}</p>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{inv.invoice_number}</span>
-                        <StatusBadge label={st.label} color={st.color} />
-                        {inv.quote_id && <Badge variant="outline">Depuis devis</Badge>}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-foreground">{formatCurrency(inv.total_ttc)}</p>
-                        <p className="text-xs text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+                {filteredInvoices.map(inv => renderInvoiceCard(inv, false))}
               </div>
             </>
+          )}
+
+          {/* Factures archivées */}
+          {(archivedInvoices.length > 0 || (!loading && filteredArchived.length === 0 && archivedInvoices.length > 0)) && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowArchived(v => !v)}
+                className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground hover:bg-muted/40 transition-colors"
+              >
+                <Archive className="h-4 w-4" />
+                <span className="font-medium">Factures archivées ({archivedInvoices.length})</span>
+                <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${showArchived ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showArchived && (
+                <div className="mt-3">
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Les factures archivées sont conservées conformément aux obligations légales (art. L. 102 B LPF — 6 ans minimum). Elles ne peuvent pas être supprimées.
+                  </p>
+
+                  {filteredArchived.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucune facture archivée ne correspond à la recherche.</p>
+                  ) : (
+                    <>
+                      <div className="hidden sm:block rounded-xl border border-border bg-card overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/30">
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numero</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Client</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Titre</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origine</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Dates</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Echeance</th>
+                                <th className="px-4 py-3 w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filteredArchived.map(inv => renderInvoiceRow(inv, true))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="sm:hidden space-y-3">
+                        {filteredArchived.map(inv => renderInvoiceCard(inv, true))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </section>
       </div>
