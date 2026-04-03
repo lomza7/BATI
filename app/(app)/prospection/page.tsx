@@ -326,6 +326,12 @@ export default function ProspectionPage() {
         .from('leads')
         .update(payload)
         .eq('id', editingLead.id);
+
+      // Créer un devis brouillon si le lead vient de passer en "Gagné"
+      if (form.stage === 'gagne' && editingLead.stage !== 'gagne') {
+        const updatedLead: Lead = { ...editingLead, ...payload, client_id: clientId };
+        await createDraftQuoteForLead(updatedLead);
+      }
     } else {
       await supabase
         .from('leads')
@@ -341,11 +347,67 @@ export default function ProspectionPage() {
     setSubmitting(false);
   }
 
+  async function createDraftQuoteForLead(lead: Lead) {
+    if (!user) return;
+
+    try {
+      const clientId = await ensureClientForLead(lead);
+      const now = new Date();
+      const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const validUntil = new Date(now);
+      validUntil.setDate(validUntil.getDate() + 30);
+
+      const totalHt = Number(lead.value || 0);
+      const title = [
+        lead.work_type || PROJECT_KINDS.find((item) => item.value === lead.project_kind)?.label || 'Travaux',
+        lead.project_city,
+      ].filter(Boolean).join(' - ') || `Devis ${getLeadDisplayName(lead)}`;
+
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .insert({
+          user_id: user.id,
+          quote_number: quoteNumber,
+          client_id: clientId,
+          title,
+          description: lead.work_details || lead.notes || '',
+          status: 'brouillon',
+          total_ht: totalHt,
+          total_ttc: totalHt * 1.2,
+          valid_until: validUntil.toISOString().split('T')[0],
+        })
+        .select('id')
+        .single();
+
+      if (quoteError || !quote) return;
+
+      const lineDescription = lead.work_details || lead.work_type || title;
+      await supabase.from('quote_lines').insert({
+        user_id: user.id,
+        quote_id: quote.id,
+        description: lineDescription,
+        quantity: 1,
+        unit: 'forfait',
+        unit_price: totalHt,
+        total: totalHt,
+        position: 0,
+      });
+    } catch {
+      // Silently ignore quote creation errors
+    }
+  }
+
   async function moveStage(id: string, stage: string) {
+    const previousLead = leads.find((lead) => lead.id === id);
+
     await supabase
       .from('leads')
       .update({ stage, updated_at: new Date().toISOString() })
       .eq('id', id);
+
+    if (stage === 'gagne' && previousLead && previousLead.stage !== 'gagne') {
+      await createDraftQuoteForLead(previousLead);
+    }
 
     await loadLeads();
   }
