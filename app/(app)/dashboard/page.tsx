@@ -25,6 +25,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { buildLeadSourceLabelMap, type LeadSource } from '@/lib/lead-sources';
+import { DEFAULT_LEAD_STAGES, type LeadStageConfig } from '@/lib/lead-pipeline';
 import {
   INVOICE_STATUSES,
   MEMBER_TYPES,
@@ -179,6 +180,15 @@ type LeadSourcePoint = {
   active: number;
   won: number;
   lost: number;
+};
+
+type StageConversionPoint = {
+  slug: string;
+  label: string;
+  color: string;
+  total: number;
+  wonValue: number;
+  conversionRate: number;
 };
 
 const revenueChartConfig = {
@@ -513,6 +523,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [leads, setLeads] = useState<LeadDashboardRow[]>([]);
   const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
+  const [leadStages, setLeadStages] = useState<LeadStageConfig[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
   const [planningEvents, setPlanningEvents] = useState<PlanningEventRow[]>([]);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettingsRow | null>(null);
@@ -523,7 +534,7 @@ export default function DashboardPage() {
     if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -542,6 +553,10 @@ export default function DashboardPage() {
         .order('updated_at', { ascending: false }),
       supabase
         .from('lead_sources')
+        .select('*')
+        .order('position', { ascending: true }),
+      supabase
+        .from('lead_stages')
         .select('*')
         .order('position', { ascending: true }),
       supabase
@@ -583,6 +598,15 @@ export default function DashboardPage() {
       value: toNumber(lead.value),
     })));
     setLeadSources((leadSourcesRes.data as LeadSource[]) || []);
+    setLeadStages(((leadStagesRes.data as LeadStageConfig[]) || []).length > 0 ? (leadStagesRes.data as LeadStageConfig[]) : DEFAULT_LEAD_STAGES.map((stage, index) => ({
+      id: `default-${stage.slug}`,
+      user_id: user.id,
+      slug: stage.slug,
+      label: stage.label,
+      color: stage.color,
+      position: stage.position ?? index,
+      is_terminal: stage.is_terminal,
+    })));
     setTeamMembers((teamMembersRes.data as TeamMemberRow[]) || []);
     setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
     setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
@@ -915,6 +939,27 @@ export default function DashboardPage() {
       })
       .sort((a, b) => b.wonValue - a.wonValue || b.leadCount - a.leadCount);
 
+    const stageConversionData: StageConversionPoint[] = leadStages
+      .map((stage) => {
+        const stageLeads = leads.filter((lead) => lead.stage === stage.slug);
+        const total = stageLeads.length;
+        const wonValue = stageLeads
+          .filter((lead) => lead.stage === 'gagne')
+          .reduce((sum, lead) => sum + lead.value, 0);
+        const conversionRate = leads.length > 0 ? Math.round((total / leads.length) * 100) : 0;
+
+        return {
+          slug: stage.slug,
+          label: stage.label,
+          color: stage.color,
+          total,
+          wonValue,
+          conversionRate,
+        };
+      })
+      .filter((stage) => stage.total > 0)
+      .sort((a, b) => b.total - a.total || a.slug.localeCompare(b.slug));
+
     return {
       revenueThisMonth,
       revenuePreviousMonth,
@@ -930,6 +975,7 @@ export default function DashboardPage() {
       funnelChartData,
       leadSourceChartData,
       topPartnerSources,
+      stageConversionData,
       hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0,
       activeProjects: projects.filter((project) => project.status === 'en_cours').length,
       unpaidInvoicesTotal: invoices
@@ -955,7 +1001,7 @@ export default function DashboardPage() {
         return start >= todayStart && start <= nextWeek;
       }).length,
     };
-  }, [companyProfile, invoices, leadSources, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
+  }, [companyProfile, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
 
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
     ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} le mois dernier`
@@ -1214,7 +1260,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.7fr_0.7fr]">
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1285,6 +1331,53 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Lecture par etape</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Visualisez ou votre pipe se remplit et ou les leads stagnent</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/prospection">Voir le kanban</Link>
+                </Button>
+              </div>
+
+              {dashboardData.stageConversionData.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                  Des que votre pipe contiendra des leads, vous verrez ici le poids de chaque etape.
+                </div>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  {dashboardData.stageConversionData.slice(0, 6).map((stage) => (
+                    <div key={stage.slug} className="space-y-2 rounded-xl border border-border/70 bg-muted/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${stage.color}`}>
+                            {stage.label}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-foreground">{stage.total} lead{stage.total > 1 ? 's' : ''}</p>
+                          <p className="text-xs text-muted-foreground">{stage.conversionRate}% du pipe</p>
+                        </div>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${Math.max(stage.conversionRate, 6)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {stage.slug === 'gagne'
+                          ? `${formatCurrency(stage.wonValue)} signes sur cette etape finale.`
+                          : `Surveillez cette etape si les leads y restent trop longtemps.`}
+                      </p>
+                    </div>
                   ))}
                 </div>
               )}

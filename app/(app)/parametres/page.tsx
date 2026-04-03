@@ -56,7 +56,10 @@ import {
   type LeadSource,
 } from '@/lib/lead-sources';
 import {
+  CORE_LEAD_STAGE_SLUGS,
   DEFAULT_LEAD_STAGES,
+  LEAD_STAGE_COLOR_PRESETS,
+  normalizeLeadStageSlug,
   type LeadStageConfig,
 } from '@/lib/lead-pipeline';
 
@@ -141,6 +144,12 @@ interface LeadSourceFormState {
   source_type: 'channel' | 'partner';
   contact_name: string;
   reward_note: string;
+}
+
+interface LeadStageFormState {
+  label: string;
+  color: string;
+  position: number;
 }
 
 const planIcons = {
@@ -290,6 +299,7 @@ export default function ParametresPage() {
   const [savingSourceId, setSavingSourceId] = useState<string | null>(null);
   const [savingStageId, setSavingStageId] = useState<string | null>(null);
   const [creatingSource, setCreatingSource] = useState(false);
+  const [creatingStage, setCreatingStage] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
@@ -301,6 +311,11 @@ export default function ParametresPage() {
     source_type: 'channel',
     contact_name: '',
     reward_note: '',
+  });
+  const [newLeadStage, setNewLeadStage] = useState<LeadStageFormState>({
+    label: '',
+    color: DEFAULT_LEAD_STAGES[1]?.color || 'bg-blue-50 text-blue-700',
+    position: DEFAULT_LEAD_STAGES.length,
   });
 
   useEffect(() => {
@@ -680,6 +695,55 @@ export default function ParametresPage() {
       return [...rest, data as LeadStageConfig].sort((a, b) => a.position - b.position);
     });
     setSavingStageId(null);
+  }
+
+  async function createLeadStage() {
+    if (!user || !newLeadStage.label.trim()) return;
+
+    setCreatingStage(true);
+    setError('');
+
+    const slug = normalizeLeadStageSlug(newLeadStage.label);
+    if (!slug) {
+      setError("Le nom de l'etape est invalide.");
+      setCreatingStage(false);
+      return;
+    }
+
+    if (leadStages.some((stage) => stage.slug === slug)) {
+      setError('Une etape avec ce nom existe deja.');
+      setCreatingStage(false);
+      return;
+    }
+
+    const payload = {
+      user_id: user.id,
+      slug,
+      label: newLeadStage.label.trim(),
+      color: newLeadStage.color,
+      position: newLeadStage.position,
+      is_terminal: false,
+    };
+
+    const { data, error: stageError } = await supabase
+      .from('lead_stages')
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (stageError) {
+      setError(stageError.message);
+      setCreatingStage(false);
+      return;
+    }
+
+    setLeadStages((prev) => [...prev, data as LeadStageConfig].sort((a, b) => a.position - b.position));
+    setNewLeadStage({
+      label: '',
+      color: newLeadStage.color,
+      position: leadStages.length + 1,
+    });
+    setCreatingStage(false);
   }
 
   async function launchCheckout(planKey: PricingPlanKey) {
@@ -1640,14 +1704,76 @@ export default function ParametresPage() {
             <CardHeader>
               <CardTitle className="text-xl">Etapes de votre pipe CRM</CardTitle>
               <CardDescription>
-                Renommez les etapes de votre pipeline et changez leur ordre. Les slugs metier restent stables pour ne pas casser les automatisations de devis et de chantiers.
+                Renommez les etapes de votre pipeline, changez leur ordre et donnez-leur une couleur. Les slugs metier restent stables pour ne pas casser les automatisations de devis et de chantiers.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-2xl border border-white/40 bg-background/70 p-4">
+                <div className="grid gap-4 lg:grid-cols-[1fr_180px_120px_auto] lg:items-end">
+                  <div className="space-y-2">
+                    <Label>Nouvelle etape intermediaire</Label>
+                    <Input
+                      value={newLeadStage.label}
+                      onChange={(e) => setNewLeadStage((prev) => ({ ...prev, label: e.target.value }))}
+                      placeholder="Ex: Visite technique, Relance chaude, Accord oral"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Couleur</Label>
+                    <select
+                      value={newLeadStage.color}
+                      onChange={(e) => setNewLeadStage((prev) => ({ ...prev, color: e.target.value }))}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {LEAD_STAGE_COLOR_PRESETS.map((preset) => (
+                        <option key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Position</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={newLeadStage.position}
+                      onChange={(e) =>
+                        setNewLeadStage((prev) => ({ ...prev, position: Number(e.target.value || 0) }))
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={() => void createLeadStage()} disabled={creatingStage || !newLeadStage.label.trim()}>
+                      {creatingStage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                      Ajouter l etape
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {LEAD_STAGE_COLOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setNewLeadStage((prev) => ({ ...prev, color: preset.value }))}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors ${
+                        newLeadStage.color === preset.value
+                          ? 'border-primary bg-primary/5 text-foreground'
+                          : 'border-border bg-card text-muted-foreground'
+                      }`}
+                    >
+                      <span className={`h-2.5 w-2.5 rounded-full ${preset.preview}`} />
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {leadStages
                 .sort((a, b) => a.position - b.position)
                 .map((stage) => (
-                  <div key={stage.id} className="grid gap-4 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[1fr_120px_180px_auto] lg:items-end">
+                  <div key={stage.id} className="grid gap-4 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[1fr_180px_120px_220px_auto] lg:items-end">
                     <div className="space-y-2">
                       <Label>Nom affiche</Label>
                       <Input
@@ -1655,6 +1781,20 @@ export default function ParametresPage() {
                         onChange={(e) => updateLeadStage(stage.id, { label: e.target.value })}
                         placeholder="Nom de l etape"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Couleur</Label>
+                      <select
+                        value={stage.color}
+                        onChange={(e) => updateLeadStage(stage.id, { color: e.target.value })}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {LEAD_STAGE_COLOR_PRESETS.map((preset) => (
+                          <option key={preset.value} value={preset.value}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-2">
                       <Label>Position</Label>
@@ -1668,7 +1808,11 @@ export default function ParametresPage() {
                     <div className="space-y-2">
                       <Label>Role</Label>
                       <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
-                        {stage.is_terminal ? 'Etape terminale' : 'Etape active du pipe'}
+                        {stage.is_terminal
+                          ? 'Etape terminale'
+                          : CORE_LEAD_STAGE_SLUGS.has(stage.slug)
+                            ? 'Etape active du pipe'
+                            : 'Etape intermediaire personnalisee'}
                       </div>
                     </div>
                     <div className="flex justify-end">
@@ -1676,6 +1820,19 @@ export default function ParametresPage() {
                         {savingStageId === stage.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Enregistrer
                       </Button>
+                    </div>
+                    <div className="lg:col-span-5">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-xs text-muted-foreground">Apercu :</span>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${stage.color}`}>
+                          {stage.label}
+                        </span>
+                        {!CORE_LEAD_STAGE_SLUGS.has(stage.slug) && !stage.is_terminal && (
+                          <span className="text-xs text-muted-foreground">
+                            Cette etape sert de palier personnalise dans votre pipe.
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
