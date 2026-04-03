@@ -22,6 +22,17 @@ export const PROJECT_STATUSES = {
   en_pause: { label: 'En pause', color: 'bg-amber-50 text-amber-700' },
 } as const;
 
+export const PROJECT_PHASES = [
+  { key: 'preparation', label: 'Préparation administrative', description: 'Devis signé, autorisations, commandes matériaux', weight: 5 },
+  { key: 'installation', label: 'Installation chantier', description: 'Protection, mise en place, approvisionnement', weight: 10 },
+  { key: 'demolition', label: 'Démolition / Préparation', description: 'Dépose, préparation des supports', weight: 10 },
+  { key: 'gros_oeuvre', label: 'Gros œuvre', description: 'Travaux structurels principaux', weight: 25 },
+  { key: 'second_oeuvre', label: 'Second œuvre', description: 'Plomberie, électricité, isolation, placo', weight: 25 },
+  { key: 'finitions', label: 'Finitions', description: 'Peinture, revêtements, pose équipements', weight: 15 },
+  { key: 'nettoyage', label: 'Nettoyage & Levée de réserves', description: 'Nettoyage fin de chantier, corrections', weight: 5 },
+  { key: 'reception', label: 'Réception chantier', description: 'PV de réception, remise des clés', weight: 5 },
+] as const;
+
 export const LEAD_STAGES = {
   nouveau: { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' },
   contacte: { label: 'Contacte', color: 'bg-blue-50 text-blue-700' },

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   Calendar,
   Camera,
+  CheckCircle2,
+  Circle,
   CircleCheck,
   Clock,
   Clock3,
@@ -22,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { INVOICE_STATUSES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { INVOICE_STATUSES, PROJECT_PHASES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
@@ -78,6 +80,11 @@ interface ProjectInvoice {
   issued_at: string | null;
 }
 
+interface CompletedPhase {
+  key: string;
+  completed_at: string;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -91,6 +98,7 @@ interface Project {
   end_date: string | null;
   created_at: string;
   notes: string | null;
+  completed_phases: CompletedPhase[];
   clients: { name: string } | null;
   project_photos: ProjectPhoto[];
   trackedHours: number;
@@ -203,7 +211,7 @@ export default function ChantiersPage() {
       await Promise.all([
         supabase
           .from('projects')
-          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, clients(name), project_photos(id, url, caption, created_at)')
+          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name), project_photos(id, url, caption, created_at)')
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
       ]);
@@ -230,6 +238,7 @@ export default function ChantiersPage() {
     const mappedProjects = ((projectRows as unknown as Project[]) || []).map((project) => ({
       ...project,
       notes: project.notes || '',
+      completed_phases: Array.isArray(project.completed_phases) ? project.completed_phases : [],
       project_photos: [...(project.project_photos || [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
       trackedHours: Math.round((hoursByProject.get(project.id) || 0) * 10) / 10,
     }));
@@ -531,6 +540,41 @@ export default function ChantiersPage() {
     const merged = [...((viaQuotes.data as ProjectInvoice[]) || []), ...((viaProject.data as ProjectInvoice[]) || [])]
       .filter(inv => { if (seen.has(inv.id)) return false; seen.add(inv.id); return true; });
     setProjectInvoices(merged);
+  }
+
+  async function togglePhase(projectId: string, phaseKey: string, currentPhases: CompletedPhase[]) {
+    const exists = currentPhases.find(p => p.key === phaseKey);
+    let updated: CompletedPhase[];
+    if (exists) {
+      updated = currentPhases.filter(p => p.key !== phaseKey);
+    } else {
+      updated = [...currentPhases, { key: phaseKey, completed_at: new Date().toISOString() }];
+    }
+
+    // Calculer le nouveau % d'avancement
+    const completedWeight = PROJECT_PHASES
+      .filter(phase => updated.some(p => p.key === phase.key))
+      .reduce((sum, phase) => sum + phase.weight, 0);
+
+    // Déterminer le statut automatiquement
+    let newStatus: string | undefined;
+    if (completedWeight === 100) {
+      newStatus = 'termine';
+    } else if (completedWeight > 0) {
+      newStatus = 'en_cours';
+    }
+
+    await supabase
+      .from('projects')
+      .update({
+        completed_phases: updated,
+        progress: completedWeight,
+        ...(newStatus ? { status: newStatus } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', projectId);
+
+    await loadProjects();
   }
 
   async function updateStatus(id: string, status: keyof typeof PROJECT_STATUSES) {
@@ -1153,6 +1197,65 @@ export default function ChantiersPage() {
                       {activeProject.notes?.trim() || 'Aucune note chantier pour le moment.'}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Avancement du chantier */}
+              <div className="mt-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Avancement du chantier</p>
+                    <p className="text-xs text-muted-foreground">Cochez chaque étape au fur et à mesure pour suivre la progression.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-foreground">{activeProject.progress}%</span>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  {PROJECT_PHASES.map((phase, index) => {
+                    const completed = activeProject.completed_phases.find(p => p.key === phase.key);
+                    const isLast = index === PROJECT_PHASES.length - 1;
+
+                    return (
+                      <div key={phase.key} className="relative flex gap-3">
+                        {/* Ligne verticale */}
+                        {!isLast && (
+                          <div className={`absolute left-[15px] top-[30px] w-0.5 h-[calc(100%-14px)] ${completed ? 'bg-emerald-400' : 'bg-border'}`} />
+                        )}
+
+                        {/* Cercle */}
+                        <button
+                          onClick={() => togglePhase(activeProject.id, phase.key, activeProject.completed_phases)}
+                          className="relative z-10 mt-0.5 shrink-0"
+                        >
+                          {completed ? (
+                            <CheckCircle2 className="h-[30px] w-[30px] text-emerald-500" />
+                          ) : (
+                            <Circle className="h-[30px] w-[30px] text-muted-foreground/40 hover:text-primary transition-colors" />
+                          )}
+                        </button>
+
+                        {/* Contenu */}
+                        <div className={`pb-5 flex-1 min-w-0 ${completed ? '' : 'opacity-70'}`}>
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-medium ${completed ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {phase.label}
+                            </p>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {phase.weight}%
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{phase.description}</p>
+                          {completed && (
+                            <p className="text-[10px] text-emerald-600 mt-1">
+                              Validé le {new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(completed.completed_at))}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
