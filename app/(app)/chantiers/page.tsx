@@ -206,6 +206,8 @@ export default function ChantiersPage() {
   const { user } = useAuth();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const detailFileInputRef = useRef<HTMLInputElement>(null);
+  const [detailUploading, setDetailUploading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -498,6 +500,64 @@ export default function ChantiersPage() {
         throw new Error(photoInsertError.message);
       }
     }
+  }
+
+  async function uploadPhotosDirect(files: FileList | File[], category: PhotoCategory, projectId: string) {
+    if (!user || !files.length) return;
+    setDetailUploading(true);
+
+    const accepted = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024);
+    const filesToUpload = category === 'presentation' ? accepted.slice(0, 1) : accepted;
+
+    // Si présentation, supprimer l'ancienne
+    if (category === 'presentation') {
+      const existing = selectedProject?.project_photos.filter(p => p.category === 'presentation') || [];
+      for (const photo of existing) {
+        const storagePath = extractProjectPhotoPath(photo.url);
+        if (storagePath) await supabase.storage.from('project-photos').remove([storagePath]);
+        await supabase.from('project_photos').delete().eq('id', photo.id);
+      }
+    }
+
+    for (const file of filesToUpload) {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('project-photos')
+        .upload(fileName, file, { contentType: file.type, upsert: false });
+      if (uploadError) { console.error(uploadError); continue; }
+
+      const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(fileName);
+      await supabase.from('project_photos').insert({
+        user_id: user.id,
+        project_id: projectId,
+        url: urlData.publicUrl,
+        category,
+      });
+    }
+
+    // Rafraîchir les photos du projet
+    const { data: freshPhotos } = await supabase
+      .from('project_photos')
+      .select('id, url, caption, category, created_at')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+
+    const updatedPhotos = (freshPhotos as ProjectPhoto[]) || [];
+    setSelectedProject(prev => prev ? { ...prev, project_photos: updatedPhotos } : prev);
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, project_photos: updatedPhotos } : p));
+    setDetailUploading(false);
+  }
+
+  async function deletePhotoDirect(photoId: string, projectId: string) {
+    const photo = selectedProject?.project_photos.find(p => p.id === photoId);
+    if (!photo) return;
+    const storagePath = extractProjectPhotoPath(photo.url);
+    if (storagePath) await supabase.storage.from('project-photos').remove([storagePath]);
+    await supabase.from('project_photos').delete().eq('id', photoId);
+
+    setSelectedProject(prev => prev ? { ...prev, project_photos: prev.project_photos.filter(p => p.id !== photoId) } : prev);
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, project_photos: p.project_photos.filter(ph => ph.id !== photoId) } : p));
   }
 
   async function deleteRemovedPhotos() {
@@ -1369,80 +1429,145 @@ export default function ChantiersPage() {
 
               <div className="grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
                 <div className="space-y-4">
-                  {/* Photo de présentation */}
+                  {/* Photo de présentation — cliquable pour changer */}
                   {(() => {
                     const cover = activeProject.project_photos.find(p => p.category === 'presentation') || activeProject.project_photos[0];
                     return cover ? (
-                      <div className="overflow-hidden rounded-3xl border border-border">
-                        <img src={cover.url} alt={activeProject.name} className="h-[220px] sm:h-[280px] w-full object-cover" />
+                      <div
+                        className="group relative overflow-hidden rounded-3xl border border-border cursor-pointer"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const files = (e.target as HTMLInputElement).files;
+                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id);
+                          };
+                          input.click();
+                        }}
+                      >
+                        <img src={cover.url} alt={activeProject.name} className="h-[220px] sm:h-[280px] w-full object-cover transition-all group-hover:brightness-90" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-all">
+                          <div className="rounded-full bg-white/90 p-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                            <Camera className="h-5 w-5 text-foreground" />
+                          </div>
+                        </div>
+                        {detailUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Loader2 className="h-6 w-6 animate-spin text-white" />
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="flex h-[180px] sm:h-[220px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/20">
+                      <div
+                        className="flex h-[180px] sm:h-[220px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/20 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all"
+                        onDragOver={(e) => { e.preventDefault(); }}
+                        onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, 'presentation', activeProject.id); }}
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const files = (e.target as HTMLInputElement).files;
+                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id);
+                          };
+                          input.click();
+                        }}
+                      >
                         <div className="text-center">
-                          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                            <Camera className="h-5 w-5 text-primary" />
-                          </div>
-                          <p className="text-sm font-medium text-foreground">Aucune photo</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">Ajoutez-en via Modifier</p>
+                          {detailUploading ? (
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
+                          ) : (
+                            <>
+                              <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                                <Camera className="h-5 w-5 text-primary" />
+                              </div>
+                              <p className="text-sm font-medium text-foreground">Ajouter une photo de présentation</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">Cliquez ou glissez une image</p>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
                   })()}
 
-                  {/* Onglets Avant / Pendant / Après */}
-                  {(() => {
-                    const categoriesWithPhotos = (['avant', 'pendant', 'apres'] as PhotoCategory[]).filter(
-                      cat => activeProject.project_photos.some(p => p.category === cat)
-                    );
-                    if (categoriesWithPhotos.length === 0 && !activeProject.project_photos.some(p => p.category === 'presentation')) return null;
-                    if (categoriesWithPhotos.length === 0) return null;
-
-                    return (
-                      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                        <div className="flex gap-1 bg-muted/40 p-1">
-                          {(['avant', 'pendant', 'apres'] as PhotoCategory[]).map(cat => {
-                            const photos = activeProject.project_photos.filter(p => p.category === cat);
-                            const catLabel = PHOTO_CATEGORIES.find(c => c.key === cat)!.label;
-                            return (
-                              <button
-                                key={cat}
-                                type="button"
-                                onClick={() => setDetailPhotoTab(cat)}
-                                className={cn(
-                                  'flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all',
-                                  detailPhotoTab === cat
-                                    ? 'bg-background text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground'
-                                )}
-                              >
-                                {catLabel}
-                                {photos.length > 0 && <span className="ml-1 opacity-60">({photos.length})</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {(() => {
-                          const photos = activeProject.project_photos.filter(p => p.category === detailPhotoTab);
-                          if (photos.length === 0) {
-                            return (
-                              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                                Aucune photo « {PHOTO_CATEGORIES.find(c => c.key === detailPhotoTab)!.label} » pour ce chantier.
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+                  {/* Onglets Avant / Pendant / Après avec upload direct */}
+                  <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                    <div className="flex gap-1 bg-muted/40 p-1">
+                      {(['avant', 'pendant', 'apres'] as PhotoCategory[]).map(cat => {
+                        const photos = activeProject.project_photos.filter(p => p.category === cat);
+                        const catLabel = PHOTO_CATEGORIES.find(c => c.key === cat)!.label;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setDetailPhotoTab(cat)}
+                            className={cn(
+                              'flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all',
+                              detailPhotoTab === cat
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {catLabel}
+                            {photos.length > 0 && <span className="ml-1 opacity-60">({photos.length})</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const photos = activeProject.project_photos.filter(p => p.category === detailPhotoTab);
+                      return (
+                        <div className="p-3 space-y-3">
+                          {photos.length > 0 && (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               {photos.map(photo => (
-                                <div key={photo.id} className="overflow-hidden rounded-xl border border-border">
+                                <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-border">
                                   <img src={photo.url} alt="" className="h-24 sm:h-28 w-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => deletePhotoDirect(photo.id, activeProject.id)}
+                                    className="absolute top-1.5 right-1.5 rounded-full bg-black/50 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
                                 </div>
                               ))}
                             </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })()}
+                          )}
+                          {/* Zone d'ajout */}
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); }}
+                            onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, detailPhotoTab, activeProject.id); }}
+                            onClick={() => detailFileInputRef.current?.click()}
+                            className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-center transition-all hover:border-primary/40 hover:bg-primary/5"
+                          >
+                            {detailUploading ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            ) : (
+                              <UploadCloud className="h-4 w-4 text-primary" />
+                            )}
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {photos.length === 0
+                                ? `Ajouter des photos « ${PHOTO_CATEGORIES.find(c => c.key === detailPhotoTab)!.label} »`
+                                : 'Ajouter d\u0027autres photos'}
+                            </span>
+                            <input
+                              ref={detailFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files) uploadPhotosDirect(e.target.files, detailPhotoTab, activeProject.id);
+                                e.target.value = '';
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 <div className="space-y-4">
