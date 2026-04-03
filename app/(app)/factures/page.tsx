@@ -263,6 +263,16 @@ export default function FacturesPage() {
         .update({ status: 'accepte', updated_at: new Date().toISOString() })
         .eq('id', quote.id);
 
+      // Créer le chantier associé automatiquement
+      await supabase.from('projects').insert({
+        user_id: user.id,
+        quote_id: quote.id,
+        client_id: client?.id || null,
+        name: quote.title,
+        budget: quote.total_ht,
+        status: 'a_planifier',
+      });
+
       await loadData();
     } finally {
       setCreatingFromQuoteId(null);
