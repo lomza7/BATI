@@ -257,6 +257,12 @@ export default function FacturesPage() {
         }
       }
 
+      // Passer le devis en "Accepté" automatiquement
+      await supabase
+        .from('quotes')
+        .update({ status: 'accepte', updated_at: new Date().toISOString() })
+        .eq('id', quote.id);
+
       await loadData();
     } finally {
       setCreatingFromQuoteId(null);
