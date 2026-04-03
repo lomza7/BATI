@@ -5,7 +5,9 @@ import {
   ArrowUpRight,
   Building2,
   CalendarClock,
+  FileText,
   Euro,
+  HardHat,
   Mail,
   MapPin,
   MoveHorizontal as MoreHorizontal,
@@ -156,6 +158,7 @@ export default function ProspectionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [actionLeadId, setActionLeadId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('kanban');
   const [query, setQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<'all' | string>('all');
@@ -287,6 +290,149 @@ export default function ProspectionPage() {
       .eq('id', id);
 
     await loadLeads();
+  }
+
+  async function ensureClientForLead(lead: Lead) {
+    if (!user) return null;
+
+    const clientName = lead.company_name || lead.name;
+    if (!clientName.trim()) return null;
+
+    const { data: existingClient } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('name', clientName.trim())
+      .maybeSingle();
+
+    if (existingClient) return existingClient.id;
+
+    const { data: newClient, error } = await supabase
+      .from('clients')
+      .insert({
+        user_id: user.id,
+        name: clientName.trim(),
+        email: lead.email || '',
+        phone: lead.phone || '',
+        address: lead.project_address || '',
+        city: lead.project_city || '',
+        postal_code: lead.project_postal_code || '',
+        notes: lead.notes || '',
+      })
+      .select('id')
+      .single();
+
+    if (error) throw new Error(error.message);
+    return newClient?.id || null;
+  }
+
+  async function convertLeadToQuote(lead: Lead) {
+    if (!user) return;
+
+    setActionLeadId(lead.id);
+
+    try {
+      const clientId = await ensureClientForLead(lead);
+      const now = new Date();
+      const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const validUntil = new Date(now);
+      validUntil.setDate(validUntil.getDate() + 30);
+
+      const totalHt = Number(lead.value || 0);
+      const title = [
+        lead.work_type || PROJECT_KINDS.find((item) => item.value === lead.project_kind)?.label || 'Travaux',
+        lead.project_city,
+      ].filter(Boolean).join(' - ') || `Devis ${getLeadDisplayName(lead)}`;
+
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .insert({
+          user_id: user.id,
+          quote_number: quoteNumber,
+          client_id: clientId,
+          title,
+          description: lead.work_details || lead.notes || '',
+          total_ht: totalHt,
+          total_ttc: totalHt * 1.2,
+          valid_until: validUntil.toISOString().split('T')[0],
+        })
+        .select('id')
+        .single();
+
+      if (quoteError || !quote) {
+        throw new Error(quoteError?.message || 'Impossible de creer le devis.');
+      }
+
+      const lineDescription = lead.work_details || lead.work_type || title;
+      await supabase.from('quote_lines').insert({
+        user_id: user.id,
+        quote_id: quote.id,
+        description: lineDescription,
+        quantity: 1,
+        unit: 'forfait',
+        unit_price: totalHt,
+        total: totalHt,
+        position: 0,
+      });
+
+      await supabase
+        .from('leads')
+        .update({
+          stage: 'devis_envoye',
+          last_contact_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id);
+
+      await loadLeads();
+    } finally {
+      setActionLeadId(null);
+    }
+  }
+
+  async function convertLeadToProject(lead: Lead) {
+    if (!user) return;
+
+    setActionLeadId(lead.id);
+
+    try {
+      const clientId = await ensureClientForLead(lead);
+      const projectName = [
+        lead.company_name || lead.name,
+        lead.work_type || PROJECT_KINDS.find((item) => item.value === lead.project_kind)?.label || 'Chantier',
+      ].filter(Boolean).join(' - ');
+
+      const { error } = await supabase
+        .from('projects')
+        .insert({
+          user_id: user.id,
+          client_id: clientId,
+          name: projectName || `Chantier ${getLeadDisplayName(lead)}`,
+          address: lead.project_address || '',
+          city: lead.project_city || '',
+          postal_code: lead.project_postal_code || '',
+          lat: lead.project_lat,
+          lng: lead.project_lng,
+          budget: Number(lead.value || 0),
+          notes: [lead.work_details, lead.notes].filter(Boolean).join('\n\n'),
+          status: 'a_planifier',
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) throw new Error(error.message);
+
+      await supabase
+        .from('leads')
+        .update({
+          stage: 'gagne',
+          last_contact_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id);
+
+      await loadLeads();
+    } finally {
+      setActionLeadId(null);
+    }
   }
 
   const filteredLeads = useMemo(() => {
@@ -486,6 +632,9 @@ export default function ProspectionPage() {
                       lead={lead}
                       onOpen={() => openEditDialog(lead)}
                       onMoveStage={moveStage}
+                      onConvertToQuote={convertLeadToQuote}
+                      onConvertToProject={convertLeadToProject}
+                      actioning={actionLeadId === lead.id}
                     />
                   ))}
                 </div>
@@ -714,6 +863,28 @@ export default function ProspectionPage() {
             </section>
 
             <div className="flex justify-end gap-2 border-t border-border pt-4">
+              {editingLead && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => void convertLeadToQuote(editingLead)}
+                    disabled={submitting || actionLeadId === editingLead.id}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Creer un devis
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void convertLeadToProject(editingLead)}
+                    disabled={submitting || actionLeadId === editingLead.id}
+                    className="gap-2"
+                  >
+                    <HardHat className="h-4 w-4" />
+                    Creer un chantier
+                  </Button>
+                </>
+              )}
               <Button variant="outline" onClick={closeFormDialog}>Annuler</Button>
               <Button onClick={saveLead} disabled={!form.name.trim() || submitting}>
                 {editingLead ? 'Enregistrer' : 'Ajouter au pipeline'}
@@ -730,10 +901,16 @@ function LeadCard({
   lead,
   onOpen,
   onMoveStage,
+  onConvertToQuote,
+  onConvertToProject,
+  actioning,
 }: {
   lead: Lead;
   onOpen: () => void;
   onMoveStage: (id: string, stage: string) => Promise<void>;
+  onConvertToQuote: (lead: Lead) => Promise<void>;
+  onConvertToProject: (lead: Lead) => Promise<void>;
+  actioning: boolean;
 }) {
   const stage = LEAD_STAGES[lead.stage as keyof typeof LEAD_STAGES] || LEAD_STAGES.nouveau;
 
@@ -758,6 +935,14 @@ function LeadCard({
             <DropdownMenuItem onClick={onOpen}>
               <Pencil className="mr-2 h-4 w-4" />
               Ouvrir
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onConvertToQuote(lead)}>
+              <FileText className="mr-2 h-4 w-4" />
+              Creer un devis
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onConvertToProject(lead)}>
+              <HardHat className="mr-2 h-4 w-4" />
+              Creer un chantier
             </DropdownMenuItem>
             {STAGE_ORDER.filter((stageKey) => stageKey !== lead.stage).map((stageKey) => (
               <DropdownMenuItem key={stageKey} onClick={() => onMoveStage(lead.id, stageKey)}>
@@ -809,6 +994,17 @@ function LeadCard({
           {stage.label}
         </span>
         <span className="text-[11px] text-muted-foreground">Maj {formatDate(lead.updated_at || lead.created_at)}</span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2" onClick={(event) => event.stopPropagation()}>
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => void onConvertToQuote(lead)} disabled={actioning}>
+          <FileText className="h-3.5 w-3.5" />
+          Devis
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => void onConvertToProject(lead)} disabled={actioning}>
+          <HardHat className="h-3.5 w-3.5" />
+          Chantier
+        </Button>
       </div>
     </div>
   );
