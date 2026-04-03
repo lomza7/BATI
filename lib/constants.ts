@@ -8,10 +8,11 @@ export const QUOTE_STATUSES = {
 
 export const INVOICE_STATUSES = {
   brouillon: { label: 'Brouillon', color: 'bg-slate-100 text-slate-700' },
-  envoyee: { label: 'Envoyee', color: 'bg-blue-50 text-blue-700' },
-  payee: { label: 'Payee', color: 'bg-emerald-50 text-emerald-700' },
+  creee: { label: 'Créée', color: 'bg-violet-50 text-violet-700' },
+  envoyee: { label: 'Envoyée', color: 'bg-blue-50 text-blue-700' },
+  payee: { label: 'Payée', color: 'bg-emerald-50 text-emerald-700' },
   en_retard: { label: 'En retard', color: 'bg-red-50 text-red-700' },
-  annulee: { label: 'Annulee', color: 'bg-slate-100 text-slate-500' },
+  annulee: { label: 'Annulée', color: 'bg-slate-100 text-slate-500' },
 } as const;
 
 export const PROJECT_STATUSES = {

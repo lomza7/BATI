@@ -7,6 +7,7 @@ import {
   CircleCheck as CheckCircle,
   ChevronDown,
   Clock,
+  FileCheck,
   MoveHorizontal as MoreHorizontal,
   Plus,
   Receipt,
@@ -265,7 +266,14 @@ export default function FacturesPage() {
   async function updateStatus(id: string, status: string) {
     const updates: Record<string, string> = { status, updated_at: new Date().toISOString() };
     if (status === 'payee') updates.paid_at = new Date().toISOString();
-    // Horodatage d'émission officielle (conformité comptable)
+    // Horodatage d'émission officielle : settée lors de la création officielle de la facture
+    if (status === 'creee') {
+      const inv = invoices.find(i => i.id === id);
+      if (inv && !inv.issued_at) {
+        updates.issued_at = new Date().toISOString();
+      }
+    }
+    // Fallback : si on passe directement en envoyée sans passer par créée
     if (status === 'envoyee') {
       const inv = invoices.find(i => i.id === id);
       if (inv && !inv.issued_at) {
@@ -348,13 +356,27 @@ export default function FacturesPage() {
         <td className="px-4 py-3 text-sm text-muted-foreground">{inv.clients?.name || '-'}</td>
         <td className="px-4 py-3 text-sm text-foreground">{inv.title}</td>
         <td className="px-4 py-3 text-sm text-muted-foreground">{inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}</td>
-        <td className="px-4 py-3"><StatusBadge label={st.label} color={st.color} /></td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <StatusBadge label={st.label} color={st.color} />
+            {inv.status === 'brouillon' && !archived && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 border-violet-300 text-violet-700 hover:bg-violet-50 text-xs"
+                onClick={() => updateStatus(inv.id, 'creee')}
+              >
+                <FileCheck className="h-3 w-3" /> Créer
+              </Button>
+            )}
+          </div>
+        </td>
         <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(inv.total_ttc)}</td>
         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
           <span title="Date de création">{formatDateTime(inv.created_at)}</span>
           {inv.issued_at && (
-            <span className="block text-blue-600" title="Date d'émission officielle">
-              Emise le {formatDateTime(inv.issued_at)}
+            <span className="block text-violet-600" title="Date de création officielle">
+              Créée le {formatDateTime(inv.issued_at)}
             </span>
           )}
         </td>
@@ -367,8 +389,13 @@ export default function FacturesPage() {
             <DropdownMenuContent align="end">
               {!archived && (
                 <>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
+                  {inv.status === 'brouillon' && (
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'creee')}>
+                      <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
@@ -404,8 +431,13 @@ export default function FacturesPage() {
             <DropdownMenuContent align="end">
               {!archived && (
                 <>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyee</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payee</DropdownMenuItem>
+                  {inv.status === 'brouillon' && (
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'creee')}>
+                      <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
@@ -422,6 +454,16 @@ export default function FacturesPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{inv.invoice_number}</span>
           <StatusBadge label={st.label} color={st.color} />
+          {inv.status === 'brouillon' && !archived && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 border-violet-300 text-violet-700 hover:bg-violet-50 text-xs"
+              onClick={() => updateStatus(inv.id, 'creee')}
+            >
+              <FileCheck className="h-3 w-3" /> Créer la facture
+            </Button>
+          )}
           {inv.quote_id && <Badge variant="outline">Depuis devis</Badge>}
         </div>
         <div className="flex items-center justify-between">
@@ -429,9 +471,9 @@ export default function FacturesPage() {
           <p className="text-xs text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</p>
         </div>
         <div className="text-xs text-muted-foreground">
-          Créée le {formatDateTime(inv.created_at)}
+          Ajoutée le {formatDateTime(inv.created_at)}
           {inv.issued_at && (
-            <span className="block text-blue-600">Emise le {formatDateTime(inv.issued_at)}</span>
+            <span className="block text-violet-600">Créée officiellement le {formatDateTime(inv.issued_at)}</span>
           )}
         </div>
       </div>
