@@ -66,7 +66,8 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
           .eq('id', quote.id);
       }
 
-      const link = `${window.location.origin}/d/${token}`;
+      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const link = `${base}/d/${token}`;
       setMagicLink(link);
       onSent?.();
     }

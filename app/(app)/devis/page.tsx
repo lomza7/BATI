@@ -220,7 +220,8 @@ export default function DevisPage() {
   }
 
   function copyLink(token: string) {
-    const link = `${window.location.origin}/d/${token}`;
+    const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+    const link = `${base}/d/${token}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(token);
     setTimeout(() => setCopiedLink(null), 2000);

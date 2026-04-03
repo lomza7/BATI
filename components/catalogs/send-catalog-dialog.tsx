@@ -51,7 +51,8 @@ export function SendCatalogDialog({ catalog, onClose }: Props) {
     });
 
     if (!error) {
-      const link = `${window.location.origin}/c/${token}`;
+      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const link = `${base}/c/${token}`;
       setMagicLink(link);
     }
 
