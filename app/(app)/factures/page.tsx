@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Archive,
   ArrowRightLeft,
@@ -94,6 +95,8 @@ function formatDateTime(iso: string | null): string {
 
 export default function FacturesPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const prefillProjectId = useRef<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotes, setQuotes] = useState<QuoteCandidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +110,22 @@ export default function FacturesPage() {
 
   useEffect(() => {
     loadData();
+
+    // Pré-remplissage depuis l'URL (venant d'un chantier ou d'une fiche client)
+    const params = new URLSearchParams(window.location.search);
+    const paramClientId = params.get('client_id');
+    const paramProjectId = params.get('project_id');
+
+    if (paramClientId || paramProjectId) {
+      if (paramProjectId) prefillProjectId.current = paramProjectId;
+      if (paramClientId) {
+        supabase.from('clients').select('name').eq('id', paramClientId).single().then(({ data }) => {
+          if (data) setForm(prev => ({ ...prev, clientName: data.name }));
+        });
+      }
+      setShowCreate(true);
+      router.replace('/factures', { scroll: false });
+    }
   }, []);
 
   async function loadData() {
@@ -192,6 +211,7 @@ export default function FacturesPage() {
       user_id: user.id,
       invoice_number: invNumber,
       client_id: clientId,
+      project_id: prefillProjectId.current || null,
       title: form.title,
       total_ht: form.totalHt,
       total_ttc: form.totalHt * 1.2,
@@ -200,6 +220,7 @@ export default function FacturesPage() {
 
     setShowCreate(false);
     setForm({ title: '', clientName: '', totalHt: 0 });
+    prefillProjectId.current = null;
     loadData();
   }
 

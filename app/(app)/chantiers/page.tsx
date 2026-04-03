@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Calendar,
   Camera,
@@ -170,6 +171,7 @@ function extractProjectPhotoPath(url: string) {
 
 export default function ChantiersPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,10 +191,6 @@ export default function ChantiersPage() {
   const [removedPhotoIds, setRemovedPhotoIds] = useState<string[]>([]);
   const [projectQuotes, setProjectQuotes] = useState<ProjectQuote[]>([]);
   const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
-  const [showQuickQuote, setShowQuickQuote] = useState(false);
-  const [showQuickInvoice, setShowQuickInvoice] = useState(false);
-  const [quickForm, setQuickForm] = useState({ title: '', totalHt: '' });
-  const [quickSaving, setQuickSaving] = useState(false);
 
   useEffect(() => {
     void loadProjects();
@@ -533,54 +531,6 @@ export default function ChantiersPage() {
     const merged = [...((viaQuotes.data as ProjectInvoice[]) || []), ...((viaProject.data as ProjectInvoice[]) || [])]
       .filter(inv => { if (seen.has(inv.id)) return false; seen.add(inv.id); return true; });
     setProjectInvoices(merged);
-  }
-
-  async function createQuickQuote() {
-    if (!user || !activeProject || !quickForm.title.trim()) return;
-    setQuickSaving(true);
-    const now = new Date();
-    const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-    const validUntil = new Date(now);
-    validUntil.setDate(validUntil.getDate() + 30);
-    const totalHt = Number(quickForm.totalHt || 0);
-    await supabase.from('quotes').insert({
-      user_id: user.id,
-      client_id: activeProject.client_id,
-      project_id: activeProject.id,
-      quote_number: quoteNumber,
-      title: quickForm.title.trim(),
-      total_ht: totalHt,
-      total_ttc: totalHt * 1.2,
-      valid_until: validUntil.toISOString().split('T')[0],
-    });
-    setQuickSaving(false);
-    setShowQuickQuote(false);
-    setQuickForm({ title: '', totalHt: '' });
-    reloadProjectFinance(activeProject.id);
-  }
-
-  async function createQuickInvoice() {
-    if (!user || !activeProject || !quickForm.title.trim()) return;
-    setQuickSaving(true);
-    const now = new Date();
-    const invNumber = `F-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-    const dueDate = new Date(now);
-    dueDate.setDate(dueDate.getDate() + 30);
-    const totalHt = Number(quickForm.totalHt || 0);
-    await supabase.from('invoices').insert({
-      user_id: user.id,
-      client_id: activeProject.client_id,
-      project_id: activeProject.id,
-      invoice_number: invNumber,
-      title: quickForm.title.trim(),
-      total_ht: totalHt,
-      total_ttc: totalHt * 1.2,
-      due_date: dueDate.toISOString().split('T')[0],
-    });
-    setQuickSaving(false);
-    setShowQuickInvoice(false);
-    setQuickForm({ title: '', totalHt: '' });
-    reloadProjectFinance(activeProject.id);
   }
 
   async function updateStatus(id: string, status: keyof typeof PROJECT_STATUSES) {
@@ -1079,10 +1029,20 @@ export default function ChantiersPage() {
                       label={(PROJECT_STATUSES[activeProject.status] || PROJECT_STATUSES.a_planifier).label}
                       color={(PROJECT_STATUSES[activeProject.status] || PROJECT_STATUSES.a_planifier).color}
                     />
-                    <Button size="sm" variant="outline" className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => { setQuickForm({ title: '', totalHt: '' }); setShowQuickQuote(true); }}>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => {
+                      const params = new URLSearchParams();
+                      if (activeProject.client_id) params.set('client_id', activeProject.client_id);
+                      params.set('project_id', activeProject.id);
+                      router.push(`/devis?${params.toString()}`);
+                    }}>
                       <FileText className="h-3.5 w-3.5" /> Nouveau devis
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => { setQuickForm({ title: '', totalHt: '' }); setShowQuickInvoice(true); }}>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => {
+                      const params = new URLSearchParams();
+                      if (activeProject.client_id) params.set('client_id', activeProject.client_id);
+                      params.set('project_id', activeProject.id);
+                      router.push(`/factures?${params.toString()}`);
+                    }}>
                       <Receipt className="h-3.5 w-3.5" /> Nouvelle facture
                     </Button>
                     <Button
@@ -1310,57 +1270,6 @@ export default function ChantiersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog création rapide devis */}
-      <Dialog open={showQuickQuote} onOpenChange={setShowQuickQuote}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Nouveau devis — {activeProject?.name}</DialogTitle>
-            <DialogDescription>Le devis sera créé en brouillon et lié à ce chantier.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <label className="text-sm font-medium">Titre *</label>
-              <Input className="mt-1" placeholder="Ex : Rénovation salle de bain" value={quickForm.title} onChange={e => setQuickForm({ ...quickForm, title: e.target.value })} />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Montant HT</label>
-              <Input className="mt-1" type="number" min="0" placeholder="0" value={quickForm.totalHt} onChange={e => setQuickForm({ ...quickForm, totalHt: e.target.value })} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowQuickQuote(false)}>Annuler</Button>
-              <Button onClick={createQuickQuote} disabled={!quickForm.title.trim() || quickSaving}>
-                {quickSaving ? 'Création...' : 'Créer le devis'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog création rapide facture */}
-      <Dialog open={showQuickInvoice} onOpenChange={setShowQuickInvoice}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Nouvelle facture — {activeProject?.name}</DialogTitle>
-            <DialogDescription>La facture sera créée en brouillon et liée à ce chantier.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <label className="text-sm font-medium">Titre *</label>
-              <Input className="mt-1" placeholder="Ex : Travaux toiture" value={quickForm.title} onChange={e => setQuickForm({ ...quickForm, title: e.target.value })} />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Montant HT</label>
-              <Input className="mt-1" type="number" min="0" placeholder="0" value={quickForm.totalHt} onChange={e => setQuickForm({ ...quickForm, totalHt: e.target.value })} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowQuickInvoice(false)}>Annuler</Button>
-              <Button onClick={createQuickInvoice} disabled={!quickForm.title.trim() || quickSaving}>
-                {quickSaving ? 'Création...' : 'Créer la facture'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

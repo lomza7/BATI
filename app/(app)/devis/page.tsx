@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -46,6 +47,8 @@ interface QuoteLine {
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'batiflow_ai_quote_intro_seen';
   const { user } = useAuth();
+  const router = useRouter();
+  const prefillProjectId = useRef<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -61,6 +64,22 @@ export default function DevisPage() {
 
   useEffect(() => {
     loadQuotes();
+
+    // Pré-remplissage depuis l'URL (venant d'un chantier ou d'une fiche client)
+    const params = new URLSearchParams(window.location.search);
+    const paramClientId = params.get('client_id');
+    const paramProjectId = params.get('project_id');
+
+    if (paramClientId || paramProjectId) {
+      if (paramProjectId) prefillProjectId.current = paramProjectId;
+      if (paramClientId) {
+        supabase.from('clients').select('name').eq('id', paramClientId).single().then(({ data }) => {
+          if (data) setNewQuote(prev => ({ ...prev, clientName: data.name }));
+        });
+      }
+      setShowCreateOptions(true);
+      router.replace('/devis', { scroll: false });
+    }
   }, []);
 
   async function loadQuotes() {
@@ -111,6 +130,7 @@ export default function DevisPage() {
         user_id: user.id,
         quote_number: quoteNumber,
         client_id: clientId,
+        project_id: prefillProjectId.current || null,
         title: newQuote.title,
         description: newQuote.description,
         total_ht: totalHt,
@@ -138,6 +158,7 @@ export default function DevisPage() {
     setShowCreate(false);
     setNewQuote({ title: '', clientName: '', description: '' });
     setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+    prefillProjectId.current = null;
     loadQuotes();
   }
 
