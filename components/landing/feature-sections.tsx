@@ -133,7 +133,7 @@ export function DevisSection() {
         'Validation finale toujours humaine avant envoi',
       ]}
       visual={
-        <MockBrowser url="app.hellobat.fr/devis">
+        <MockBrowser url="hellobat.app/devis">
           <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
@@ -437,7 +437,7 @@ export function ContactsSection() {
       ]}
       reversed
       visual={
-        <MockBrowser url="app.hellobat.fr/clients">
+        <MockBrowser url="hellobat.app/clients">
           <div className="space-y-3">
             <div className="flex gap-2 mb-3">
               {['Tous', 'Clients', 'Prospects', 'Prestataires'].map((f, i) => (
@@ -489,7 +489,7 @@ export function EquipeSection() {
         'Notes internes et historique',
       ]}
       visual={
-        <MockBrowser url="app.hellobat.fr/equipe">
+        <MockBrowser url="hellobat.app/equipe">
           <div className="space-y-3">
             {[
               { name: 'Jean Martin', role: 'Salarie', specialty: 'Plomberie', hours: '142h', rate: '28 EUR/h' },
@@ -536,7 +536,7 @@ export function PlanningSection() {
       ]}
       reversed
       visual={
-        <MockBrowser url="app.hellobat.fr/planning">
+        <MockBrowser url="hellobat.app/planning">
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 rounded-full bg-[var(--landing-accent)] text-white text-[10px] font-medium">Semaine</div>
@@ -596,7 +596,7 @@ export function CataloguesSection() {
         'Suivi des consultations et selections',
       ]}
       visual={
-        <MockBrowser url="app.hellobat.fr/catalogues">
+        <MockBrowser url="hellobat.app/catalogues">
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
               {['Robinetterie', 'Carrelage', 'Sanitaires'].map((cat) => (
@@ -610,7 +610,7 @@ export function CataloguesSection() {
               <Link2 className="w-4 h-4 text-[var(--landing-accent)]" />
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-medium text-[var(--landing-text)]">Lien magique</div>
-                <div className="text-[9px] text-[var(--landing-muted)] truncate">app.hellobat.fr/c/abc123...</div>
+                <div className="text-[9px] text-[var(--landing-muted)] truncate">hellobat.app/c/abc123...</div>
               </div>
               <div className="text-[9px] text-[var(--landing-accent)] font-medium shrink-0">Copier</div>
             </div>

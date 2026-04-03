@@ -75,7 +75,7 @@ export function DemoApp() {
               <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#febc2e]" />
               <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#28c840]" />
             </div>
-            <span className="text-[10px] sm:text-xs text-[var(--landing-muted)] ml-2 sm:ml-3 font-mono">app.hellobat.fr</span>
+            <span className="text-[10px] sm:text-xs text-[var(--landing-muted)] ml-2 sm:ml-3 font-mono">hellobat.app</span>
           </div>
 
           <div className="flex flex-col md:flex-row md:min-h-[500px]">

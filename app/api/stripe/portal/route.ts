@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const returnUrl =
       body?.return_url ||
-      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.hellobat.fr'}/parametres?tab=abonnement`;
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/parametres?tab=abonnement`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,

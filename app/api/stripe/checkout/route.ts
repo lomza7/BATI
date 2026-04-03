@@ -29,8 +29,8 @@ export async function POST(request: Request) {
       payment_method_types: ['card'],
       customer_email: user_email,
       line_items: [{ price: resolvedPrice.id, quantity: 1 }],
-      success_url: success_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.hellobat.fr'}/dashboard?checkout=success`,
-      cancel_url: cancel_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.hellobat.fr'}/dashboard?checkout=cancel`,
+      success_url: success_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/dashboard?checkout=success`,
+      cancel_url: cancel_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/dashboard?checkout=cancel`,
       metadata: {
         user_id: user_id || '',
         stripe_input_id: price_id,

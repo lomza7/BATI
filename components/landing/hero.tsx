@@ -52,7 +52,7 @@ export function Hero() {
                 <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
                 <span className="w-3 h-3 rounded-full bg-[#28c840]" />
               </div>
-              <span className="text-xs text-[var(--landing-muted)] ml-3 font-mono">app.hellobat.fr</span>
+              <span className="text-xs text-[var(--landing-muted)] ml-3 font-mono">hellobat.app</span>
             </div>
 
             <div className="p-4 sm:p-8 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
