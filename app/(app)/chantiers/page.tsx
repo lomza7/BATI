@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar,
   Camera,
+  CircleCheck,
+  Clock,
   Clock3,
+  FileText,
   HardHat,
   ImagePlus,
   Loader as Loader2,
@@ -12,12 +15,13 @@ import {
   MoveHorizontal as MoreHorizontal,
   Pencil,
   Plus,
+  Receipt,
   Search,
   UploadCloud,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { PROJECT_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { INVOICE_STATUSES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
@@ -49,6 +53,28 @@ interface ProjectPhoto {
   url: string;
   caption: string | null;
   created_at: string;
+}
+
+interface ProjectQuote {
+  id: string;
+  quote_number: string;
+  title: string;
+  status: string;
+  total_ht: number;
+  total_ttc: number;
+  created_at: string;
+}
+
+interface ProjectInvoice {
+  id: string;
+  invoice_number: string;
+  title: string;
+  status: string;
+  total_ht: number;
+  total_ttc: number;
+  due_date: string | null;
+  paid_at: string | null;
+  issued_at: string | null;
 }
 
 interface Project {
@@ -161,6 +187,8 @@ export default function ChantiersPage() {
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<ProjectPhoto[]>([]);
   const [removedPhotoIds, setRemovedPhotoIds] = useState<string[]>([]);
+  const [projectQuotes, setProjectQuotes] = useState<ProjectQuote[]>([]);
+  const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
 
   useEffect(() => {
     void loadProjects();
@@ -262,9 +290,30 @@ export default function ChantiersPage() {
     setShowEditor(true);
   }
 
-  function openDetails(project: Project) {
+  async function openDetails(project: Project) {
     setSelectedProject(project);
+    setProjectQuotes([]);
+    setProjectInvoices([]);
     setShowDetails(true);
+
+    const { data: quotes } = await supabase
+      .from('quotes')
+      .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
+      .eq('project_id', project.id)
+      .order('created_at', { ascending: false });
+
+    const loadedQuotes = (quotes as ProjectQuote[]) || [];
+    setProjectQuotes(loadedQuotes);
+
+    if (loadedQuotes.length > 0) {
+      const quoteIds = loadedQuotes.map(q => q.id);
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at')
+        .in('quote_id', quoteIds)
+        .order('created_at', { ascending: false });
+      setProjectInvoices((invoices as ProjectInvoice[]) || []);
+    }
   }
 
   function handleAddressSelect(result: AddressResult) {
@@ -1033,6 +1082,116 @@ export default function ChantiersPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Synthèse financière */}
+              {(() => {
+                const totalDevis = projectQuotes.reduce((s, q) => s + q.total_ttc, 0);
+                const totalFacture = projectInvoices.reduce((s, i) => s + i.total_ttc, 0);
+                const totalEncaisse = projectInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
+                const totalEnAttente = projectInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
+
+                return (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-xl border border-border bg-muted/25 p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Budget</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">{activeProject.budget > 0 ? formatCurrency(activeProject.budget) : '—'}</p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-muted/25 p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total devis</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">{totalDevis > 0 ? formatCurrency(totalDevis) : '—'}</p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-muted/25 p-4">
+                        <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"><CircleCheck className="h-3 w-3 text-emerald-500" /> Encaissé</div>
+                        <p className="mt-1 text-lg font-semibold text-emerald-600">{totalEncaisse > 0 ? formatCurrency(totalEncaisse) : '—'}</p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-muted/25 p-4">
+                        <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Clock className="h-3 w-3 text-blue-500" /> En attente</div>
+                        <p className="mt-1 text-lg font-semibold text-blue-600">{totalEnAttente > 0 ? formatCurrency(totalEnAttente) : '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* Devis */}
+                    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-semibold text-foreground">Devis ({projectQuotes.length})</p>
+                      </div>
+                      {projectQuotes.length === 0 ? (
+                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucun devis lié à ce chantier.</p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                              <th className="px-4 py-2 font-medium">Numéro</th>
+                              <th className="px-4 py-2 font-medium">Titre</th>
+                              <th className="px-4 py-2 font-medium">Statut</th>
+                              <th className="px-4 py-2 font-medium text-right">Montant TTC</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {projectQuotes.map(q => {
+                              const st = QUOTE_STATUSES[q.status as keyof typeof QUOTE_STATUSES] || QUOTE_STATUSES.brouillon;
+                              return (
+                                <tr key={q.id} className="hover:bg-muted/10">
+                                  <td className="px-4 py-2 font-medium text-foreground">{q.quote_number}</td>
+                                  <td className="px-4 py-2 text-muted-foreground">{q.title}</td>
+                                  <td className="px-4 py-2">
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${st.color}`}>{st.label}</span>
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-semibold text-foreground">{formatCurrency(q.total_ttc)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    {/* Factures */}
+                    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
+                        <Receipt className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-semibold text-foreground">Factures ({projectInvoices.length})</p>
+                        {totalFacture > 0 && (
+                          <span className="ml-auto text-sm font-medium text-foreground">{formatCurrency(totalFacture)} facturés</span>
+                        )}
+                      </div>
+                      {projectInvoices.length === 0 ? (
+                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune facture liée à ce chantier.</p>
+                      ) : (
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                              <th className="px-4 py-2 font-medium">Numéro</th>
+                              <th className="px-4 py-2 font-medium">Titre</th>
+                              <th className="px-4 py-2 font-medium">Statut</th>
+                              <th className="px-4 py-2 font-medium">Échéance</th>
+                              <th className="px-4 py-2 font-medium text-right">Montant TTC</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {projectInvoices.map(inv => {
+                              const st = INVOICE_STATUSES[inv.status as keyof typeof INVOICE_STATUSES] || INVOICE_STATUSES.brouillon;
+                              return (
+                                <tr key={inv.id} className="hover:bg-muted/10">
+                                  <td className="px-4 py-2 font-medium text-foreground">{inv.invoice_number}</td>
+                                  <td className="px-4 py-2 text-muted-foreground">{inv.title}</td>
+                                  <td className="px-4 py-2">
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${st.color}`}>{st.label}</span>
+                                  </td>
+                                  <td className="px-4 py-2 text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
+                                  <td className="px-4 py-2 text-right font-semibold text-foreground">{formatCurrency(inv.total_ttc)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </>
           ) : null}
         </DialogContent>
