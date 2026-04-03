@@ -143,12 +143,18 @@ export default function PublicQuotePage() {
       }
     }
 
-    // Mark viewed_at
+    // Mark viewed_at (premiere fois) + incrementer le compteur
     await anonClient
       .from('quote_sends')
       .update({ viewed_at: new Date().toISOString() })
       .eq('id', send.id)
       .is('viewed_at', null);
+
+    // Log chaque ouverture dans quote_send_views
+    await anonClient.from('quote_send_views').insert({
+      send_id: send.id,
+      user_agent: navigator.userAgent,
+    });
 
     // 2. Fetch quote with client
     const { data: quoteData } = await anonClient
