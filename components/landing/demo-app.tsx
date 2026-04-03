@@ -28,6 +28,7 @@ import {
   Plus,
   Filter,
   Send,
+  Hexagon,
 } from 'lucide-react';
 
 const views = [
@@ -81,7 +82,7 @@ export function DemoApp() {
             <aside className="w-[200px] shrink-0 border-r border-[var(--landing-border)] bg-[var(--landing-off)] p-3 space-y-0.5 hidden md:block">
               <div className="flex items-center gap-2 px-3 py-2 mb-3">
                 <div className="w-6 h-6 bg-[var(--landing-accent)] rounded-md flex items-center justify-center">
-                  <span className="text-white font-bold text-[10px]">B</span>
+                  <Hexagon className="h-3 w-3 text-white" />
                 </div>
                 <span className="text-xs font-semibold text-[var(--landing-text)]">Hellobat</span>
               </div>

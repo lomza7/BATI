@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Hexagon } from 'lucide-react';
 
 const footerLinks = {
   Produit: [
@@ -35,7 +36,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">B</span>
+                <Hexagon className="h-4 w-4 text-white" />
               </div>
               <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
             </Link>
