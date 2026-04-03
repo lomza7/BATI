@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, SquareCheck as CheckSquare, Filter, ListTodo, CalendarDays, CircleCheck as CheckCircle2, Circle, Clock, Sparkles } from 'lucide-react';
+import { Plus, Search, SquareCheck as CheckSquare, Filter, ListTodo, CalendarDays, CircleCheck as CheckCircle2, Circle, Clock, Sparkles, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatDate } from '@/lib/constants';
+import { ClientPicker } from '@/components/shared/client-picker';
 import {
   TODO_PRIORITIES,
   TODO_CATEGORIES,
@@ -59,6 +60,7 @@ export default function TachesPage() {
     priority: 'moyenne' as TodoPriority,
     category: 'autre' as TodoCategory,
     due_date: '',
+    client_id: null as string | null,
   });
 
   useEffect(() => { loadTodos(); }, []);
@@ -66,11 +68,16 @@ export default function TachesPage() {
   async function loadTodos() {
     const { data } = await supabase
       .from('todos')
-      .select('*')
+      .select('*, clients(name)')
       .order('completed', { ascending: true })
       .order('position', { ascending: true })
       .order('created_at', { ascending: false });
-    setTodos((data as unknown as Todo[]) || []);
+    const mapped = ((data as any[]) || []).map(t => ({
+      ...t,
+      client_name: t.clients?.name || null,
+      clients: undefined,
+    })) as Todo[];
+    setTodos(mapped);
     setLoading(false);
   }
 
@@ -83,6 +90,7 @@ export default function TachesPage() {
       priority: form.priority,
       category: form.category,
       due_date: form.due_date || null,
+      client_id: form.client_id,
       position: todos.length,
     });
     setShowCreate(false);
@@ -112,6 +120,7 @@ export default function TachesPage() {
       priority: form.priority,
       category: form.category,
       due_date: form.due_date || null,
+      client_id: form.client_id,
       updated_at: new Date().toISOString(),
     }).eq('id', editingTodo.id);
     setEditingTodo(null);
@@ -146,11 +155,12 @@ export default function TachesPage() {
       priority: todo.priority,
       category: todo.category,
       due_date: todo.due_date || '',
+      client_id: todo.client_id,
     });
   }
 
   function resetForm() {
-    setForm({ title: '', description: '', priority: 'moyenne', category: 'autre', due_date: '' });
+    setForm({ title: '', description: '', priority: 'moyenne', category: 'autre', due_date: '', client_id: null });
   }
 
   const today = new Date(new Date().toDateString()).toISOString().split('T')[0];
@@ -405,6 +415,12 @@ export default function TachesPage() {
               </div>
             </div>
             <div>
+              <label className="text-sm font-medium">Client (optionnel)</label>
+              <div className="mt-1">
+                <ClientPicker value={form.client_id} onChange={(id) => setForm({ ...form, client_id: id })} />
+              </div>
+            </div>
+            <div>
               <label className="text-sm font-medium">Date limite (optionnel)</label>
               <Input
                 className="mt-1"
@@ -466,6 +482,12 @@ export default function TachesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Client</label>
+              <div className="mt-1">
+                <ClientPicker value={form.client_id} onChange={(id) => setForm({ ...form, client_id: id })} />
               </div>
             </div>
             <div>

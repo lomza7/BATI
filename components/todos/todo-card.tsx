@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, GripVertical, CalendarDays, Pencil } from 'lucide-react';
+import { Trash2, GripVertical, CalendarDays, Pencil, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constants';
 import { formatDate } from '@/lib/constants';
@@ -95,6 +95,13 @@ export function TodoCard({ todo, onToggle, onDelete, onEdit }: TodoCardProps) {
           <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium', category.color)}>
             {category.label}
           </span>
+
+          {todo.client_name && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600">
+              <User className="h-3 w-3" />
+              {todo.client_name}
+            </span>
+          )}
 
           {todo.due_date && (
             <span className={cn(

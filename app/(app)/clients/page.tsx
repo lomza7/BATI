@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, Search, User, Phone, Mail, MapPin, Pencil, Trash2,
   FileText, HardHat, Receipt, StickyNote, ChevronDown, X,
+  ListTodo, CircleCheck as CheckCircle2, Circle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate, CONTACT_TYPES } from '@/lib/constants';
+import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -61,6 +63,7 @@ export default function ClientsPage() {
   const [quotes, setQuotes] = useState<ClientQuote[]>([]);
   const [invoices, setInvoices] = useState<ClientInvoice[]>([]);
   const [projects, setProjects] = useState<ClientProject[]>([]);
+  const [clientTodos, setClientTodos] = useState<Todo[]>([]);
 
   // Form
   const [showForm, setShowForm] = useState(false);
@@ -79,14 +82,16 @@ export default function ClientsPage() {
 
   async function loadClientDetails(id: string) {
     setSelectedId(id);
-    const [q, inv, proj] = await Promise.all([
+    const [q, inv, proj, td] = await Promise.all([
       supabase.from('quotes').select('id, quote_number, title, status, total_ttc, created_at').eq('client_id', id).order('created_at', { ascending: false }),
       supabase.from('invoices').select('id, invoice_number, title, status, total_ttc, created_at').eq('client_id', id).order('created_at', { ascending: false }),
       supabase.from('projects').select('id, name, status, city, progress').eq('client_id', id).order('created_at', { ascending: false }),
+      supabase.from('todos').select('*').eq('client_id', id).order('completed', { ascending: true }).order('created_at', { ascending: false }),
     ]);
     setQuotes((q.data as ClientQuote[]) || []);
     setInvoices((inv.data as ClientInvoice[]) || []);
     setProjects((proj.data as ClientProject[]) || []);
+    setClientTodos((td.data as Todo[]) || []);
   }
 
   async function saveClient() {
@@ -109,6 +114,15 @@ export default function ClientsPage() {
     setShowDelete(null);
     if (selectedId === id) setSelectedId(null);
     loadClients();
+  }
+
+  async function toggleClientTodo(todoId: string, completed: boolean) {
+    await supabase.from('todos').update({
+      completed,
+      completed_at: completed ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', todoId);
+    if (selectedId) loadClientDetails(selectedId);
   }
 
   function openEdit(c: Client) {
@@ -298,7 +312,7 @@ export default function ClientsPage() {
                   </div>
 
                   {/* KPI */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
                     <div className="rounded-lg bg-muted/50 p-3">
                       <p className="text-xs text-muted-foreground">Devis</p>
                       <p className="text-sm font-semibold mt-0.5">{quotes.length} — {formatCurrency(totalDevis)}</p>
@@ -315,15 +329,20 @@ export default function ClientsPage() {
                       <p className="text-xs text-muted-foreground">Chantiers</p>
                       <p className="text-sm font-semibold mt-0.5">{projects.length}</p>
                     </div>
+                    <div className="rounded-lg bg-muted/50 p-3">
+                      <p className="text-xs text-muted-foreground">Tâches</p>
+                      <p className="text-sm font-semibold mt-0.5">{clientTodos.filter(t => !t.completed).length} en cours</p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Tabs */}
                 <Tabs defaultValue="chantiers" className="p-4 sm:p-6">
-                  <TabsList className="w-full sm:w-auto">
+                  <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:flex sm:grid-cols-none">
                     <TabsTrigger value="chantiers" className="gap-1.5"><HardHat className="h-3.5 w-3.5" /> Chantiers</TabsTrigger>
                     <TabsTrigger value="devis" className="gap-1.5"><FileText className="h-3.5 w-3.5" /> Devis</TabsTrigger>
                     <TabsTrigger value="factures" className="gap-1.5"><Receipt className="h-3.5 w-3.5" /> Factures</TabsTrigger>
+                    <TabsTrigger value="taches" className="gap-1.5"><ListTodo className="h-3.5 w-3.5" /> Tâches</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="chantiers" className="mt-4">
@@ -391,6 +410,60 @@ export default function ClientsPage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="taches" className="mt-4">
+                    {clientTodos.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">Aucune tâche liée à ce contact</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {clientTodos.map(todo => {
+                          const priority = TODO_PRIORITIES[todo.priority] || TODO_PRIORITIES.moyenne;
+                          const category = TODO_CATEGORIES[todo.category] || TODO_CATEGORIES.autre;
+                          const isOverdue = todo.due_date && !todo.completed && todo.due_date < new Date().toISOString().split('T')[0];
+                          return (
+                            <div key={todo.id} className={cn(
+                              'flex items-start gap-3 rounded-lg border border-border p-3 transition-all',
+                              todo.completed && 'opacity-60'
+                            )}>
+                              <button
+                                onClick={() => toggleClientTodo(todo.id, !todo.completed)}
+                                className={cn(
+                                  'mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all',
+                                  todo.completed
+                                    ? 'border-emerald-500 bg-emerald-500'
+                                    : 'border-muted-foreground/30 hover:border-primary'
+                                )}
+                              >
+                                {todo.completed && (
+                                  <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <p className={cn('text-sm font-medium', todo.completed && 'line-through text-muted-foreground')}>{todo.title}</p>
+                                {todo.description && <p className="text-xs text-muted-foreground mt-0.5">{todo.description}</p>}
+                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                  <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium', priority.color)}>
+                                    <span className={cn('h-1.5 w-1.5 rounded-full', priority.dot)} />
+                                    {priority.label}
+                                  </span>
+                                  <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium', category.color)}>
+                                    {category.label}
+                                  </span>
+                                  {todo.due_date && (
+                                    <span className={cn('text-[10px] font-medium', isOverdue ? 'text-red-600' : 'text-muted-foreground')}>
+                                      {formatDate(todo.due_date)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>

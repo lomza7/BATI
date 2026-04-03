@@ -25,6 +25,8 @@ export interface Todo {
   completed: boolean;
   completed_at: string | null;
   position: number;
+  client_id: string | null;
+  client_name?: string;
   created_at: string;
   updated_at: string;
 }
