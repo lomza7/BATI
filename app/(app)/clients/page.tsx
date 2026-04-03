@@ -66,6 +66,12 @@ export default function ClientsPage() {
   const [form, setForm] = useState(emptyForm);
   const [showDelete, setShowDelete] = useState<string | null>(null);
 
+  // Création rapide
+  const [showQuickQuote, setShowQuickQuote] = useState(false);
+  const [showQuickInvoice, setShowQuickInvoice] = useState(false);
+  const [quickForm, setQuickForm] = useState({ title: '', totalHt: '' });
+  const [quickSaving, setQuickSaving] = useState(false);
+
   useEffect(() => { loadClients(); }, []);
 
   async function loadClients() {
@@ -106,6 +112,52 @@ export default function ClientsPage() {
     setShowDelete(null);
     if (selectedId === id) setSelectedId(null);
     loadClients();
+  }
+
+  async function createQuickQuote() {
+    if (!user || !selectedId || !quickForm.title.trim()) return;
+    setQuickSaving(true);
+    const now = new Date();
+    const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+    const validUntil = new Date(now);
+    validUntil.setDate(validUntil.getDate() + 30);
+    const totalHt = Number(quickForm.totalHt || 0);
+    await supabase.from('quotes').insert({
+      user_id: user.id,
+      client_id: selectedId,
+      quote_number: quoteNumber,
+      title: quickForm.title.trim(),
+      total_ht: totalHt,
+      total_ttc: totalHt * 1.2,
+      valid_until: validUntil.toISOString().split('T')[0],
+    });
+    setQuickSaving(false);
+    setShowQuickQuote(false);
+    setQuickForm({ title: '', totalHt: '' });
+    loadClientDetails(selectedId);
+  }
+
+  async function createQuickInvoice() {
+    if (!user || !selectedId || !quickForm.title.trim()) return;
+    setQuickSaving(true);
+    const now = new Date();
+    const invNumber = `F-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+    const dueDate = new Date(now);
+    dueDate.setDate(dueDate.getDate() + 30);
+    const totalHt = Number(quickForm.totalHt || 0);
+    await supabase.from('invoices').insert({
+      user_id: user.id,
+      client_id: selectedId,
+      invoice_number: invNumber,
+      title: quickForm.title.trim(),
+      total_ht: totalHt,
+      total_ttc: totalHt * 1.2,
+      due_date: dueDate.toISOString().split('T')[0],
+    });
+    setQuickSaving(false);
+    setShowQuickInvoice(false);
+    setQuickForm({ title: '', totalHt: '' });
+    loadClientDetails(selectedId);
   }
 
   function openEdit(c: Client) {
@@ -260,7 +312,13 @@ export default function ClientsPage() {
                             <StatusBadge label={CONTACT_TYPES[selected.contact_type].label} color={CONTACT_TYPES[selected.contact_type].color} />
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button size="sm" variant="outline" className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => { setQuickForm({ title: '', totalHt: '' }); setShowQuickQuote(true); }}>
+                            <FileText className="h-3.5 w-3.5" /> Nouveau devis
+                          </Button>
+                          <Button size="sm" variant="outline" className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => { setQuickForm({ title: '', totalHt: '' }); setShowQuickInvoice(true); }}>
+                            <Receipt className="h-3.5 w-3.5" /> Nouvelle facture
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => openEdit(selected)} className="gap-1.5">
                             <Pencil className="h-3.5 w-3.5" /> Modifier
                           </Button>
@@ -449,6 +507,58 @@ export default function ClientsPage() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Annuler</Button>
               <Button onClick={saveClient} disabled={!form.name.trim()}>{editingId ? 'Enregistrer' : 'Creer'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog création rapide devis */}
+      <Dialog open={showQuickQuote} onOpenChange={(open) => { setShowQuickQuote(open); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nouveau devis — {selected?.name}</DialogTitle>
+            <DialogDescription>Le devis sera créé en brouillon et lié à ce client.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm font-medium">Titre *</label>
+              <Input className="mt-1" placeholder="Ex : Rénovation salle de bain" value={quickForm.title} onChange={e => setQuickForm({ ...quickForm, title: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Montant HT</label>
+              <Input className="mt-1" type="number" min="0" placeholder="0" value={quickForm.totalHt} onChange={e => setQuickForm({ ...quickForm, totalHt: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowQuickQuote(false)}>Annuler</Button>
+              <Button onClick={createQuickQuote} disabled={!quickForm.title.trim() || quickSaving}>
+                {quickSaving ? 'Création...' : 'Créer le devis'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog création rapide facture */}
+      <Dialog open={showQuickInvoice} onOpenChange={(open) => { setShowQuickInvoice(open); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nouvelle facture — {selected?.name}</DialogTitle>
+            <DialogDescription>La facture sera créée en brouillon et liée à ce client.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm font-medium">Titre *</label>
+              <Input className="mt-1" placeholder="Ex : Travaux toiture" value={quickForm.title} onChange={e => setQuickForm({ ...quickForm, title: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Montant HT</label>
+              <Input className="mt-1" type="number" min="0" placeholder="0" value={quickForm.totalHt} onChange={e => setQuickForm({ ...quickForm, totalHt: e.target.value })} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowQuickInvoice(false)}>Annuler</Button>
+              <Button onClick={createQuickInvoice} disabled={!quickForm.title.trim() || quickSaving}>
+                {quickSaving ? 'Création...' : 'Créer la facture'}
+              </Button>
             </div>
           </div>
         </DialogContent>
