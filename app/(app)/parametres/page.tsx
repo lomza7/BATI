@@ -8,11 +8,14 @@ import {
   Check,
   CreditCard,
   ExternalLink,
+  Gift,
+  Handshake,
   Loader2,
   LogOut,
   Mail,
   MapPin,
   Phone,
+  Plus,
   RefreshCw,
   Save,
   Settings2,
@@ -47,6 +50,11 @@ import {
   PRICING_PLAN_DEFAULTS,
   type PricingPlanKey,
 } from '@/lib/pricing-plans';
+import {
+  DEFAULT_LEAD_SOURCES,
+  normalizeLeadSourceSlug,
+  type LeadSource,
+} from '@/lib/lead-sources';
 
 type SettingsTab = 'parametres' | 'abonnement' | 'securite';
 
@@ -122,6 +130,13 @@ interface PappersCompanyPayload {
   phone: string;
   website: string;
   rcs: string;
+}
+
+interface LeadSourceFormState {
+  name: string;
+  source_type: 'channel' | 'partner';
+  contact_name: string;
+  reward_note: string;
 }
 
 const planIcons = {
@@ -264,13 +279,23 @@ export default function ParametresPage() {
   });
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({});
   const [reminderSettings, setReminderSettings] = useState(defaultReminderSettings);
+  const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
   const [saving, setSaving] = useState(false);
   const [savingReminders, setSavingReminders] = useState(false);
+  const [savingSourceId, setSavingSourceId] = useState<string | null>(null);
+  const [creatingSource, setCreatingSource] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
+  const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
   const [pappersRefreshing, setPappersRefreshing] = useState(false);
+  const [newLeadSource, setNewLeadSource] = useState<LeadSourceFormState>({
+    name: '',
+    source_type: 'channel',
+    contact_name: '',
+    reward_note: '',
+  });
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -284,7 +309,7 @@ export default function ParametresPage() {
     setLoading(true);
     setError('');
 
-    const [profileRes, configRes, reminderSettingsRes] = await Promise.all([
+    const [profileRes, configRes, reminderSettingsRes, leadSourcesRes] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -300,6 +325,10 @@ export default function ParametresPage() {
         )
         .eq('user_id', user.id)
         .maybeSingle(),
+      supabase
+        .from('lead_sources')
+        .select('*')
+        .order('position', { ascending: true }),
     ]);
 
     if (profileRes.error) {
@@ -325,6 +354,21 @@ export default function ParametresPage() {
     });
     setPlatformConfig((configRes.data as PlatformConfig) || {});
     setReminderSettings(buildPrefilledReminderSettings(nextProfile, reminderSettingsRes.data));
+    setLeadSources(
+      (((leadSourcesRes.data as LeadSource[]) || []).length > 0
+        ? (leadSourcesRes.data as LeadSource[])
+        : DEFAULT_LEAD_SOURCES.map((source, index) => ({
+            id: `default-${source.slug}`,
+            user_id: user.id,
+            name: source.name,
+            slug: source.slug,
+            source_type: source.source_type,
+            contact_name: '',
+            reward_note: '',
+            is_active: true,
+            position: source.position ?? index,
+          }))) as LeadSource[]
+    );
     setLoading(false);
   }, [user]);
 
@@ -477,6 +521,103 @@ export default function ParametresPage() {
     }
   }
 
+  function updateLeadSource(id: string, patch: Partial<LeadSource>) {
+    setLeadSources((prev) => prev.map((source) => (source.id === id ? { ...source, ...patch } : source)));
+  }
+
+  async function saveLeadSource(source: LeadSource) {
+    if (!user || !source.name.trim()) return;
+
+    setSavingSourceId(source.id);
+    setSaveSourceSuccess(false);
+    setError('');
+    const isTempSource = source.id.startsWith('default-');
+
+    const payload = {
+      user_id: user.id,
+      name: source.name.trim(),
+      slug: isTempSource ? normalizeLeadSourceSlug(source.name) : source.slug,
+      source_type: source.source_type,
+      contact_name: source.contact_name.trim(),
+      reward_note: source.reward_note.trim(),
+      is_active: source.is_active,
+      position: source.position,
+      updated_at: new Date().toISOString(),
+    };
+
+    const query = isTempSource
+      ? supabase.from('lead_sources').insert(payload).select('*').single()
+      : supabase.from('lead_sources').update(payload).eq('id', source.id).select('*').single();
+
+    const { data, error: sourceError } = await query;
+
+    if (sourceError) {
+      setError(sourceError.message);
+      setSavingSourceId(null);
+      return;
+    }
+
+    setLeadSources((prev) => {
+      const rest = prev.filter((item) => item.id !== source.id);
+      return [...rest, data as LeadSource].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    });
+    setSavingSourceId(null);
+    setSaveSourceSuccess(true);
+    window.setTimeout(() => setSaveSourceSuccess(false), 2500);
+  }
+
+  async function createLeadSource() {
+    if (!user || !newLeadSource.name.trim()) return;
+
+    setCreatingSource(true);
+    setSaveSourceSuccess(false);
+    setError('');
+
+    const slug = normalizeLeadSourceSlug(newLeadSource.name);
+    if (!slug) {
+      setError('Le nom de la source est invalide.');
+      setCreatingSource(false);
+      return;
+    }
+
+    const payload = {
+      user_id: user.id,
+      name: newLeadSource.name.trim(),
+      slug,
+      source_type: newLeadSource.source_type,
+      contact_name: newLeadSource.contact_name.trim(),
+      reward_note: newLeadSource.reward_note.trim(),
+      is_active: true,
+      position: leadSources.length,
+    };
+
+    const { data, error: sourceError } = await supabase
+      .from('lead_sources')
+      .upsert(payload, { onConflict: 'user_id,slug' })
+      .select('*')
+      .single();
+
+    if (sourceError) {
+      setError(sourceError.message);
+      setCreatingSource(false);
+      return;
+    }
+
+    setLeadSources((prev) => {
+      const filtered = prev.filter((source) => source.slug !== slug);
+      return [...filtered, data as LeadSource].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    });
+    setNewLeadSource({
+      name: '',
+      source_type: 'channel',
+      contact_name: '',
+      reward_note: '',
+    });
+    setCreatingSource(false);
+    setSaveSourceSuccess(true);
+    window.setTimeout(() => setSaveSourceSuccess(false), 2500);
+  }
+
   async function launchCheckout(planKey: PricingPlanKey) {
     if (!user?.email) return;
 
@@ -580,6 +721,7 @@ export default function ParametresPage() {
     reminderSettings.has_employees ? reminderSettings.dsn_due_day : 1,
   ].filter(Boolean).length;
   const reminderCompletionPercent = Math.round((reminderCompletionScore / 7) * 100);
+  const partnerSourcesCount = leadSources.filter((source) => source.source_type === 'partner' && source.is_active).length;
 
   if (authLoading || loading) {
     return (
@@ -1267,6 +1409,166 @@ export default function ParametresPage() {
                   </span>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-xl">Sources de leads et partenaires</CardTitle>
+              <CardDescription>
+                Creez ici vos canaux d acquisition et vos apporteurs d affaires pour les reutiliser dans le CRM et mesurer leur performance dans le dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 rounded-2xl border border-primary/15 bg-primary/5 p-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Handshake className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Nouvelle source</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-source-name">Nom de la source</Label>
+                      <Input
+                        id="lead-source-name"
+                        value={newLeadSource.name}
+                        onChange={(e) => setNewLeadSource((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ex: Architecte Martin, Google Ads, Salon local"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-source-type">Type</Label>
+                      <select
+                        id="lead-source-type"
+                        value={newLeadSource.source_type}
+                        onChange={(e) =>
+                          setNewLeadSource((prev) => ({
+                            ...prev,
+                            source_type: e.target.value as LeadSourceFormState['source_type'],
+                          }))
+                        }
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="channel">Canal d acquisition</option>
+                        <option value="partner">Apporteur d affaires</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-source-contact">Contact</Label>
+                      <Input
+                        id="lead-source-contact"
+                        value={newLeadSource.contact_name}
+                        onChange={(e) => setNewLeadSource((prev) => ({ ...prev, contact_name: e.target.value }))}
+                        placeholder="Nom du partenaire ou referent"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-source-reward">Idee de recompense</Label>
+                      <Input
+                        id="lead-source-reward"
+                        value={newLeadSource.reward_note}
+                        onChange={(e) => setNewLeadSource((prev) => ({ ...prev, reward_note: e.target.value }))}
+                        placeholder="Ex: cadeau de fin d annee, commission, dejeuner"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={createLeadSource} disabled={creatingSource || !newLeadSource.name.trim()}>
+                    {creatingSource ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Ajouter la source
+                  </Button>
+                </div>
+
+                <div className="rounded-2xl border border-white/40 bg-background/70 p-4">
+                  <p className="text-sm font-semibold text-foreground">Lecture rapide</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Sources actives</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">
+                        {leadSources.filter((source) => source.is_active).length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Apporteurs actifs</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{partnerSourcesCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Usage CRM</p>
+                      <p className="mt-2 text-sm font-medium text-foreground">
+                        Chaque lead pourra etre rattache a la bonne source pour mesurer vos canaux qui signent vraiment.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {leadSources.map((source) => (
+                  <div key={source.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="grid gap-4 lg:grid-cols-[1.1fr_0.7fr_0.8fr_0.9fr_auto] lg:items-end">
+                      <div className="space-y-2">
+                        <Label>Nom</Label>
+                        <Input
+                          value={source.name}
+                          onChange={(e) => updateLeadSource(source.id, { name: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <select
+                          value={source.source_type}
+                          onChange={(e) => updateLeadSource(source.id, { source_type: e.target.value as LeadSource['source_type'] })}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="channel">Canal</option>
+                          <option value="partner">Partenaire</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Contact</Label>
+                        <Input
+                          value={source.contact_name}
+                          onChange={(e) => updateLeadSource(source.id, { contact_name: e.target.value })}
+                          placeholder="Nom du contact"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Recompense / geste</Label>
+                        <Input
+                          value={source.reward_note}
+                          onChange={(e) => updateLeadSource(source.id, { reward_note: e.target.value })}
+                          placeholder="Bon cadeau, commission, dejeuner..."
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 pb-2 lg:justify-end">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={source.is_active}
+                            onCheckedChange={(checked) => updateLeadSource(source.id, { is_active: checked })}
+                          />
+                          <span className="text-sm text-muted-foreground">Actif</span>
+                        </div>
+                        <Button onClick={() => void saveLeadSource(source)} disabled={savingSourceId === source.id}>
+                          {savingSourceId === source.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : source.source_type === 'partner' ? (
+                            <Gift className="mr-2 h-4 w-4" />
+                          ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                          )}
+                          Enregistrer
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {saveSourceSuccess && (
+                <span className="inline-flex items-center gap-2 text-sm text-emerald-700">
+                  <Check className="h-4 w-4" />
+                  Sources mises a jour
+                </span>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -21,6 +21,10 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { LEAD_STAGES, SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
+import {
+  DEFAULT_LEAD_SOURCES,
+  type LeadSource,
+} from '@/lib/lead-sources';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -99,16 +103,6 @@ interface LeadForm {
   preferred_visit_date: string;
 }
 
-const SOURCES = [
-  { value: 'travaux_com', label: 'Travaux.com' },
-  { value: 'site_web', label: 'Site web' },
-  { value: 'google', label: 'Google' },
-  { value: 'meta_ads', label: 'Meta Ads' },
-  { value: 'bouche_a_oreille', label: 'Bouche a oreille' },
-  { value: 'partenaire', label: 'Partenaire' },
-  { value: 'autre', label: 'Autre' },
-] as const;
-
 const PROJECT_KINDS = [
   { value: 'depannage', label: 'Depannage' },
   { value: 'renovation', label: 'Renovation' },
@@ -154,6 +148,7 @@ function createEmptyForm(): LeadForm {
 export default function ProspectionPage() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [sources, setSources] = useState<LeadSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -169,12 +164,20 @@ export default function ProspectionPage() {
     if (!user) return;
 
     setLoading(true);
-    const { data } = await supabase
-      .from('leads')
-      .select('*')
-      .order('updated_at', { ascending: false });
+    const [leadsRes, sourcesRes] = await Promise.all([
+      supabase
+        .from('leads')
+        .select('*')
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('lead_sources')
+        .select('*')
+        .order('position', { ascending: true }),
+    ]);
 
-    setLeads((data as Lead[]) || []);
+    const nextSources = (sourcesRes.data as LeadSource[]) || [];
+    setLeads((leadsRes.data as Lead[]) || []);
+    setSources(nextSources);
     setLoading(false);
   }, [user]);
 
@@ -471,6 +474,16 @@ export default function ProspectionPage() {
   const nextDueLead = [...leads]
     .filter((lead) => lead.next_action_date && !['gagne', 'perdu'].includes(lead.stage))
     .sort((a, b) => new Date(a.next_action_date || '').getTime() - new Date(b.next_action_date || '').getTime())[0];
+
+  const sourceOptions = useMemo(() => {
+    if (sources.length > 0) {
+      return sources
+        .filter((source) => source.is_active)
+        .map((source) => ({ value: source.slug, label: source.name }));
+    }
+
+    return DEFAULT_LEAD_SOURCES.map((source) => ({ value: source.slug, label: source.name }));
+  }, [sources]);
 
   return (
     <div className="space-y-6">
@@ -823,7 +836,7 @@ export default function ProspectionPage() {
                   <Select value={form.source} onValueChange={(value) => updateForm('source', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {SOURCES.map((source) => (
+                      {sourceOptions.map((source) => (
                         <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
                       ))}
                     </SelectContent>

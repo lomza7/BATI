@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { buildLeadSourceLabelMap, type LeadSource } from '@/lib/lead-sources';
 import {
   INVOICE_STATUSES,
   MEMBER_TYPES,
@@ -125,6 +126,13 @@ interface CompanyProfileRow {
   tva_number: string;
 }
 
+interface LeadDashboardRow {
+  id: string;
+  source: string;
+  stage: string;
+  value: number;
+}
+
 type ActivityItem = {
   id: string;
   label: string;
@@ -166,6 +174,13 @@ type FunnelPoint = {
   fill: string;
 };
 
+type LeadSourcePoint = {
+  source: string;
+  active: number;
+  won: number;
+  lost: number;
+};
+
 const revenueChartConfig = {
   encaisse: {
     label: 'Encaisse',
@@ -181,6 +196,21 @@ const funnelChartConfig = {
   value: {
     label: 'Volume',
     color: 'hsl(var(--chart-2))',
+  },
+} satisfies ChartConfig;
+
+const leadSourceChartConfig = {
+  active: {
+    label: 'En cours',
+    color: 'hsl(var(--chart-3))',
+  },
+  won: {
+    label: 'Gagnes',
+    color: 'hsl(var(--chart-2))',
+  },
+  lost: {
+    label: 'Perdus',
+    color: 'hsl(var(--chart-5))',
   },
 } satisfies ChartConfig;
 
@@ -481,6 +511,8 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [leads, setLeads] = useState<LeadDashboardRow[]>([]);
+  const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
   const [planningEvents, setPlanningEvents] = useState<PlanningEventRow[]>([]);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettingsRow | null>(null);
@@ -491,7 +523,7 @@ export default function DashboardPage() {
     if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -504,6 +536,14 @@ export default function DashboardPage() {
         .from('projects')
         .select('id, name, status, budget, start_date, end_date, created_at, updated_at, clients(name)')
         .order('created_at', { ascending: false }),
+      supabase
+        .from('leads')
+        .select('id, source, stage, value')
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('lead_sources')
+        .select('*')
+        .order('position', { ascending: true }),
       supabase
         .from('team_members')
         .select('id, name, type, status, color')
@@ -538,6 +578,11 @@ export default function DashboardPage() {
       ...project,
       budget: toNumber(project.budget),
     })));
+    setLeads((((leadsRes.data as LeadDashboardRow[]) || [])).map((lead) => ({
+      ...lead,
+      value: toNumber(lead.value),
+    })));
+    setLeadSources((leadSourcesRes.data as LeadSource[]) || []);
     setTeamMembers((teamMembersRes.data as TeamMemberRow[]) || []);
     setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
     setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
@@ -830,6 +875,46 @@ export default function DashboardPage() {
       },
     ];
 
+    const sourceLabelMap = buildLeadSourceLabelMap(leadSources);
+    const leadSourceChartData: LeadSourcePoint[] = Array.from(
+      leads.reduce((acc, lead) => {
+        const key = lead.source || 'autre';
+        const entry = acc.get(key) || {
+          source: sourceLabelMap.get(key) || key,
+          active: 0,
+          won: 0,
+          lost: 0,
+        };
+
+        if (lead.stage === 'gagne') {
+          entry.won += 1;
+        } else if (lead.stage === 'perdu') {
+          entry.lost += 1;
+        } else {
+          entry.active += 1;
+        }
+
+        acc.set(key, entry);
+        return acc;
+      }, new Map<string, LeadSourcePoint>()).values()
+    )
+      .sort((a, b) => (b.active + b.won + b.lost) - (a.active + a.won + a.lost))
+      .slice(0, 6);
+
+    const topPartnerSources = leadSources
+      .filter((source) => source.source_type === 'partner' && source.is_active)
+      .map((source) => {
+        const sourceLeads = leads.filter((lead) => lead.source === source.slug);
+        const wonLeads = sourceLeads.filter((lead) => lead.stage === 'gagne');
+        return {
+          ...source,
+          leadCount: sourceLeads.length,
+          wonCount: wonLeads.length,
+          wonValue: wonLeads.reduce((sum, lead) => sum + lead.value, 0),
+        };
+      })
+      .sort((a, b) => b.wonValue - a.wonValue || b.leadCount - a.leadCount);
+
     return {
       revenueThisMonth,
       revenuePreviousMonth,
@@ -843,7 +928,9 @@ export default function DashboardPage() {
       reminderItems,
       revenueChartData,
       funnelChartData,
-      hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0,
+      leadSourceChartData,
+      topPartnerSources,
+      hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0,
       activeProjects: projects.filter((project) => project.status === 'en_cours').length,
       unpaidInvoicesTotal: invoices
         .filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard')
@@ -868,7 +955,7 @@ export default function DashboardPage() {
         return start >= todayStart && start <= nextWeek;
       }).length,
     };
-  }, [companyProfile, invoices, planningEvents, projects, quotes, reminderSettings, teamMembers]);
+  }, [companyProfile, invoices, leadSources, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
 
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
     ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} le mois dernier`
@@ -1124,6 +1211,83 @@ export default function DashboardPage() {
                   </BarChart>
                 </ChartContainer>
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Origine de vos leads</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Ou vos opportunites entrent vraiment, et dans quel etat elles se trouvent</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/prospection">Ouvrir le CRM</Link>
+                </Button>
+              </div>
+
+              {dashboardData.leadSourceChartData.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                  Des que vos leads seront qualifies avec une source, vous verrez ici quels canaux performent le mieux.
+                </div>
+              ) : (
+                <div className="mt-6">
+                  <ChartContainer config={leadSourceChartConfig} className="h-[300px] w-full">
+                    <BarChart data={dashboardData.leadSourceChartData} margin={{ left: 12, right: 12, top: 10, bottom: 10 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="source" tickLine={false} axisLine={false} tickMargin={8} />
+                      <YAxis hide />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="active" stackId="state" radius={[6, 6, 0, 0]} fill="var(--color-active)" />
+                      <Bar dataKey="won" stackId="state" fill="var(--color-won)" />
+                      <Bar dataKey="lost" stackId="state" radius={[6, 6, 0, 0]} fill="var(--color-lost)" />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Top apporteurs</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Les partenaires a cultiver en priorite</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/parametres?tab=parametres">Gerer les sources</Link>
+                </Button>
+              </div>
+
+              {dashboardData.topPartnerSources.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                  Ajoutez vos apporteurs d affaires dans Parametres pour suivre ceux qui vous envoient les meilleurs leads.
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {dashboardData.topPartnerSources.slice(0, 5).map((source) => (
+                    <Link
+                      key={source.id}
+                      href="/prospection"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-transparent px-2 py-2 transition-colors hover:border-border hover:bg-muted/40"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{source.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {source.contact_name || 'Contact non renseigne'}
+                          {source.reward_note ? ` • ${source.reward_note}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-foreground">{source.leadCount} lead{source.leadCount > 1 ? 's' : ''}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {source.wonCount} gagne{source.wonCount > 1 ? 's' : ''} • {formatCurrency(source.wonValue)}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
