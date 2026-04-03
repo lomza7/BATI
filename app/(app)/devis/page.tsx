@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2 } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
+import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -61,6 +62,7 @@ export default function DevisPage() {
   const [lines, setLines] = useState<QuoteLine[]>([
     { description: '', quantity: 1, unit: 'u', unit_price: 0 },
   ]);
+  const [sendQuote, setSendQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -306,6 +308,11 @@ export default function DevisPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {(q.status === 'brouillon' || q.status === 'envoye') && (
+                                <DropdownMenuItem onClick={() => setSendQuote(q)}>
+                                  <PenLine className="mr-2 h-4 w-4" /> Envoyer pour signature
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>
                                 <Send className="mr-2 h-4 w-4" /> Marquer envoye
                               </DropdownMenuItem>
@@ -342,6 +349,11 @@ export default function DevisPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {(q.status === 'brouillon' || q.status === 'envoye') && (
+                          <DropdownMenuItem onClick={() => setSendQuote(q)}>
+                            <PenLine className="mr-2 h-4 w-4" /> Envoyer pour signature
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>Marquer envoye</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>Marquer accepte</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refuse</DropdownMenuItem>
@@ -564,6 +576,14 @@ export default function DevisPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {sendQuote && (
+        <SendQuoteDialog
+          quote={sendQuote}
+          onClose={() => setSendQuote(null)}
+          onSent={loadQuotes}
+        />
+      )}
     </div>
   );
 }
