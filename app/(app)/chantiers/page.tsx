@@ -11,8 +11,10 @@ import {
   Clock,
   Clock3,
   FileText,
+  Grid3x3 as LayoutGrid,
   HardHat,
   ImagePlus,
+  List,
   Loader as Loader2,
   MapPin,
   MoveHorizontal as MoreHorizontal,
@@ -52,10 +54,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+type PhotoCategory = 'presentation' | 'avant' | 'pendant' | 'apres';
+
+const PHOTO_CATEGORIES: { key: PhotoCategory; label: string }[] = [
+  { key: 'presentation', label: 'Présentation' },
+  { key: 'avant', label: 'Avant' },
+  { key: 'pendant', label: 'Pendant' },
+  { key: 'apres', label: 'Après' },
+];
+
 interface ProjectPhoto {
   id: string;
   url: string;
   caption: string | null;
+  category: PhotoCategory;
   created_at: string;
 }
 
@@ -120,6 +132,7 @@ interface PendingPhoto {
   id: string;
   file: File;
   previewUrl: string;
+  category: PhotoCategory;
 }
 
 interface ProjectFormState {
@@ -197,6 +210,7 @@ export default function ChantiersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showEditor, setShowEditor] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
@@ -205,6 +219,8 @@ export default function ChantiersPage() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [form, setForm] = useState<ProjectFormState>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
+  const [editorPhotoTab, setEditorPhotoTab] = useState<PhotoCategory>('avant');
+  const [detailPhotoTab, setDetailPhotoTab] = useState<PhotoCategory>('avant');
   const [dragOver, setDragOver] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState<PendingPhoto[]>([]);
   const [existingPhotos, setExistingPhotos] = useState<ProjectPhoto[]>([]);
@@ -238,7 +254,7 @@ export default function ChantiersPage() {
       await Promise.all([
         supabase
           .from('projects')
-          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name), project_photos(id, url, caption, created_at)')
+          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name), project_photos(id, url, caption, category, created_at)')
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
       ]);
@@ -400,12 +416,33 @@ export default function ChantiersPage() {
     }));
   }
 
-  function addFiles(fileList: FileList | File[]) {
+  function addFiles(fileList: FileList | File[], category: PhotoCategory) {
     const acceptedFiles = Array.from(fileList).filter(
       (file) => file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024
     );
 
     if (acceptedFiles.length === 0) return;
+
+    // Pour 'presentation', on ne garde qu'une seule photo
+    if (category === 'presentation') {
+      setPendingPhotos((current) => {
+        // Retirer les pending presentation
+        const cleaned = current.filter(p => p.category !== 'presentation');
+        return [...cleaned, {
+          id: `${acceptedFiles[0].name}-${acceptedFiles[0].lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          file: acceptedFiles[0],
+          previewUrl: URL.createObjectURL(acceptedFiles[0]),
+          category,
+        }];
+      });
+      // Retirer les existing presentation aussi
+      setExistingPhotos(current => {
+        const toRemove = current.filter(p => p.category === 'presentation');
+        setRemovedPhotoIds(ids => [...ids, ...toRemove.map(p => p.id)]);
+        return current.filter(p => p.category !== 'presentation');
+      });
+      return;
+    }
 
     setPendingPhotos((current) => [
       ...current,
@@ -413,6 +450,7 @@ export default function ChantiersPage() {
         id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
         file,
         previewUrl: URL.createObjectURL(file),
+        category,
       })),
     ]);
   }
@@ -453,6 +491,7 @@ export default function ChantiersPage() {
         user_id: user.id,
         project_id: projectId,
         url: urlData.publicUrl,
+        category: photo.category,
       });
 
       if (photoInsertError) {
@@ -694,14 +733,38 @@ export default function ChantiersPage() {
         })}
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher un chantier..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="pl-10"
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher un chantier..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            className={cn(
+              'rounded-md p-1.5 transition-all',
+              viewMode === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'rounded-md p-1.5 transition-all',
+              viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -721,11 +784,11 @@ export default function ChantiersPage() {
             Ajouter un chantier
           </Button>
         </EmptyState>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filteredProjects.map((project) => {
             const statusInfo = PROJECT_STATUSES[project.status] || PROJECT_STATUSES.a_planifier;
-            const coverPhoto = project.project_photos[0];
+            const coverPhoto = project.project_photos.find(p => p.category === 'presentation') || project.project_photos[0];
 
             return (
               <div
@@ -850,6 +913,103 @@ export default function ChantiersPage() {
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* Vue liste */
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          {/* Desktop : tableau */}
+          <table className="hidden sm:table w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground bg-muted/30">
+                <th className="px-4 py-3 font-medium">Chantier</th>
+                <th className="px-4 py-3 font-medium">Client</th>
+                <th className="px-4 py-3 font-medium">Statut</th>
+                <th className="px-4 py-3 font-medium">Ville</th>
+                <th className="px-4 py-3 font-medium text-center">Avancement</th>
+                <th className="px-4 py-3 font-medium text-right">Budget</th>
+                <th className="px-4 py-3 font-medium text-right">Temps</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredProjects.map((project) => {
+                const statusInfo = PROJECT_STATUSES[project.status] || PROJECT_STATUSES.a_planifier;
+                const coverPhoto = project.project_photos.find(p => p.category === 'presentation') || project.project_photos[0];
+                return (
+                  <tr
+                    key={project.id}
+                    onClick={() => openDetails(project)}
+                    className="cursor-pointer hover:bg-muted/10 transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {coverPhoto ? (
+                          <img src={coverPhoto.url} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                            <HardHat className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="font-medium text-foreground truncate">{project.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{project.clients?.name || '—'}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge label={statusInfo.label} color={statusInfo.color} />
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{project.city || '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Progress value={project.progress} className="h-1.5 w-16" />
+                        <span className="text-xs font-medium text-foreground">{project.progress}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-foreground">{project.budget > 0 ? formatCurrency(project.budget) : '—'}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{formatTrackedHours(project.trackedHours)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {/* Mobile : cartes compactes */}
+          <div className="divide-y divide-border sm:hidden">
+            {filteredProjects.map((project) => {
+              const statusInfo = PROJECT_STATUSES[project.status] || PROJECT_STATUSES.a_planifier;
+              const coverPhoto = project.project_photos.find(p => p.category === 'presentation') || project.project_photos[0];
+              return (
+                <div
+                  key={project.id}
+                  onClick={() => openDetails(project)}
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer active:bg-muted/20"
+                >
+                  {coverPhoto ? (
+                    <img src={coverPhoto.url} alt="" className="h-12 w-12 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <HardHat className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-medium text-foreground text-sm">{project.name}</p>
+                      <StatusBadge label={statusInfo.label} color={statusInfo.color} />
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                      <span>{project.clients?.name || 'Sans client'}</span>
+                      {project.city && <span>{project.city}</span>}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <Progress value={project.progress} className="h-1 w-12" />
+                        <span className="text-[10px] font-medium text-foreground">{project.progress}%</span>
+                      </div>
+                      {project.budget > 0 && <span className="text-[10px] font-medium text-foreground">{formatCurrency(project.budget)}</span>}
+                      <span className="text-[10px] text-muted-foreground">{formatTrackedHours(project.trackedHours)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -982,111 +1142,151 @@ export default function ChantiersPage() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">Photos du chantier</p>
                     <p className="text-xs text-muted-foreground">
-                      Glissez vos photos ici pour garder une trace avant, pendant et apres.
+                      Organisez vos photos par catégorie.
                     </p>
                   </div>
                   <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    {existingPhotos.length + pendingPhotos.length} photo
-                    {existingPhotos.length + pendingPhotos.length > 1 ? 's' : ''}
+                    {existingPhotos.length + pendingPhotos.length} photo{(existingPhotos.length + pendingPhotos.length) > 1 ? 's' : ''}
                   </span>
                 </div>
 
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragOver(false);
-                    addFiles(event.dataTransfer.files);
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={cn(
-                    'flex min-h-[170px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-8 text-center transition-all',
-                    dragOver
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5'
-                  )}
-                >
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    {saving ? (
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    ) : (
-                      <UploadCloud className="h-6 w-6 text-primary" />
-                    )}
-                  </div>
-                  <p className="text-sm font-medium text-foreground">
-                    Glissez vos photos ou cliquez pour les ajouter
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    JPG, PNG, WebP - 10 Mo max par photo
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-4 gap-2"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      fileInputRef.current?.click();
-                    }}
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    Ajouter des photos
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files) addFiles(event.target.files);
-                      event.target.value = '';
-                    }}
-                  />
+                {/* Onglets catégories */}
+                <div className="flex gap-1 rounded-xl bg-muted/60 p-1 mb-3">
+                  {PHOTO_CATEGORIES.map(cat => {
+                    const count = existingPhotos.filter(p => p.category === cat.key).length + pendingPhotos.filter(p => p.category === cat.key).length;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => setEditorPhotoTab(cat.key)}
+                        className={cn(
+                          'flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all',
+                          editorPhotoTab === cat.key
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        {cat.label}
+                        {count > 0 && <span className="ml-1 text-[10px] opacity-70">({count})</span>}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {existingPhotos.length > 0 || pendingPhotos.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    {existingPhotos.map((photo) => (
-                      <div key={photo.id} className="group relative overflow-hidden rounded-2xl border border-border">
-                        <img src={photo.url} alt="" className="h-28 w-full object-cover" />
-                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 to-transparent px-3 py-2 text-xs text-white">
-                          <span>Deja enregistre</span>
-                          <button
-                            type="button"
-                            onClick={() => removeExistingPhoto(photo.id)}
-                            className="rounded-full bg-white/15 p-1 transition hover:bg-white/25"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                {/* Zone de drop pour la catégorie active */}
+                {(() => {
+                  const catExisting = existingPhotos.filter(p => p.category === editorPhotoTab);
+                  const catPending = pendingPhotos.filter(p => p.category === editorPhotoTab);
+                  const isPresentation = editorPhotoTab === 'presentation';
+                  const hasPresentation = catExisting.length > 0 || catPending.length > 0;
 
-                    {pendingPhotos.map((photo) => (
-                      <div key={photo.id} className="group relative overflow-hidden rounded-2xl border border-primary/20">
-                        <img src={photo.previewUrl} alt="" className="h-28 w-full object-cover" />
-                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 to-transparent px-3 py-2 text-xs text-white">
-                          <span>A envoyer</span>
-                          <button
-                            type="button"
-                            onClick={() => removePendingPhoto(photo.id)}
-                            className="rounded-full bg-white/15 p-1 transition hover:bg-white/25"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                  return (
+                    <>
+                      {/* Photo de présentation : afficher si existe */}
+                      {isPresentation && hasPresentation ? (
+                        <div className="relative overflow-hidden rounded-2xl border border-border mb-3">
+                          <img
+                            src={catPending[0]?.previewUrl || catExisting[0]?.url}
+                            alt="Photo de présentation"
+                            className="h-44 w-full object-cover"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/65 to-transparent px-3 py-2 text-xs text-white">
+                            <span>Photo de présentation</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (catPending[0]) removePendingPhoto(catPending[0].id);
+                                else if (catExisting[0]) removeExistingPhoto(catExisting[0].id);
+                              }}
+                              className="rounded-full bg-white/15 p-1 transition hover:bg-white/25"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4 rounded-2xl bg-background px-4 py-3 text-sm text-muted-foreground">
-                    Ajoutez quelques photos pour documenter le chantier et retrouver facilement les avant/apres.
-                  </div>
-                )}
+                      ) : null}
+
+                      {/* Zone drop */}
+                      {(!isPresentation || !hasPresentation) && (
+                        <div
+                          onDragOver={(event) => { event.preventDefault(); setDragOver(true); }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            setDragOver(false);
+                            addFiles(event.dataTransfer.files, editorPhotoTab);
+                          }}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={cn(
+                            'flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-4 py-6 text-center transition-all',
+                            isPresentation ? 'min-h-[140px]' : 'min-h-[100px]',
+                            dragOver
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5'
+                          )}
+                        >
+                          <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                            {saving ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                            ) : (
+                              <UploadCloud className="h-5 w-5 text-primary" />
+                            )}
+                          </div>
+                          <p className="text-xs font-medium text-foreground">
+                            {isPresentation ? 'Glissez ou cliquez pour la photo de présentation' : 'Glissez vos photos ou cliquez'}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-muted-foreground">JPG, PNG, WebP - 10 Mo max</p>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple={!isPresentation}
+                            className="hidden"
+                            onChange={(event) => {
+                              if (event.target.files) addFiles(event.target.files, editorPhotoTab);
+                              event.target.value = '';
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Grille de photos (hors présentation) */}
+                      {!isPresentation && (catExisting.length > 0 || catPending.length > 0) && (
+                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {catExisting.map((photo) => (
+                            <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-border">
+                              <img src={photo.url} alt="" className="h-24 w-full object-cover" />
+                              <div className="absolute inset-x-0 bottom-0 flex items-center justify-end bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => removeExistingPhoto(photo.id)}
+                                  className="rounded-full bg-white/15 p-1 transition hover:bg-white/25"
+                                >
+                                  <X className="h-3 w-3 text-white" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {catPending.map((photo) => (
+                            <div key={photo.id} className="group relative overflow-hidden rounded-xl border border-primary/20">
+                              <img src={photo.previewUrl} alt="" className="h-24 w-full object-cover" />
+                              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
+                                <span className="text-[10px] text-white/80">À envoyer</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removePendingPhoto(photo.id)}
+                                  className="rounded-full bg-white/15 p-1 transition hover:bg-white/25"
+                                >
+                                  <X className="h-3 w-3 text-white" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="rounded-2xl border border-border bg-card p-4">
@@ -1169,36 +1369,80 @@ export default function ChantiersPage() {
 
               <div className="grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
                 <div className="space-y-4">
-                  {activeProject.project_photos.length > 0 ? (
-                    <>
+                  {/* Photo de présentation */}
+                  {(() => {
+                    const cover = activeProject.project_photos.find(p => p.category === 'presentation') || activeProject.project_photos[0];
+                    return cover ? (
                       <div className="overflow-hidden rounded-3xl border border-border">
-                        <img
-                          src={activeProject.project_photos[0].url}
-                          alt={activeProject.name}
-                          className="h-[320px] w-full object-cover"
-                        />
+                        <img src={cover.url} alt={activeProject.name} className="h-[220px] sm:h-[280px] w-full object-cover" />
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {activeProject.project_photos.slice(1, 7).map((photo) => (
-                          <div key={photo.id} className="overflow-hidden rounded-2xl border border-border">
-                            <img src={photo.url} alt="" className="h-28 w-full object-cover" />
+                    ) : (
+                      <div className="flex h-[180px] sm:h-[220px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/20">
+                        <div className="text-center">
+                          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                            <Camera className="h-5 w-5 text-primary" />
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/20">
-                      <div className="text-center">
-                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                          <Camera className="h-6 w-6 text-primary" />
+                          <p className="text-sm font-medium text-foreground">Aucune photo</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Ajoutez-en via Modifier</p>
                         </div>
-                        <p className="text-sm font-medium text-foreground">Aucune photo pour ce chantier</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Ajoutez-en dans la modal de modification pour documenter les etapes.
-                        </p>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
+
+                  {/* Onglets Avant / Pendant / Après */}
+                  {(() => {
+                    const categoriesWithPhotos = (['avant', 'pendant', 'apres'] as PhotoCategory[]).filter(
+                      cat => activeProject.project_photos.some(p => p.category === cat)
+                    );
+                    if (categoriesWithPhotos.length === 0 && !activeProject.project_photos.some(p => p.category === 'presentation')) return null;
+                    if (categoriesWithPhotos.length === 0) return null;
+
+                    return (
+                      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                        <div className="flex gap-1 bg-muted/40 p-1">
+                          {(['avant', 'pendant', 'apres'] as PhotoCategory[]).map(cat => {
+                            const photos = activeProject.project_photos.filter(p => p.category === cat);
+                            const catLabel = PHOTO_CATEGORIES.find(c => c.key === cat)!.label;
+                            return (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setDetailPhotoTab(cat)}
+                                className={cn(
+                                  'flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-all',
+                                  detailPhotoTab === cat
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                )}
+                              >
+                                {catLabel}
+                                {photos.length > 0 && <span className="ml-1 opacity-60">({photos.length})</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(() => {
+                          const photos = activeProject.project_photos.filter(p => p.category === detailPhotoTab);
+                          if (photos.length === 0) {
+                            return (
+                              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                Aucune photo « {PHOTO_CATEGORIES.find(c => c.key === detailPhotoTab)!.label} » pour ce chantier.
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+                              {photos.map(photo => (
+                                <div key={photo.id} className="overflow-hidden rounded-xl border border-border">
+                                  <img src={photo.url} alt="" className="h-24 sm:h-28 w-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-4">
