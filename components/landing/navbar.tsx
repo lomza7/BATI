@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   FileText,
@@ -37,13 +37,21 @@ const features = [
 export function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoClicked, setLogoClicked] = useState(false);
+  const clickTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  function handleLogoClick() {
+    setLogoClicked(true);
+    if (clickTimeout.current) clearTimeout(clickTimeout.current);
+    clickTimeout.current = setTimeout(() => setLogoClicked(false), 600);
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--landing-white)]/80 backdrop-blur-md border-b border-[var(--landing-border)]">
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
           <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
-            <Hexagon className="h-4 w-4 text-white" />
+            <Hexagon className={`h-4 w-4 text-white ${logoClicked ? 'animate-nut-click' : ''}`} />
           </div>
           <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
         </Link>

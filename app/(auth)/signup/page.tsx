@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Hexagon, Eye, EyeOff, ArrowRight, Loader as Loader2, Check } from 'lucide-react';
+import { Hexagon, Eye, EyeOff, ArrowRight, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const benefits = [
@@ -183,7 +183,7 @@ export default function SignupPage() {
               className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Hexagon className="h-4 w-4 animate-nut-ratchet" />
               ) : (
                 <>
                   Creer mon compte

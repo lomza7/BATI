@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar/sidebar';
 import { useAuth } from '@/lib/auth-context';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
-import { Loader as Loader2 } from 'lucide-react';
+import { Hexagon } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, showOnboarding, completeOnboarding } = useAuth();
@@ -21,7 +21,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <Hexagon className="h-5 w-5 text-white animate-nut-ratchet" />
+          </div>
           <p className="text-sm text-muted-foreground">Chargement...</p>
         </div>
       </div>
