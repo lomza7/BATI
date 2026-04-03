@@ -277,6 +277,7 @@ export default function ProspectionPage() {
           .insert({
             user_id: user.id,
             name: clientName,
+            contact_type: 'client',
             email: form.email.trim(),
             phone: form.phone.trim(),
             address: form.project_address.trim(),
@@ -380,6 +381,7 @@ export default function ProspectionPage() {
       .insert({
         user_id: user.id,
         name: clientName.trim(),
+        contact_type: 'client',
         email: lead.email || '',
         phone: lead.phone || '',
         address: lead.project_address || '',

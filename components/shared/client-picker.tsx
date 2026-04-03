@@ -61,6 +61,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
     const { data } = await supabase.from('clients').insert({
       user_id: user.id,
       name: createForm.name.trim(),
+      contact_type: 'client',
       email: createForm.email,
       phone: createForm.phone,
       address: createForm.address,
