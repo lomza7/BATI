@@ -22,16 +22,25 @@ export const PROJECT_STATUSES = {
   en_pause: { label: 'En pause', color: 'bg-amber-50 text-amber-700' },
 } as const;
 
-export const PROJECT_PHASES = [
-  { key: 'preparation', label: 'Préparation administrative', description: 'Devis signé, autorisations, commandes matériaux', weight: 5 },
-  { key: 'installation', label: 'Installation chantier', description: 'Protection, mise en place, approvisionnement', weight: 10 },
-  { key: 'demolition', label: 'Démolition / Préparation', description: 'Dépose, préparation des supports', weight: 10 },
-  { key: 'gros_oeuvre', label: 'Gros œuvre', description: 'Travaux structurels principaux', weight: 25 },
-  { key: 'second_oeuvre', label: 'Second œuvre', description: 'Plomberie, électricité, isolation, placo', weight: 25 },
-  { key: 'finitions', label: 'Finitions', description: 'Peinture, revêtements, pose équipements', weight: 15 },
-  { key: 'nettoyage', label: 'Nettoyage & Levée de réserves', description: 'Nettoyage fin de chantier, corrections', weight: 5 },
-  { key: 'reception', label: 'Réception chantier', description: 'PV de réception, remise des clés', weight: 5 },
-] as const;
+export interface ProjectPhase {
+  key: string;
+  label: string;
+  weight: number;
+}
+
+export const DEFAULT_PROJECT_PHASES: ProjectPhase[] = [
+  { key: 'devis_signe', label: 'Devis signé', weight: 5 },
+  { key: 'acompte_demande', label: 'Acompte demandé', weight: 5 },
+  { key: 'acompte_paye', label: 'Acompte payé', weight: 5 },
+  { key: 'demarrage', label: 'Démarrage du chantier', weight: 10 },
+  { key: 'avancement_25', label: 'Avancement 25%', weight: 15 },
+  { key: 'avancement_50', label: 'Avancement 50%', weight: 15 },
+  { key: 'facture_intermediaire', label: 'Facture intermédiaire envoyée', weight: 5 },
+  { key: 'avancement_75', label: 'Avancement 75%', weight: 15 },
+  { key: 'travaux_termines', label: 'Travaux terminés', weight: 10 },
+  { key: 'facture_solde', label: 'Facture de solde envoyée', weight: 5 },
+  { key: 'solde_paye', label: 'Solde payé — Réception', weight: 10 },
+];
 
 export const LEAD_STAGES = {
   nouveau: { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' },

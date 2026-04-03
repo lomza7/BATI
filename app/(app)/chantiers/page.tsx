@@ -21,10 +21,11 @@ import {
   Receipt,
   Search,
   UploadCloud,
+  Users,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { INVOICE_STATUSES, PROJECT_PHASES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { INVOICE_STATUSES, DEFAULT_PROJECT_PHASES, MEMBER_TYPES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate, type ProjectPhase } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
@@ -83,6 +84,17 @@ interface ProjectInvoice {
 interface CompletedPhase {
   key: string;
   completed_at: string;
+}
+
+interface ProjectAssignment {
+  member_id: string;
+  member_name: string;
+  member_type: string;
+  specialty: string;
+  hourly_rate: number;
+  total_hours: number;
+  total_cost: number;
+  dates: string[];
 }
 
 interface Project {
@@ -199,10 +211,25 @@ export default function ChantiersPage() {
   const [removedPhotoIds, setRemovedPhotoIds] = useState<string[]>([]);
   const [projectQuotes, setProjectQuotes] = useState<ProjectQuote[]>([]);
   const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
 
   useEffect(() => {
     void loadProjects();
+    void loadPhasesConfig();
   }, []);
+
+  async function loadPhasesConfig() {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('project_phases_config')
+      .eq('id', user.id)
+      .single();
+    if (data?.project_phases_config && Array.isArray(data.project_phases_config) && data.project_phases_config.length > 0) {
+      setUserPhases(data.project_phases_config as ProjectPhase[]);
+    }
+  }
 
   async function loadProjects() {
     setLoading(true);
@@ -305,13 +332,21 @@ export default function ChantiersPage() {
     setSelectedProject(project);
     setProjectQuotes([]);
     setProjectInvoices([]);
+    setProjectAssignments([]);
     setShowDetails(true);
 
-    const { data: quotes } = await supabase
-      .from('quotes')
-      .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
-      .eq('project_id', project.id)
-      .order('created_at', { ascending: false });
+    const [{ data: quotes }, { data: assignmentRows }] = await Promise.all([
+      supabase
+        .from('quotes')
+        .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('team_assignments')
+        .select('team_member_id, date, hours, team_members(name, type, specialty, hourly_rate)')
+        .eq('project_id', project.id)
+        .order('date', { ascending: true }),
+    ]);
 
     const loadedQuotes = (quotes as ProjectQuote[]) || [];
     setProjectQuotes(loadedQuotes);
@@ -325,6 +360,33 @@ export default function ChantiersPage() {
         .order('created_at', { ascending: false });
       setProjectInvoices((invoices as ProjectInvoice[]) || []);
     }
+
+    // Agréger les affectations par membre
+    const memberMap = new Map<string, ProjectAssignment>();
+    ((assignmentRows as any[]) || []).forEach(row => {
+      const memberId = row.team_member_id as string;
+      const member = row.team_members as { name: string; type: string; specialty: string; hourly_rate: number } | null;
+      const hours = Number(row.hours || 0);
+      const date = row.date as string;
+
+      if (!memberMap.has(memberId)) {
+        memberMap.set(memberId, {
+          member_id: memberId,
+          member_name: member?.name || 'Inconnu',
+          member_type: member?.type || 'salarie',
+          specialty: member?.specialty || '',
+          hourly_rate: Number(member?.hourly_rate || 0),
+          total_hours: 0,
+          total_cost: 0,
+          dates: [],
+        });
+      }
+      const entry = memberMap.get(memberId)!;
+      entry.total_hours += hours;
+      entry.total_cost += hours * entry.hourly_rate;
+      if (date && !entry.dates.includes(date)) entry.dates.push(date);
+    });
+    setProjectAssignments(Array.from(memberMap.values()).sort((a, b) => b.total_hours - a.total_hours));
   }
 
   function handleAddressSelect(result: AddressResult) {
@@ -552,7 +614,7 @@ export default function ChantiersPage() {
     }
 
     // Calculer le nouveau % d'avancement
-    const completedWeight = PROJECT_PHASES
+    const completedWeight = userPhases
       .filter(phase => updated.some(p => p.key === phase.key))
       .reduce((sum, phase) => sum + phase.weight, 0);
 
@@ -1213,9 +1275,9 @@ export default function ChantiersPage() {
                 </div>
 
                 <div className="relative">
-                  {PROJECT_PHASES.map((phase, index) => {
+                  {userPhases.map((phase, index) => {
                     const completed = activeProject.completed_phases.find(p => p.key === phase.key);
-                    const isLast = index === PROJECT_PHASES.length - 1;
+                    const isLast = index === userPhases.length - 1;
 
                     return (
                       <div key={phase.key} className="relative flex gap-3">
@@ -1246,7 +1308,6 @@ export default function ChantiersPage() {
                               {phase.weight}%
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{phase.description}</p>
                           {completed && (
                             <p className="text-[10px] text-emerald-600 mt-1">
                               Validé le {new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(completed.completed_at))}
@@ -1363,6 +1424,73 @@ export default function ChantiersPage() {
                             })}
                           </tbody>
                         </table>
+                      )}
+                    </div>
+
+                    {/* Suivi main-d'œuvre */}
+                    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-semibold text-foreground">Main-d&apos;œuvre ({projectAssignments.length})</p>
+                        {projectAssignments.length > 0 && (
+                          <span className="ml-auto text-sm font-medium text-foreground">
+                            {formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))} — {formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}
+                          </span>
+                        )}
+                      </div>
+                      {projectAssignments.length === 0 ? (
+                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation d&apos;équipe sur ce chantier.</p>
+                      ) : (
+                        <>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                                <th className="px-4 py-2 font-medium">Intervenant</th>
+                                <th className="px-4 py-2 font-medium hidden sm:table-cell">Spécialité</th>
+                                <th className="px-4 py-2 font-medium text-center">Jours</th>
+                                <th className="px-4 py-2 font-medium text-center">Heures</th>
+                                <th className="px-4 py-2 font-medium text-right hidden sm:table-cell">Taux/h</th>
+                                <th className="px-4 py-2 font-medium text-right">Coût</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {projectAssignments.map(a => {
+                                const mt = MEMBER_TYPES[a.member_type as keyof typeof MEMBER_TYPES];
+                                return (
+                                  <tr key={a.member_id} className="hover:bg-muted/10">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-bold text-slate-600">
+                                          {a.member_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="truncate font-medium text-foreground">{a.member_name}</p>
+                                          {mt && (
+                                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${mt.color}`}>{mt.label}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{a.specialty || '—'}</td>
+                                    <td className="px-4 py-3 text-center font-medium text-foreground">{a.dates.length}</td>
+                                    <td className="px-4 py-3 text-center font-medium text-foreground">{formatTrackedHours(a.total_hours)}</td>
+                                    <td className="px-4 py-3 text-right text-muted-foreground hidden sm:table-cell">{a.hourly_rate > 0 ? formatCurrency(a.hourly_rate) : '—'}</td>
+                                    <td className="px-4 py-3 text-right font-semibold text-foreground">{a.total_cost > 0 ? formatCurrency(a.total_cost) : '—'}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-border bg-muted/20">
+                                <td className="px-4 py-3 font-semibold text-foreground" colSpan={2}>Total</td>
+                                <td className="px-4 py-3 text-center font-semibold text-foreground hidden sm:table-cell" />
+                                <td className="px-4 py-3 text-center font-semibold text-foreground">{formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}</td>
+                                <td className="px-4 py-3 hidden sm:table-cell" />
+                                <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </>
                       )}
                     </div>
                   </div>

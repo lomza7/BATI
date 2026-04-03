@@ -24,10 +24,14 @@ import {
   Users,
   Zap,
   Crown,
+  GripVertical,
+  HardHat,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import { formatDate } from '@/lib/constants';
+import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +67,7 @@ import {
   type LeadStageConfig,
 } from '@/lib/lead-pipeline';
 
-type SettingsTab = 'parametres' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'chantier' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -318,9 +322,14 @@ export default function ParametresPage() {
     position: DEFAULT_LEAD_STAGES.length,
   });
 
+  // Phases chantier
+  const [phases, setPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
+  const [savingPhases, setSavingPhases] = useState(false);
+  const [savePhasesSuccess, setSavePhasesSuccess] = useState(false);
+
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres') {
+    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres' || tab === 'chantier') {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -334,7 +343,7 @@ export default function ParametresPage() {
       supabase
         .from('profiles')
         .select(
-          'id, full_name, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, onboarding_completed, plan, plan_started_at, stripe_customer_id'
+          'id, full_name, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, onboarding_completed, plan, plan_started_at, stripe_customer_id, project_phases_config'
         )
         .eq('id', user.id)
         .maybeSingle(),
@@ -377,6 +386,12 @@ export default function ParametresPage() {
       team_size: nextProfile?.team_size || 'seul',
       referral_source: nextProfile?.referral_source || '',
     });
+    // Charger la config des phases personnalisées
+    const savedPhases = (nextProfile as any)?.project_phases_config;
+    if (Array.isArray(savedPhases) && savedPhases.length > 0) {
+      setPhases(savedPhases as ProjectPhase[]);
+    }
+
     setPlatformConfig((configRes.data as PlatformConfig) || {});
     setReminderSettings(buildPrefilledReminderSettings(nextProfile, reminderSettingsRes.data));
     setLeadSources(
@@ -444,6 +459,28 @@ export default function ParametresPage() {
     setSaveSuccess(true);
     setSaving(false);
     window.setTimeout(() => setSaveSuccess(false), 2500);
+  }
+
+  async function savePhases() {
+    if (!user) return;
+    setSavingPhases(true);
+    setSavePhasesSuccess(false);
+    setError('');
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ project_phases_config: phases, updated_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      setSavingPhases(false);
+      return;
+    }
+
+    setSavePhasesSuccess(true);
+    setSavingPhases(false);
+    window.setTimeout(() => setSavePhasesSuccess(false), 2500);
   }
 
   async function saveReminderPreferences() {
@@ -896,8 +933,9 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-3 rounded-xl bg-muted/60 p-1">
+        <TabsList className="grid h-auto grid-cols-4 rounded-xl bg-muted/60 p-1">
           <TabsTrigger value="parametres" className="rounded-lg py-2.5">Parametres</TabsTrigger>
+          <TabsTrigger value="chantier" className="rounded-lg py-2.5">Chantier</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5">Abonnement</TabsTrigger>
           <TabsTrigger value="securite" className="rounded-lg py-2.5">Securite</TabsTrigger>
         </TabsList>
@@ -2021,6 +2059,111 @@ export default function ParametresPage() {
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Se deconnecter
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="chantier" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HardHat className="h-5 w-5" />
+                Étapes d&apos;avancement
+              </CardTitle>
+              <CardDescription>
+                Personnalisez les étapes de suivi de vos chantiers. Le poids détermine le pourcentage de progression associé à chaque étape (total = 100 %).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {phases.map((phase, index) => (
+                <div key={phase.key} className="flex items-center gap-2">
+                  <GripVertical className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="w-6 text-center text-xs font-medium text-slate-500">{index + 1}</span>
+                  <Input
+                    value={phase.label}
+                    onChange={(e) => {
+                      const updated = [...phases];
+                      updated[index] = { ...phase, label: e.target.value };
+                      setPhases(updated);
+                    }}
+                    className="flex-1"
+                    placeholder="Nom de l'étape"
+                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={phase.weight}
+                      onChange={(e) => {
+                        const updated = [...phases];
+                        updated[index] = { ...phase, weight: parseInt(e.target.value) || 0 };
+                        setPhases(updated);
+                      }}
+                      className="w-20 text-center"
+                    />
+                    <span className="text-sm text-slate-500">%</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-red-500 hover:text-red-700"
+                    onClick={() => setPhases(phases.filter((_, i) => i !== index))}
+                    disabled={phases.length <= 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+
+              {/* Total poids */}
+              {(() => {
+                const total = phases.reduce((s, p) => s + p.weight, 0);
+                return (
+                  <div className={`flex items-center justify-between rounded-lg border px-4 py-2 text-sm font-medium ${total === 100 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                    <span>Total des poids</span>
+                    <span>{total} %{total !== 100 && ' — doit être égal à 100 %'}</span>
+                  </div>
+                );
+              })()}
+
+              {/* Ajouter une étape */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const key = `etape_${Date.now()}`;
+                  setPhases([...phases, { key, label: '', weight: 5 }]);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter une étape
+              </Button>
+
+              <Separator />
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={savePhases}
+                  disabled={savingPhases || phases.reduce((s, p) => s + p.weight, 0) !== 100 || phases.some(p => !p.label.trim())}
+                >
+                  {savingPhases ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : savePhasesSuccess ? (
+                    <Check className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {savePhasesSuccess ? 'Enregistré !' : 'Enregistrer'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setPhases(DEFAULT_PROJECT_PHASES)}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Réinitialiser par défaut
                 </Button>
               </div>
             </CardContent>
