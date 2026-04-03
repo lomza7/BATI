@@ -56,12 +56,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AddressAutocomplete, type AddressResult } from '@/components/shared/address-autocomplete';
+import { ClientPicker, type Client } from '@/components/shared/client-picker';
 import { cn } from '@/lib/utils';
 
 type ViewMode = 'kanban' | 'list';
 
 interface Lead {
   id: string;
+  client_id: string | null;
   name: string;
   company_name: string;
   email: string;
@@ -87,6 +89,7 @@ interface Lead {
 }
 
 interface LeadForm {
+  client_id: string | null;
   name: string;
   company_name: string;
   email: string;
@@ -126,6 +129,7 @@ const URGENCY_OPTIONS = [
 
 function createEmptyForm(): LeadForm {
   return {
+    client_id: null,
     name: '',
     company_name: '',
     email: '',
@@ -206,6 +210,7 @@ export default function ProspectionPage() {
   function openEditDialog(lead: Lead) {
     setEditingLead(lead);
     setForm({
+      client_id: lead.client_id || null,
       name: lead.name || '',
       company_name: lead.company_name || '',
       email: lead.email || '',
@@ -255,7 +260,44 @@ export default function ProspectionPage() {
 
     setSubmitting(true);
 
+    let clientId = form.client_id;
+    if (!clientId) {
+      const clientName = form.company_name.trim() || form.name.trim();
+      const { data: existingClient } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('name', clientName)
+        .maybeSingle();
+
+      if (existingClient?.id) {
+        clientId = existingClient.id;
+      } else {
+        const { data: newClient, error: clientError } = await supabase
+          .from('clients')
+          .insert({
+            user_id: user.id,
+            name: clientName,
+            email: form.email.trim(),
+            phone: form.phone.trim(),
+            address: form.project_address.trim(),
+            city: form.project_city.trim(),
+            postal_code: form.project_postal_code.trim(),
+            notes: form.notes.trim(),
+          })
+          .select('id')
+          .single();
+
+        if (clientError || !newClient?.id) {
+          setSubmitting(false);
+          return;
+        }
+
+        clientId = newClient.id;
+      }
+    }
+
     const payload = {
+      client_id: clientId,
       name: form.name.trim(),
       company_name: form.company_name.trim(),
       email: form.email.trim(),
@@ -320,6 +362,7 @@ export default function ProspectionPage() {
 
   async function ensureClientForLead(lead: Lead) {
     if (!user) return null;
+    if (lead.client_id) return lead.client_id;
 
     const clientName = lead.company_name || lead.name;
     if (!clientName.trim()) return null;
@@ -526,6 +569,19 @@ export default function ProspectionPage() {
     () => buildLeadStageMap(pipelineStages.map((stage) => ({ slug: stage.slug, label: stage.label, color: stage.color }))),
     [pipelineStages]
   );
+
+  function handleClientChange(clientId: string | null, client: Client | null) {
+    setForm((prev) => ({
+      ...prev,
+      client_id: clientId,
+      company_name: client ? client.name || prev.company_name : prev.company_name,
+      email: client && !prev.email ? client.email || '' : prev.email,
+      phone: client && !prev.phone ? client.phone || '' : prev.phone,
+      project_address: client && !prev.project_address ? client.address || '' : prev.project_address,
+      project_city: client && !prev.project_city ? client.city || '' : prev.project_city,
+      project_postal_code: client && !prev.project_postal_code ? client.postal_code || '' : prev.project_postal_code,
+    }));
+  }
 
   return (
     <div className="space-y-6">
@@ -806,6 +862,12 @@ export default function ProspectionPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Client existant" className="sm:col-span-2">
+                  <ClientPicker
+                    value={form.client_id}
+                    onChange={handleClientChange}
+                  />
+                </Field>
                 <Field label="Nom du contact">
                   <Input value={form.name} placeholder="Jean Martin" onChange={(e) => updateForm('name', e.target.value)} />
                 </Field>
@@ -1112,9 +1174,9 @@ function LeadCard({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-2', className)}>
       <label className="text-sm font-medium text-foreground">{label}</label>
       {children}
     </div>
