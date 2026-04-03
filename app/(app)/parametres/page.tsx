@@ -933,11 +933,11 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-4 rounded-xl bg-muted/60 p-1">
-          <TabsTrigger value="parametres" className="rounded-lg py-2.5">Parametres</TabsTrigger>
-          <TabsTrigger value="chantier" className="rounded-lg py-2.5">Chantier</TabsTrigger>
-          <TabsTrigger value="abonnement" className="rounded-lg py-2.5">Abonnement</TabsTrigger>
-          <TabsTrigger value="securite" className="rounded-lg py-2.5">Securite</TabsTrigger>
+        <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 rounded-xl bg-muted/60 p-1">
+          <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
+          <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
+          <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
+          <TabsTrigger value="securite" className="rounded-lg py-2.5 text-xs sm:text-sm">Securite</TabsTrigger>
         </TabsList>
 
         <TabsContent value="parametres" className="space-y-6">
@@ -2078,9 +2078,51 @@ export default function ParametresPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {phases.map((phase, index) => (
-                <div key={phase.key} className="flex items-center gap-2">
-                  <GripVertical className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="w-6 text-center text-xs font-medium text-slate-500">{index + 1}</span>
+                <div key={phase.key} className="rounded-lg border border-border p-3 space-y-2 sm:border-0 sm:p-0 sm:space-y-0 sm:flex sm:items-center sm:gap-2">
+                  <div className="flex items-center gap-2 sm:hidden">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">{index + 1}</span>
+                    <Input
+                      value={phase.label}
+                      onChange={(e) => {
+                        const updated = [...phases];
+                        updated[index] = { ...phase, label: e.target.value };
+                        setPhases(updated);
+                      }}
+                      className="flex-1 h-9"
+                      placeholder="Nom de l'étape"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2 sm:hidden">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">Poids :</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={phase.weight}
+                        onChange={(e) => {
+                          const updated = [...phases];
+                          updated[index] = { ...phase, weight: parseInt(e.target.value) || 0 };
+                          setPhases(updated);
+                        }}
+                        className="w-16 h-9 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700 h-8 px-2"
+                      onClick={() => setPhases(phases.filter((_, i) => i !== index))}
+                      disabled={phases.length <= 1}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      <span className="text-xs">Supprimer</span>
+                    </Button>
+                  </div>
+                  {/* Desktop layout */}
+                  <GripVertical className="h-4 w-4 shrink-0 text-slate-400 hidden sm:block" />
+                  <span className="hidden sm:block w-6 text-center text-xs font-medium text-slate-500">{index + 1}</span>
                   <Input
                     value={phase.label}
                     onChange={(e) => {
@@ -2088,10 +2130,10 @@ export default function ParametresPage() {
                       updated[index] = { ...phase, label: e.target.value };
                       setPhases(updated);
                     }}
-                    className="flex-1"
+                    className="hidden sm:block flex-1"
                     placeholder="Nom de l'étape"
                   />
-                  <div className="flex items-center gap-1">
+                  <div className="hidden sm:flex items-center gap-1">
                     <Input
                       type="number"
                       min={1}
@@ -2109,7 +2151,7 @@ export default function ParametresPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="shrink-0 text-red-500 hover:text-red-700"
+                    className="hidden sm:flex shrink-0 text-red-500 hover:text-red-700"
                     onClick={() => setPhases(phases.filter((_, i) => i !== index))}
                     disabled={phases.length <= 1}
                   >

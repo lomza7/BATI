@@ -1429,11 +1429,13 @@ export default function ChantiersPage() {
 
                     {/* Suivi main-d'œuvre */}
                     <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-semibold text-foreground">Main-d&apos;œuvre ({projectAssignments.length})</p>
+                      <div className="flex flex-col gap-1 border-b border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:gap-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-sm font-semibold text-foreground">Main-d&apos;œuvre ({projectAssignments.length})</p>
+                        </div>
                         {projectAssignments.length > 0 && (
-                          <span className="ml-auto text-sm font-medium text-foreground">
+                          <span className="text-xs font-medium text-muted-foreground sm:ml-auto sm:text-sm sm:text-foreground">
                             {formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))} — {formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}
                           </span>
                         )}
@@ -1442,14 +1444,54 @@ export default function ChantiersPage() {
                         <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation d&apos;équipe sur ce chantier.</p>
                       ) : (
                         <>
-                          <table className="w-full text-sm">
+                          {/* Mobile : cartes */}
+                          <div className="divide-y divide-border sm:hidden">
+                            {projectAssignments.map(a => {
+                              const mt = MEMBER_TYPES[a.member_type as keyof typeof MEMBER_TYPES];
+                              return (
+                                <div key={a.member_id} className="px-4 py-3 space-y-2">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-xs font-bold text-slate-600">
+                                      {a.member_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate font-medium text-foreground">{a.member_name}</p>
+                                      <div className="flex items-center gap-1.5 mt-0.5">
+                                        {mt && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${mt.color}`}>{mt.label}</span>
+                                        )}
+                                        {a.specialty && (
+                                          <span className="text-[10px] text-muted-foreground">{a.specialty}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="text-sm font-semibold text-foreground shrink-0">{a.total_cost > 0 ? formatCurrency(a.total_cost) : '—'}</p>
+                                  </div>
+                                  <div className="flex items-center gap-4 pl-11 text-xs text-muted-foreground">
+                                    <span><strong className="text-foreground">{a.dates.length}</strong> jour{a.dates.length > 1 ? 's' : ''}</span>
+                                    <span><strong className="text-foreground">{formatTrackedHours(a.total_hours)}</strong></span>
+                                    {a.hourly_rate > 0 && <span>{formatCurrency(a.hourly_rate)}/h</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <div className="flex items-center justify-between px-4 py-3 bg-muted/20">
+                              <span className="text-sm font-semibold text-foreground">Total</span>
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="font-medium text-muted-foreground">{formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}</span>
+                                <span className="font-bold text-foreground">{formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Desktop : tableau */}
+                          <table className="hidden sm:table w-full text-sm">
                             <thead>
                               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                                 <th className="px-4 py-2 font-medium">Intervenant</th>
-                                <th className="px-4 py-2 font-medium hidden sm:table-cell">Spécialité</th>
+                                <th className="px-4 py-2 font-medium">Spécialité</th>
                                 <th className="px-4 py-2 font-medium text-center">Jours</th>
                                 <th className="px-4 py-2 font-medium text-center">Heures</th>
-                                <th className="px-4 py-2 font-medium text-right hidden sm:table-cell">Taux/h</th>
+                                <th className="px-4 py-2 font-medium text-right">Taux/h</th>
                                 <th className="px-4 py-2 font-medium text-right">Coût</th>
                               </tr>
                             </thead>
@@ -1471,10 +1513,10 @@ export default function ChantiersPage() {
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{a.specialty || '—'}</td>
+                                    <td className="px-4 py-3 text-muted-foreground">{a.specialty || '—'}</td>
                                     <td className="px-4 py-3 text-center font-medium text-foreground">{a.dates.length}</td>
                                     <td className="px-4 py-3 text-center font-medium text-foreground">{formatTrackedHours(a.total_hours)}</td>
-                                    <td className="px-4 py-3 text-right text-muted-foreground hidden sm:table-cell">{a.hourly_rate > 0 ? formatCurrency(a.hourly_rate) : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-muted-foreground">{a.hourly_rate > 0 ? formatCurrency(a.hourly_rate) : '—'}</td>
                                     <td className="px-4 py-3 text-right font-semibold text-foreground">{a.total_cost > 0 ? formatCurrency(a.total_cost) : '—'}</td>
                                   </tr>
                                 );
@@ -1483,9 +1525,9 @@ export default function ChantiersPage() {
                             <tfoot>
                               <tr className="border-t-2 border-border bg-muted/20">
                                 <td className="px-4 py-3 font-semibold text-foreground" colSpan={2}>Total</td>
-                                <td className="px-4 py-3 text-center font-semibold text-foreground hidden sm:table-cell" />
+                                <td className="px-4 py-3 text-center font-semibold text-foreground" />
                                 <td className="px-4 py-3 text-center font-semibold text-foreground">{formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}</td>
-                                <td className="px-4 py-3 hidden sm:table-cell" />
+                                <td className="px-4 py-3" />
                                 <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))}</td>
                               </tr>
                             </tfoot>
