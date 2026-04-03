@@ -158,6 +158,8 @@ export default function ProspectionPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [actionLeadId, setActionLeadId] = useState<string | null>(null);
+  const [draggingLeadId, setDraggingLeadId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('kanban');
   const [query, setQuery] = useState('');
   const [stageFilter, setStageFilter] = useState<'all' | string>('all');
@@ -303,6 +305,17 @@ export default function ProspectionPage() {
       .eq('id', id);
 
     await loadLeads();
+  }
+
+  async function handleDropOnStage(stageSlug: string) {
+    if (!draggingLeadId) return;
+
+    const draggedLead = leads.find((lead) => lead.id === draggingLeadId);
+    setDragOverStage(null);
+    setDraggingLeadId(null);
+
+    if (!draggedLead || draggedLead.stage === stageSlug) return;
+    await moveStage(draggingLeadId, stageSlug);
   }
 
   async function ensureClientForLead(lead: Lead) {
@@ -648,7 +661,11 @@ export default function ProspectionPage() {
           <p className="mt-1 text-sm text-muted-foreground">Elargissez la recherche ou creez un nouveau lead.</p>
         </div>
       ) : view === 'kanban' ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Glissez-deposez vos cartes d&apos;une colonne a l&apos;autre pour faire avancer le pipe plus vite.
+          </p>
+          <div className="flex gap-4 overflow-x-auto pb-4">
           {pipelineStages.map((stage) => {
             const stageLeads = filteredLeads.filter((lead) => lead.stage === stage.slug);
 
@@ -666,13 +683,35 @@ export default function ProspectionPage() {
                   </span>
                 </div>
 
-                <div className="space-y-3 rounded-2xl border border-dashed border-border bg-muted/15 p-3 min-h-[280px]">
+                <div
+                  className={cn(
+                    'space-y-3 rounded-2xl border border-dashed border-border bg-muted/15 p-3 min-h-[280px] transition-colors',
+                    dragOverStage === stage.slug && 'border-primary bg-primary/5'
+                  )}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (dragOverStage !== stage.slug) setDragOverStage(stage.slug);
+                  }}
+                  onDragLeave={(event) => {
+                    const nextTarget = event.relatedTarget as Node | null;
+                    if (!event.currentTarget.contains(nextTarget)) {
+                      setDragOverStage((current) => (current === stage.slug ? null : current));
+                    }
+                  }}
+                  onDrop={() => void handleDropOnStage(stage.slug)}
+                >
                   {stageLeads.map((lead) => (
                     <LeadCard
                       key={lead.id}
                       lead={lead}
                       pipelineStages={pipelineStages}
                       stageMap={stageMap}
+                      dragging={draggingLeadId === lead.id}
+                      onDragStart={(id) => setDraggingLeadId(id)}
+                      onDragEnd={() => {
+                        setDraggingLeadId(null);
+                        setDragOverStage(null);
+                      }}
                       onOpen={() => openEditDialog(lead)}
                       onMoveStage={moveStage}
                       onConvertToQuote={convertLeadToQuote}
@@ -684,6 +723,7 @@ export default function ProspectionPage() {
               </div>
             );
           })}
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -944,6 +984,9 @@ function LeadCard({
   lead,
   pipelineStages,
   stageMap,
+  dragging,
+  onDragStart,
+  onDragEnd,
   onOpen,
   onMoveStage,
   onConvertToQuote,
@@ -953,6 +996,9 @@ function LeadCard({
   lead: Lead;
   pipelineStages: LeadStageConfig[];
   stageMap: Map<string, { label: string; color: string }>;
+  dragging: boolean;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
   onOpen: () => void;
   onMoveStage: (id: string, stage: string) => Promise<void>;
   onConvertToQuote: (lead: Lead) => Promise<void>;
@@ -963,7 +1009,16 @@ function LeadCard({
 
   return (
     <div
-      className="rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        onDragStart(lead.id);
+      }}
+      onDragEnd={onDragEnd}
+      className={cn(
+        'rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer',
+        dragging && 'opacity-60 ring-2 ring-primary/30 cursor-grabbing'
+      )}
       onClick={onOpen}
     >
       <div className="flex items-start justify-between gap-3">
