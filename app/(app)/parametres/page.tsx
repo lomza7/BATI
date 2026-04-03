@@ -55,6 +55,10 @@ import {
   normalizeLeadSourceSlug,
   type LeadSource,
 } from '@/lib/lead-sources';
+import {
+  DEFAULT_LEAD_STAGES,
+  type LeadStageConfig,
+} from '@/lib/lead-pipeline';
 
 type SettingsTab = 'parametres' | 'abonnement' | 'securite';
 
@@ -280,9 +284,11 @@ export default function ParametresPage() {
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({});
   const [reminderSettings, setReminderSettings] = useState(defaultReminderSettings);
   const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
+  const [leadStages, setLeadStages] = useState<LeadStageConfig[]>([]);
   const [saving, setSaving] = useState(false);
   const [savingReminders, setSavingReminders] = useState(false);
   const [savingSourceId, setSavingSourceId] = useState<string | null>(null);
+  const [savingStageId, setSavingStageId] = useState<string | null>(null);
   const [creatingSource, setCreatingSource] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
@@ -309,7 +315,7 @@ export default function ParametresPage() {
     setLoading(true);
     setError('');
 
-    const [profileRes, configRes, reminderSettingsRes, leadSourcesRes] = await Promise.all([
+    const [profileRes, configRes, reminderSettingsRes, leadSourcesRes, leadStagesRes] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -327,6 +333,10 @@ export default function ParametresPage() {
         .maybeSingle(),
       supabase
         .from('lead_sources')
+        .select('*')
+        .order('position', { ascending: true }),
+      supabase
+        .from('lead_stages')
         .select('*')
         .order('position', { ascending: true }),
     ]);
@@ -368,6 +378,19 @@ export default function ParametresPage() {
             is_active: true,
             position: source.position ?? index,
           }))) as LeadSource[]
+    );
+    setLeadStages(
+      (((leadStagesRes.data as LeadStageConfig[]) || []).length > 0
+        ? (leadStagesRes.data as LeadStageConfig[])
+        : DEFAULT_LEAD_STAGES.map((stage, index) => ({
+            id: `default-${stage.slug}`,
+            user_id: user.id,
+            slug: stage.slug,
+            label: stage.label,
+            color: stage.color,
+            position: stage.position ?? index,
+            is_terminal: stage.is_terminal,
+          }))) as LeadStageConfig[]
     );
     setLoading(false);
   }, [user]);
@@ -616,6 +639,47 @@ export default function ParametresPage() {
     setCreatingSource(false);
     setSaveSourceSuccess(true);
     window.setTimeout(() => setSaveSourceSuccess(false), 2500);
+  }
+
+  function updateLeadStage(id: string, patch: Partial<LeadStageConfig>) {
+    setLeadStages((prev) =>
+      prev.map((stage) => (stage.id === id ? { ...stage, ...patch } : stage)).sort((a, b) => a.position - b.position)
+    );
+  }
+
+  async function saveLeadStage(stage: LeadStageConfig) {
+    if (!user || !stage.label.trim()) return;
+
+    setSavingStageId(stage.id);
+    setError('');
+    const isTempStage = stage.id.startsWith('default-');
+    const payload = {
+      user_id: user.id,
+      slug: stage.slug,
+      label: stage.label.trim(),
+      color: stage.color,
+      position: stage.position,
+      is_terminal: stage.is_terminal,
+      updated_at: new Date().toISOString(),
+    };
+
+    const query = isTempStage
+      ? supabase.from('lead_stages').insert(payload).select('*').single()
+      : supabase.from('lead_stages').update(payload).eq('id', stage.id).select('*').single();
+
+    const { data, error: stageError } = await query;
+
+    if (stageError) {
+      setError(stageError.message);
+      setSavingStageId(null);
+      return;
+    }
+
+    setLeadStages((prev) => {
+      const rest = prev.filter((item) => item.id !== stage.id);
+      return [...rest, data as LeadStageConfig].sort((a, b) => a.position - b.position);
+    });
+    setSavingStageId(null);
   }
 
   async function launchCheckout(planKey: PricingPlanKey) {
@@ -1569,6 +1633,52 @@ export default function ParametresPage() {
                   Sources mises a jour
                 </span>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-xl">Etapes de votre pipe CRM</CardTitle>
+              <CardDescription>
+                Renommez les etapes de votre pipeline et changez leur ordre. Les slugs metier restent stables pour ne pas casser les automatisations de devis et de chantiers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {leadStages
+                .sort((a, b) => a.position - b.position)
+                .map((stage) => (
+                  <div key={stage.id} className="grid gap-4 rounded-2xl border border-border bg-card p-4 lg:grid-cols-[1fr_120px_180px_auto] lg:items-end">
+                    <div className="space-y-2">
+                      <Label>Nom affiche</Label>
+                      <Input
+                        value={stage.label}
+                        onChange={(e) => updateLeadStage(stage.id, { label: e.target.value })}
+                        placeholder="Nom de l etape"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Position</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={stage.position}
+                        onChange={(e) => updateLeadStage(stage.id, { position: Number(e.target.value || 0) })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                        {stage.is_terminal ? 'Etape terminale' : 'Etape active du pipe'}
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={() => void saveLeadStage(stage)} disabled={savingStageId === stage.id}>
+                        {savingStageId === stage.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Enregistrer
+                      </Button>
+                    </div>
+                  </div>
+                ))}
             </CardContent>
           </Card>
         </TabsContent>

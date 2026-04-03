@@ -20,11 +20,16 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import { LEAD_STAGES, SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
+import { SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
 import {
   DEFAULT_LEAD_SOURCES,
   type LeadSource,
 } from '@/lib/lead-sources';
+import {
+  buildLeadStageMap,
+  DEFAULT_LEAD_STAGES,
+  type LeadStageConfig,
+} from '@/lib/lead-pipeline';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -119,8 +124,6 @@ const URGENCY_OPTIONS = [
   { value: 'immediate', label: 'Immediate' },
 ] as const;
 
-const STAGE_ORDER = ['nouveau', 'contacte', 'devis_envoye', 'negocie', 'gagne', 'perdu'];
-
 function createEmptyForm(): LeadForm {
   return {
     name: '',
@@ -149,6 +152,7 @@ export default function ProspectionPage() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [sources, setSources] = useState<LeadSource[]>([]);
+  const [stages, setStages] = useState<LeadStageConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -164,7 +168,7 @@ export default function ProspectionPage() {
     if (!user) return;
 
     setLoading(true);
-    const [leadsRes, sourcesRes] = await Promise.all([
+    const [leadsRes, sourcesRes, stagesRes] = await Promise.all([
       supabase
         .from('leads')
         .select('*')
@@ -173,11 +177,17 @@ export default function ProspectionPage() {
         .from('lead_sources')
         .select('*')
         .order('position', { ascending: true }),
+      supabase
+        .from('lead_stages')
+        .select('*')
+        .order('position', { ascending: true }),
     ]);
 
     const nextSources = (sourcesRes.data as LeadSource[]) || [];
+    const nextStages = (stagesRes.data as LeadStageConfig[]) || [];
     setLeads((leadsRes.data as Lead[]) || []);
     setSources(nextSources);
+    setStages(nextStages);
     setLoading(false);
   }, [user]);
 
@@ -485,6 +495,25 @@ export default function ProspectionPage() {
     return DEFAULT_LEAD_SOURCES.map((source) => ({ value: source.slug, label: source.name }));
   }, [sources]);
 
+  const pipelineStages = useMemo(() => {
+    if (stages.length > 0) return stages;
+
+    return DEFAULT_LEAD_STAGES.map((stage, index) => ({
+      id: `default-${stage.slug}`,
+      user_id: user?.id || '',
+      slug: stage.slug,
+      label: stage.label,
+      color: stage.color,
+      position: stage.position ?? index,
+      is_terminal: stage.is_terminal,
+    }));
+  }, [stages, user?.id]);
+
+  const stageMap = useMemo(
+    () => buildLeadStageMap(pipelineStages.map((stage) => ({ slug: stage.slug, label: stage.label, color: stage.color }))),
+    [pipelineStages]
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -569,9 +598,9 @@ export default function ProspectionPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes les etapes</SelectItem>
-                {STAGE_ORDER.map((stageKey) => (
-                  <SelectItem key={stageKey} value={stageKey}>
-                    {LEAD_STAGES[stageKey as keyof typeof LEAD_STAGES].label}
+                {pipelineStages.map((stage) => (
+                  <SelectItem key={stage.slug} value={stage.slug}>
+                    {stage.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -620,12 +649,11 @@ export default function ProspectionPage() {
         </div>
       ) : view === 'kanban' ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {STAGE_ORDER.map((stageKey) => {
-            const stage = LEAD_STAGES[stageKey as keyof typeof LEAD_STAGES];
-            const stageLeads = filteredLeads.filter((lead) => lead.stage === stageKey);
+          {pipelineStages.map((stage) => {
+            const stageLeads = filteredLeads.filter((lead) => lead.stage === stage.slug);
 
             return (
-              <div key={stageKey} className="flex-shrink-0 w-[320px]">
+              <div key={stage.slug} className="flex-shrink-0 w-[320px]">
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className={cn('inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', stage.color)}>
@@ -643,6 +671,8 @@ export default function ProspectionPage() {
                     <LeadCard
                       key={lead.id}
                       lead={lead}
+                      pipelineStages={pipelineStages}
+                      stageMap={stageMap}
                       onOpen={() => openEditDialog(lead)}
                       onMoveStage={moveStage}
                       onConvertToQuote={convertLeadToQuote}
@@ -671,7 +701,7 @@ export default function ProspectionPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredLeads.map((lead) => {
-                  const stage = LEAD_STAGES[lead.stage as keyof typeof LEAD_STAGES] || LEAD_STAGES.nouveau;
+                  const stage = stageMap.get(lead.stage) || stageMap.get('nouveau') || { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' };
 
                   return (
                     <tr
@@ -846,9 +876,9 @@ export default function ProspectionPage() {
                   <Select value={form.stage} onValueChange={(value) => updateForm('stage', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STAGE_ORDER.map((stageKey) => (
-                        <SelectItem key={stageKey} value={stageKey}>
-                          {LEAD_STAGES[stageKey as keyof typeof LEAD_STAGES].label}
+                      {pipelineStages.map((stage) => (
+                        <SelectItem key={stage.slug} value={stage.slug}>
+                          {stage.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -912,6 +942,8 @@ export default function ProspectionPage() {
 
 function LeadCard({
   lead,
+  pipelineStages,
+  stageMap,
   onOpen,
   onMoveStage,
   onConvertToQuote,
@@ -919,13 +951,15 @@ function LeadCard({
   actioning,
 }: {
   lead: Lead;
+  pipelineStages: LeadStageConfig[];
+  stageMap: Map<string, { label: string; color: string }>;
   onOpen: () => void;
   onMoveStage: (id: string, stage: string) => Promise<void>;
   onConvertToQuote: (lead: Lead) => Promise<void>;
   onConvertToProject: (lead: Lead) => Promise<void>;
   actioning: boolean;
 }) {
-  const stage = LEAD_STAGES[lead.stage as keyof typeof LEAD_STAGES] || LEAD_STAGES.nouveau;
+  const stage = stageMap.get(lead.stage) || stageMap.get('nouveau') || { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' };
 
   return (
     <div
@@ -957,9 +991,9 @@ function LeadCard({
               <HardHat className="mr-2 h-4 w-4" />
               Creer un chantier
             </DropdownMenuItem>
-            {STAGE_ORDER.filter((stageKey) => stageKey !== lead.stage).map((stageKey) => (
-              <DropdownMenuItem key={stageKey} onClick={() => onMoveStage(lead.id, stageKey)}>
-                {LEAD_STAGES[stageKey as keyof typeof LEAD_STAGES].label}
+            {pipelineStages.filter((item) => item.slug !== lead.stage).map((item) => (
+              <DropdownMenuItem key={item.slug} onClick={() => onMoveStage(lead.id, item.slug)}>
+                {item.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
