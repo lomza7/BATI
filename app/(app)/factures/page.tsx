@@ -78,7 +78,7 @@ interface QuoteCandidate {
   quote_lines: QuoteLine[];
 }
 
-type QuoteInvoiceFilter = 'all' | 'to_invoice' | 'already_invoiced';
+type QuoteInvoiceFilter = 'to_invoice' | 'already_invoiced';
 type QuoteSortKey = 'recent' | 'oldest' | 'amount_desc' | 'amount_asc' | 'client';
 
 function formatDateTime(iso: string | null): string {
@@ -327,8 +327,7 @@ export default function FacturesPage() {
 
         if (!matchesSearch) return false;
         if (quoteFilter === 'to_invoice') return !quote.invoice_id;
-        if (quoteFilter === 'already_invoiced') return Boolean(quote.invoice_id);
-        return true;
+        return Boolean(quote.invoice_id);
       })
       .sort((a, b) => {
         switch (quoteSort) {
@@ -528,9 +527,6 @@ export default function FacturesPage() {
               </Button>
               <Button variant={quoteFilter === 'already_invoiced' ? 'default' : 'outline'} size="sm" onClick={() => setQuoteFilter('already_invoiced')}>
                 Deja factures
-              </Button>
-              <Button variant={quoteFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setQuoteFilter('all')}>
-                Tous les devis
               </Button>
             </div>
           </div>
