@@ -415,6 +415,11 @@ export default function ChantiersPage() {
   async function saveProject() {
     if (!form.name.trim()) return;
 
+    if (!form.lat || !form.lng) {
+      setFormError("L'adresse GPS est obligatoire pour afficher le chantier sur la carte. Sélectionnez une adresse dans la liste déroulante.");
+      return;
+    }
+
     if (editorMode === 'create' && !user) {
       setFormError("La session utilisateur est requise pour creer un chantier.");
       return;
@@ -741,6 +746,11 @@ export default function ChantiersPage() {
                 <div className="space-y-4 p-5">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge label={statusInfo.label} color={statusInfo.color} />
+                    {(!project.address || !project.city) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200">
+                        <MapPin className="h-3 w-3" /> Adresse GPS manquante
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                       <Camera className="h-3.5 w-3.5" />
                       {project.project_photos.length} photo{project.project_photos.length > 1 ? 's' : ''}
@@ -829,9 +839,19 @@ export default function ChantiersPage() {
                     placeholder="Tapez une adresse..."
                     className="mt-1"
                   />
-                  {form.city && (
+                  {form.lat && form.lng ? (
+                    <p className="mt-1 text-xs text-emerald-600 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {form.address}, {form.postal_code} {form.city} — GPS enregistré
+                    </p>
+                  ) : addressQuery.trim() ? (
+                    <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      Sélectionnez une adresse dans la liste pour obtenir les coordonnées GPS
+                    </p>
+                  ) : (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {form.address}, {form.postal_code} {form.city}
+                      Obligatoire pour afficher le chantier sur la carte
                     </p>
                   )}
                 </div>
@@ -1034,7 +1054,7 @@ export default function ChantiersPage() {
             <Button variant="outline" onClick={closeEditor}>
               Annuler
             </Button>
-            <Button onClick={saveProject} disabled={!form.name.trim() || saving} className="gap-2">
+            <Button onClick={saveProject} disabled={!form.name.trim() || !form.lat || !form.lng || saving} className="gap-2">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               {editorMode === 'create' ? 'Creer le chantier' : 'Enregistrer'}
             </Button>
