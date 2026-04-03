@@ -37,7 +37,7 @@ export function Footer() {
               <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">B</span>
               </div>
-              <span className="font-semibold text-[var(--landing-text)] text-lg">BatiFlow</span>
+              <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
             </Link>
             <p className="text-xs text-[var(--landing-muted)] leading-relaxed">
               La plateforme tout-en-un pour les artisans du batiment.
@@ -67,7 +67,7 @@ export function Footer() {
 
         <div className="border-t border-[var(--landing-border)] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-[var(--landing-muted)]">
-            &copy; 2026 BatiFlow. Tous droits reserves.
+            &copy; 2026 Hellobat. Tous droits reserves.
           </span>
           <div className="flex items-center gap-4">
             <span className="text-xs text-[var(--landing-muted)]">Fait avec soin pour les artisans francais</span>

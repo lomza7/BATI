@@ -22,7 +22,7 @@ export function StepWelcome({ data, onChange, onNext, onSkip }: Props) {
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
-        Bienvenue sur BatiFlow !
+        Bienvenue sur Hellobat !
       </h2>
       <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
         Avant de commencer, on a besoin de quelques informations pour

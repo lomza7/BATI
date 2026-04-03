@@ -946,7 +946,7 @@ export default function ParametresPage() {
               <CardHeader>
                 <CardTitle className="text-xl">Profil et entreprise</CardTitle>
                 <CardDescription>
-                  Les informations ici sont celles que BatiFlow utilisera dans votre compte et vos futurs automatisations.
+                  Les informations ici sont celles que Hellobat utilisera dans votre compte et vos futurs automatisations.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1109,7 +1109,7 @@ export default function ParametresPage() {
                     <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="font-medium text-foreground">{user?.email || 'Email indisponible'}</p>
-                      <p className="text-muted-foreground">Compte principal BatiFlow</p>
+                      <p className="text-muted-foreground">Compte principal Hellobat</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -1171,7 +1171,7 @@ export default function ParametresPage() {
             <CardHeader>
               <CardTitle className="text-xl">Rappels chef d entreprise</CardTitle>
               <CardDescription>
-                Personnalisez ici les informations qui permettent a BatiFlow de vous rappeler la TVA, la paie, la DSN, la cloture comptable et les grandes echeances.
+                Personnalisez ici les informations qui permettent a Hellobat de vous rappeler la TVA, la paie, la DSN, la cloture comptable et les grandes echeances.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

@@ -63,7 +63,7 @@ export function DemoApp() {
             Explorez <em className="italic text-[var(--landing-accent)]">l&apos;application</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            Naviguez dans les principales vues de BatiFlow pour comprendre comment devis, chantier, commercial et finance s&apos;enchainent vraiment.
+            Naviguez dans les principales vues de Hellobat pour comprendre comment devis, chantier, commercial et finance s&apos;enchainent vraiment.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export function DemoApp() {
               <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#febc2e]" />
               <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#28c840]" />
             </div>
-            <span className="text-[10px] sm:text-xs text-[var(--landing-muted)] ml-2 sm:ml-3 font-mono">app.batiflow.fr</span>
+            <span className="text-[10px] sm:text-xs text-[var(--landing-muted)] ml-2 sm:ml-3 font-mono">app.hellobat.fr</span>
           </div>
 
           <div className="flex flex-col md:flex-row md:min-h-[500px]">
@@ -83,7 +83,7 @@ export function DemoApp() {
                 <div className="w-6 h-6 bg-[var(--landing-accent)] rounded-md flex items-center justify-center">
                   <span className="text-white font-bold text-[10px]">B</span>
                 </div>
-                <span className="text-xs font-semibold text-[var(--landing-text)]">BatiFlow</span>
+                <span className="text-xs font-semibold text-[var(--landing-text)]">Hellobat</span>
               </div>
               {views.map((v) => (
                 <button

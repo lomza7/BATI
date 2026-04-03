@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const GOOGLE_BUSINESS_SCOPE = 'https://www.googleapis.com/auth/business.manage';
-export const GOOGLE_STATE_COOKIE = 'batiflow_google_state';
-export const GOOGLE_SESSION_COOKIE = 'batiflow_google_business';
+export const GOOGLE_STATE_COOKIE = 'hellobat_google_state';
+export const GOOGLE_SESSION_COOKIE = 'hellobat_google_business';
 
 export interface GoogleBusinessLocation {
   accountName: string;

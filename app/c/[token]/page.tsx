@@ -239,7 +239,7 @@ export default function ClientCatalogPage() {
             <div className="h-8 w-8 rounded-lg bg-[#d35400] flex items-center justify-center">
               <Hexagon className="h-4 w-4 text-white" />
             </div>
-            <span className="text-sm font-semibold text-[#1a1a1a]">BatiFlow</span>
+            <span className="text-sm font-semibold text-[#1a1a1a]">Hellobat</span>
           </div>
           {sendData && (
             <div className="flex items-center gap-2 text-xs text-[#6b6560]">
@@ -449,7 +449,7 @@ export default function ClientCatalogPage() {
             <div className="h-6 w-6 rounded bg-[#d35400] flex items-center justify-center">
               <Hexagon className="h-3 w-3 text-white" />
             </div>
-            <span className="text-xs font-medium text-[#6b6560]">BatiFlow</span>
+            <span className="text-xs font-medium text-[#6b6560]">Hellobat</span>
           </div>
           <p className="text-xs text-[#6b6560]/50">Catalogue professionnel</p>
         </div>

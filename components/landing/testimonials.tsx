@@ -3,7 +3,7 @@ export function Testimonials() {
     {
       name: 'Thomas Renard',
       role: 'Plombier, Lyon',
-      text: 'BatiFlow a transforme ma gestion quotidienne. Je passe moitie moins de temps sur l\'administratif et mes clients recoivent les devis en quelques minutes.',
+      text: 'Hellobat a transforme ma gestion quotidienne. Je passe moitie moins de temps sur l\'administratif et mes clients recoivent les devis en quelques minutes.',
       avatar: 'TR',
     },
     {
@@ -28,7 +28,7 @@ export function Testimonials() {
             Ils nous font <em className="italic text-[var(--landing-accent)]">confiance</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            Decouvrez ce que les artisans pensent de BatiFlow au quotidien.
+            Decouvrez ce que les artisans pensent de Hellobat au quotidien.
           </p>
         </div>
 

@@ -15,7 +15,7 @@ export const PRICING_PLAN_DEFAULTS: PricingPlanDefinition[] = [
     key: 'starter',
     name: 'Starter',
     defaultPrice: '0',
-    description: 'Pour demarrer et tester BatiFlow sans engagement.',
+    description: 'Pour demarrer et tester Hellobat sans engagement.',
     features: [
       '5 devis / mois',
       '2 chantiers actifs',

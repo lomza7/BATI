@@ -15,7 +15,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Hexagon className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="text-[15px] font-semibold tracking-tight text-foreground">
-          BatiFlow
+          Hellobat
         </span>
       </div>
 
@@ -73,7 +73,7 @@ export function Sidebar() {
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
             <Hexagon className="h-3.5 w-3.5 text-primary-foreground" />
           </div>
-          <span className="text-sm font-semibold tracking-tight text-foreground">BatiFlow</span>
+          <span className="text-sm font-semibold tracking-tight text-foreground">Hellobat</span>
         </div>
       </div>
     </>

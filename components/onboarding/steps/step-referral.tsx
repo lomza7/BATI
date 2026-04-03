@@ -35,7 +35,7 @@ export function StepReferral({ data, onChange, onNext, onBack, onSkip }: Props) 
         Une derniere question
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        Comment avez-vous entendu parler de BatiFlow ?
+        Comment avez-vous entendu parler de Hellobat ?
       </p>
 
       <div className="mt-6 flex-1">

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
-  title: 'BatiFlow - Gestion BTP intelligente',
+  title: 'Hellobat - Gestion BTP intelligente',
   description: 'La plateforme tout-en-un pour les artisans du batiment',
 };
 

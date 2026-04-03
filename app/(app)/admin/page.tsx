@@ -321,7 +321,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Administration" description="Vue d'ensemble de la plateforme BatiFlow">
+      <PageHeader title="Administration" description="Vue d'ensemble de la plateforme Hellobat">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
             <Shield className="h-3.5 w-3.5" /> Admin

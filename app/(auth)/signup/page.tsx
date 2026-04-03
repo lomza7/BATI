@@ -69,7 +69,7 @@ export default function SignupPage() {
             <div className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
               <Hexagon className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-semibold text-white">BatiFlow</span>
+            <span className="text-xl font-semibold text-white">Hellobat</span>
           </div>
           <div className="space-y-8">
             <h2 className="text-3xl font-semibold text-white leading-tight">
@@ -100,7 +100,7 @@ export default function SignupPage() {
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Hexagon className="h-4.5 w-4.5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-semibold text-foreground">BatiFlow</span>
+            <span className="text-lg font-semibold text-foreground">Hellobat</span>
           </div>
 
           <div className="space-y-2 mb-8">

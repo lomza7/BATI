@@ -125,7 +125,7 @@ export function DevisSection() {
       badge="Devis IA"
       title="Vos devis,"
       titleAccent="pas comme tout le monde"
-      description="BatiFlow vous aide a preparer vos devis a partir de la voix et des photos du chantier. L artisan parle naturellement, ajoute quelques images, puis l IA propose une base de chiffrage claire a relire."
+      description="Hellobat vous aide a preparer vos devis a partir de la voix et des photos du chantier. L artisan parle naturellement, ajoute quelques images, puis l IA propose une base de chiffrage claire a relire."
       bulletPoints={[
         'Description du besoin en parlant, comme sur chantier',
         'Ajout de photos pour enrichir le contexte',
@@ -133,7 +133,7 @@ export function DevisSection() {
         'Validation finale toujours humaine avant envoi',
       ]}
       visual={
-        <MockBrowser url="app.batiflow.fr/devis">
+        <MockBrowser url="app.hellobat.fr/devis">
           <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
@@ -234,7 +234,7 @@ export function EmailSection() {
       badge="Emails"
       title="Votre messagerie,"
       titleAccent="centralisee"
-      description="Plus besoin de jongler entre votre boite mail et votre logiciel. Envoyez, recevez et suivez tous vos emails directement dans BatiFlow."
+      description="Plus besoin de jongler entre votre boite mail et votre logiciel. Envoyez, recevez et suivez tous vos emails directement dans Hellobat."
       bulletPoints={[
         'Boite de reception integree',
         'Envoi de devis et factures par email',
@@ -316,7 +316,7 @@ export function AvisSection() {
       badge="Avis Google"
       title="Des avis 5 etoiles,"
       titleAccent="automatiquement"
-      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-reputation depuis BatiFlow."
+      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-reputation depuis Hellobat."
       bulletPoints={[
         'Envoi automatique post-chantier',
         'Suivi de votre note Google',
@@ -437,7 +437,7 @@ export function ContactsSection() {
       ]}
       reversed
       visual={
-        <MockBrowser url="app.batiflow.fr/clients">
+        <MockBrowser url="app.hellobat.fr/clients">
           <div className="space-y-3">
             <div className="flex gap-2 mb-3">
               {['Tous', 'Clients', 'Prospects', 'Prestataires'].map((f, i) => (
@@ -489,7 +489,7 @@ export function EquipeSection() {
         'Notes internes et historique',
       ]}
       visual={
-        <MockBrowser url="app.batiflow.fr/equipe">
+        <MockBrowser url="app.hellobat.fr/equipe">
           <div className="space-y-3">
             {[
               { name: 'Jean Martin', role: 'Salarie', specialty: 'Plomberie', hours: '142h', rate: '28 EUR/h' },
@@ -536,7 +536,7 @@ export function PlanningSection() {
       ]}
       reversed
       visual={
-        <MockBrowser url="app.batiflow.fr/planning">
+        <MockBrowser url="app.hellobat.fr/planning">
           <div className="space-y-2">
             <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 rounded-full bg-[var(--landing-accent)] text-white text-[10px] font-medium">Semaine</div>
@@ -596,7 +596,7 @@ export function CataloguesSection() {
         'Suivi des consultations et selections',
       ]}
       visual={
-        <MockBrowser url="app.batiflow.fr/catalogues">
+        <MockBrowser url="app.hellobat.fr/catalogues">
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
               {['Robinetterie', 'Carrelage', 'Sanitaires'].map((cat) => (
@@ -610,7 +610,7 @@ export function CataloguesSection() {
               <Link2 className="w-4 h-4 text-[var(--landing-accent)]" />
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-medium text-[var(--landing-text)]">Lien magique</div>
-                <div className="text-[9px] text-[var(--landing-muted)] truncate">app.batiflow.fr/c/abc123...</div>
+                <div className="text-[9px] text-[var(--landing-muted)] truncate">app.hellobat.fr/c/abc123...</div>
               </div>
               <div className="text-[9px] text-[var(--landing-accent)] font-medium shrink-0">Copier</div>
             </div>

@@ -196,7 +196,7 @@ export default function CartePubliquePage() {
 
       {/* Footer */}
       <footer className="border-t border-border mt-8 py-4 text-center text-xs text-muted-foreground">
-        Propulse par BatiFlow
+        Propulse par Hellobat
       </footer>
     </div>
   );

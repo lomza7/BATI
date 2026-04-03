@@ -48,7 +48,7 @@ export default function MailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Boite mail" description="Gerez vos emails depuis BatiFlow">
+      <PageHeader title="Boite mail" description="Gerez vos emails depuis Hellobat">
         <Button onClick={() => setComposing(true)} className="gap-2"><Plus className="h-4 w-4" /> Nouveau message</Button>
       </PageHeader>
 

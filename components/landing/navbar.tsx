@@ -44,7 +44,7 @@ export function Navbar() {
           <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">B</span>
           </div>
-          <span className="font-semibold text-[var(--landing-text)] text-lg">BatiFlow</span>
+          <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">

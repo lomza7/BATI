@@ -260,7 +260,7 @@ export default function AvisPage() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
             <p className="text-sm font-semibold text-amber-900">Connexion Google reussie</p>
             <p className="mt-1 text-sm text-amber-800">
-              Votre compte Google est bien connecte a BatiFlow.
+              Votre compte Google est bien connecte a Hellobat.
             </p>
             <p className="mt-1 text-sm text-amber-800">
               Nous attendons maintenant l autorisation officielle de Google pour importer et gerer votre fiche et vos avis depuis l application.
@@ -326,7 +326,7 @@ export default function AvisPage() {
                 ? 'Des que Google nous autorise officiellement a importer et gerer votre fiche, elle apparaitra automatiquement ici.'
                 : status.connected
                   ? 'Si votre fiche vient juste d etre creee, reconnectez Google dans quelques minutes.'
-                  : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis BatiFlow.'}
+                  : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis Hellobat.'}
               </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -461,7 +461,7 @@ export default function AvisPage() {
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Avis reels remontes depuis Google</h2>
                   <p className="text-sm text-muted-foreground">
-                    Repondez depuis BatiFlow sans sortir du logiciel.
+                    Repondez depuis Hellobat sans sortir du logiciel.
                   </p>
                 </div>
                 <Button variant="outline" size="sm" className="gap-2" onClick={loadGoogleData} disabled={syncing}>

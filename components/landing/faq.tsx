@@ -5,12 +5,12 @@ import { ChevronDown } from 'lucide-react';
 
 const faqs = [
   {
-    question: 'BatiFlow est-il vraiment gratuit ?',
+    question: 'Hellobat est-il vraiment gratuit ?',
     answer: 'Oui, le plan Starter est 100% gratuit et sans engagement. Il inclut 5 devis par mois et 2 chantiers actifs. Aucune carte bancaire n\'est requise pour commencer.',
   },
   {
     question: 'Puis-je importer mes donnees existantes ?',
-    answer: 'Absolument. BatiFlow permet l\'import de vos contacts, devis et factures depuis Excel, CSV ou depuis d\'autres logiciels de gestion. Notre equipe peut vous accompagner dans la migration.',
+    answer: 'Absolument. Hellobat permet l\'import de vos contacts, devis et factures depuis Excel, CSV ou depuis d\'autres logiciels de gestion. Notre equipe peut vous accompagner dans la migration.',
   },
   {
     question: 'Comment fonctionne le devis IA vocal ?',

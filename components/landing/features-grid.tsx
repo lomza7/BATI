@@ -73,7 +73,7 @@ const featureCards = [
   {
     icon: Mail,
     title: 'Emails integres',
-    desc: 'Envoyez et recevez vos emails directement dans BatiFlow.',
+    desc: 'Envoyez et recevez vos emails directement dans Hellobat.',
   },
   {
     icon: Star,

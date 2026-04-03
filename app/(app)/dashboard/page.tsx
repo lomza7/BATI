@@ -1013,7 +1013,7 @@ export default function DashboardPage() {
     ? 'Sur les devis decides des 30 derniers jours'
     : 'Le taux apparaitra des que vous aurez des devis';
 
-  const displayName = profile?.company_name || profile?.full_name || 'BatiFlow';
+  const displayName = profile?.company_name || profile?.full_name || 'Hellobat';
   const topPriorityReminder = dashboardData.reminderItems[0] || null;
   const nextDeadline = dashboardData.deadlineItems[0] || null;
   const hasConfiguredAdminSignals = Boolean(
@@ -1438,7 +1438,7 @@ export default function DashboardPage() {
 
                       <div className="mt-4 flex items-center justify-between gap-3">
                         <span className="text-xs text-muted-foreground">
-                          BatiFlow vous aide a ne rien laisser trainer.
+                          Hellobat vous aide a ne rien laisser trainer.
                         </span>
                         <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                           {reminder.actionLabel}

@@ -9,7 +9,7 @@ export function CTA() {
           Prêt a simplifier votre gestion ?
         </h2>
         <p className="text-[#a0a0a0] mb-8 max-w-md mx-auto">
-          Rejoignez 2 400+ artisans qui gèrent leur activité plus efficacement avec BatiFlow.
+          Rejoignez 2 400+ artisans qui gèrent leur activité plus efficacement avec Hellobat.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link

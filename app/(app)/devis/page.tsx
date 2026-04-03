@@ -45,7 +45,7 @@ interface QuoteLine {
 }
 
 export default function DevisPage() {
-  const AI_INTRO_SESSION_KEY = 'batiflow_ai_quote_intro_seen';
+  const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
