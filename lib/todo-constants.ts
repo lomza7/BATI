@@ -24,6 +24,7 @@ export interface Todo {
   due_date: string | null;
   completed: boolean;
   completed_at: string | null;
+  time_spent: number; // minutes
   position: number;
   client_id: string | null;
   client_name?: string;

@@ -38,6 +38,8 @@ import { KpiCard } from '@/components/dashboard/kpi-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { TimeByCategoryChart } from '@/components/todos/time-by-category-chart';
+import type { Todo } from '@/lib/todo-constants';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -528,13 +530,14 @@ export default function DashboardPage() {
   const [planningEvents, setPlanningEvents] = useState<PlanningEventRow[]>([]);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettingsRow | null>(null);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileRow | null>(null);
+  const [dashTodos, setDashTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -579,6 +582,10 @@ export default function DashboardPage() {
         .select('legal_form, naf_label, tva_number')
         .eq('id', user!.id)
         .maybeSingle(),
+      supabase
+        .from('todos')
+        .select('id, title, description, priority, category, due_date, completed, completed_at, time_spent, position, client_id, created_at, updated_at')
+        .gt('time_spent', 0),
     ]);
 
     setQuotes(((quotesRes.data as unknown as QuoteRow[]) || []).map((quote) => ({
@@ -611,6 +618,7 @@ export default function DashboardPage() {
     setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
     setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
     setCompanyProfile((profileRes.data as CompanyProfileRow | null) || null);
+    setDashTodos(((todosRes.data as unknown as Todo[]) || []).map(t => ({ ...t, client_name: undefined })));
     setLoading(false);
   }, [user]);
 
@@ -1463,6 +1471,10 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          {dashTodos.length > 0 && (
+            <TimeByCategoryChart todos={dashTodos} />
+          )}
 
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">

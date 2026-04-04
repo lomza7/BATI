@@ -16,6 +16,7 @@ import {
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { TodoCard } from '@/components/todos/todo-card';
+import { TimeByCategoryChart } from '@/components/todos/time-by-category-chart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,6 +62,7 @@ export default function TachesPage() {
     category: 'autre' as TodoCategory,
     due_date: '',
     client_id: null as string | null,
+    time_spent: 0,
   });
 
   useEffect(() => { loadTodos(); }, []);
@@ -91,6 +93,7 @@ export default function TachesPage() {
       category: form.category,
       due_date: form.due_date || null,
       client_id: form.client_id,
+      time_spent: form.time_spent || 0,
       position: todos.length,
     });
     setShowCreate(false);
@@ -121,6 +124,7 @@ export default function TachesPage() {
       category: form.category,
       due_date: form.due_date || null,
       client_id: form.client_id,
+      time_spent: form.time_spent || 0,
       updated_at: new Date().toISOString(),
     }).eq('id', editingTodo.id);
     setEditingTodo(null);
@@ -156,11 +160,12 @@ export default function TachesPage() {
       category: todo.category,
       due_date: todo.due_date || '',
       client_id: todo.client_id,
+      time_spent: todo.time_spent || 0,
     });
   }
 
   function resetForm() {
-    setForm({ title: '', description: '', priority: 'moyenne', category: 'autre', due_date: '', client_id: null });
+    setForm({ title: '', description: '', priority: 'moyenne', category: 'autre', due_date: '', client_id: null, time_spent: 0 });
   }
 
   const today = new Date(new Date().toDateString()).toISOString().split('T')[0];
@@ -420,14 +425,27 @@ export default function TachesPage() {
                 <ClientPicker value={form.client_id} onChange={(id) => setForm({ ...form, client_id: id })} />
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Date limite (optionnel)</label>
-              <Input
-                className="mt-1"
-                type="date"
-                value={form.due_date}
-                onChange={e => setForm({ ...form, due_date: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Date limite (optionnel)</label>
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={form.due_date}
+                  onChange={e => setForm({ ...form, due_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Temps passe (min)</label>
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={form.time_spent || ''}
+                  onChange={e => setForm({ ...form, time_spent: Number(e.target.value) })}
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
@@ -490,14 +508,26 @@ export default function TachesPage() {
                 <ClientPicker value={form.client_id} onChange={(id) => setForm({ ...form, client_id: id })} />
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Date limite</label>
-              <Input
-                className="mt-1"
-                type="date"
-                value={form.due_date}
-                onChange={e => setForm({ ...form, due_date: e.target.value })}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Date limite</label>
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={form.due_date}
+                  onChange={e => setForm({ ...form, due_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Temps passe (min)</label>
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={0}
+                  value={form.time_spent}
+                  onChange={e => setForm({ ...form, time_spent: parseInt(e.target.value) || 0 })}
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditingTodo(null)}>Annuler</Button>
@@ -506,6 +536,8 @@ export default function TachesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <TimeByCategoryChart todos={todos} />
     </div>
   );
 }
