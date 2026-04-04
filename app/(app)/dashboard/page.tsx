@@ -15,11 +15,13 @@ import {
 import {
   ArrowRight,
   BellRing,
+  Calendar,
   CalendarClock,
   CircleAlert,
   Euro,
   FileText,
   FolderKanban,
+  Receipt,
   TrendingUp,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -50,6 +52,57 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+
+type DatePreset = 'jour' | 'semaine' | 'mois' | 'annee' | 'custom';
+
+function getDateRange(
+  preset: DatePreset,
+  customRange?: { from?: Date; to?: Date }
+): { start: Date; end: Date } {
+  const now = new Date();
+  switch (preset) {
+    case 'jour': {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'semaine': {
+      const day = now.getDay();
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'mois': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'annee': {
+      const start = new Date(now.getFullYear(), 0, 1);
+      const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'custom': {
+      if (!customRange?.from) return getDateRange('mois');
+      const from = customRange.from;
+      const to = customRange.to || from;
+      const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+      const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
+      return { start, end };
+    }
+  }
+}
+
+const PRESET_LABELS: Record<DatePreset, string> = {
+  jour: "Aujourd'hui",
+  semaine: 'Cette semaine',
+  mois: 'Ce mois',
+  annee: 'Cette annee',
+  custom: 'Date precise',
+};
 
 interface QuoteRow {
   id: string;
@@ -169,6 +222,7 @@ type RevenuePoint = {
   month: string;
   encaisse: number;
   devis: number;
+  factures: number;
 };
 
 type FunnelPoint = {
@@ -195,8 +249,12 @@ type StageConversionPoint = {
 
 const revenueChartConfig = {
   encaisse: {
-    label: 'Encaisse',
+    label: 'CA encaisse',
     color: 'hsl(var(--chart-1))',
+  },
+  factures: {
+    label: 'Factures creees',
+    color: 'hsl(var(--chart-2))',
   },
   devis: {
     label: 'Devis crees',
@@ -367,7 +425,7 @@ function createAdminReminders(
         description: companyProfile?.tva_number
           ? `Votre numero de TVA est bien renseigne. Preparez votre declaration ${settings.vat_frequency || 'periodique'}.`
           : 'Pensez a preparer votre declaration de TVA et a verifier vos justificatifs.',
-        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Rappel programme dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Rappel programme dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
@@ -385,7 +443,7 @@ function createAdminReminders(
         id: 'admin-payroll',
         title: 'Paie a lancer',
         description: `La paie de votre equipe approche${settings.employee_count ? ` pour ${settings.employee_count} personne${settings.employee_count > 1 ? 's' : ''}` : ''}.`,
-        dueLabel: days <= 0 ? 'Paie prevue aujourd’hui' : `Paie dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "Paie prevue aujourd'hui" : `Paie dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
@@ -403,7 +461,7 @@ function createAdminReminders(
         id: 'admin-dsn',
         title: 'DSN a transmettre',
         description: 'Votre declaration sociale nominative doit etre verifiee avant l echeance.',
-        dueLabel: days <= 0 ? 'DSN due aujourd’hui' : `DSN dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "DSN due aujourd'hui" : `DSN dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
@@ -423,7 +481,7 @@ function createAdminReminders(
         description: benefitTaxRegime === 'is'
           ? 'Preparez votre cloture, la liasse fiscale et les prochaines echeances IS.'
           : 'Preparez vos pieces comptables pour votre prochaine cloture d exercice.',
-        dueLabel: days <= 0 ? 'Cloture prevue aujourd’hui' : `Cloture dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "Cloture prevue aujourd'hui" : `Cloture dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 15 ? 'high' : 'low',
         href: '/parametres?tab=parametres',
@@ -453,7 +511,7 @@ function createAdminReminders(
         id: `admin-${nextInstallment.id}`,
         title: 'Acompte d IS a verifier',
         description: 'Votre prochaine echeance d impot sur les societes approche.',
-        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: nextInstallment.date.toISOString(),
         priority: days <= 5 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
@@ -481,7 +539,7 @@ function createAdminReminders(
         id: `admin-cfe-${nextCfe.month}`,
         title: nextCfe.label,
         description: 'Pensez a verifier votre avis CFE et a anticiper le reglement.',
-        dueLabel: days <= 0 ? 'Echeance aujourd’hui' : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: nextCfe.date.toISOString(),
         priority: days <= 5 ? 'high' : 'low',
         href: '/parametres?tab=parametres',
@@ -494,25 +552,125 @@ function createAdminReminders(
   return reminders;
 }
 
-function buildMonthlySeries(quotes: QuoteRow[], invoices: InvoiceRow[]) {
-  const now = new Date();
+function buildRevenueSeries(
+  quotes: QuoteRow[],
+  invoices: InvoiceRow[],
+  preset: DatePreset,
+  range: { start: Date; end: Date }
+) {
   const points: RevenuePoint[] = [];
 
-  for (let offset = 5; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const monthLabel = date.toLocaleDateString('fr-FR', { month: 'short' });
-    const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-
-    points.push({
-      month: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
-      encaisse: invoices
-        .filter((invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, start, end))
-        .reduce((sum, invoice) => sum + invoice.total_ttc, 0),
-      devis: quotes
-        .filter((quote) => isBetween(quote.created_at, start, end))
-        .reduce((sum, quote) => sum + quote.total_ttc, 0),
-    });
+  if (preset === 'custom') {
+    // Custom range → auto granularity based on duration
+    const durationDays = Math.round((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
+    if (durationDays <= 1) {
+      // Single day → hours
+      for (let h = 8; h <= 20; h += 2) {
+        const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
+        const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
+        points.push({
+          month: `${h}h`,
+          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+        });
+      }
+    } else if (durationDays <= 31) {
+      // Up to a month → each day
+      let cursor = new Date(range.start);
+      while (cursor <= range.end) {
+        const start = new Date(cursor);
+        const end = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 23, 59, 59, 999);
+        points.push({
+          month: `${cursor.getDate()}/${cursor.getMonth() + 1}`,
+          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+        });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+      }
+    } else if (durationDays <= 365) {
+      // Up to a year → each month
+      let cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
+      while (cursor <= range.end) {
+        const start = new Date(cursor);
+        const end = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999);
+        const clampedStart = start < range.start ? range.start : start;
+        const clampedEnd = end > range.end ? range.end : end;
+        const label = cursor.toLocaleDateString('fr-FR', { month: 'short' });
+        points.push({
+          month: label.charAt(0).toUpperCase() + label.slice(1),
+          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, clampedStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
+          factures: invoices.filter((inv) => isBetween(inv.created_at, clampedStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
+          devis: quotes.filter((q) => isBetween(q.created_at, clampedStart, clampedEnd)).reduce((s, q) => s + q.total_ttc, 0),
+        });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      }
+    } else {
+      // Multi-year → each year
+      for (let y = range.start.getFullYear(); y <= range.end.getFullYear(); y++) {
+        const start = new Date(y, 0, 1);
+        const end = new Date(y, 11, 31, 23, 59, 59, 999);
+        points.push({
+          month: String(y),
+          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+        });
+      }
+    }
+  } else if (preset === 'jour') {
+    for (let h = 8; h <= 20; h += 2) {
+      const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
+      const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
+      points.push({
+        month: `${h}h`,
+        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+      });
+    }
+  } else if (preset === 'semaine') {
+    const dayLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    for (let d = 0; d < 7; d++) {
+      const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate() + d);
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+      points.push({
+        month: dayLabels[d],
+        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+      });
+    }
+  } else if (preset === 'mois') {
+    const monthStart = range.start;
+    let weekNum = 1;
+    let cursor = new Date(monthStart);
+    while (cursor <= range.end) {
+      const weekStart = new Date(cursor);
+      const weekEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6, 23, 59, 59, 999);
+      const clampedEnd = weekEnd > range.end ? range.end : weekEnd;
+      points.push({
+        month: `S${weekNum}`,
+        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, weekStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
+        factures: invoices.filter((inv) => isBetween(inv.created_at, weekStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
+        devis: quotes.filter((q) => isBetween(q.created_at, weekStart, clampedEnd)).reduce((s, q) => s + q.total_ttc, 0),
+      });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
+      weekNum++;
+    }
+  } else {
+    for (let m = 0; m < 12; m++) {
+      const start = new Date(range.start.getFullYear(), m, 1);
+      const end = new Date(range.start.getFullYear(), m + 1, 0, 23, 59, 59, 999);
+      const label = start.toLocaleDateString('fr-FR', { month: 'short' });
+      points.push({
+        month: label.charAt(0).toUpperCase() + label.slice(1),
+        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
+        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
+      });
+    }
   }
 
   return points;
@@ -532,6 +690,9 @@ export default function DashboardPage() {
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileRow | null>(null);
   const [dashTodos, setDashTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [datePreset, setDatePreset] = useState<DatePreset>('annee');
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -635,30 +796,36 @@ export default function DashboardPage() {
     const now = new Date();
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
-    const currentMonth = getMonthRange(now);
-    const previousMonth = getMonthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    const last30Days = new Date(now);
-    last30Days.setDate(last30Days.getDate() - 30);
-    const previous30Days = new Date(last30Days);
-    previous30Days.setDate(previous30Days.getDate() - 30);
-    const nextWeek = new Date(now);
-    nextWeek.setDate(nextWeek.getDate() + 7);
+    const filterRange = getDateRange(datePreset, customRange);
+    const filterDurationMs = filterRange.end.getTime() - filterRange.start.getTime();
+    const previousRange = {
+      start: new Date(filterRange.start.getTime() - filterDurationMs - 1),
+      end: new Date(filterRange.start.getTime() - 1),
+    };
 
-    const paidThisMonth = invoices.filter(
-      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, currentMonth.start, currentMonth.end)
+    // ── Filter all raw data by the selected period ──
+    const fQuotes = quotes.filter((q) => isBetween(q.created_at, filterRange.start, filterRange.end));
+    const fInvoices = invoices.filter((inv) => isBetween(inv.created_at, filterRange.start, filterRange.end));
+    const fProjects = projects.filter((p) => isBetween(p.created_at, filterRange.start, filterRange.end));
+    const fEvents = planningEvents.filter((e) => isBetween(e.start_date, filterRange.start, filterRange.end));
+
+    // Revenue: paid invoices in period (any invoice paid in range, not just created in range)
+    const paidThisPeriod = invoices.filter(
+      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, filterRange.start, filterRange.end)
     );
-    const paidPreviousMonth = invoices.filter(
-      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, previousMonth.start, previousMonth.end)
+    const paidPreviousPeriod = invoices.filter(
+      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, previousRange.start, previousRange.end)
     );
-    const revenueThisMonth = paidThisMonth.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
-    const revenuePreviousMonth = paidPreviousMonth.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
+    const revenueThisMonth = paidThisPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
+    const revenuePreviousMonth = paidPreviousPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
     const revenueDelta = revenuePreviousMonth > 0
       ? Math.round(((revenueThisMonth - revenuePreviousMonth) / revenuePreviousMonth) * 100)
       : revenueThisMonth > 0
         ? 100
         : 0;
 
-    const pendingQuotes = quotes.filter((quote) => quote.status === 'envoye');
+    // Quotes KPIs scoped to period
+    const pendingQuotes = fQuotes.filter((quote) => quote.status === 'envoye');
     const quotesToRelaunch = pendingQuotes.filter((quote) => {
       if (!quote.valid_until) return false;
       const validUntil = new Date(quote.valid_until);
@@ -666,31 +833,19 @@ export default function DashboardPage() {
       return daysLeft <= 7;
     });
 
-    const acceptedWindow = quotes.filter((quote) => {
-      const updated = new Date(quote.updated_at || quote.created_at);
-      return updated >= last30Days && quote.status === 'accepte';
-    }).length;
-    const decidedWindow = quotes.filter((quote) => {
-      const updated = new Date(quote.updated_at || quote.created_at);
-      return updated >= last30Days && ['accepte', 'refuse', 'expire'].includes(quote.status);
-    }).length;
+    const acceptedWindow = fQuotes.filter((q) => q.status === 'accepte').length;
+    const decidedWindow = fQuotes.filter((q) => ['accepte', 'refuse', 'expire'].includes(q.status)).length;
     const acceptanceRate = decidedWindow > 0 ? Math.round((acceptedWindow / decidedWindow) * 100) : 0;
 
-    const acceptedPreviousWindow = quotes.filter((quote) => {
-      const updated = new Date(quote.updated_at || quote.created_at);
-      return updated >= previous30Days && updated < last30Days && quote.status === 'accepte';
-    }).length;
-    const decidedPreviousWindow = quotes.filter((quote) => {
-      const updated = new Date(quote.updated_at || quote.created_at);
-      return updated >= previous30Days && updated < last30Days && ['accepte', 'refuse', 'expire'].includes(quote.status);
-    }).length;
-    const previousAcceptanceRate = decidedPreviousWindow > 0
-      ? Math.round((acceptedPreviousWindow / decidedPreviousWindow) * 100)
-      : 0;
+    const prevQuotes = quotes.filter((q) => isBetween(q.created_at, previousRange.start, previousRange.end));
+    const acceptedPrev = prevQuotes.filter((q) => q.status === 'accepte').length;
+    const decidedPrev = prevQuotes.filter((q) => ['accepte', 'refuse', 'expire'].includes(q.status)).length;
+    const previousAcceptanceRate = decidedPrev > 0 ? Math.round((acceptedPrev / decidedPrev) * 100) : 0;
     const acceptanceDelta = acceptanceRate - previousAcceptanceRate;
 
+    // Activity items — scoped to period
     const activityItems: ActivityItem[] = [
-      ...quotes.slice(0, 4).map((quote) => ({
+      ...fQuotes.slice(0, 4).map((quote) => ({
         id: `quote-${quote.id}`,
         label: `${quote.quote_number} • ${QUOTE_STATUSES[quote.status]?.label || 'Devis'}${quote.clients?.name ? ` • ${quote.clients.name}` : ''}`,
         time: getRelativeTimeLabel(quote.updated_at || quote.created_at),
@@ -701,7 +856,7 @@ export default function DashboardPage() {
             : 'bg-blue-500',
         href: '/devis',
       })),
-      ...invoices.slice(0, 4).map((invoice) => ({
+      ...fInvoices.slice(0, 4).map((invoice) => ({
         id: `invoice-${invoice.id}`,
         label: `${invoice.invoice_number} • ${INVOICE_STATUSES[invoice.status]?.label || 'Facture'}${invoice.clients?.name ? ` • ${invoice.clients.name}` : ''}`,
         time: getRelativeTimeLabel(invoice.updated_at || invoice.created_at),
@@ -712,7 +867,7 @@ export default function DashboardPage() {
             : 'bg-amber-500',
         href: '/factures',
       })),
-      ...projects.slice(0, 4).map((project) => ({
+      ...fProjects.slice(0, 4).map((project) => ({
         id: `project-${project.id}`,
         label: `${project.name} • ${(PROJECT_STATUSES[project.status] || PROJECT_STATUSES.a_planifier).label}`,
         time: getRelativeTimeLabel(project.updated_at || project.created_at),
@@ -725,9 +880,10 @@ export default function DashboardPage() {
       })),
     ].slice(0, 8);
 
+    // Deadlines scoped to period
     const deadlineItems: DeadlineItem[] = [
-      ...invoices
-        .filter((invoice) => invoice.due_date && invoice.status !== 'payee' && new Date(invoice.due_date) >= now)
+      ...fInvoices
+        .filter((invoice) => invoice.due_date && invoice.status !== 'payee')
         .map((invoice) => ({
           id: `invoice-${invoice.id}`,
           label: invoice.title || invoice.invoice_number,
@@ -736,8 +892,8 @@ export default function DashboardPage() {
           badgeColor: INVOICE_STATUSES[invoice.status]?.color || INVOICE_STATUSES.brouillon.color,
           href: '/factures',
         })),
-      ...projects
-        .filter((project) => project.start_date && project.status === 'a_planifier' && new Date(project.start_date) >= now)
+      ...fProjects
+        .filter((project) => project.start_date && project.status === 'a_planifier')
         .map((project) => ({
           id: `project-${project.id}`,
           label: project.name,
@@ -746,8 +902,8 @@ export default function DashboardPage() {
           badgeColor: 'bg-blue-50 text-blue-700',
           href: '/chantiers',
         })),
-      ...quotes
-        .filter((quote) => quote.valid_until && quote.status === 'envoye' && new Date(quote.valid_until) >= now)
+      ...fQuotes
+        .filter((quote) => quote.valid_until && quote.status === 'envoye')
         .map((quote) => ({
           id: `quote-${quote.id}`,
           label: quote.title || quote.quote_number,
@@ -760,8 +916,9 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 6);
 
+    // Reminders scoped to period
     const reminderItems: ReminderItem[] = [
-      ...invoices
+      ...fInvoices
         .filter((invoice) => invoice.status === 'en_retard' && invoice.due_date)
         .map((invoice) => {
           const daysLate = Math.max(1, Math.abs(differenceInDays(invoice.due_date as string, now)));
@@ -777,7 +934,7 @@ export default function DashboardPage() {
             kind: 'facturation' as const,
           };
         }),
-      ...invoices
+      ...fInvoices
         .filter((invoice) => (invoice.status === 'envoyee' || invoice.status === 'brouillon') && invoice.due_date)
         .map((invoice) => {
           const days = differenceInDays(invoice.due_date as string, now);
@@ -787,7 +944,7 @@ export default function DashboardPage() {
             id: `invoice-due-${invoice.id}`,
             title: `Suivre ${invoice.invoice_number}`,
             description: `${invoice.clients?.name || 'Ce client'} arrive a l'echeance de paiement.`,
-            dueLabel: days === 0 ? 'Echeance aujourd’hui' : `Echeance dans ${days} jour${days > 1 ? 's' : ''}`,
+            dueLabel: days === 0 ? "Echeance aujourd'hui" : `Echeance dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: invoice.due_date as string,
             href: '/factures',
@@ -796,7 +953,7 @@ export default function DashboardPage() {
           };
         })
         .filter(Boolean) as ReminderItem[],
-      ...quotes
+      ...fQuotes
         .filter((quote) => quote.status === 'envoye')
         .map((quote) => {
           const sentSinceDays = Math.max(0, Math.floor((now.getTime() - new Date(quote.created_at).getTime()) / (1000 * 60 * 60 * 24)));
@@ -815,7 +972,7 @@ export default function DashboardPage() {
           };
         })
         .filter(Boolean) as ReminderItem[],
-      ...quotes
+      ...fQuotes
         .filter((quote) => quote.status === 'envoye' && quote.valid_until)
         .map((quote) => {
           const days = differenceInDays(quote.valid_until as string, now);
@@ -825,7 +982,7 @@ export default function DashboardPage() {
             id: `quote-expiry-${quote.id}`,
             title: `Validite bientot atteinte pour ${quote.quote_number}`,
             description: `${quote.clients?.name || 'Ce client'} doit etre relance avant expiration.`,
-            dueLabel: days === 0 ? 'Expire aujourd’hui' : `Expire dans ${days} jour${days > 1 ? 's' : ''}`,
+            dueLabel: days === 0 ? "Expire aujourd'hui" : `Expire dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: quote.valid_until as string,
             href: '/devis',
@@ -834,7 +991,7 @@ export default function DashboardPage() {
           };
         })
         .filter(Boolean) as ReminderItem[],
-      ...projects
+      ...fProjects
         .filter((project) => project.status === 'a_planifier' && project.start_date)
         .map((project) => {
           const days = differenceInDays(project.start_date as string, now);
@@ -844,7 +1001,7 @@ export default function DashboardPage() {
             id: `project-start-${project.id}`,
             title: `Preparer ${project.name}`,
             description: `${project.clients?.name || 'Le client'} attend le lancement du chantier.`,
-            dueLabel: days === 0 ? 'Demarrage aujourd’hui' : `Demarrage dans ${days} jour${days > 1 ? 's' : ''}`,
+            dueLabel: days === 0 ? "Demarrage aujourd'hui" : `Demarrage dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: project.start_date as string,
             href: '/chantiers',
@@ -853,7 +1010,7 @@ export default function DashboardPage() {
           };
         })
         .filter(Boolean) as ReminderItem[],
-      ...projects
+      ...fProjects
         .filter((project) => project.status === 'en_cours' && project.end_date)
         .map((project) => {
           const days = differenceInDays(project.end_date as string, now);
@@ -863,7 +1020,7 @@ export default function DashboardPage() {
             id: `project-end-${project.id}`,
             title: `Clore ${project.name}`,
             description: 'Pensez a finaliser le chantier, envoyer la facture et demander un avis client.',
-            dueLabel: days === 0 ? 'Fin prevue aujourd’hui' : `Fin prevue dans ${days} jour${days > 1 ? 's' : ''}`,
+            dueLabel: days === 0 ? "Fin prevue aujourd'hui" : `Fin prevue dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days === 0 ? 'high' as const : 'low' as const,
             dueDate: project.end_date as string,
             href: '/chantiers',
@@ -882,7 +1039,10 @@ export default function DashboardPage() {
       })
       .slice(0, 6);
 
-    const revenueChartData = buildMonthlySeries(quotes, invoices);
+    // Revenue chart — adapts to selected period
+    const revenueChartData = buildRevenueSeries(quotes, invoices, datePreset, filterRange);
+
+    // Pipeline funnel — scoped to period
     const funnelChartData: FunnelPoint[] = [
       {
         label: 'Devis en attente',
@@ -891,21 +1051,22 @@ export default function DashboardPage() {
       },
       {
         label: 'Factures a encaisser',
-        value: invoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length,
+        value: fInvoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length,
         fill: 'hsl(var(--chart-1))',
       },
       {
         label: 'Chantiers en cours',
-        value: projects.filter((project) => project.status === 'en_cours').length,
+        value: fProjects.filter((project) => project.status === 'en_cours').length,
         fill: 'hsl(var(--chart-2))',
       },
       {
         label: 'A planifier',
-        value: projects.filter((project) => project.status === 'a_planifier').length,
+        value: fProjects.filter((project) => project.status === 'a_planifier').length,
         fill: 'hsl(var(--chart-4))',
       },
     ];
 
+    // Leads — no created_at available in the dashboard query, keep global for now
     const sourceLabelMap = buildLeadSourceLabelMap(leadSources);
     const leadSourceChartData: LeadSourcePoint[] = Array.from(
       leads.reduce((acc, lead) => {
@@ -967,6 +1128,9 @@ export default function DashboardPage() {
       .filter((stage) => stage.total > 0)
       .sort((a, b) => b.total - a.total || a.slug.localeCompare(b.slug));
 
+    const totalQuotesPeriod = fQuotes.reduce((sum, q) => sum + q.total_ttc, 0);
+    const totalInvoicesPeriod = fInvoices.reduce((sum, inv) => sum + inv.total_ttc, 0);
+
     return {
       revenueThisMonth,
       revenuePreviousMonth,
@@ -975,6 +1139,8 @@ export default function DashboardPage() {
       quotesToRelaunch,
       acceptanceRate,
       acceptanceDelta,
+      totalQuotesPeriod,
+      totalInvoicesPeriod,
       activityItems,
       deadlineItems,
       reminderItems,
@@ -984,45 +1150,42 @@ export default function DashboardPage() {
       topPartnerSources,
       stageConversionData,
       hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0,
-      activeProjects: projects.filter((project) => project.status === 'en_cours').length,
-      unpaidInvoicesTotal: invoices
+      activeProjects: fProjects.filter((project) => project.status === 'en_cours').length,
+      unpaidInvoicesTotal: fInvoices
         .filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard')
         .reduce((sum, invoice) => sum + invoice.total_ttc, 0),
-      openProjectsBudget: projects
+      openProjectsBudget: fProjects
         .filter((project) => project.status !== 'termine')
         .reduce((sum, project) => sum + project.budget, 0),
-      activePipelineTotal: quotes
+      activePipelineTotal: fQuotes
         .filter((quote) => quote.status === 'brouillon' || quote.status === 'envoye')
         .reduce((sum, quote) => sum + quote.total_ttc, 0),
-      projectsToLaunchSoon: projects.filter((project) => {
+      projectsToLaunchSoon: fProjects.filter((project) => {
         if (project.status !== 'a_planifier' || !project.start_date) return false;
         const days = differenceInDays(project.start_date, now);
         return days >= 0 && days <= 7;
       }).length,
       activeTeamMembers: teamMembers.filter((member) => member.status === 'actif'),
-      nextPlanningEvents: planningEvents
-        .filter((event) => new Date(event.start_date) >= todayStart)
-        .slice(0, 3),
-      planningThisWeekCount: planningEvents.filter((event) => {
-        const start = new Date(event.start_date);
-        return start >= todayStart && start <= nextWeek;
-      }).length,
+      nextPlanningEvents: fEvents.slice(0, 3),
+      planningThisWeekCount: fEvents.length,
     };
-  }, [companyProfile, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
+  }, [companyProfile, customRange, datePreset, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
 
+  const periodLabel = datePreset === 'custom' && customRange.from
+    ? customRange.to
+      ? `Du ${customRange.from.toLocaleDateString('fr-FR')} au ${customRange.to.toLocaleDateString('fr-FR')}`
+      : customRange.from.toLocaleDateString('fr-FR')
+    : PRESET_LABELS[datePreset];
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
-    ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} le mois dernier`
+    ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} sur la periode precedente`
     : dashboardData.revenueThisMonth > 0
-      ? 'Premier encaissement enregistre ce mois-ci'
-      : 'Aucun paiement enregistre ce mois-ci';
+      ? `Premier encaissement sur ${periodLabel.toLowerCase()}`
+      : `Aucun paiement sur ${periodLabel.toLowerCase()}`;
 
   const acceptanceSubtitle = quotes.length > 0
     ? 'Sur les devis decides des 30 derniers jours'
     : 'Le taux apparaitra des que vous aurez des devis';
 
-  const displayName = profile?.company_name || profile?.full_name || 'Hellobat';
-  const topPriorityReminder = dashboardData.reminderItems[0] || null;
-  const nextDeadline = dashboardData.deadlineItems[0] || null;
   const hasConfiguredAdminSignals = Boolean(
     reminderSettings?.vat_regime ||
       reminderSettings?.vat_reminder_day ||
@@ -1057,12 +1220,51 @@ export default function DashboardPage() {
         title="Tableau de bord"
         description="Le cockpit de votre activite : tresorerie, pipeline, chantiers et actions a lancer."
       >
-        <Button asChild variant="outline">
-          <Link href="/planning">Voir le planning</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/devis">Nouveau devis</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {(['jour', 'semaine', 'mois', 'annee'] as DatePreset[]).map((p) => (
+            <Button
+              key={p}
+              size="sm"
+              variant={datePreset === p ? 'default' : 'outline'}
+              onClick={() => { setDatePreset(p); setCustomRange({}); }}
+            >
+              {PRESET_LABELS[p]}
+            </Button>
+          ))}
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant={datePreset === 'custom' ? 'default' : 'outline'}
+                className="gap-1.5"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                {datePreset === 'custom' && customRange.from
+                  ? customRange.to
+                    ? `${customRange.from.toLocaleDateString('fr-FR')} — ${customRange.to.toLocaleDateString('fr-FR')}`
+                    : customRange.from.toLocaleDateString('fr-FR')
+                  : 'Periode'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarPicker
+                mode="range"
+                selected={customRange.from ? { from: customRange.from, to: customRange.to } : undefined}
+                onSelect={(range) => {
+                  if (range?.from) {
+                    setCustomRange({ from: range.from, to: range.to });
+                    setDatePreset('custom');
+                    if (range.to) {
+                      setCalendarOpen(false);
+                    }
+                  }
+                }}
+                numberOfMonths={2}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </PageHeader>
 
       {!dashboardData.hasAnyData ? (
@@ -1085,76 +1287,10 @@ export default function DashboardPage() {
         </EmptyState>
       ) : (
         <>
-          <section className="overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-background to-chart-3/10">
-            <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[1.35fr_0.95fr] xl:items-end">
-              <div className="space-y-4">
-                <Badge variant="outline" className="border-primary/20 bg-background/70 text-primary">
-                  Vue dirigeant
-                </Badge>
-                <div className="space-y-1">
-                  <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                    Bonjour {displayName}, voici ce qui merite votre attention aujourd&apos;hui.
-                  </h2>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild>
-                    <Link href="/factures">Voir les encaissements</Link>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <Link href="/chantiers">Suivre les chantiers</Link>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-2">
-                <Link
-                  href={topPriorityReminder?.href || '/dashboard'}
-                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priorite du jour</p>
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        {topPriorityReminder ? topPriorityReminder.title : 'Rien d urgent'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                      <BellRing className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {topPriorityReminder
-                      ? topPriorityReminder.dueLabel
-                      : 'Votre tableau est calme pour le moment.'}
-                  </p>
-                </Link>
-                <Link
-                  href={nextDeadline?.href || '/planning'}
-                  className="rounded-2xl border border-white/40 bg-white/70 p-4 backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prochaine echeance</p>
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        {nextDeadline ? nextDeadline.label : 'Aucune urgence planifiee'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                      <CalendarClock className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {nextDeadline ? formatDate(nextDeadline.date) : 'Rien a surveiller cette semaine.'}
-                  </p>
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
               <KpiCard
-                title="CA encaisse ce mois"
+                title={`CA encaisse — ${periodLabel.toLowerCase()}`}
                 value={formatCurrency(dashboardData.revenueThisMonth)}
                 subtitle={revenueSubtitle}
                 trend={
@@ -1166,6 +1302,28 @@ export default function DashboardPage() {
                     : undefined
                 }
                 icon={Euro}
+                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.encaisse }))}
+                sparklineColor="hsl(var(--chart-1))"
+              />
+            </Link>
+            <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+              <KpiCard
+                title={`Devis crees — ${periodLabel.toLowerCase()}`}
+                value={formatCurrency(dashboardData.totalQuotesPeriod)}
+                subtitle={`${dashboardData.pendingQuotes.length} en attente de reponse`}
+                icon={FileText}
+                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.devis }))}
+                sparklineColor="hsl(var(--chart-3))"
+              />
+            </Link>
+            <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+              <KpiCard
+                title={`Factures creees — ${periodLabel.toLowerCase()}`}
+                value={formatCurrency(dashboardData.totalInvoicesPeriod)}
+                subtitle={`${dashboardData.unpaidInvoicesTotal > 0 ? formatCurrency(dashboardData.unpaidInvoicesTotal) + ' a encaisser' : 'Aucune facture impayee'}`}
+                icon={Receipt}
+                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.factures }))}
+                sparklineColor="hsl(var(--chart-2))"
               />
             </Link>
             <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
@@ -1178,6 +1336,8 @@ export default function DashboardPage() {
                     : 'Aucune relance urgente pour le moment'
                 }
                 icon={FileText}
+                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.devis }))}
+                sparklineColor="hsl(var(--chart-3))"
               />
             </Link>
             <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
@@ -1211,7 +1371,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Dynamique business</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Encaissements et devis sur les 6 derniers mois</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Devis, factures et encaissements — {periodLabel.toLowerCase()}</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href="/factures">Ouvrir les factures</Link>
@@ -1230,8 +1390,9 @@ export default function DashboardPage() {
                       </div>
                     )} />} />
                     <ChartLegend content={<ChartLegendContent />} />
+                    <Area type="monotone" dataKey="devis" stroke="var(--color-devis)" fill="var(--color-devis)" fillOpacity={0.08} strokeWidth={2} />
+                    <Area type="monotone" dataKey="factures" stroke="var(--color-factures)" fill="var(--color-factures)" fillOpacity={0.12} strokeWidth={2} />
                     <Area type="monotone" dataKey="encaisse" stroke="var(--color-encaisse)" fill="var(--color-encaisse)" fillOpacity={0.18} strokeWidth={3} />
-                    <Area type="monotone" dataKey="devis" stroke="var(--color-devis)" fill="var(--color-devis)" fillOpacity={0.1} strokeWidth={2} />
                   </AreaChart>
                 </ChartContainer>
               </div>
@@ -1305,7 +1466,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Top apporteurs</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Les partenaires a cultiver en priorite</p>
+                  <p className="mt-1 text-sm text-muted-foreground">La course de vos meilleurs partenaires</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href="/parametres?tab=parametres">Gerer les sources</Link>
@@ -1316,31 +1477,64 @@ export default function DashboardPage() {
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
                   Ajoutez vos apporteurs d affaires dans Parametres pour suivre ceux qui vous envoient les meilleurs leads.
                 </div>
-              ) : (
-                <div className="mt-6 space-y-3">
-                  {dashboardData.topPartnerSources.slice(0, 5).map((source) => (
-                    <Link
-                      key={source.id}
-                      href="/prospection"
-                      className="flex items-start justify-between gap-3 rounded-xl border border-transparent px-2 py-2 transition-colors hover:border-border hover:bg-muted/40"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground">{source.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {source.contact_name || 'Contact non renseigne'}
-                          {source.reward_note ? ` • ${source.reward_note}` : ''}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">{source.leadCount} lead{source.leadCount > 1 ? 's' : ''}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {source.wonCount} gagne{source.wonCount > 1 ? 's' : ''} • {formatCurrency(source.wonValue)}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              ) : (() => {
+                const maxValue = Math.max(...dashboardData.topPartnerSources.map((s) => s.wonValue), 1);
+                const raceColors = [
+                  'hsl(var(--primary))',
+                  'hsl(var(--chart-2))',
+                  'hsl(var(--chart-3))',
+                  'hsl(var(--chart-4))',
+                  'hsl(var(--chart-5))',
+                ];
+                const medals = ['🥇', '🥈', '🥉'];
+                return (
+                  <div className="mt-6 space-y-4">
+                    {dashboardData.topPartnerSources.slice(0, 5).map((source, i) => {
+                      const pct = maxValue > 0 ? Math.max((source.wonValue / maxValue) * 100, 12) : 12;
+                      const color = raceColors[i % raceColors.length];
+                      return (
+                        <Link
+                          key={source.id}
+                          href="/prospection"
+                          className="group block rounded-xl p-2.5 -mx-1 transition-colors hover:bg-muted/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-7 text-center text-lg">{medals[i] || `${i + 1}.`}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                  <p className="text-sm font-semibold truncate" style={{ color }}>{source.name}</p>
+                                  <span className="hidden sm:inline text-xs text-muted-foreground truncate">{source.contact_name}</span>
+                                </div>
+                                <p className="text-sm font-bold tabular-nums whitespace-nowrap" style={{ color }}>{formatCurrency(source.wonValue)}</p>
+                              </div>
+                              <div className="relative h-8 w-full overflow-hidden rounded-full" style={{ backgroundColor: `${color}15` }}>
+                                <div
+                                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
+                                  style={{
+                                    width: `${pct}%`,
+                                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+                                    boxShadow: `0 0 12px ${color}40`,
+                                  }}
+                                />
+                                <div className="absolute inset-0 flex items-center px-3.5">
+                                  <span className="text-xs font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
+                                    {source.wonCount} signe{source.wonCount > 1 ? 's' : ''} · {source.leadCount} lead{source.leadCount > 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              {source.reward_note && (
+                                <p className="mt-1.5 text-[11px] italic truncate" style={{ color: `${color}aa` }}>{source.reward_note}</p>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">

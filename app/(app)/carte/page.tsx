@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { MapPin, Plus, Search, Navigation, Share2, Copy, Check, Eye, EyeOff, Pencil, ExternalLink } from 'lucide-react';
+import { MapPin, Plus, Search, Navigation, Share2, Copy, Check, Eye, EyeOff, Pencil, ExternalLink, Send, Loader2, Mail } from 'lucide-react';
+import { ClientPicker, type Client } from '@/components/shared/client-picker';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { PROJECT_STATUSES } from '@/lib/constants';
@@ -45,7 +46,7 @@ const STATUS_PIN_COLORS: Record<string, string> = {
 };
 
 export default function CartePage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -55,6 +56,11 @@ export default function CartePage() {
   const [showDetails, setShowDetails] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shareClientId, setShareClientId] = useState<string | null>(null);
+  const [shareClient, setShareClient] = useState<Client | null>(null);
+  const [shareEmailOverride, setShareEmailOverride] = useState('');
+  const [shareSending, setShareSending] = useState(false);
+  const [shareSent, setShareSent] = useState(false);
   const [addressQuery, setAddressQuery] = useState('');
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -119,13 +125,57 @@ export default function CartePage() {
   }
 
   function getShareLink() {
-    return `${window.location.origin}/carte/publique`;
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
+    return `${baseUrl}/carte/publique`;
   }
 
   async function copyShareLink() {
     await navigator.clipboard.writeText(getShareLink());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function sendShareEmail() {
+    const email = shareClient?.email || shareEmailOverride;
+    if (!email || !profile) return;
+    setShareSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const link = getShareLink();
+      const companyName = profile.company_name || 'notre entreprise';
+      const clientName = shareClient?.name || '';
+      const greeting = clientName ? `Bonjour ${clientName},` : 'Bonjour,';
+      await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email,
+          subject: `Decouvrez nos chantiers - ${companyName}`,
+          body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <h2 style="color:#D35400;">Nos realisations</h2>
+            <p>${greeting}</p>
+            <p>${companyName} vous partage la carte interactive de ses chantiers et realisations.</p>
+            <p style="margin:24px 0;">
+              <a href="${link}" style="background:#D35400;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
+                Voir la carte des chantiers
+              </a>
+            </p>
+            <p style="color:#666;font-size:14px;">Vous pouvez consulter la localisation, l'avancement et les details de nos projets.</p>
+            <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+            <p style="color:#999;font-size:12px;">Envoye depuis <a href="https://hellobat.app" style="color:#D35400;">Hellobat</a></p>
+          </div>`,
+        }),
+      });
+      setShareSent(true);
+      setTimeout(() => {
+        setShareSent(false);
+        setShareClientId(null);
+        setShareClient(null);
+        setShareEmailOverride('');
+      }, 3000);
+    } catch { /* silent */ }
+    setShareSending(false);
   }
 
   function handleAddressSelect(result: AddressResult) {
@@ -350,6 +400,50 @@ export default function CartePage() {
               <Button size="sm" onClick={copyShareLink} className="gap-2 shrink-0">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copie !' : 'Copier'}
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Contact</label>
+                <ClientPicker
+                  value={shareClientId}
+                  onChange={(id, client) => {
+                    setShareClientId(id);
+                    setShareClient(client);
+                    setShareEmailOverride(client?.email || '');
+                    setShareSent(false);
+                  }}
+                />
+              </div>
+              {shareClient && !shareClient.email && (
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5" />
+                    Email de {shareClient.name}
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="email@client.com"
+                    value={shareEmailOverride}
+                    onChange={e => { setShareEmailOverride(e.target.value); setShareSent(false); }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Ce contact n&apos;a pas d&apos;email. Saisissez-le et il sera enregistre.</p>
+                </div>
+              )}
+              <Button
+                onClick={async () => {
+                  // If client has no email and user typed one, save it to the contact
+                  if (shareClient && !shareClient.email && shareEmailOverride) {
+                    await supabase.from('clients').update({ email: shareEmailOverride }).eq('id', shareClient.id);
+                  }
+                  sendShareEmail();
+                }}
+                disabled={shareSending || !(shareClient?.email || shareEmailOverride) || shareSent}
+                className="w-full gap-2"
+              >
+                {shareSending ? <Loader2 className="h-4 w-4 animate-spin" /> : shareSent ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                {shareSent ? 'Envoye !' : `Envoyer${shareClient ? ` a ${shareClient.name}` : ''}`}
               </Button>
             </div>
 

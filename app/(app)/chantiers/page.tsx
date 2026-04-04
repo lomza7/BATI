@@ -126,6 +126,8 @@ interface Project {
   clients: { name: string } | null;
   project_photos: ProjectPhoto[];
   trackedHours: number;
+  plannedHours: number;
+  plannedDays: number;
 }
 
 interface PendingPhoto {
@@ -252,13 +254,14 @@ export default function ChantiersPage() {
   async function loadProjects() {
     setLoading(true);
 
-    const [{ data: projectRows, error: projectsError }, { data: assignmentsRows, error: assignmentsError }] =
+    const [{ data: projectRows, error: projectsError }, { data: assignmentsRows, error: assignmentsError }, { data: planningRows }] =
       await Promise.all([
         supabase
           .from('projects')
           .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name), project_photos(id, url, caption, category, created_at)')
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
+        supabase.from('planning_events').select('project_id, start_date, end_date, half_day').eq('event_type', 'chantier').not('project_id', 'is', null),
       ]);
 
     if (projectsError) {
@@ -280,13 +283,35 @@ export default function ChantiersPage() {
       hoursByProject.set(projectId, (hoursByProject.get(projectId) || 0) + hours);
     });
 
-    const mappedProjects = ((projectRows as unknown as Project[]) || []).map((project) => ({
-      ...project,
-      notes: project.notes || '',
-      completed_phases: Array.isArray(project.completed_phases) ? project.completed_phases : [],
-      project_photos: [...(project.project_photos || [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
-      trackedHours: Math.round((hoursByProject.get(project.id) || 0) * 10) / 10,
-    }));
+    // Calculate planned hours from planning_events
+    const plannedByProject = new Map<string, { hours: number; days: Set<string> }>();
+    (planningRows || []).forEach((pe: { project_id: string; start_date: string; end_date: string; half_day: string | null }) => {
+      if (!pe.project_id) return;
+      if (!plannedByProject.has(pe.project_id)) plannedByProject.set(pe.project_id, { hours: 0, days: new Set() });
+      const entry = plannedByProject.get(pe.project_id)!;
+      const hPerDay = (pe.half_day === 'am' || pe.half_day === 'pm') ? 4 : 8;
+      let d = new Date(pe.start_date);
+      const end = new Date(pe.end_date);
+      while (d <= end) {
+        const ds = d.toISOString().split('T')[0];
+        entry.days.add(ds);
+        entry.hours += hPerDay;
+        d.setDate(d.getDate() + 1);
+      }
+    });
+
+    const mappedProjects = ((projectRows as unknown as Project[]) || []).map((project) => {
+      const planned = plannedByProject.get(project.id);
+      return {
+        ...project,
+        notes: project.notes || '',
+        completed_phases: Array.isArray(project.completed_phases) ? project.completed_phases : [],
+        project_photos: [...(project.project_photos || [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+        trackedHours: Math.round((hoursByProject.get(project.id) || 0) * 10) / 10,
+        plannedHours: planned ? Math.round(planned.hours * 10) / 10 : 0,
+        plannedDays: planned ? planned.days.size : 0,
+      };
+    });
 
     setProjects(mappedProjects);
     setLoading(false);
@@ -353,7 +378,7 @@ export default function ChantiersPage() {
     setProjectAssignments([]);
     setShowDetails(true);
 
-    const [{ data: quotes }, { data: assignmentRows }] = await Promise.all([
+    const [{ data: quotes }, { data: assignmentRows }, { data: planningRows }] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
@@ -364,6 +389,11 @@ export default function ChantiersPage() {
         .select('team_member_id, date, hours, team_members(name, type, specialty, hourly_rate)')
         .eq('project_id', project.id)
         .order('date', { ascending: true }),
+      supabase
+        .from('planning_events')
+        .select('team_member_id, start_date, end_date, half_day, team_members(name, type, specialty, hourly_rate)')
+        .eq('project_id', project.id)
+        .eq('event_type', 'chantier'),
     ]);
 
     const loadedQuotes = (quotes as ProjectQuote[]) || [];
@@ -379,7 +409,7 @@ export default function ChantiersPage() {
       setProjectInvoices((invoices as ProjectInvoice[]) || []);
     }
 
-    // Agréger les affectations par membre
+    // Agréger les affectations par membre (team_assignments = heures pointees)
     const memberMap = new Map<string, ProjectAssignment>();
     ((assignmentRows as any[]) || []).forEach(row => {
       const memberId = row.team_member_id as string;
@@ -404,6 +434,42 @@ export default function ChantiersPage() {
       entry.total_cost += hours * entry.hourly_rate;
       if (date && !entry.dates.includes(date)) entry.dates.push(date);
     });
+
+    // Fusionner les planning_events (heures planifiees) dans le meme memberMap
+    ((planningRows as any[]) || []).forEach(pe => {
+      if (!pe.team_member_id) return;
+      const memberId = pe.team_member_id as string;
+      const member = pe.team_members as { name: string; type: string; specialty: string; hourly_rate: number } | null;
+      const hPerDay = (pe.half_day === 'am' || pe.half_day === 'pm') ? 4 : 8;
+
+      if (!memberMap.has(memberId)) {
+        memberMap.set(memberId, {
+          member_id: memberId,
+          member_name: member?.name || 'Inconnu',
+          member_type: member?.type || 'salarie',
+          specialty: member?.specialty || '',
+          hourly_rate: Number(member?.hourly_rate || 0),
+          total_hours: 0,
+          total_cost: 0,
+          dates: [],
+        });
+      }
+      const entry = memberMap.get(memberId)!;
+      // Iterate each day in the planning event range
+      let d = new Date(pe.start_date);
+      const end = new Date(pe.end_date);
+      while (d <= end) {
+        const ds = d.toISOString().split('T')[0];
+        // Only add if not already tracked via team_assignments
+        if (!entry.dates.includes(ds)) {
+          entry.total_hours += hPerDay;
+          entry.total_cost += hPerDay * entry.hourly_rate;
+          entry.dates.push(ds);
+        }
+        d.setDate(d.getDate() + 1);
+      }
+    });
+
     setProjectAssignments(Array.from(memberMap.values()).sort((a, b) => b.total_hours - a.total_hours));
   }
 
@@ -936,7 +1002,7 @@ export default function ChantiersPage() {
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                       <Clock3 className="h-3.5 w-3.5" />
-                      {formatTrackedHours(project.trackedHours)}
+                      {project.plannedDays > 0 ? `${project.plannedDays} j` : formatTrackedHours(project.trackedHours)}
                     </span>
                   </div>
 
@@ -1024,7 +1090,7 @@ export default function ChantiersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-foreground">{project.budget > 0 ? formatCurrency(project.budget) : '—'}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{formatTrackedHours(project.trackedHours)}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{project.plannedDays > 0 ? `${project.plannedDays} j (${formatTrackedHours(project.plannedHours)})` : formatTrackedHours(project.trackedHours)}</td>
                   </tr>
                 );
               })}
@@ -1063,7 +1129,7 @@ export default function ChantiersPage() {
                         <span className="text-[10px] font-medium text-foreground">{project.progress}%</span>
                       </div>
                       {project.budget > 0 && <span className="text-[10px] font-medium text-foreground">{formatCurrency(project.budget)}</span>}
-                      <span className="text-[10px] text-muted-foreground">{formatTrackedHours(project.trackedHours)}</span>
+                      <span className="text-[10px] text-muted-foreground">{project.plannedDays > 0 ? `${project.plannedDays} j` : formatTrackedHours(project.trackedHours)}</span>
                     </div>
                   </div>
                 </div>
@@ -1175,9 +1241,11 @@ export default function ChantiersPage() {
                 </div>
 
                 <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                  <p className="text-sm font-medium text-foreground">Temps equipe deja saisi</p>
+                  <p className="text-sm font-medium text-foreground">Main-d&apos;oeuvre</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
-                    {selectedProject ? formatTrackedHours(selectedProject.trackedHours) : '0 h'}
+                    {selectedProject && selectedProject.plannedDays > 0
+                      ? `${selectedProject.plannedDays} j (${formatTrackedHours(selectedProject.plannedHours)})`
+                      : selectedProject ? formatTrackedHours(selectedProject.trackedHours) : '0 h'}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Base sur les heures renseignees par membre sur ce chantier.
@@ -1574,19 +1642,33 @@ export default function ChantiersPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        Temps chantier
+                        Jours travailles
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatDurationLabel(activeProject.start_date, activeProject.end_date)}
+                        {activeProject.plannedDays > 0 ? (
+                          <>{activeProject.plannedDays} jour{activeProject.plannedDays > 1 ? 's' : ''}</>
+                        ) : 'Non planifie'}
                       </p>
+                      {activeProject.start_date && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          du {formatDate(activeProject.start_date)} au {activeProject.end_date ? formatDate(activeProject.end_date) : "aujourd'hui"}
+                        </p>
+                      )}
                     </div>
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        Temps equipe
+                        Heures main-d&apos;oeuvre
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatTrackedHours(activeProject.trackedHours)}
+                        {activeProject.plannedHours > 0 ? (
+                          formatTrackedHours(activeProject.plannedHours)
+                        ) : activeProject.trackedHours > 0 ? formatTrackedHours(activeProject.trackedHours) : '0 h'}
                       </p>
+                      {activeProject.plannedDays > 0 && projectAssignments.length > 0 && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {projectAssignments.length} intervenant{projectAssignments.length > 1 ? 's' : ''}
+                        </p>
+                      )}
                     </div>
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -1810,7 +1892,7 @@ export default function ChantiersPage() {
                         )}
                       </div>
                       {projectAssignments.length === 0 ? (
-                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation d&apos;équipe sur ce chantier.</p>
+                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation. Planifiez ce chantier dans le Planning pour voir la main-d&apos;oeuvre ici.</p>
                       ) : (
                         <>
                           {/* Mobile : cartes */}

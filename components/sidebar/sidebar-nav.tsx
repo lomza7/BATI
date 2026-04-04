@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ const navGroups: NavGroup[] = [
     title: 'Principal',
     items: [
       { label: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Calendrier', href: '/calendrier', icon: CalendarCheck },
       { label: 'Mes taches', href: '/taches', icon: CheckSquare },
       { label: 'Contacts', href: '/clients', icon: Contact },
       { label: 'Devis', href: '/devis', icon: FileText },

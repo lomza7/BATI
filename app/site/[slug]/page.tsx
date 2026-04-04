@@ -62,7 +62,7 @@ async function getSiteData(slug: string) {
       .limit(20),
     sb
       .from('reviews')
-      .select('id, author_name, rating, comment, created_at')
+      .select('id, client_name, rating, comment, created_at')
       .eq('user_id', typedSite.user_id)
       .order('created_at', { ascending: false })
       .limit(12),
@@ -77,7 +77,13 @@ async function getSiteData(slug: string) {
     site: typedSite,
     profile: profileRes.data as SiteProfile | null,
     projects: (projectsRes.data || []) as (SiteProject & { lat?: number; lng?: number })[],
-    reviews: (reviewsRes.data || []) as SiteReview[],
+    reviews: (reviewsRes.data || []).map((r: { id: string; client_name: string; rating: number; comment: string | null; created_at: string }) => ({
+      id: r.id,
+      author_name: r.client_name,
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at,
+    })) as SiteReview[],
     services: (servicesRes.data || []) as SiteService[],
   };
 }
