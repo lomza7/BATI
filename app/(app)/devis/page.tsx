@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
+import { ServicePicker } from '@/components/devis/service-picker';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ClientPicker } from '@/components/shared/client-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -61,6 +63,7 @@ export default function DevisPage() {
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
+  const draftId = useRef<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -69,10 +72,12 @@ export default function DevisPage() {
   const [showAiCreate, setShowAiCreate] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [aiPresetRequest, setAiPresetRequest] = useState<{ id: number; mode: 'empty' | 'example' } | null>(null);
-  const [newQuote, setNewQuote] = useState({ title: '', clientName: '', description: '' });
+  const [newQuote, setNewQuote] = useState({ title: '', description: '' });
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [lines, setLines] = useState<QuoteLine[]>([
     { description: '', quantity: 1, unit: 'u', unit_price: 0 },
   ]);
+  const [showServicePicker, setShowServicePicker] = useState(false);
   const [sendQuote, setSendQuote] = useState<Quote | null>(null);
   const [quoteSends, setQuoteSends] = useState<Record<string, QuoteSend>>({}); // quote_id -> latest send
   const [trackingQuote, setTrackingQuote] = useState<Quote | null>(null);
@@ -89,11 +94,7 @@ export default function DevisPage() {
 
     if (paramClientId || paramProjectId) {
       if (paramProjectId) prefillProjectId.current = paramProjectId;
-      if (paramClientId) {
-        supabase.from('clients').select('name').eq('id', paramClientId).single().then(({ data }) => {
-          if (data) setNewQuote(prev => ({ ...prev, clientName: data.name }));
-        });
-      }
+      if (paramClientId) setSelectedClientId(paramClientId);
       setShowCreateOptions(true);
       router.replace('/devis', { scroll: false });
     }
@@ -143,74 +144,171 @@ export default function DevisPage() {
     setLoading(false);
   }
 
-  async function createQuote() {
-    if (!user) return;
-
-    let clientId: string | null = null;
-    if (newQuote.clientName.trim()) {
-      const { data: existingClient } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('name', newQuote.clientName.trim())
-        .maybeSingle();
-
-      if (existingClient) {
-        clientId = existingClient.id;
-      } else {
-        const { data: newClient } = await supabase
-          .from('clients')
-          .insert({ name: newQuote.clientName.trim(), user_id: user.id })
-          .select('id')
-          .single();
-        clientId = newClient?.id || null;
-      }
-    }
-
-    const validLines = lines.filter(l => l.description.trim());
-    const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
-    const totalTtc = totalHt * 1.2;
+  // Auto-save: create a brouillon draft as soon as a client is selected
+  async function autosaveDraft(clientId: string) {
+    if (!user || draftId.current) return;
 
     const now = new Date();
     const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
-
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 30);
 
-    const { data: quote } = await supabase
+    const { data } = await supabase
       .from('quotes')
       .insert({
         user_id: user.id,
         quote_number: quoteNumber,
         client_id: clientId,
         project_id: prefillProjectId.current || null,
-        title: newQuote.title,
-        description: newQuote.description,
-        total_ht: totalHt,
-        total_ttc: totalTtc,
+        title: newQuote.title || '',
+        description: newQuote.description || '',
+        status: 'brouillon',
+        total_ht: 0,
+        total_ttc: 0,
         valid_until: validUntil.toISOString().split('T')[0],
       })
       .select('id')
       .single();
 
-    if (quote && validLines.length > 0) {
-      await supabase.from('quote_lines').insert(
-        validLines.map((l, i) => ({
+    if (data) {
+      draftId.current = data.id;
+    }
+  }
+
+  function handleClientSelect(clientId: string | null) {
+    setSelectedClientId(clientId);
+    if (clientId && !draftId.current) {
+      autosaveDraft(clientId);
+    }
+  }
+
+  async function saveQuote() {
+    if (!user) return;
+
+    const validLines = lines.filter(l => l.description.trim());
+    const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
+    const totalTtc = totalHt * 1.2;
+
+    if (draftId.current) {
+      // Update existing draft
+      await supabase
+        .from('quotes')
+        .update({
+          client_id: selectedClientId,
+          project_id: prefillProjectId.current || null,
+          title: newQuote.title,
+          description: newQuote.description,
+          total_ht: totalHt,
+          total_ttc: totalTtc,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', draftId.current);
+
+      // Replace lines: delete old, insert new
+      await supabase.from('quote_lines').delete().eq('quote_id', draftId.current);
+      if (validLines.length > 0) {
+        await supabase.from('quote_lines').insert(
+          validLines.map((l, i) => ({
+            user_id: user.id,
+            quote_id: draftId.current!,
+            description: l.description,
+            quantity: l.quantity,
+            unit: l.unit,
+            unit_price: l.unit_price,
+            total: l.quantity * l.unit_price,
+            position: i,
+          }))
+        );
+      }
+
+      // Create lead if none exists yet for this quote
+      const { data: existingLead } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('quote_id', draftId.current)
+        .maybeSingle();
+
+      if (!existingLead) {
+        const now = new Date();
+        const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+        await supabase.from('leads').insert({
           user_id: user.id,
+          name: newQuote.title || `Devis ${quoteNumber}`,
+          client_id: selectedClientId || null,
+          quote_id: draftId.current,
+          stage: 'devis_envoye',
+          source: 'devis',
+          value: totalTtc,
+          notes: newQuote.description || '',
+        });
+      }
+    } else {
+      // No draft yet — create everything from scratch
+      const now = new Date();
+      const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+
+      const { data: quote } = await supabase
+        .from('quotes')
+        .insert({
+          user_id: user.id,
+          quote_number: quoteNumber,
+          client_id: selectedClientId,
+          project_id: prefillProjectId.current || null,
+          title: newQuote.title,
+          description: newQuote.description,
+          total_ht: totalHt,
+          total_ttc: totalTtc,
+          valid_until: validUntil.toISOString().split('T')[0],
+        })
+        .select('id')
+        .single();
+
+      if (quote && validLines.length > 0) {
+        await supabase.from('quote_lines').insert(
+          validLines.map((l, i) => ({
+            user_id: user.id,
+            quote_id: quote.id,
+            description: l.description,
+            quantity: l.quantity,
+            unit: l.unit,
+            unit_price: l.unit_price,
+            total: l.quantity * l.unit_price,
+            position: i,
+          }))
+        );
+      }
+
+      if (quote) {
+        await supabase.from('leads').insert({
+          user_id: user.id,
+          name: newQuote.title || `Devis ${quoteNumber}`,
+          client_id: selectedClientId || null,
           quote_id: quote.id,
-          description: l.description,
-          quantity: l.quantity,
-          unit: l.unit,
-          unit_price: l.unit_price,
-          total: l.quantity * l.unit_price,
-          position: i,
-        }))
-      );
+          stage: 'devis_envoye',
+          source: 'devis',
+          value: totalTtc,
+          notes: newQuote.description || '',
+        });
+      }
     }
 
     setShowCreate(false);
-    setNewQuote({ title: '', clientName: '', description: '' });
+    setNewQuote({ title: '', description: '' });
+    setSelectedClientId(null);
     setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+    draftId.current = null;
     prefillProjectId.current = null;
+    loadQuotes();
+  }
+
+  async function deleteQuote(id: string) {
+    // Delete associated lead first
+    await supabase.from('leads').delete().eq('quote_id', id);
+    await supabase.from('quote_lines').delete().eq('quote_id', id);
+    await supabase.from('quote_sends').delete().eq('quote_id', id);
+    await supabase.from('quotes').delete().eq('id', id);
     loadQuotes();
   }
 
@@ -279,6 +377,7 @@ export default function DevisPage() {
 
   function openManualCreate() {
     setShowCreateOptions(false);
+    draftId.current = null;
     setShowCreate(true);
   }
 
@@ -301,15 +400,24 @@ export default function DevisPage() {
     setShowAiCreate(true);
   }
 
-  function applyAiDraft(draft: AiQuoteDraft) {
+  async function applyAiDraft(draft: AiQuoteDraft) {
     setNewQuote({
       title: draft.title,
-      clientName: draft.clientName,
       description: draft.description,
     });
     setLines(draft.lines.map((line) => ({ ...line })));
     setShowAiCreate(false);
     setShowCreate(true);
+
+    // Try to match AI client name to an existing client
+    if (draft.clientName?.trim()) {
+      const { data } = await supabase
+        .from('clients')
+        .select('id')
+        .ilike('name', draft.clientName.trim())
+        .maybeSingle();
+      if (data) setSelectedClientId(data.id);
+    }
   }
 
   const linesTotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
@@ -445,6 +553,11 @@ export default function DevisPage() {
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>
                                 <X className="mr-2 h-4 w-4" /> Marquer refuse
                               </DropdownMenuItem>
+                              {q.status === 'brouillon' && (
+                                <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
@@ -490,6 +603,11 @@ export default function DevisPage() {
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>Marquer envoye</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>Marquer accepte</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refuse</DropdownMenuItem>
+                        {q.status === 'brouillon' && (
+                          <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -640,7 +758,19 @@ export default function DevisPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(open) => {
+        setShowCreate(open);
+        if (!open) {
+          // Reload list to show any auto-saved draft
+          if (draftId.current) {
+            loadQuotes();
+            draftId.current = null;
+          }
+          setNewQuote({ title: '', description: '' });
+          setSelectedClientId(null);
+          setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nouveau devis</DialogTitle>
@@ -658,11 +788,10 @@ export default function DevisPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground">Client</label>
-                <Input
+                <ClientPicker
                   className="mt-1"
-                  placeholder="Nom du client"
-                  value={newQuote.clientName}
-                  onChange={e => setNewQuote({ ...newQuote, clientName: e.target.value })}
+                  value={selectedClientId}
+                  onChange={(id) => handleClientSelect(id)}
                 />
               </div>
             </div>
@@ -678,12 +807,27 @@ export default function DevisPage() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-2">
                 <label className="text-sm font-medium text-foreground">Lignes du devis</label>
-                <Button variant="outline" size="sm" onClick={addLine} className="gap-1">
-                  <Plus className="h-3 w-3" /> Ajouter
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowServicePicker(!showServicePicker)} className="gap-1">
+                    <Package className="h-3 w-3" /> Mes prestations
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={addLine} className="gap-1">
+                    <Plus className="h-3 w-3" /> Ligne vide
+                  </Button>
+                </div>
               </div>
+              {showServicePicker && (
+                <div className="mb-4 rounded-lg border bg-muted/30 p-3">
+                  <ServicePicker
+                    onSelect={(svc) => {
+                      setLines(prev => [...prev, svc]);
+                    }}
+                    onClose={() => setShowServicePicker(false)}
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 {lines.map((line, i) => (
                   <div key={i} className="grid grid-cols-12 gap-2 items-start">
@@ -740,8 +884,8 @@ export default function DevisPage() {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button onClick={createQuote} disabled={!newQuote.title.trim()}>
-                Creer le devis
+              <Button onClick={saveQuote} disabled={!newQuote.title.trim()}>
+                {draftId.current ? 'Enregistrer le devis' : 'Creer le devis'}
               </Button>
             </div>
           </div>

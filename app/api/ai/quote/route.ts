@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const transcript = String(formData.get('transcript') || '').trim();
+    const servicesCatalog = String(formData.get('services_catalog') || '').trim();
     const photoEntries = formData.getAll('photos').filter((value): value is File => value instanceof File);
 
     if (!transcript) {
@@ -89,6 +90,14 @@ export async function POST(request: Request) {
       '- assumptions doit contenir seulement des hypotheses utiles.',
       '- lines doit contenir des lignes concretes de devis avec quantites et prix unitaires plausibles.',
       '- Si un prix est incertain, propose une estimation raisonnable pour un brouillon.',
+      ...(servicesCatalog ? [
+        '',
+        'IMPORTANT: L\'artisan a une bibliotheque de prestations avec ses propres prix et descriptions.',
+        'Utilise EN PRIORITE les prestations de ce catalogue pour les lignes du devis.',
+        'Reprends exactement les noms, descriptions, unites et prix unitaires du catalogue.',
+        'Ne modifie les prix que si la transcription mentionne explicitement un tarif different.',
+        `Catalogue de prestations de l'artisan: ${servicesCatalog}`,
+      ] : []),
       '',
       `Transcription: ${transcript}`,
       `Nombre de photos: ${photoEntries.length}`,
@@ -103,7 +112,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-        max_tokens: 1400,
+        max_tokens: 2000,
         temperature: 0.2,
         messages: [
           {

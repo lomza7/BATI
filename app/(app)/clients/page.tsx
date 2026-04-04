@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, Search, User, Phone, Mail, MapPin, Pencil, Trash2,
   FileText, HardHat, Receipt, StickyNote, ChevronDown, X,
-  ListTodo, CircleCheck as CheckCircle2, Circle,
+  ListTodo, CircleCheck as CheckCircle2, Circle, ArrowUpRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate, CONTACT_TYPES } from '@/lib/constants';
+import { DEFAULT_LEAD_SOURCES } from '@/lib/lead-sources';
 import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -41,6 +42,7 @@ interface Client {
   postal_code: string;
   notes: string;
   contact_type: ContactType;
+  source: string;
   created_at: string;
 }
 
@@ -48,7 +50,7 @@ interface ClientQuote { id: string; quote_number: string; title: string; status:
 interface ClientInvoice { id: string; invoice_number: string; title: string; status: string; total_ttc: number; created_at: string; }
 interface ClientProject { id: string; name: string; status: string; city: string; progress: number; }
 
-const emptyForm = { name: '', email: '', phone: '', address: '', city: '', postal_code: '', notes: '', contact_type: 'client' as ContactType };
+const emptyForm = { name: '', email: '', phone: '', address: '', city: '', postal_code: '', notes: '', contact_type: 'client' as ContactType, source: '' };
 
 export default function ClientsPage() {
   const { user } = useAuth();
@@ -126,7 +128,7 @@ export default function ClientsPage() {
   }
 
   function openEdit(c: Client) {
-    setForm({ name: c.name, email: c.email, phone: c.phone, address: c.address, city: c.city, postal_code: c.postal_code, notes: c.notes, contact_type: c.contact_type || 'client' });
+    setForm({ name: c.name, email: c.email, phone: c.phone, address: c.address, city: c.city, postal_code: c.postal_code, notes: c.notes, contact_type: c.contact_type || 'client', source: c.source || '' });
     setEditingId(c.id);
     setShowForm(true);
   }
@@ -299,6 +301,12 @@ export default function ClientsPage() {
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {[selected.address, selected.postal_code, selected.city].filter(Boolean).join(', ')}
+                          </span>
+                        )}
+                        {selected.source && (
+                          <span className="flex items-center gap-1">
+                            <ArrowUpRight className="h-3 w-3" />
+                            {DEFAULT_LEAD_SOURCES.find(s => s.slug === selected.source)?.name || selected.source}
                           </span>
                         )}
                       </div>
@@ -495,6 +503,20 @@ export default function ClientsPage() {
                   <SelectContent>
                     {(Object.entries(CONTACT_TYPES) as [ContactType, typeof CONTACT_TYPES[ContactType]][]).map(([key, val]) => (
                       <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Source</label>
+                <Select value={form.source || 'none'} onValueChange={(v) => setForm({ ...form, source: v === 'none' ? '' : v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Source..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Non renseigne</SelectItem>
+                    {DEFAULT_LEAD_SOURCES.map(s => (
+                      <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

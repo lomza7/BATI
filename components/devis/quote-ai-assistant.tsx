@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Camera, CheckCircle2, Mic, Square, Wand2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -284,8 +285,19 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       setAnalysisError('');
       setAnalysis(null);
 
+      // Load user's service catalog for AI context
+      const { data: userServices } = await supabase
+        .from('services')
+        .select('name, description, unit, unit_price, category')
+        .eq('is_active', true)
+        .order('category')
+        .order('name');
+
       const formData = new FormData();
       formData.append('transcript', transcript.trim());
+      if (userServices && userServices.length > 0) {
+        formData.append('services_catalog', JSON.stringify(userServices));
+      }
       photos.forEach((photo) => {
         formData.append('photos', photo.file);
       });

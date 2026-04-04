@@ -1,11 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, User, Phone, Mail, MapPin, Check } from 'lucide-react';
+import { Search, Plus, User, Phone, Mail, MapPin, Check, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { CONTACT_TYPES } from '@/lib/constants';
+import { DEFAULT_LEAD_SOURCES } from '@/lib/lead-sources';
+import { AddressAutocomplete, type AddressResult } from '@/components/shared/address-autocomplete';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 export interface Client {
@@ -17,6 +27,8 @@ export interface Client {
   city: string;
   postal_code: string;
   notes: string;
+  source?: string;
+  contact_type?: string;
 }
 
 interface ClientPickerProps {
@@ -25,13 +37,26 @@ interface ClientPickerProps {
   className?: string;
 }
 
+const emptyForm = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  city: '',
+  postal_code: '',
+  contact_type: 'client',
+  source: '',
+  notes: '',
+};
+
 export function ClientPicker({ value, onChange, className }: ClientPickerProps) {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', email: '', phone: '', address: '', city: '', postal_code: '' });
+  const [createForm, setCreateForm] = useState(emptyForm);
+  const [addressQuery, setAddressQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selected = clients.find(c => c.id === value);
@@ -61,12 +86,14 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
     const { data } = await supabase.from('clients').insert({
       user_id: user.id,
       name: createForm.name.trim(),
-      contact_type: 'client',
+      contact_type: createForm.contact_type,
       email: createForm.email,
       phone: createForm.phone,
       address: createForm.address,
       city: createForm.city,
       postal_code: createForm.postal_code,
+      source: createForm.source,
+      notes: createForm.notes,
     }).select().single();
     if (data) {
       await loadClients();
@@ -74,8 +101,19 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
       setSearch('');
       setShowCreate(false);
       setOpen(false);
-      setCreateForm({ name: '', email: '', phone: '', address: '', city: '', postal_code: '' });
+      setCreateForm(emptyForm);
+      setAddressQuery('');
     }
+  }
+
+  function handleAddressSelect(result: AddressResult) {
+    setCreateForm(prev => ({
+      ...prev,
+      address: result.label,
+      city: result.city || '',
+      postal_code: result.postcode || '',
+    }));
+    setAddressQuery(result.label);
   }
 
   const filtered = search
@@ -128,21 +166,112 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
       {open && !selected && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
           {showCreate ? (
-            <div className="p-3 space-y-3">
-              <p className="text-sm font-medium">Nouveau client</p>
-              <Input placeholder="Nom *" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Telephone" value={createForm.phone} onChange={e => setCreateForm({ ...createForm, phone: e.target.value })} />
-                <Input placeholder="Email" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
+            <div className="p-4 space-y-3 max-h-[420px] overflow-y-auto">
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  onClick={() => setShowCreate(false)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <p className="text-sm font-semibold">Nouveau client</p>
               </div>
-              <Input placeholder="Adresse" value={createForm.address} onChange={e => setCreateForm({ ...createForm, address: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Code postal" value={createForm.postal_code} onChange={e => setCreateForm({ ...createForm, postal_code: e.target.value })} />
-                <Input placeholder="Ville" value={createForm.city} onChange={e => setCreateForm({ ...createForm, city: e.target.value })} />
+
+              {/* Nom */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Nom *</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Nom complet"
+                  value={createForm.name}
+                  onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
+                />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Retour</Button>
-                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim()}>Creer</Button>
+
+              {/* Type de contact + Source */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Type</label>
+                  <Select value={createForm.contact_type} onValueChange={v => setCreateForm({ ...createForm, contact_type: v })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CONTACT_TYPES).map(([key, val]) => (
+                        <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Source</label>
+                  <Select value={createForm.source || 'none'} onValueChange={v => setCreateForm({ ...createForm, source: v === 'none' ? '' : v })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Source..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Non renseigne</SelectItem>
+                      {DEFAULT_LEAD_SOURCES.map(s => (
+                        <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Telephone + Email */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Telephone</label>
+                  <Input className="mt-1" placeholder="06 12 34 56 78" value={createForm.phone} onChange={e => setCreateForm({ ...createForm, phone: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <Input className="mt-1" placeholder="email@example.com" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Adresse avec autocompletion */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Adresse</label>
+                <AddressAutocomplete
+                  className="mt-1"
+                  value={addressQuery}
+                  onChange={setAddressQuery}
+                  onSelect={handleAddressSelect}
+                  placeholder="Tapez une adresse..."
+                />
+              </div>
+
+              {/* CP + Ville (pre-remplis par l'autocompletion) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Code postal</label>
+                  <Input className="mt-1" placeholder="75000" value={createForm.postal_code} onChange={e => setCreateForm({ ...createForm, postal_code: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Ville</label>
+                  <Input className="mt-1" placeholder="Paris" value={createForm.city} onChange={e => setCreateForm({ ...createForm, city: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Notes</label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                  rows={2}
+                  placeholder="Informations complementaires..."
+                  value={createForm.notes}
+                  onChange={e => setCreateForm({ ...createForm, notes: e.target.value })}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Annuler</Button>
+                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim()}>Creer le client</Button>
               </div>
             </div>
           ) : (
@@ -180,7 +309,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
-                  onClick={() => { setShowCreate(true); setCreateForm({ ...createForm, name: search }); }}
+                  onClick={() => { setShowCreate(true); setCreateForm({ ...emptyForm, name: search }); }}
                 >
                   <Plus className="h-4 w-4" /> Creer un nouveau client{search ? ` "${search}"` : ''}
                 </button>

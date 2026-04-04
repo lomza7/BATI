@@ -70,6 +70,18 @@ interface ArtisanProfile {
   company_postal_code: string | null;
   company_city: string | null;
   company_phone: string | null;
+  logo_url: string | null;
+  document_config: {
+    primary_color?: string;
+    secondary_color?: string;
+    font?: string;
+    show_logo?: boolean;
+    header_style?: string;
+    show_watermark?: boolean;
+    footer_text?: string;
+    mentions_legales?: string;
+    template?: string;
+  } | null;
 }
 
 function formatCurrency(amount: number): string {
@@ -189,7 +201,7 @@ export default function PublicQuotePage() {
     if (sendFull?.user_id) {
       const { data: profile } = await anonClient
         .from('profiles')
-        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone')
+        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
         .eq('id', sendFull.user_id)
         .maybeSingle();
 
@@ -278,16 +290,34 @@ export default function PublicQuotePage() {
   const tvaRate = quote.tva_rate || 20;
   const tvaAmount = quote.total_ht * (tvaRate / 100);
 
+  // Document template config from artisan profile
+  const dc = artisan?.document_config || {};
+  const accent = dc.primary_color || '#d35400';
+  const textColor = dc.secondary_color || '#1a1a1a';
+  const logoUrl = artisan?.logo_url || '';
+  const showLogo = dc.show_logo !== false;
+  const headerStyle = dc.header_style || 'standard';
+  const showWatermark = dc.show_watermark || false;
+  const footerText = dc.footer_text || '';
+  const mentionsLegales = dc.mentions_legales || '';
+  const companyName = artisan?.company_name || artisan?.full_name || 'Artisan';
+
+  const fontClass = dc.font === 'serif' ? 'font-serif' : 'font-sans';
+
   return (
-    <div className="min-h-screen bg-[#faf9f7]">
+    <div className={`min-h-screen bg-[#faf9f7] ${fontClass}`}>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#e5e1da]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-[#d35400] flex items-center justify-center">
-              <Hexagon className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-sm font-semibold text-[#1a1a1a]">Hellobat</span>
+            {showLogo && logoUrl ? (
+              <img src={logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
+            ) : (
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
+                <Hexagon className="h-4 w-4 text-white" />
+              </div>
+            )}
+            <span className="text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
           </div>
           {sendData && (
             <div className="flex items-center gap-2 text-xs text-[#6b6560]">
@@ -316,47 +346,104 @@ export default function PublicQuotePage() {
 
         {/* Document card */}
         <div className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
-          {/* Document header */}
-          <div className="p-5 sm:p-8 border-b border-[#e5e1da]">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
-              {/* Artisan info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-[#d35400]/10 flex items-center justify-center flex-shrink-0">
-                    <Building2 className="h-5 w-5 text-[#d35400]" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold text-[#1a1a1a] truncate">
-                      {artisan?.company_name || artisan?.full_name || 'Artisan'}
-                    </p>
-                    {artisan?.siret && (
-                      <p className="text-xs text-[#6b6560]">SIRET : {artisan.siret}</p>
-                    )}
+          {/* Document header — Banner style */}
+          {headerStyle === 'banner' ? (
+            <div className="p-5 sm:p-8" style={{ backgroundColor: accent }}>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  {showLogo && logoUrl ? (
+                    <img src={logoUrl} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+                      <Building2 className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-base font-semibold text-white">{companyName}</p>
+                    {artisan?.siret && <p className="text-xs text-white/70">SIRET : {artisan.siret}</p>}
                   </div>
                 </div>
-                <div className="text-xs text-[#6b6560] space-y-0.5 pl-[52px]">
-                  {artisan?.company_address && <p>{artisan.company_address}</p>}
-                  {(artisan?.company_postal_code || artisan?.company_city) && (
-                    <p>{[artisan.company_postal_code, artisan.company_city].filter(Boolean).join(' ')}</p>
-                  )}
-                  {artisan?.company_phone && <p>Tel : {artisan.company_phone}</p>}
-                  {artisan?.tva_number && <p>TVA : {artisan.tva_number}</p>}
-                </div>
-              </div>
-
-              {/* Quote meta */}
-              <div className="sm:text-right flex-shrink-0">
-                <p className="text-2xl sm:text-3xl font-bold text-[#d35400]">DEVIS</p>
-                <p className="text-sm font-medium text-[#1a1a1a] mt-1">{quote.quote_number}</p>
-                <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
-                  <p>Date : {formatDate(quote.created_at)}</p>
-                  {quote.valid_until && (
-                    <p>Valable jusqu&apos;au : {formatDate(quote.valid_until)}</p>
-                  )}
+                <div className="sm:text-right">
+                  <p className="text-2xl sm:text-3xl font-bold text-white">DEVIS</p>
+                  <p className="text-sm font-medium text-white/80 mt-1">{quote.quote_number}</p>
+                  <p className="text-xs text-white/60 mt-1">Date : {formatDate(quote.created_at)}</p>
                 </div>
               </div>
             </div>
-          </div>
+          ) : headerStyle === 'compact' ? (
+            /* Compact header */
+            <div className="px-5 sm:px-8 py-3 border-b border-[#e5e1da] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex items-center gap-3">
+                {showLogo && logoUrl ? (
+                  <img src={logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                ) : null}
+                <span className="text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
+                {artisan?.siret && <span className="text-xs text-[#6b6560]">SIRET {artisan.siret}</span>}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-bold" style={{ color: accent }}>DEVIS</span>
+                <span className="text-sm font-medium" style={{ color: textColor }}>{quote.quote_number}</span>
+                <span className="text-xs text-[#6b6560]">{formatDate(quote.created_at)}</span>
+              </div>
+            </div>
+          ) : (
+            /* Standard header */
+            <div className="p-5 sm:p-8 border-b border-[#e5e1da]">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    {showLogo && logoUrl ? (
+                      <img src={logoUrl} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                    ) : (
+                      <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: accent + '15' }}>
+                        <Building2 className="h-5 w-5" style={{ color: accent }} />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold truncate" style={{ color: textColor }}>
+                        {companyName}
+                      </p>
+                      {artisan?.siret && (
+                        <p className="text-xs text-[#6b6560]">SIRET : {artisan.siret}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-[#6b6560] space-y-0.5 pl-[52px]">
+                    {artisan?.company_address && <p>{artisan.company_address}</p>}
+                    {(artisan?.company_postal_code || artisan?.company_city) && (
+                      <p>{[artisan.company_postal_code, artisan.company_city].filter(Boolean).join(' ')}</p>
+                    )}
+                    {artisan?.company_phone && <p>Tel : {artisan.company_phone}</p>}
+                    {artisan?.tva_number && <p>TVA : {artisan.tva_number}</p>}
+                  </div>
+                </div>
+                <div className="sm:text-right flex-shrink-0">
+                  <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>DEVIS</p>
+                  <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{quote.quote_number}</p>
+                  <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
+                    <p>Date : {formatDate(quote.created_at)}</p>
+                    {quote.valid_until && (
+                      <p>Valable jusqu&apos;au : {formatDate(quote.valid_until)}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Accent line for banner/compact */}
+          {(headerStyle === 'compact') && (
+            <div className="h-0.5" style={{ backgroundColor: accent }} />
+          )}
+
+          {/* Artisan details (for banner/compact where they're not in the header) */}
+          {headerStyle !== 'standard' && (artisan?.company_address || artisan?.company_phone || artisan?.tva_number) && (
+            <div className="px-5 sm:px-8 py-3 border-b border-[#e5e1da] text-xs text-[#6b6560] flex flex-wrap gap-x-4 gap-y-0.5">
+              {artisan?.company_address && <span>{artisan.company_address}, {artisan?.company_postal_code} {artisan?.company_city}</span>}
+              {artisan?.company_phone && <span>Tel : {artisan.company_phone}</span>}
+              {artisan?.tva_number && <span>TVA : {artisan.tva_number}</span>}
+            </div>
+          )}
 
           {/* Client info */}
           {quote.clients && (
@@ -365,7 +452,7 @@ export default function PublicQuotePage() {
                 <User className="h-4 w-4 text-[#6b6560]" />
                 <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Client</p>
               </div>
-              <p className="text-sm font-medium text-[#1a1a1a]">{quote.clients.name}</p>
+              <p className="text-sm font-medium" style={{ color: textColor }}>{quote.clients.name}</p>
               <div className="text-xs text-[#6b6560] mt-1 space-y-0.5">
                 {quote.clients.email && <p>{quote.clients.email}</p>}
                 {quote.clients.phone && <p>{quote.clients.phone}</p>}
@@ -379,7 +466,7 @@ export default function PublicQuotePage() {
 
           {/* Quote title & description */}
           <div className="px-5 sm:px-8 py-5 border-b border-[#e5e1da]">
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">{quote.title}</h2>
+            <h2 className="text-lg font-semibold" style={{ color: textColor }}>{quote.title}</h2>
             {quote.description && (
               <p className="text-sm text-[#6b6560] mt-1 leading-relaxed">{quote.description}</p>
             )}
@@ -389,22 +476,22 @@ export default function PublicQuotePage() {
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-[#faf9f7] border-b border-[#e5e1da]">
-                  <th className="px-8 py-3 text-left text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Description</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Qte</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Unite</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Prix unit. HT</th>
-                  <th className="px-8 py-3 text-right text-xs font-semibold text-[#6b6560] uppercase tracking-wider">Total HT</th>
+                <tr className="border-b border-[#e5e1da]" style={{ backgroundColor: accent + '08' }}>
+                  <th className="px-8 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Description</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qte</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unite</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Prix unit. HT</th>
+                  <th className="px-8 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e1da]">
                 {lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-8 py-3.5 text-sm text-[#1a1a1a]">{line.description}</td>
-                    <td className="px-4 py-3.5 text-sm text-[#1a1a1a] text-center">{line.quantity}</td>
+                    <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>{line.description}</td>
+                    <td className="px-4 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
                     <td className="px-4 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
-                    <td className="px-4 py-3.5 text-sm text-[#1a1a1a] text-right">{formatCurrency(line.unit_price)}</td>
-                    <td className="px-8 py-3.5 text-sm font-medium text-[#1a1a1a] text-right">{formatCurrency(line.total)}</td>
+                    <td className="px-4 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                    <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -415,12 +502,12 @@ export default function PublicQuotePage() {
           <div className="sm:hidden divide-y divide-[#e5e1da]">
             {lines.map((line) => (
               <div key={line.id} className="px-5 py-4">
-                <p className="text-sm font-medium text-[#1a1a1a]">{line.description}</p>
+                <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-[#6b6560]">
                     {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)}
                   </span>
-                  <span className="text-sm font-semibold text-[#1a1a1a]">{formatCurrency(line.total)}</span>
+                  <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.total)}</span>
                 </div>
               </div>
             ))}
@@ -431,15 +518,15 @@ export default function PublicQuotePage() {
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center justify-between w-full sm:w-64">
                 <span className="text-sm text-[#6b6560]">Total HT</span>
-                <span className="text-sm font-medium text-[#1a1a1a]">{formatCurrency(quote.total_ht)}</span>
+                <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(quote.total_ht)}</span>
               </div>
               <div className="flex items-center justify-between w-full sm:w-64">
                 <span className="text-sm text-[#6b6560]">TVA ({tvaRate}%)</span>
-                <span className="text-sm font-medium text-[#1a1a1a]">{formatCurrency(tvaAmount)}</span>
+                <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(tvaAmount)}</span>
               </div>
               <div className="flex items-center justify-between w-full sm:w-64 pt-2 border-t border-[#e5e1da] mt-1">
-                <span className="text-base font-semibold text-[#1a1a1a]">Total TTC</span>
-                <span className="text-xl font-bold text-[#d35400]">{formatCurrency(quote.total_ttc)}</span>
+                <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
+                <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(quote.total_ttc)}</span>
               </div>
             </div>
           </div>
@@ -479,7 +566,7 @@ export default function PublicQuotePage() {
 
                 {signing ? (
                   <div className="flex items-center justify-center gap-3 py-10">
-                    <div className="w-8 h-8 bg-[#d35400] rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: accent }}>
                       <Hexagon className="h-4 w-4 text-white animate-nut-ratchet" />
                     </div>
                     <p className="text-sm text-[#6b6560]">Signature en cours...</p>
@@ -496,13 +583,20 @@ export default function PublicQuotePage() {
             <div className="flex items-start gap-2">
               <Shield className="h-3.5 w-3.5 text-[#6b6560]/50 mt-0.5 flex-shrink-0" />
               <p className="text-[11px] text-[#6b6560]/60 leading-relaxed">
-                {quote.valid_until
-                  ? `Devis valable jusqu'au ${formatDate(quote.valid_until)}. `
-                  : ''}
-                Signature electronique realisee au sens du reglement europeen eIDAS (signature electronique simple).
-                Ce document a valeur contractuelle entre les parties.
+                {mentionsLegales || (
+                  <>
+                    {quote.valid_until
+                      ? `Devis valable jusqu'au ${formatDate(quote.valid_until)}. `
+                      : ''}
+                    Signature electronique realisee au sens du reglement europeen eIDAS (signature electronique simple).
+                    Ce document a valeur contractuelle entre les parties.
+                  </>
+                )}
               </p>
             </div>
+            {footerText && (
+              <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>
+            )}
           </div>
         </div>
       </div>
@@ -511,12 +605,18 @@ export default function PublicQuotePage() {
       <footer className="border-t border-[#e5e1da] py-6 mt-8">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-[#d35400] flex items-center justify-center">
-              <Hexagon className="h-3 w-3 text-white" />
-            </div>
-            <span className="text-xs font-medium text-[#6b6560]">Hellobat</span>
+            {showLogo && logoUrl ? (
+              <img src={logoUrl} alt="" className="h-6 w-6 rounded object-cover" />
+            ) : (
+              <div className="h-6 w-6 rounded flex items-center justify-center" style={{ backgroundColor: accent }}>
+                <Hexagon className="h-3 w-3 text-white" />
+              </div>
+            )}
+            <span className="text-xs font-medium text-[#6b6560]">{companyName}</span>
           </div>
-          <p className="text-xs text-[#6b6560]/50">Devis professionnel</p>
+          {showWatermark && (
+            <p className="text-xs" style={{ color: accent + '60' }}>Cree avec Hellobat</p>
+          )}
         </div>
       </footer>
     </div>

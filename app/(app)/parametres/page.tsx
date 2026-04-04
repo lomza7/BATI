@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
+import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,7 +68,7 @@ import {
   type LeadStageConfig,
 } from '@/lib/lead-pipeline';
 
-type SettingsTab = 'parametres' | 'chantier' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'documents' | 'chantier' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -933,8 +934,9 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 rounded-xl bg-muted/60 p-1">
+        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-5 rounded-xl bg-muted/60 p-1">
           <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
+          <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
           <TabsTrigger value="securite" className="rounded-lg py-2.5 text-xs sm:text-sm">Securite</TabsTrigger>
@@ -1876,6 +1878,10 @@ export default function ParametresPage() {
                 ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-6">
+          <DocumentTemplateSettings />
         </TabsContent>
 
         <TabsContent value="abonnement" className="space-y-6">

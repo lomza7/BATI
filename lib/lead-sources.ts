@@ -19,7 +19,8 @@ export const DEFAULT_LEAD_SOURCES: Array<Pick<LeadSource, 'name' | 'slug' | 'sou
   { name: 'Meta Ads', slug: 'meta_ads', source_type: 'channel', position: 3 },
   { name: 'Bouche a oreille', slug: 'bouche_a_oreille', source_type: 'channel', position: 4 },
   { name: 'Partenaire', slug: 'partenaire', source_type: 'partner', position: 5 },
-  { name: 'Autre', slug: 'autre', source_type: 'channel', position: 6 },
+  { name: 'Devis', slug: 'devis', source_type: 'channel', position: 6 },
+  { name: 'Autre', slug: 'autre', source_type: 'channel', position: 7 },
 ];
 
 export function normalizeLeadSourceSlug(value: string) {
