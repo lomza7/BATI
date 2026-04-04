@@ -45,18 +45,15 @@ export function DocusealSigning({ slug, onComplete, accentColor = '#d35400' }: P
   }, [loading]);
 
   return (
-    <div ref={containerRef} className="relative" id="docuseal-signing">
+    <div ref={containerRef} className="relative" id="docuseal-signing" style={{ minHeight: '300px' }}>
       {loading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-sm text-muted-foreground">Chargement de la signature...</span>
         </div>
       )}
 
-      <div
-        className={loading ? 'opacity-0 h-0 overflow-hidden' : ''}
-        style={!loading ? { minHeight: '500px', width: '100%' } : undefined}
-      >
+      <div style={{ minHeight: '300px', width: '100%' }}>
         <DocusealForm
           src={`https://docuseal.eu/s/${slug}`}
           withTitle={false}
