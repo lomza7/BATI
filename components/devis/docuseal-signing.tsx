@@ -38,10 +38,17 @@ export function DocusealSigning({ slug, onComplete, accentColor = '#d35400' }: P
             #form_container {
               font-family: 'Inter', sans-serif;
               touch-action: manipulation;
+              padding: 0 !important;
+              margin: 0 !important;
             }
             #form_container canvas {
               touch-action: none;
               width: 100% !important;
+              min-height: 180px !important;
+            }
+            .signature-pad, [data-signature-pad] {
+              width: 100% !important;
+              min-height: 180px !important;
             }
             button[type="submit"] {
               background-color: ${accentColor} !important;
@@ -54,8 +61,8 @@ export function DocusealSigning({ slug, onComplete, accentColor = '#d35400' }: P
               opacity: 0.9 !important;
             }
             @media (max-width: 640px) {
-              #form_container {
-                padding: 0 !important;
+              #form_container canvas {
+                min-height: 160px !important;
               }
               button[type="submit"] {
                 width: 100% !important;

@@ -540,8 +540,8 @@ export default function PublicQuotePage() {
             </div>
           </div>
 
-          {/* Signature section */}
-          <div id="signature-section" className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
+          {/* Signature section — no horizontal padding on mobile for max canvas width */}
+          <div id="signature-section" className="border-t-2 border-[#e5e1da] px-2 sm:px-8 py-6">
             <div className="flex items-center gap-2 mb-4">
               <PenLine className="h-4 w-4 text-[#6b6560]" />
               <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
