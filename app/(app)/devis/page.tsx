@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2 } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
@@ -83,6 +83,8 @@ export default function DevisPage() {
   const [trackingQuote, setTrackingQuote] = useState<Quote | null>(null);
   const [trackingViews, setTrackingViews] = useState<{ viewed_at: string; user_agent: string }[]>([]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [resendingQuoteId, setResendingQuoteId] = useState<string | null>(null);
+  const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -325,6 +327,32 @@ export default function DevisPage() {
     setTimeout(() => setCopiedLink(null), 2000);
   }
 
+  async function resendEmail(quoteId: string) {
+    if (resendingQuoteId) return;
+    setResendingQuoteId(quoteId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const res = await fetch('/api/docuseal/resend-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ quote_id: quoteId }),
+      });
+
+      if (res.ok) {
+        setResentQuoteId(quoteId);
+        setTimeout(() => setResentQuoteId(null), 3000);
+      }
+    } catch {
+      // silently fail
+    }
+    setResendingQuoteId(null);
+  }
+
   async function openTracking(q: Quote) {
     setTrackingQuote(q);
     const send = quoteSends[q.id];
@@ -535,6 +563,17 @@ export default function DevisPage() {
                                 </DropdownMenuItem>
                               )}
                               {send && (
+                                <DropdownMenuItem onClick={() => resendEmail(q.id)} disabled={resendingQuoteId === q.id}>
+                                  {resentQuoteId === q.id ? (
+                                    <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoye !</>
+                                  ) : resendingQuoteId === q.id ? (
+                                    <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Envoi en cours...</>
+                                  ) : (
+                                    <><Mail className="mr-2 h-4 w-4" /> Renvoyer l&apos;email</>
+                                  )}
+                                </DropdownMenuItem>
+                              )}
+                              {send && (
                                 <DropdownMenuItem onClick={() => copyLink(send.token)}>
                                   <Copy className="mr-2 h-4 w-4" /> Copier le lien
                                 </DropdownMenuItem>
@@ -590,6 +629,17 @@ export default function DevisPage() {
                         <DropdownMenuItem onClick={() => setSendQuote(q)}>
                           <PenLine className="mr-2 h-4 w-4" /> {send ? 'Renvoyer' : 'Envoyer pour signature'}
                         </DropdownMenuItem>
+                        {send && (
+                          <DropdownMenuItem onClick={() => resendEmail(q.id)} disabled={resendingQuoteId === q.id}>
+                            {resentQuoteId === q.id ? (
+                              <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoye !</>
+                            ) : resendingQuoteId === q.id ? (
+                              <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
+                            ) : (
+                              <><Mail className="mr-2 h-4 w-4" /> Renvoyer l&apos;email</>
+                            )}
+                          </DropdownMenuItem>
+                        )}
                         {send && (
                           <DropdownMenuItem onClick={() => copyLink(send.token)}>
                             <Copy className="mr-2 h-4 w-4" /> Copier le lien
