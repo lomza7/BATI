@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package, Ruler } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +44,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Catalogues', href: '/catalogues', icon: BookOpen },
       { label: 'Prospection', href: '/prospection', icon: Users },
-      { label: 'Site web IA', href: '/site-web', icon: Globe },
     ],
   },
   {
@@ -55,15 +54,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: 'Creativite',
+    title: 'IA',
     items: [
-      { label: 'Plans & Rendus IA', href: '/plans-rendus', icon: Paintbrush },
-    ],
-  },
-  {
-    title: 'Agents IA',
-    items: [
-      { label: 'Mes Agents', href: '/agents', icon: Bot },
+      { label: 'Agents IA', href: '/agents', icon: Bot },
+      { label: 'Plans IA', href: '/plans', icon: Ruler },
+      { label: 'Rendus IA', href: '/rendus', icon: Paintbrush },
+      { label: 'Site web IA', href: '/site-web', icon: Globe },
     ],
   },
   {

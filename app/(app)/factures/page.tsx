@@ -8,11 +8,13 @@ import {
   CircleCheck as CheckCircle,
   ChevronDown,
   Clock,
+  CreditCard,
   FileCheck,
   MoveHorizontal as MoreHorizontal,
   Plus,
   Receipt,
   Search,
+  Send,
   TriangleAlert as AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -37,6 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 
 interface Invoice {
   id: string;
@@ -45,12 +48,14 @@ interface Invoice {
   title: string;
   status: keyof typeof INVOICE_STATUSES;
   total_ttc: number;
+  total_ht: number;
   due_date: string | null;
   paid_at: string | null;
   issued_at: string | null;
   is_archived: boolean;
   created_at: string;
-  clients: { name: string } | null;
+  payment_method: string;
+  clients: { name: string; email?: string | null } | null;
 }
 
 interface QuoteLine {
@@ -107,6 +112,7 @@ export default function FacturesPage() {
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
   const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0 });
   const [showArchived, setShowArchived] = useState(false);
+  const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
     loadData();
@@ -134,7 +140,7 @@ export default function FacturesPage() {
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, title, status, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, clients(name)')
+        .select('id, invoice_number, quote_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -435,6 +441,10 @@ export default function FacturesPage() {
                       <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
+                    <Send className="mr-2 h-4 w-4" /> Envoyer au client
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
@@ -477,6 +487,10 @@ export default function FacturesPage() {
                       <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
+                    <Send className="mr-2 h-4 w-4" /> Envoyer au client
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
@@ -506,6 +520,11 @@ export default function FacturesPage() {
             </Button>
           )}
           {inv.quote_id && <Badge variant="outline">Depuis devis</Badge>}
+          {inv.payment_method === 'stripe' && (
+            <Badge className="bg-violet-50 text-violet-700 hover:bg-violet-50">
+              <CreditCard className="mr-1 h-3 w-3" /> Stripe
+            </Badge>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-foreground">{formatCurrency(inv.total_ttc)}</p>
@@ -746,6 +765,14 @@ export default function FacturesPage() {
           )}
         </section>
       </div>
+
+      {sendingInvoice && (
+        <SendInvoiceDialog
+          invoice={sendingInvoice}
+          onClose={() => setSendingInvoice(null)}
+          onSent={() => loadData()}
+        />
+      )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>

@@ -53,7 +53,7 @@ export default function PlansRendusPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Plans & Rendus IA" description="Transformez vos photos en rendus 3D professionnels">
+      <PageHeader title="Rendus IA" description="Transformez vos photos en rendus 3D professionnels">
         {generated && <Button variant="outline" onClick={reset}>Nouveau rendu</Button>}
       </PageHeader>
 

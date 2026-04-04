@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const publicPaths = ['/', '/login', '/signup', '/carte/publique'];
-const publicPrefixes = ['/site/', '/c/', '/d/'];
+const publicPrefixes = ['/site/', '/c/', '/d/', '/f/'];
 
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
