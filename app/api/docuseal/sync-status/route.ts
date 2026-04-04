@@ -24,14 +24,16 @@ export async function POST(request: Request) {
     });
 
     // Verifier que ce submission_id existe en base
-    const { data: send } = await admin
+    const { data: send, error: queryError } = await admin
       .from('quote_sends')
       .select('id, signed_at, docuseal_submission_id')
       .eq('docuseal_submission_id', submission_id)
       .maybeSingle();
 
+    console.error('sync-status debug:', { submission_id, supabaseUrl, send, queryError, keyPrefix: serviceRoleKey.substring(0, 10) });
+
     if (!send) {
-      return NextResponse.json({ error: 'Submission introuvable' }, { status: 404 });
+      return NextResponse.json({ error: 'Submission introuvable', debug: { submission_id, queryError } }, { status: 404 });
     }
 
     // Deja signe en base — rien a faire
