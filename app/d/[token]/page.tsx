@@ -541,7 +541,7 @@ export default function PublicQuotePage() {
           </div>
 
           {/* Signature section */}
-          <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
+          <div id="signature-section" className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
             <div className="flex items-center gap-2 mb-4">
               <PenLine className="h-4 w-4 text-[#6b6560]" />
               <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
@@ -632,6 +632,26 @@ export default function PublicQuotePage() {
           </div>
         </div>
       </div>
+
+      {/* Sticky CTA mobile — scroll to signature */}
+      {!signed && sendData && !loading && (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 p-4 bg-white/95 backdrop-blur-md border-t border-[#e5e1da] safe-area-bottom">
+          <button
+            onClick={() => {
+              const el = document.getElementById('docuseal-signing') || document.getElementById('signature-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+            className="w-full h-[52px] rounded-xl text-white font-semibold text-base flex items-center justify-center gap-2 active:opacity-90 transition-all"
+            style={{ backgroundColor: accent }}
+          >
+            <PenLine className="h-5 w-5" />
+            Signer mon devis
+          </button>
+        </div>
+      )}
+
+      {/* Spacer for sticky button on mobile */}
+      {!signed && <div className="sm:hidden h-20" />}
 
       {/* Footer */}
       <footer className="border-t border-[#e5e1da] py-6 mt-8">
