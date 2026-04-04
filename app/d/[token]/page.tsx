@@ -13,6 +13,7 @@ import {
   User,
   PenLine,
   Shield,
+  Download,
 } from 'lucide-react';
 import { SignatureCanvas } from '@/components/devis/signature-canvas';
 import { DocusealSigning } from '@/components/devis/docuseal-signing';
@@ -29,8 +30,10 @@ interface SendData {
   signed_at: string | null;
   signature_url: string;
   docuseal_slug: string | null;
+  docuseal_submission_id: number | null;
   docuseal_certificate_url: string | null;
   docuseal_audit_log_url: string | null;
+  docuseal_signed_document_url: string | null;
 }
 
 interface QuoteData {
@@ -132,7 +135,7 @@ export default function PublicQuotePage() {
     // 1. Fetch send by token
     const { data: send } = await anonClient
       .from('quote_sends')
-      .select('id, quote_id, client_name, expires_at, signed_at, signature_url, docuseal_slug, docuseal_certificate_url, docuseal_audit_log_url')
+      .select('id, quote_id, client_name, expires_at, signed_at, signature_url, docuseal_slug, docuseal_submission_id, docuseal_certificate_url, docuseal_audit_log_url, docuseal_signed_document_url')
       .eq('token', token)
       .maybeSingle();
 
@@ -260,9 +263,34 @@ export default function PublicQuotePage() {
     setSigning(false);
   }
 
-  function handleDocuSealComplete() {
+  async function handleDocuSealComplete() {
     setSigned(true);
     setSignedAt(new Date().toISOString());
+
+    // Appeler le sync comme fallback au webhook
+    if (sendData?.docuseal_submission_id) {
+      fetch('/api/docuseal/sync-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submission_id: sendData.docuseal_submission_id }),
+      }).catch(() => {});
+    }
+
+    // Poll pour recuperer l'URL du document signe
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts > 20) { clearInterval(poll); return; }
+      const { data: fresh } = await anonClient
+        .from('quote_sends')
+        .select('docuseal_signed_document_url, docuseal_audit_log_url, docuseal_certificate_url')
+        .eq('token', token)
+        .maybeSingle();
+      if (fresh?.docuseal_signed_document_url) {
+        setSendData(prev => prev ? { ...prev, ...fresh } : prev);
+        clearInterval(poll);
+      }
+    }, 2000);
   }
 
   // ── Loading ──
@@ -566,18 +594,32 @@ export default function PublicQuotePage() {
                     Signe electroniquement le {signedAt ? formatDate(signedAt) : ''}
                   </span>
                 </div>
-                {sendData?.docuseal_audit_log_url && (
-                  <a
-                    href={sendData.docuseal_audit_log_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e5e1da] hover:bg-[#f5f3f0] transition-colors"
-                    style={{ color: accent }}
-                  >
-                    <Shield className="h-3 w-3" />
-                    Certificat de signature
-                  </a>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {sendData?.docuseal_signed_document_url && (
+                    <a
+                      href={sendData.docuseal_signed_document_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-white transition-colors"
+                      style={{ backgroundColor: accent }}
+                    >
+                      <Download className="h-3 w-3" />
+                      Telecharger le devis signe
+                    </a>
+                  )}
+                  {sendData?.docuseal_audit_log_url && (
+                    <a
+                      href={sendData.docuseal_audit_log_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e5e1da] hover:bg-[#f5f3f0] transition-colors"
+                      style={{ color: accent }}
+                    >
+                      <Shield className="h-3 w-3" />
+                      Certificat de signature
+                    </a>
+                  )}
+                </div>
               </div>
             ) : sendData?.docuseal_slug ? (
               <div className="space-y-4">

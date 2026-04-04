@@ -131,11 +131,14 @@ export async function POST(request: Request) {
       submission_id: number;
     }
 
+    const webhookBase = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
+
     const docusealResponse = await docusealFetch<DocuSealSubmitter[]>('/submissions', {
       method: 'POST',
       body: {
         template_id: template.id,
         send_email: false,
+        webhook_url: `${webhookBase}/api/docuseal/webhook`,
         submitters: [
           {
             name: client_name.trim(),
