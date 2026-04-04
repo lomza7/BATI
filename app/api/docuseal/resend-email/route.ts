@@ -66,9 +66,9 @@ export async function POST(request: Request) {
     }
 
     const quote = quoteRes.data;
-    const artisan = profileRes.data || { company_name: 'Artisan' };
-    const dc = ((artisan.document_config as Record<string, string>) || {});
-    const companyName = artisan.company_name || artisan.full_name || 'Artisan';
+    const artisanRaw = profileRes.data || { company_name: 'Artisan', full_name: null, document_config: null };
+    const dc = ((artisanRaw.document_config as Record<string, string>) || {});
+    const companyName = artisanRaw.company_name || artisanRaw.full_name || 'Artisan';
 
     const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
     const magicLink = `${base}/d/${send.token}`;
