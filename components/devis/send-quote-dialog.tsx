@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Copy, Check, Link2, Loader as Loader2, PenLine } from 'lucide-react';
+import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
   const [magicLink, setMagicLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
 
   async function handleSend() {
     if (!user || !clientName.trim()) return;
@@ -69,6 +70,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       }
 
       setMagicLink(data.magic_link);
+      setEmailSent(!!clientEmail.trim());
       onSent?.();
     } catch {
       setSendError('Erreur reseau, veuillez reessayer');
@@ -103,20 +105,24 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
         <div className="px-6 py-5 space-y-4">
           {magicLink ? (
             <div className="space-y-4 animate-fade-up">
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <Check className="h-4 w-4 text-emerald-600" />
+              {emailSent && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Mail className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800">Devis envoye par email</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      Un email de signature a ete envoye a <strong>{clientEmail}</strong>
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-emerald-800">Lien de signature cree</p>
-                  <p className="text-xs text-emerald-600 mt-0.5">
-                    Valide pendant {expiresIn} jour{parseInt(expiresIn) > 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
+              )}
 
               <div>
-                <label className="text-xs font-medium text-foreground mb-1.5 block">Lien de signature</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Lien de secours (si le client ne recoit pas l&apos;email)
+                </label>
                 <div className="flex gap-2">
                   <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">
                     <Link2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -134,11 +140,10 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                     {copied ? 'Copie !' : 'Copier'}
                   </button>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                  Vous pouvez aussi envoyer ce lien par SMS ou WhatsApp a <strong>{clientName}</strong>.
+                </p>
               </div>
-
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Partagez ce lien avec <strong>{clientName}</strong> par SMS, WhatsApp ou email. Votre client pourra consulter le devis et le signer electroniquement.
-              </p>
             </div>
           ) : (
             <>
@@ -216,7 +221,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Generer le lien
+              Envoyer le devis
             </button>
           )}
         </div>
