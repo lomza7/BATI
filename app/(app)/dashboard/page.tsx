@@ -1479,54 +1479,43 @@ export default function DashboardPage() {
                 </div>
               ) : (() => {
                 const maxValue = Math.max(...dashboardData.topPartnerSources.map((s) => s.wonValue), 1);
-                const raceColors = [
+                const barColors = [
                   'hsl(var(--primary))',
                   'hsl(var(--chart-2))',
                   'hsl(var(--chart-3))',
                   'hsl(var(--chart-4))',
                   'hsl(var(--chart-5))',
                 ];
-                const medals = ['🥇', '🥈', '🥉'];
                 return (
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-6 space-y-3">
                     {dashboardData.topPartnerSources.slice(0, 5).map((source, i) => {
-                      const pct = maxValue > 0 ? Math.max((source.wonValue / maxValue) * 100, 12) : 12;
-                      const color = raceColors[i % raceColors.length];
+                      const pct = maxValue > 0 ? Math.max((source.wonValue / maxValue) * 100, 8) : 8;
+                      const color = barColors[i % barColors.length];
                       return (
                         <Link
                           key={source.id}
                           href="/prospection"
-                          className="group block rounded-xl p-2.5 -mx-1 transition-colors hover:bg-muted/30"
+                          className="group block rounded-lg p-2.5 -mx-1 transition-colors hover:bg-muted/30"
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="w-7 text-center text-lg">{medals[i] || `${i + 1}.`}</span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                                  <p className="text-sm font-semibold truncate" style={{ color }}>{source.name}</p>
-                                  <span className="hidden sm:inline text-xs text-muted-foreground truncate">{source.contact_name}</span>
-                                </div>
-                                <p className="text-sm font-bold tabular-nums whitespace-nowrap" style={{ color }}>{formatCurrency(source.wonValue)}</p>
-                              </div>
-                              <div className="relative h-8 w-full overflow-hidden rounded-full" style={{ backgroundColor: `${color}15` }}>
-                                <div
-                                  className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
-                                  style={{
-                                    width: `${pct}%`,
-                                    background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-                                    boxShadow: `0 0 12px ${color}40`,
-                                  }}
-                                />
-                                <div className="absolute inset-0 flex items-center px-3.5">
-                                  <span className="text-xs font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
-                                    {source.wonCount} signe{source.wonCount > 1 ? 's' : ''} · {source.leadCount} lead{source.leadCount > 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              </div>
-                              {source.reward_note && (
-                                <p className="mt-1.5 text-[11px] italic truncate" style={{ color: `${color}aa` }}>{source.reward_note}</p>
-                              )}
+                          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm text-muted-foreground w-5 text-right shrink-0">{i + 1}.</span>
+                              <p className="text-sm font-medium text-foreground truncate">{source.name}</p>
+                            </div>
+                            <p className="text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">{formatCurrency(source.wonValue)}</p>
+                          </div>
+                          <div className="relative h-6 w-full overflow-hidden rounded-full bg-muted/50">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: color,
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center px-3">
+                              <span className="text-[11px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
+                                {source.wonCount} signe{source.wonCount > 1 ? 's' : ''} · {source.leadCount} lead{source.leadCount > 1 ? 's' : ''}
+                              </span>
                             </div>
                           </div>
                         </Link>
