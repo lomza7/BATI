@@ -16,60 +16,62 @@ interface Props {
     quote_number: string;
     title: string;
     status: string;
-    clients?: { name: string } | null;
+    clients?: { name: string; email?: string | null } | null;
   };
   onClose: () => void;
   onSent?: () => void;
 }
 
-function generateToken(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
 export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
   const { user } = useAuth();
   const [clientName, setClientName] = useState(quote.clients?.name || '');
-  const [clientEmail, setClientEmail] = useState('');
+  const [clientEmail, setClientEmail] = useState(quote.clients?.email || '');
   const [expiresIn, setExpiresIn] = useState('14');
   const [sending, setSending] = useState(false);
   const [magicLink, setMagicLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   async function handleSend() {
     if (!user || !clientName.trim()) return;
     setSending(true);
+    setSendError('');
 
-    const token = generateToken();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + parseInt(expiresIn));
-
-    const { error } = await supabase.from('quote_sends').insert({
-      user_id: user.id,
-      quote_id: quote.id,
-      client_name: clientName.trim(),
-      client_email: clientEmail.trim() || null,
-      token,
-      expires_at: expiresAt.toISOString(),
-    });
-
-    if (!error) {
-      // Passer en statut "envoye" si brouillon
-      if (quote.status === 'brouillon') {
-        await supabase
-          .from('quotes')
-          .update({ status: 'envoye', updated_at: new Date().toISOString() })
-          .eq('id', quote.id);
+    try {
+      // Recuperer le token d'auth pour l'API route
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setSendError('Session expiree, veuillez vous reconnecter');
+        setSending(false);
+        return;
       }
 
-      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-      const link = `${base}/d/${token}`;
-      setMagicLink(link);
+      const res = await fetch('/api/docuseal/create-submission', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          quote_id: quote.id,
+          client_name: clientName.trim(),
+          client_email: clientEmail.trim() || undefined,
+          expires_in_days: parseInt(expiresIn),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSendError(data.error || 'Erreur lors de la creation du lien');
+        setSending(false);
+        return;
+      }
+
+      setMagicLink(data.magic_link);
       onSent?.();
+    } catch {
+      setSendError('Erreur reseau, veuillez reessayer');
     }
 
     setSending(false);
@@ -153,13 +155,14 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
-                  Email <span className="text-muted-foreground font-normal">(optionnel)</span>
+                  Email du client
                 </label>
                 <input
                   value={clientEmail}
                   onChange={(e) => setClientEmail(e.target.value)}
                   placeholder="client@email.fr"
                   type="email"
+                  required
                   className="w-full h-11 rounded-xl border border-border bg-muted/30 px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
                 />
               </div>
@@ -189,6 +192,10 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
               </div>
             </>
           )}
+
+          {sendError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{sendError}</p>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
@@ -201,7 +208,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
           {!magicLink && (
             <button
               onClick={handleSend}
-              disabled={!clientName.trim() || sending}
+              disabled={!clientName.trim() || !clientEmail.trim() || sending}
               className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 disabled:opacity-40 transition-all"
             >
               {sending ? (

@@ -227,8 +227,8 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                   <Input className="mt-1" placeholder="06 12 34 56 78" value={createForm.phone} onChange={e => setCreateForm({ ...createForm, phone: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Email</label>
-                  <Input className="mt-1" placeholder="email@example.com" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
+                  <label className="text-xs font-medium text-muted-foreground">Email *</label>
+                  <Input className="mt-1" placeholder="email@example.com" type="email" required value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
                 </div>
               </div>
 
@@ -271,7 +271,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Annuler</Button>
-                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim()}>Creer le client</Button>
+                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim() || !createForm.email.trim()}>Creer le client</Button>
               </div>
             </div>
           ) : (

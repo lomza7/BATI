@@ -49,8 +49,8 @@ export default function SignupPage() {
       return;
     }
 
-    router.push('/dashboard');
-    router.refresh();
+    localStorage.setItem('hellobat_signup_email', email);
+    router.push('/verify-email');
   }
 
   return (

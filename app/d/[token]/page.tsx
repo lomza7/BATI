@@ -15,6 +15,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { SignatureCanvas } from '@/components/devis/signature-canvas';
+import { DocusealSigning } from '@/components/devis/docuseal-signing';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -27,6 +28,9 @@ interface SendData {
   expires_at: string;
   signed_at: string | null;
   signature_url: string;
+  docuseal_slug: string | null;
+  docuseal_certificate_url: string | null;
+  docuseal_audit_log_url: string | null;
 }
 
 interface QuoteData {
@@ -128,7 +132,7 @@ export default function PublicQuotePage() {
     // 1. Fetch send by token
     const { data: send } = await anonClient
       .from('quote_sends')
-      .select('id, quote_id, client_name, expires_at, signed_at, signature_url')
+      .select('id, quote_id, client_name, expires_at, signed_at, signature_url, docuseal_slug, docuseal_certificate_url, docuseal_audit_log_url')
       .eq('token', token)
       .maybeSingle();
 
@@ -254,6 +258,11 @@ export default function PublicQuotePage() {
     }
 
     setSigning(false);
+  }
+
+  function handleDocuSealComplete() {
+    setSigned(true);
+    setSignedAt(new Date().toISOString());
   }
 
   // ── Loading ──
@@ -557,6 +566,29 @@ export default function PublicQuotePage() {
                     Signe electroniquement le {signedAt ? formatDate(signedAt) : ''}
                   </span>
                 </div>
+                {sendData?.docuseal_audit_log_url && (
+                  <a
+                    href={sendData.docuseal_audit_log_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-[#e5e1da] hover:bg-[#f5f3f0] transition-colors"
+                    style={{ color: accent }}
+                  >
+                    <Shield className="h-3 w-3" />
+                    Certificat de signature
+                  </a>
+                )}
+              </div>
+            ) : sendData?.docuseal_slug ? (
+              <div className="space-y-4">
+                <p className="text-sm text-[#6b6560]">
+                  En signant ce devis, vous acceptez les conditions et les prix indiques ci-dessus.
+                </p>
+                <DocusealSigning
+                  slug={sendData.docuseal_slug}
+                  onComplete={handleDocuSealComplete}
+                  accentColor={accent}
+                />
               </div>
             ) : (
               <div className="space-y-4">
@@ -588,7 +620,7 @@ export default function PublicQuotePage() {
                     {quote.valid_until
                       ? `Devis valable jusqu'au ${formatDate(quote.valid_until)}. `
                       : ''}
-                    Signature electronique realisee au sens du reglement europeen eIDAS (signature electronique simple).
+                    Signature electronique realisee au sens du reglement europeen eIDAS{sendData?.docuseal_slug ? ' (signature electronique avancee)' : ' (signature electronique simple)'}.
                     Ce document a valeur contractuelle entre les parties.
                   </>
                 )}

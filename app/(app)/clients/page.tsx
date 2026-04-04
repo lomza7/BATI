@@ -528,8 +528,8 @@ export default function ClientsPage() {
                 <Input className="mt-1" placeholder="06 12 34 56 78" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Email</label>
-                <Input className="mt-1" type="email" placeholder="contact@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                <label className="text-sm font-medium">Email *</label>
+                <Input className="mt-1" type="email" required placeholder="contact@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
               </div>
             </div>
             <div>
@@ -552,7 +552,7 @@ export default function ClientsPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Annuler</Button>
-              <Button onClick={saveClient} disabled={!form.name.trim()}>{editingId ? 'Enregistrer' : 'Creer'}</Button>
+              <Button onClick={saveClient} disabled={!form.name.trim() || !form.email.trim()}>{editingId ? 'Enregistrer' : 'Creer'}</Button>
             </div>
           </div>
         </DialogContent>

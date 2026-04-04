@@ -48,7 +48,7 @@ interface Quote {
   total_ttc: number;
   valid_until: string | null;
   created_at: string;
-  clients: { name: string } | null;
+  clients: { name: string; email: string | null } | null;
 }
 
 interface QuoteLine {
@@ -104,7 +104,7 @@ export default function DevisPage() {
     const [quotesRes, sendsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
