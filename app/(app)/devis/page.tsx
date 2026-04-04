@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
@@ -38,6 +38,7 @@ interface QuoteSend {
   signed_at: string | null;
   created_at: string;
   view_count: number;
+  docuseal_signed_document_url: string | null;
 }
 
 interface Quote {
@@ -110,7 +111,7 @@ export default function DevisPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
-        .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count')
+        .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_signed_document_url')
         .order('created_at', { ascending: false }),
     ]);
 
@@ -583,6 +584,11 @@ export default function DevisPage() {
                                   <ExternalLink className="mr-2 h-4 w-4" /> Voir le devis
                                 </DropdownMenuItem>
                               )}
+                              {send?.docuseal_signed_document_url && (
+                                <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
+                                  <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>
                                 <Send className="mr-2 h-4 w-4" /> Marquer envoye
                               </DropdownMenuItem>
@@ -648,6 +654,11 @@ export default function DevisPage() {
                         {send && (
                           <DropdownMenuItem onClick={() => openTracking(q)}>
                             <Eye className="mr-2 h-4 w-4" /> Suivi d&apos;ouverture
+                          </DropdownMenuItem>
+                        )}
+                        {send?.docuseal_signed_document_url && (
+                          <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
+                            <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>Marquer envoye</DropdownMenuItem>
@@ -1015,6 +1026,17 @@ export default function DevisPage() {
                         <div>
                           <p className="text-sm font-medium text-emerald-700">Devis signe</p>
                           <p className="text-xs text-muted-foreground">{formatDate(send.signed_at)}</p>
+                          {send.docuseal_signed_document_url && (
+                            <a
+                              href={send.docuseal_signed_document_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            >
+                              <Download className="h-3 w-3" />
+                              Telecharger le devis signe
+                            </a>
+                          )}
                         </div>
                       </div>
                     ) : (
