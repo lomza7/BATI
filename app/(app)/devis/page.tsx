@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ClientPicker } from '@/components/shared/client-picker';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -50,6 +51,7 @@ interface Quote {
   valid_until: string | null;
   created_at: string;
   clients: { name: string; email: string | null } | null;
+  recurring_contract_id: string | null;
 }
 
 interface QuoteLine {
@@ -57,6 +59,8 @@ interface QuoteLine {
   quantity: number;
   unit: string;
   unit_price: number;
+  is_recurring?: boolean;
+  frequency?: string;
 }
 
 export default function DevisPage() {
@@ -107,7 +111,7 @@ export default function DevisPage() {
     const [quotesRes, sendsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email), recurring_contracts(id)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
@@ -115,7 +119,13 @@ export default function DevisPage() {
         .order('created_at', { ascending: false }),
     ]);
 
-    setQuotes((quotesRes.data as unknown as Quote[]) || []);
+    setQuotes(((quotesRes.data as unknown as Array<Record<string, unknown>>) || []).map(q => {
+      const contracts = Array.isArray(q.recurring_contracts) ? q.recurring_contracts as Array<{ id: string }> : [];
+      return {
+        ...q,
+        recurring_contract_id: contracts[0]?.id || null,
+      } as Quote;
+    }));
 
     // Garder seulement le dernier envoi par devis
     const sendsMap: Record<string, QuoteSend> = {};
@@ -191,6 +201,7 @@ export default function DevisPage() {
     const validLines = lines.filter(l => l.description.trim());
     const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
     const totalTtc = totalHt * 1.2;
+    let savedQuoteId: string | null = null;
 
     if (draftId.current) {
       // Update existing draft
@@ -223,6 +234,8 @@ export default function DevisPage() {
           }))
         );
       }
+
+      savedQuoteId = draftId.current;
 
       // Create lead if none exists yet for this quote
       const { data: existingLead } = await supabase
@@ -268,6 +281,8 @@ export default function DevisPage() {
         .select('id')
         .single();
 
+      if (quote) savedQuoteId = quote.id;
+
       if (quote && validLines.length > 0) {
         await supabase.from('quote_lines').insert(
           validLines.map((l, i) => ({
@@ -297,6 +312,37 @@ export default function DevisPage() {
       }
     }
 
+    // Auto-create recurring contracts from recurring service lines
+    const recurringLines = validLines.filter(l => l.is_recurring);
+    if (recurringLines.length > 0 && savedQuoteId && user) {
+      // Check if contract already exists for this quote
+      const { data: existingContract } = await supabase
+        .from('recurring_contracts')
+        .select('id')
+        .eq('quote_id', savedQuoteId)
+        .maybeSingle();
+
+      if (!existingContract) {
+        const startDate = new Date().toISOString().split('T')[0];
+        for (const line of recurringLines) {
+          await supabase.from('recurring_contracts').insert({
+            user_id: user.id,
+            client_id: selectedClientId || null,
+            quote_id: savedQuoteId,
+            title: line.description,
+            contract_type: 'autre',
+            amount: line.quantity * line.unit_price,
+            frequency: line.frequency || 'mensuel',
+            tva_rate: 20,
+            status: 'en_attente',
+            start_date: startDate,
+            next_billing: startDate,
+            auto_send: false,
+          });
+        }
+      }
+    }
+
     setShowCreate(false);
     setNewQuote({ title: '', description: '' });
     setSelectedClientId(null);
@@ -317,6 +363,18 @@ export default function DevisPage() {
 
   async function updateStatus(id: string, status: string) {
     await supabase.from('quotes').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+
+    // If accepted, activate any linked recurring contract
+    if (status === 'accepte') {
+      const quote = quotes.find(q => q.id === id);
+      if (quote?.recurring_contract_id) {
+        await supabase.from('recurring_contracts').update({
+          status: 'actif',
+          updated_at: new Date().toISOString(),
+        }).eq('id', quote.recurring_contract_id);
+      }
+    }
+
     loadQuotes();
   }
 
@@ -519,7 +577,14 @@ export default function DevisPage() {
                         <td className="px-4 py-3 text-sm font-medium text-foreground">{q.quote_number}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{q.clients?.name || '-'}</td>
                         <td className="px-4 py-3 text-sm text-foreground">{q.title}</td>
-                        <td className="px-4 py-3"><StatusBadge label={st.label} color={st.color} /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge label={st.label} color={st.color} />
+                            {q.recurring_contract_id && (
+                              <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><RefreshCw className="h-2.5 w-2.5" /> Contrat</Badge>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           {send ? (
                             <div className="flex items-center gap-2">
@@ -675,6 +740,9 @@ export default function DevisPage() {
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center gap-2">
                       <StatusBadge label={st.label} color={st.color} />
+                      {q.recurring_contract_id && (
+                        <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><RefreshCw className="h-2.5 w-2.5" /> Contrat</Badge>
+                      )}
                       {badge && (
                         <button
                           onClick={() => openTracking(q)}

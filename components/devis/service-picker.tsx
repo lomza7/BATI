@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Package, Plus, Check } from 'lucide-react';
+import { Search, Package, Plus, Check, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,10 +16,21 @@ interface Service {
   unit: string;
   unit_price: number;
   category: string;
+  is_recurring: boolean;
+  frequency: string;
+}
+
+export interface PickedService {
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  is_recurring?: boolean;
+  frequency?: string;
 }
 
 interface ServicePickerProps {
-  onSelect: (service: { description: string; quantity: number; unit: string; unit_price: number }) => void;
+  onSelect: (service: PickedService) => void;
   onClose: () => void;
 }
 
@@ -36,7 +48,7 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
   async function loadServices() {
     const { data } = await supabase
       .from('services')
-      .select('id, name, description, unit, unit_price, category')
+      .select('id, name, description, unit, unit_price, category, is_recurring, frequency')
       .eq('is_active', true)
       .order('category')
       .order('name');
@@ -65,6 +77,8 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
       quantity: 1,
       unit: s.unit,
       unit_price: s.unit_price,
+      is_recurring: s.is_recurring,
+      frequency: s.frequency,
     });
     setAdded(prev => new Set(prev).add(s.id));
   }
@@ -112,7 +126,14 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
                         {isAdded ? <Check className="h-4 w-4 text-emerald-600" /> : <Package className="h-4 w-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{s.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{s.name}</p>
+                          {s.is_recurring && (
+                            <Badge variant="outline" className="gap-0.5 text-[9px] px-1 py-0 border-primary/30 text-primary shrink-0">
+                              <RefreshCw className="h-2 w-2" /> {s.frequency === 'mensuel' ? '/mois' : s.frequency === 'trimestriel' ? '/trim.' : '/an'}
+                            </Badge>
+                          )}
+                        </div>
                         {s.description && <p className="text-[11px] text-muted-foreground truncate">{s.description}</p>}
                       </div>
                       <div className="text-right shrink-0">

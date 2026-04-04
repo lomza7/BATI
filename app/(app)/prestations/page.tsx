@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Pencil, Trash2, Package, Filter, GripVertical } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Filter, GripVertical, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency } from '@/lib/constants';
@@ -29,6 +29,8 @@ interface Service {
   unit_price: number;
   category: string;
   tva_rate: number;
+  is_recurring: boolean;
+  frequency: string;
   is_active: boolean;
   created_at: string;
 }
@@ -50,6 +52,12 @@ const DEFAULT_CATEGORIES = [
   'Main d\'oeuvre', 'Fourniture', 'Deplacement', 'Autre',
 ];
 
+const FREQ_LABELS: Record<string, string> = {
+  mensuel: 'Mensuel',
+  trimestriel: 'Trimestriel',
+  annuel: 'Annuel',
+};
+
 const emptyForm = {
   name: '',
   description: '',
@@ -57,6 +65,8 @@ const emptyForm = {
   unit_price: 0,
   category: '',
   tva_rate: 20,
+  is_recurring: false,
+  frequency: 'mensuel',
   is_active: true,
 };
 
@@ -117,6 +127,8 @@ export default function PrestationsPage() {
       unit_price: s.unit_price,
       category: s.category,
       tva_rate: s.tva_rate,
+      is_recurring: s.is_recurring,
+      frequency: s.frequency || 'mensuel',
       is_active: s.is_active,
     });
     setEditingId(s.id);
@@ -218,8 +230,8 @@ export default function PrestationsPage() {
           </p>
         </div>
         <div className="rounded-lg border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Actives</p>
-          <p className="text-xl font-semibold">{services.filter(s => s.is_active).length}</p>
+          <p className="text-xs text-muted-foreground">Recurrentes</p>
+          <p className="text-xl font-semibold">{services.filter(s => s.is_recurring).length}</p>
         </div>
       </div>
 
@@ -260,6 +272,11 @@ export default function PrestationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium truncate">{s.name}</p>
+                        {s.is_recurring && (
+                          <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                            <RefreshCw className="h-2.5 w-2.5" /> {FREQ_LABELS[s.frequency] || s.frequency}
+                          </Badge>
+                        )}
                         {!s.is_active && <Badge variant="outline" className="text-[10px]">Inactive</Badge>}
                       </div>
                       {s.description && (
@@ -389,6 +406,35 @@ export default function PrestationsPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_recurring}
+                  onChange={e => setForm({ ...form, is_recurring: e.target.checked })}
+                  className="rounded border-input"
+                />
+                <span className="text-sm font-medium">Prestation recurrente</span>
+              </label>
+              {form.is_recurring && (
+                <div>
+                  <label className="text-sm font-medium">Frequence</label>
+                  <Select value={form.frequency} onValueChange={v => setForm({ ...form, frequency: v })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mensuel">Mensuel</SelectItem>
+                      <SelectItem value="trimestriel">Trimestriel</SelectItem>
+                      <SelectItem value="annuel">Annuel</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Un contrat recurrent sera automatiquement cree quand cette prestation est ajoutee a un devis.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowForm(false)}>Annuler</Button>

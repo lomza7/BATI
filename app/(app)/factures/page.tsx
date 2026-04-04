@@ -13,6 +13,7 @@ import {
   MoveHorizontal as MoreHorizontal,
   Plus,
   Receipt,
+  RefreshCw,
   Search,
   Send,
   TriangleAlert as AlertTriangle,
@@ -45,6 +46,7 @@ interface Invoice {
   id: string;
   invoice_number: string;
   quote_id: string | null;
+  recurring_contract_id: string | null;
   title: string;
   status: keyof typeof INVOICE_STATUSES;
   total_ttc: number;
@@ -140,7 +142,7 @@ export default function FacturesPage() {
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email)')
+        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -402,7 +404,11 @@ export default function FacturesPage() {
         <td className="px-4 py-3 text-sm font-medium text-foreground">{inv.invoice_number}</td>
         <td className="px-4 py-3 text-sm text-muted-foreground">{inv.clients?.name || '-'}</td>
         <td className="px-4 py-3 text-sm text-foreground">{inv.title}</td>
-        <td className="px-4 py-3 text-sm text-muted-foreground">{inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}</td>
+        <td className="px-4 py-3 text-sm text-muted-foreground">
+          {inv.recurring_contract_id ? (
+            <span className="inline-flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Contrat recurrent</span>
+          ) : inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}
+        </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
             <StatusBadge label={st.label} color={st.color} />
@@ -519,7 +525,10 @@ export default function FacturesPage() {
               <FileCheck className="h-3 w-3" /> Créer la facture
             </Button>
           )}
-          {inv.quote_id && <Badge variant="outline">Depuis devis</Badge>}
+          {inv.recurring_contract_id && (
+            <Badge variant="outline" className="gap-1"><RefreshCw className="h-3 w-3" /> Contrat</Badge>
+          )}
+          {inv.quote_id && !inv.recurring_contract_id && <Badge variant="outline">Depuis devis</Badge>}
           {inv.payment_method === 'stripe' && (
             <Badge className="bg-violet-50 text-violet-700 hover:bg-violet-50">
               <CreditCard className="mr-1 h-3 w-3" /> Stripe

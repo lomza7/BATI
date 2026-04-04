@@ -22,6 +22,7 @@ import {
   FileText,
   FolderKanban,
   Receipt,
+  RefreshCw,
   TrendingUp,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -189,6 +190,18 @@ interface LeadDashboardRow {
   value: number;
 }
 
+interface ContractDashboardRow {
+  id: string;
+  title: string;
+  amount: number;
+  frequency: string;
+  status: string;
+  next_billing: string | null;
+  created_at: string;
+  cancelled_at: string | null;
+  clients: { name: string } | null;
+}
+
 type ActivityItem = {
   id: string;
   label: string;
@@ -282,6 +295,10 @@ const leadSourceChartConfig = {
     label: 'Perdus',
     color: 'hsl(var(--chart-5))',
   },
+} satisfies ChartConfig;
+
+const mrrChartConfig = {
+  mrr: { label: 'MRR', color: 'hsl(var(--chart-4))' },
 } satisfies ChartConfig;
 
 function differenceInDays(targetDate: string, now = new Date()) {
@@ -689,6 +706,7 @@ export default function DashboardPage() {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettingsRow | null>(null);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileRow | null>(null);
   const [dashTodos, setDashTodos] = useState<Todo[]>([]);
+  const [contracts, setContracts] = useState<ContractDashboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState<DatePreset>('annee');
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
@@ -698,7 +716,7 @@ export default function DashboardPage() {
     if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes, contractsRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
@@ -746,6 +764,10 @@ export default function DashboardPage() {
       supabase
         .from('todos')
         .select('id, title, description, priority, category, due_date, completed, completed_at, time_spent, position, client_id, created_at, updated_at'),
+      supabase
+        .from('recurring_contracts')
+        .select('id, title, amount, frequency, status, next_billing, created_at, cancelled_at, clients(name)')
+        .order('next_billing', { ascending: true }),
     ]);
 
     setQuotes(((quotesRes.data as unknown as QuoteRow[]) || []).map((quote) => ({
@@ -779,6 +801,7 @@ export default function DashboardPage() {
     setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
     setCompanyProfile((profileRes.data as CompanyProfileRow | null) || null);
     setDashTodos(((todosRes.data as unknown as Todo[]) || []).map(t => ({ ...t, client_name: undefined })));
+    setContracts(((contractsRes.data as unknown as ContractDashboardRow[]) || []).map(c => ({ ...c, amount: toNumber(c.amount) })));
     setLoading(false);
   }, [user]);
 
@@ -1030,6 +1053,24 @@ export default function DashboardPage() {
         })
         .filter(Boolean) as ReminderItem[],
       ...createAdminReminders(reminderSettings, companyProfile, now),
+      ...contracts
+        .filter(c => c.status === 'actif' && c.next_billing)
+        .map(c => {
+          const days = differenceInDays(c.next_billing!, now);
+          if (days < 0 || days > 7) return null;
+          return {
+            id: `contract-billing-${c.id}`,
+            title: `Facturation ${c.title}`,
+            description: `${c.clients?.name || 'Un client'} — contrat recurrent a facturer.`,
+            dueLabel: days === 0 ? "Facturation aujourd'hui" : `Facturation dans ${days} jour${days > 1 ? 's' : ''}`,
+            priority: days <= 1 ? 'high' as const : 'medium' as const,
+            dueDate: c.next_billing!,
+            href: '/contrats',
+            actionLabel: 'Voir les contrats',
+            kind: 'facturation' as const,
+          };
+        })
+        .filter(Boolean) as ReminderItem[],
     ]
       .sort((a, b) => {
         const priorityWeight = { high: 0, medium: 1, low: 2 };
@@ -1131,6 +1172,49 @@ export default function DashboardPage() {
     const totalQuotesPeriod = fQuotes.reduce((sum, q) => sum + q.total_ttc, 0);
     const totalInvoicesPeriod = fInvoices.reduce((sum, inv) => sum + inv.total_ttc, 0);
 
+    // MRR from active contracts
+    const activeContracts = contracts.filter(c => c.status === 'actif');
+    const mrr = activeContracts.reduce((sum, c) => {
+      if (c.frequency === 'mensuel') return sum + c.amount;
+      if (c.frequency === 'trimestriel') return sum + c.amount / 3;
+      if (c.frequency === 'annuel') return sum + c.amount / 12;
+      return sum + c.amount;
+    }, 0);
+
+    // Contracts with billing in next 7 days
+    const upcomingBillings = activeContracts.filter(c => {
+      if (!c.next_billing) return false;
+      const days = differenceInDays(c.next_billing, now);
+      return days >= 0 && days <= 7;
+    });
+
+    // MRR chart — 12-month series based on contract creation dates
+    const mrrChartData: { month: string; mrr: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const label = d.toLocaleDateString('fr-FR', { month: 'short' });
+      // Sum MRR of contracts that were active (created before month end, not cancelled before month start)
+      const monthMrr = contracts
+        .filter(c => {
+          const created = new Date(c.created_at);
+          if (created > monthEnd) return false;
+          if (c.status === 'resilie' && c.cancelled_at) {
+            const cancelled = new Date(c.cancelled_at);
+            if (cancelled < d) return false;
+          }
+          if (c.status === 'suspendu') return false;
+          return true;
+        })
+        .reduce((sum, c) => {
+          if (c.frequency === 'mensuel') return sum + c.amount;
+          if (c.frequency === 'trimestriel') return sum + c.amount / 3;
+          if (c.frequency === 'annuel') return sum + c.amount / 12;
+          return sum + c.amount;
+        }, 0);
+      mrrChartData.push({ month: label, mrr: Math.round(monthMrr) });
+    }
+
     return {
       revenueThisMonth,
       revenuePreviousMonth,
@@ -1149,7 +1233,11 @@ export default function DashboardPage() {
       leadSourceChartData,
       topPartnerSources,
       stageConversionData,
-      hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0,
+      mrr,
+      mrrChartData,
+      activeContractsCount: activeContracts.length,
+      upcomingBillingsCount: upcomingBillings.length,
+      hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0 || contracts.length > 0,
       activeProjects: fProjects.filter((project) => project.status === 'en_cours').length,
       unpaidInvoicesTotal: fInvoices
         .filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard')
@@ -1169,7 +1257,7 @@ export default function DashboardPage() {
       nextPlanningEvents: fEvents.slice(0, 3),
       planningThisWeekCount: fEvents.length,
     };
-  }, [companyProfile, customRange, datePreset, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
+  }, [companyProfile, contracts, customRange, datePreset, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
 
   const periodLabel = datePreset === 'custom' && customRange.from
     ? customRange.to
@@ -1427,6 +1515,46 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {dashboardData.activeContractsCount > 0 && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 text-primary" />
+                    <h2 className="text-base font-semibold text-foreground">Revenus recurrents (MRR)</h2>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatCurrency(dashboardData.mrr)}/mois · {dashboardData.activeContractsCount} contrat{dashboardData.activeContractsCount > 1 ? 's' : ''} actif{dashboardData.activeContractsCount > 1 ? 's' : ''}
+                    {dashboardData.upcomingBillingsCount > 0 && ` · ${dashboardData.upcomingBillingsCount} a facturer cette semaine`}
+                  </p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/contrats">Voir les contrats</Link>
+                </Button>
+              </div>
+              <div className="mt-4 h-[200px]">
+                <ChartContainer config={mrrChartConfig} className="h-full w-full">
+                  <AreaChart data={dashboardData.mrrChartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={v => `${v}€`} width={50} />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => (
+                      <span className="font-medium text-foreground">{formatCurrency(Number(value || 0))}/mois</span>
+                    )} />} />
+                    <Area
+                      type="monotone"
+                      dataKey="mrr"
+                      stroke="var(--color-mrr)"
+                      fill="var(--color-mrr)"
+                      fillOpacity={0.15}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.7fr_0.7fr]">
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
