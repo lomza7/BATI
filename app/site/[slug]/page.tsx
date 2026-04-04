@@ -17,6 +17,8 @@ import { SiteReviews } from '@/components/site/site-reviews';
 import { SiteContact } from '@/components/site/site-contact';
 import { SiteFooter } from '@/components/site/site-footer';
 import { SiteJsonLd } from '@/components/site/site-json-ld';
+import { SiteFaq } from '@/components/site/site-faq';
+import { SiteMap } from '@/components/site/site-map';
 
 export const revalidate = 3600; // ISR — revalidate every hour
 
@@ -27,10 +29,17 @@ function getAnonClient() {
   return createClient(supabaseUrl, supabaseAnonKey);
 }
 
+// Theme accent colors for the map markers
+const THEME_ACCENTS: Record<string, string> = {
+  modern: '#3b82f6',
+  warm: '#d97706',
+  clean: '#059669',
+  bold: '#ef4444',
+};
+
 async function getSiteData(slug: string) {
   const sb = getAnonClient();
 
-  // 1. Get the published site
   const { data: site } = await sb
     .from('artisan_sites')
     .select('*')
@@ -42,16 +51,15 @@ async function getSiteData(slug: string) {
 
   const typedSite = site as ArtisanSite;
 
-  // 2. Fetch related data in parallel
   const [profileRes, projectsRes, reviewsRes, servicesRes] = await Promise.all([
     sb.from('profiles').select('*').eq('id', typedSite.user_id).maybeSingle(),
     sb
       .from('projects')
-      .select('id, title, description, address, city, status, project_photos(id, photo_url, caption)')
+      .select('id, title, description, address, city, status, lat, lng, project_photos(id, photo_url, caption)')
       .eq('user_id', typedSite.user_id)
       .eq('is_public', true)
       .order('created_at', { ascending: false })
-      .limit(12),
+      .limit(20),
     sb
       .from('reviews')
       .select('id, author_name, rating, comment, created_at')
@@ -68,7 +76,7 @@ async function getSiteData(slug: string) {
   return {
     site: typedSite,
     profile: profileRes.data as SiteProfile | null,
-    projects: (projectsRes.data || []) as SiteProject[],
+    projects: (projectsRes.data || []) as (SiteProject & { lat?: number; lng?: number })[],
     reviews: (reviewsRes.data || []) as SiteReview[],
     services: (servicesRes.data || []) as SiteService[],
   };
@@ -114,6 +122,11 @@ export default async function SitePage({
   const content = site.site_content as SiteContent;
   const siteUrl = `https://hellobat.app/site/${slug}`;
 
+  // Projects with coordinates for the map
+  const mapProjects = projects
+    .filter(p => p.lat && p.lng)
+    .map(p => ({ id: p.id, title: p.title, city: p.city, lat: p.lat!, lng: p.lng! }));
+
   return (
     <div
       data-site-theme={site.theme}
@@ -139,7 +152,7 @@ export default async function SitePage({
 
       <SiteHero hero={content.hero} companyName={profile.company_name} />
 
-      {/* About */}
+      {/* About + Highlights */}
       <section id="a-propos" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
         <div className="max-w-3xl mx-auto text-center">
           <h2
@@ -153,6 +166,22 @@ export default async function SitePage({
               {p}
             </p>
           ))}
+
+          {/* Highlights / key figures */}
+          {content.about?.highlights && content.about.highlights.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-8 mt-10">
+              {content.about.highlights.map((h, i) => (
+                <div key={i} className="text-center">
+                  <p className="text-3xl sm:text-4xl font-bold" style={{ color: 'var(--site-accent)' }}>
+                    {h.value}
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
+                    {h.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -164,8 +193,18 @@ export default async function SitePage({
         <SiteProjects projects={projects} />
       )}
 
+      {/* Map of projects */}
+      {(site.show_map ?? true) && mapProjects.length > 0 && (
+        <SiteMap projects={mapProjects} accentColor={THEME_ACCENTS[site.theme] || '#3b82f6'} />
+      )}
+
       {site.show_reviews && reviews.length > 0 && (
         <SiteReviews reviews={reviews} googleReviewLink={profile.google_review_link} />
+      )}
+
+      {/* FAQ */}
+      {content.faq && content.faq.length > 0 && (
+        <SiteFaq faq={content.faq} />
       )}
 
       {site.show_contact && (

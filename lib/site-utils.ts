@@ -13,6 +13,7 @@ export interface SiteContentHero {
 export interface SiteContentAbout {
   title: string;
   paragraphs: string[];
+  highlights?: { label: string; value: string }[];
 }
 
 export interface SiteContentService {
@@ -35,6 +36,11 @@ export interface SiteContentFooter {
   tagline: string;
 }
 
+export interface SiteContentFaq {
+  question: string;
+  answer: string;
+}
+
 export interface SiteContent {
   hero: SiteContentHero;
   about: SiteContentAbout;
@@ -42,6 +48,7 @@ export interface SiteContent {
   contact: SiteContentContact;
   seo: SiteContentSeo;
   footer: SiteContentFooter;
+  faq?: SiteContentFaq[];
 }
 
 export interface ArtisanSite {
@@ -55,6 +62,7 @@ export interface ArtisanSite {
   show_projects: boolean;
   show_reviews: boolean;
   show_contact: boolean;
+  show_map: boolean;
   custom_slogan: string;
   published_at: string | null;
   created_at: string;

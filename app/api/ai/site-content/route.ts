@@ -51,15 +51,31 @@ export async function POST(request: Request) {
       activity,
       city,
       slogan,
+      description,
+      years_experience,
+      zone,
+      certifications,
+      values,
+      target_clients,
       services,
       theme,
+      review_count,
+      avg_rating,
     } = body as {
       company_name: string;
       activity: string;
       city: string;
       slogan?: string;
+      description?: string;
+      years_experience?: string;
+      zone?: string;
+      certifications?: string[];
+      values?: string;
+      target_clients?: string;
       services?: { name: string; description?: string }[];
       theme?: string;
+      review_count?: number;
+      avg_rating?: string;
     };
 
     if (!company_name?.trim() || !activity?.trim()) {
@@ -70,57 +86,92 @@ export async function POST(request: Request) {
       .map(s => `- ${s.name}${s.description ? `: ${s.description}` : ''}`)
       .join('\n');
 
-    const systemPrompt = `Tu es un expert en marketing digital pour les artisans du batiment en France. Tu rediges du contenu professionnel, convaincant et optimise pour le SEO local. Ton style est chaleureux mais professionnel. Tout le contenu est en francais.`;
+    const certList = (certifications || []).join(', ');
 
-    const userPrompt = `Genere le contenu complet d'un site vitrine pour cet artisan du batiment :
+    const systemPrompt = `Tu es un copywriter expert specialise dans les sites vitrines pour artisans du batiment en France. Tu maitrises le SEO local, la redaction persuasive et la conversion web. Tu ecris un contenu authentique, professionnel et chaleureux qui donne envie aux visiteurs de contacter l'artisan. Tout le contenu est en francais. Tu ne dois jamais inventer de fausses informations (faux chiffres, fausses certifications).`;
 
+    const userPrompt = `Genere le contenu complet d'un site vitrine haut de gamme pour cet artisan du batiment :
+
+═══ INFORMATIONS DE L'ARTISAN ═══
 **Entreprise** : ${company_name.trim()}
 **Activite** : ${activity.trim()}
 **Ville** : ${city?.trim() || 'Non precisee'}
+${years_experience ? `**Experience** : ${years_experience} ans` : ''}
 ${slogan ? `**Slogan** : ${slogan.trim()}` : ''}
+${description ? `**Description** : ${description.trim()}` : ''}
+${zone ? `**Zone d'intervention** : ${zone.trim()}` : ''}
+${target_clients ? `**Clients cibles** : ${target_clients.trim()}` : ''}
+${certList ? `**Certifications** : ${certList}` : ''}
+${values ? `**Valeurs / Differenciants** : ${values.trim()}` : ''}
 ${servicesList ? `**Services proposes** :\n${servicesList}` : ''}
+${review_count && review_count > 0 ? `**Avis clients** : ${review_count} avis, note moyenne ${avg_rating}/5` : ''}
 ${theme ? `**Style du site** : ${theme}` : ''}
 
+═══ CONSIGNES DE REDACTION ═══
+- Le hero doit etre percutant et donner envie d'agir immediatement
+- La section "A propos" doit raconter une histoire, pas juste lister des faits
+- Si l'artisan a des certifications, mets-les en avant naturellement dans le texte
+- Cree des "highlights" (chiffres cles) uniquement avec des donnees reelles fournies (experience, avis)
+- Les descriptions de services doivent expliquer le benefice client, pas juste la prestation technique
+- La FAQ doit anticiper les vraies questions des clients (devis, delais, garanties, zone)
+- Le SEO doit cibler "[activite] [ville]" et les variantes longue traine
+- Utilise un ton professionnel mais accessible, jamais pompeux
+
+═══ FORMAT JSON ═══
 Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdown) :
 
 {
   "hero": {
-    "headline": "Titre accrocheur en 6-10 mots maximum",
-    "subheadline": "Sous-titre de 15-25 mots qui decrit l'expertise et la zone geographique",
-    "cta_text": "Texte du bouton d'appel a l'action (ex: Demander un devis gratuit)"
+    "headline": "Titre accrocheur de 6-10 mots, percutant et specifique a l'activite",
+    "subheadline": "Sous-titre de 20-30 mots decrivant l'expertise, la zone et le benefice principal",
+    "cta_text": "Texte du bouton (ex: Demander un devis gratuit)"
   },
   "about": {
-    "title": "Titre de la section A propos (ex: Votre artisan de confiance)",
+    "title": "Titre engageant (ex: L'expertise au service de votre habitat)",
     "paragraphs": [
-      "Premier paragraphe (3-4 phrases) sur l'expertise et l'experience",
-      "Deuxieme paragraphe (2-3 phrases) sur les valeurs et engagements"
+      "1er paragraphe (4-5 phrases) : histoire de l'entreprise, expertise, experience. Ton narratif et authentique.",
+      "2eme paragraphe (3-4 phrases) : valeurs, engagements, ce qui differencie l'artisan. Inclure les certifications si fournies.",
+      "3eme paragraphe (2-3 phrases) : zone d'intervention et disponibilite. Rassurer sur la proximite."
+    ],
+    "highlights": [
+      {"label": "Annees d'experience", "value": "15+"},
+      {"label": "Clients satisfaits", "value": "500+"},
+      {"label": "Note Google", "value": "4.8/5"}
     ]
   },
   "services": [
     {
       "name": "Nom du service",
-      "description": "Description courte en 1-2 phrases",
-      "icon": "nom d'icone lucide-react adapte (ex: Hammer, PaintBucket, Wrench, Home, Shield, Ruler, Zap, Droplets, Flame, Layers)"
+      "description": "Description orientee benefice client en 2-3 phrases. Pas juste technique.",
+      "icon": "nom lucide-react (Hammer, PaintBucket, Wrench, Home, Shield, Ruler, Zap, Droplets, Flame, Layers, Brush, HardHat, Building2, Plug, Thermometer, Pipette, TreePine, Warehouse, Lightbulb, Settings)"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Question frequente pertinente",
+      "answer": "Reponse complete et rassurante en 2-3 phrases"
     }
   ],
   "contact": {
-    "title": "Titre section contact (ex: Contactez-nous)",
-    "description": "Court texte invitant a prendre contact (1-2 phrases)"
+    "title": "Titre invitant au contact",
+    "description": "Texte de 2-3 phrases qui rassure et incite a appeler ou demander un devis"
   },
   "seo": {
-    "meta_title": "Titre SEO optimise (50-60 caracteres, inclut ville et activite)",
-    "meta_description": "Meta description SEO (140-155 caracteres, inclut zone geo et activite principale)"
+    "meta_title": "Titre SEO 50-60 caracteres, format: [Activite] [Ville] - [Nom entreprise]",
+    "meta_description": "Meta description 140-155 caracteres, inclut activite + ville + benefice unique + CTA"
   },
   "footer": {
-    "tagline": "Court slogan de pied de page (5-8 mots)"
+    "tagline": "Court slogan memorable de 5-8 mots"
   }
 }
 
-Important :
-- Si des services sont fournis, utilise-les. Sinon, invente 4-6 services typiques pour cette activite.
-- Le contenu SEO doit cibler la ville et l'activite pour le referencement local.
-- Pas d'emojis, pas de majuscules excessives.
-- Les icones doivent etre des noms valides de lucide-react.`;
+═══ REGLES STRICTES ═══
+- Les "highlights" ne doivent contenir QUE des donnees reelles : utilise l'experience, le nombre d'avis et la note si fournis. Si pas de donnees, mets 2-3 highlights generiques ("Devis gratuit", "Intervention rapide", etc.)
+- Si des services sont fournis, utilise-les et enrichis les descriptions. Sinon, invente 4-6 services typiques.
+- Genere 4-6 questions FAQ pertinentes pour cette activite et cette zone.
+- Pas d'emojis, pas de majuscules excessives, pas de points d'exclamation abusifs.
+- Les icones doivent etre des noms valides de lucide-react.
+- Ne mets JAMAIS de faux chiffres (ex: "500 chantiers" si non fourni).`;
 
     const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
 
@@ -133,7 +184,7 @@ Important :
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [
           { role: 'user', content: userPrompt },
         ],
