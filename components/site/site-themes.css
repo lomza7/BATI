@@ -1,0 +1,73 @@
+/* ── Site vitrine artisan — themes ── */
+
+/* Theme: Moderne (fond sombre, accent bleu) */
+[data-site-theme="modern"] {
+  --site-bg: #0f172a;
+  --site-bg-alt: #1e293b;
+  --site-text: #f1f5f9;
+  --site-text-muted: #94a3b8;
+  --site-heading: #ffffff;
+  --site-accent: #3b82f6;
+  --site-accent-hover: #2563eb;
+  --site-accent-light: rgba(59, 130, 246, 0.1);
+  --site-card-bg: #1e293b;
+  --site-card-border: #334155;
+  --site-border: #334155;
+  --site-hero-overlay: rgba(15, 23, 42, 0.85);
+  --site-radius: 0.75rem;
+  --site-font: 'Inter', 'Helvetica Neue', sans-serif;
+}
+
+/* Theme: Chaleureux (fond clair chaud, accent ambre) */
+[data-site-theme="warm"] {
+  --site-bg: #fffbf5;
+  --site-bg-alt: #fef3e2;
+  --site-text: #44403c;
+  --site-text-muted: #78716c;
+  --site-heading: #292524;
+  --site-accent: #d97706;
+  --site-accent-hover: #b45309;
+  --site-accent-light: rgba(217, 119, 6, 0.1);
+  --site-card-bg: #ffffff;
+  --site-card-border: #e7e5e4;
+  --site-border: #e7e5e4;
+  --site-hero-overlay: rgba(41, 37, 36, 0.75);
+  --site-radius: 1rem;
+  --site-font: 'Georgia', serif;
+}
+
+/* Theme: Epure (fond blanc, accent emeraude) */
+[data-site-theme="clean"] {
+  --site-bg: #ffffff;
+  --site-bg-alt: #f8faf9;
+  --site-text: #374151;
+  --site-text-muted: #6b7280;
+  --site-heading: #111827;
+  --site-accent: #059669;
+  --site-accent-hover: #047857;
+  --site-accent-light: rgba(5, 150, 105, 0.08);
+  --site-card-bg: #ffffff;
+  --site-card-border: #e5e7eb;
+  --site-border: #e5e7eb;
+  --site-hero-overlay: rgba(17, 24, 39, 0.7);
+  --site-radius: 0.5rem;
+  --site-font: 'Inter', 'Helvetica Neue', sans-serif;
+}
+
+/* Theme: Dynamique (fond sombre, accent rouge) */
+[data-site-theme="bold"] {
+  --site-bg: #18181b;
+  --site-bg-alt: #27272a;
+  --site-text: #e4e4e7;
+  --site-text-muted: #a1a1aa;
+  --site-heading: #ffffff;
+  --site-accent: #ef4444;
+  --site-accent-hover: #dc2626;
+  --site-accent-light: rgba(239, 68, 68, 0.1);
+  --site-card-bg: #27272a;
+  --site-card-border: #3f3f46;
+  --site-border: #3f3f46;
+  --site-hero-overlay: rgba(24, 24, 27, 0.85);
+  --site-radius: 0.75rem;
+  --site-font: 'Inter', 'Helvetica Neue', sans-serif;
+}
