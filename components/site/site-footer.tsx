@@ -3,9 +3,10 @@ import type { SiteProfile, SiteContentFooter } from '@/lib/site-utils';
 interface SiteFooterProps {
   profile: SiteProfile;
   footer: SiteContentFooter;
+  legalText?: string;
 }
 
-export function SiteFooter({ profile, footer }: SiteFooterProps) {
+export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
   const year = new Date().getFullYear();
 
   return (
@@ -33,6 +34,26 @@ export function SiteFooter({ profile, footer }: SiteFooterProps) {
             <p>&copy; {year} {profile.company_name}. Tous droits reserves.</p>
           </div>
         </div>
+
+        {/* Legal text / CGV */}
+        {legalText && (
+          <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--site-border)' }}>
+            <details>
+              <summary
+                className="text-xs font-medium cursor-pointer hover:underline"
+                style={{ color: 'var(--site-text-muted)' }}
+              >
+                Mentions legales et conditions generales
+              </summary>
+              <div
+                className="mt-3 text-xs leading-relaxed whitespace-pre-line"
+                style={{ color: 'var(--site-text-muted)' }}
+              >
+                {legalText}
+              </div>
+            </details>
+          </div>
+        )}
 
         <div className="mt-6 pt-4 border-t text-center" style={{ borderColor: 'var(--site-border)' }}>
           <p className="text-xs" style={{ color: 'var(--site-text-muted)' }}>

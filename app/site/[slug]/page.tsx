@@ -150,7 +150,7 @@ export default async function SitePage({
         hasReviews={reviews.length > 0}
       />
 
-      <SiteHero hero={content.hero} companyName={profile.company_name} />
+      <SiteHero hero={content.hero} companyName={profile.company_name} heroImageUrl={site.hero_image_url || undefined} />
 
       {/* About + Highlights */}
       <section id="a-propos" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
@@ -211,7 +211,7 @@ export default async function SitePage({
         <SiteContact profile={profile} contact={content.contact} />
       )}
 
-      <SiteFooter profile={profile} footer={content.footer} />
+      <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} />
     </div>
   );
 }

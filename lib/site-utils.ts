@@ -63,6 +63,8 @@ export interface ArtisanSite {
   show_reviews: boolean;
   show_contact: boolean;
   show_map: boolean;
+  hero_image_url: string;
+  legal_text: string;
   custom_slogan: string;
   published_at: string | null;
   created_at: string;

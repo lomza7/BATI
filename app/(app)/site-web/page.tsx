@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { generateSlug, SITE_THEMES, type SiteTheme, type SiteContent, type ArtisanSite } from '@/lib/site-utils';
+import { SiteImageUpload } from '@/components/site/site-image-upload';
 
 const STEPS = [
   { id: 1, label: 'Informations', icon: Type },
@@ -65,6 +66,11 @@ export default function SiteWebPage() {
   const [error, setError] = useState('');
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  // Images + legal
+  const [logoUrl, setLogoUrl] = useState('');
+  const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [legalText, setLegalText] = useState('');
+
   // Section toggles
   const [showServices, setShowServices] = useState(true);
   const [showProjects, setShowProjects] = useState(true);
@@ -93,6 +99,7 @@ export default function SiteWebPage() {
         city: profileRes.data.company_city || '',
         phone: profileRes.data.company_phone || '',
       }));
+      if (profileRes.data.logo_url) setLogoUrl(profileRes.data.logo_url);
     }
 
     if (siteRes.data) {
@@ -105,6 +112,8 @@ export default function SiteWebPage() {
       setShowReviews(site.show_reviews);
       setShowContact(site.show_contact);
       setShowMap(site.show_map ?? true);
+      if (site.hero_image_url) setHeroImageUrl(site.hero_image_url);
+      if (site.legal_text) setLegalText(site.legal_text);
       if (site.custom_slogan) {
         setProfile(prev => ({ ...prev, slogan: site.custom_slogan }));
       }
@@ -187,6 +196,11 @@ export default function SiteWebPage() {
     try {
       const slug = existingSite?.slug || generateSlug(profile.company, profile.city);
 
+      // Save logo to profiles if changed
+      if (logoUrl) {
+        await supabase.from('profiles').update({ logo_url: logoUrl }).eq('id', user.id);
+      }
+
       const payload = {
         user_id: user.id,
         slug,
@@ -198,6 +212,8 @@ export default function SiteWebPage() {
         show_reviews: showReviews,
         show_contact: showContact,
         show_map: showMap,
+        hero_image_url: heroImageUrl || '',
+        legal_text: legalText || '',
         custom_slogan: profile.slogan || '',
         published_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -467,6 +483,36 @@ export default function SiteWebPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Images */}
+          <div className="rounded-xl border border-border bg-card p-6 sm:p-8 space-y-5">
+            <h2 className="font-semibold text-foreground">Images du site</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Logo de l&apos;entreprise</label>
+                <SiteImageUpload
+                  value={logoUrl}
+                  onChange={setLogoUrl}
+                  label="Ajoutez votre logo"
+                  hint="PNG ou SVG transparent, 2 Mo max"
+                  aspectRatio="aspect-square"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Image hero (fond de la page d&apos;accueil)</label>
+                <SiteImageUpload
+                  value={heroImageUrl}
+                  onChange={setHeroImageUrl}
+                  label="Photo de chantier, equipe..."
+                  hint="Format paysage recommande, 5 Mo max"
+                  aspectRatio="aspect-video"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ces images seront affichees sur votre site. Vous pourrez les modifier apres publication.
+            </p>
           </div>
 
           <Button className="w-full" size="lg" onClick={() => setStep(2)} disabled={!profile.company || !profile.activity}>
@@ -787,6 +833,60 @@ export default function SiteWebPage() {
                 ) : (
                   <div className="p-4">
                     <p className="text-sm text-muted-foreground">{siteContent.footer.tagline}</p>
+                  </div>
+                )}
+              </EditableSection>
+
+              {/* ── Mentions legales ── */}
+              <EditableSection title="Mentions legales / CGV" editing={editing} section="legal" setEditing={setEditing}>
+                {editing === 'legal' ? (
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Ajoutez vos conditions generales, mentions legales ou tout autre texte juridique.
+                    </p>
+                    <Textarea
+                      value={legalText}
+                      onChange={e => setLegalText(e.target.value)}
+                      className="min-h-[200px] text-sm font-mono"
+                      placeholder={"Mentions legales\n\nRaison sociale : ...\nSIRET : ...\nAdresse : ...\n\nConditions generales\n\n..."}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    {legalText ? (
+                      <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-6">{legalText}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Aucune mention legale. Cliquez sur Modifier pour en ajouter.</p>
+                    )}
+                  </div>
+                )}
+              </EditableSection>
+
+              {/* ── Images ── */}
+              <EditableSection title="Images" editing={editing} section="images" setEditing={setEditing}>
+                {editing === 'images' ? (
+                  <div className="p-4 space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Logo</label>
+                      <SiteImageUpload value={logoUrl} onChange={setLogoUrl} aspectRatio="aspect-square" className="max-w-[160px]" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Image hero</label>
+                      <SiteImageUpload value={heroImageUrl} onChange={setHeroImageUrl} aspectRatio="aspect-video" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 flex gap-4">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-lg object-cover border border-border" />
+                    ) : (
+                      <div className="h-16 w-16 rounded-lg bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">Logo</div>
+                    )}
+                    {heroImageUrl ? (
+                      <img src={heroImageUrl} alt="Hero" className="h-16 w-28 rounded-lg object-cover border border-border" />
+                    ) : (
+                      <div className="h-16 w-28 rounded-lg bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">Hero</div>
+                    )}
                   </div>
                 )}
               </EditableSection>
