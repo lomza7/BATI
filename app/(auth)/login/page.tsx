@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Hexagon, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Hexagon, Eye, EyeOff, ArrowRight, ArrowLeft, Zap, RefreshCw, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +52,27 @@ export default function LoginPage() {
 
     router.replace('/dashboard');
     router.refresh();
+  }
+
+  async function handleMagicLink() {
+    if (!email.trim() || magicLinkSending) return;
+    setError('');
+    setMagicLinkSending(true);
+
+    const { error: mlError } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+    });
+
+    setMagicLinkSending(false);
+
+    if (mlError) {
+      setError(mlError.message);
+      return;
+    }
+
+    setMagicLinkSent(true);
+    setTimeout(() => setMagicLinkSent(false), 8000);
   }
 
   return (
@@ -181,6 +204,37 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Separateur */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground/60">ou</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Magic link */}
+          <button
+            onClick={handleMagicLink}
+            disabled={!email.trim() || magicLinkSending || magicLinkSent}
+            className="w-full h-11 rounded-lg border border-border bg-white text-sm font-medium text-foreground flex items-center justify-center gap-2 hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {magicLinkSent ? (
+              <>
+                <Check className="h-4 w-4 text-emerald-500" />
+                Lien envoye ! Verifiez votre boite mail
+              </>
+            ) : magicLinkSending ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Envoi en cours...
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" />
+                Recevoir un lien de connexion par email
+              </>
+            )}
+          </button>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Pas encore de compte ?{' '}
