@@ -23,6 +23,7 @@ import {
   stringifyPlanFeatures,
   type PricingPlanKey,
 } from '@/lib/pricing-plans';
+import AdminAgentsSection from '@/components/admin/admin-agents-section';
 
 const ADMIN_EMAIL = 'louis@maaza.pro';
 
@@ -915,6 +916,9 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+
+          {/* Agents IA plateforme */}
+          <AdminAgentsSection />
 
           {/* Tableau utilisateurs */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
