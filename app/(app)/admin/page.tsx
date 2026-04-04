@@ -6,7 +6,7 @@ import {
   Shield, Users, CreditCard, TrendingUp, FileText, HardHat,
   Receipt, Contact, Target, RefreshCw, Crown, Zap, ChevronDown,
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
-  Save, Check, AlertCircle, ExternalLink, Loader2,
+  Save, Check, AlertCircle, ExternalLink, Loader2, Globe,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -65,6 +65,18 @@ interface AdminUser {
   client_count: number;
 }
 
+interface AdminSite {
+  id: string;
+  slug: string;
+  status: string;
+  theme: string;
+  published_at: string | null;
+  created_at: string;
+  company_name: string;
+  company_city: string;
+  company_activity: string;
+}
+
 interface ChartPoint {
   label: string;
   value: number;
@@ -98,6 +110,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [adminSites, setAdminSites] = useState<AdminSite[]>([]);
+  const [sitesLoading, setSitesLoading] = useState(false);
 
   // Stripe / pricing config
   const [configLoading, setConfigLoading] = useState(true);
@@ -230,6 +244,25 @@ export default function AdminPage() {
     }
   }
 
+  const loadSites = useCallback(async () => {
+    setSitesLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/sites', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAdminSites(data.sites || []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setSitesLoading(false);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -262,7 +295,8 @@ export default function AdminPage() {
     }
     loadData();
     loadConfig();
-  }, [authLoading, user, router, loadData, loadConfig]);
+    loadSites();
+  }, [authLoading, user, router, loadData, loadConfig, loadSites]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -607,6 +641,86 @@ export default function AdminPage() {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Sites deployes */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-primary" /> Sites deployes
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {adminSites.length} site{adminSites.length > 1 ? 's' : ''} — {adminSites.filter(s => s.status === 'published').length} publie{adminSites.filter(s => s.status === 'published').length > 1 ? 's' : ''}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={loadSites} disabled={sitesLoading} className="gap-1.5">
+                <RefreshCw className={cn('h-3.5 w-3.5', sitesLoading && 'animate-spin')} />
+              </Button>
+            </div>
+            {adminSites.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {sitesLoading ? 'Chargement...' : 'Aucun site cree pour le moment'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Entreprise</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Slug</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Theme</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Statut</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Publie le</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Lien</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminSites.map(site => (
+                      <tr key={site.id} className="border-b border-border hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-foreground text-xs">{site.company_name}</p>
+                          <p className="text-[11px] text-muted-foreground">{[site.company_activity, site.company_city].filter(Boolean).join(' · ')}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-mono text-muted-foreground">{site.slug}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs capitalize">{site.theme}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={cn(
+                            'text-[11px] px-2 py-0.5 rounded-full font-medium',
+                            site.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                          )}>
+                            {site.status === 'published' ? 'Publie' : 'Brouillon'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-muted-foreground">
+                            {site.published_at ? formatShortDate(site.published_at) : '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {site.status === 'published' ? (
+                            <a
+                              href={`https://hellobat.app/site/${site.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                            >
+                              Voir <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Tableau utilisateurs */}
