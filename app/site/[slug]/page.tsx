@@ -55,7 +55,7 @@ async function getSiteData(slug: string) {
     sb.from('profiles').select('*').eq('id', typedSite.user_id).maybeSingle(),
     sb
       .from('projects')
-      .select('id, title, description, address, city, status, lat, lng, project_photos(id, photo_url, caption)')
+      .select('id, name, description, address, city, status, lat, lng, project_photos(id, photo_url, caption)')
       .eq('user_id', typedSite.user_id)
       .eq('is_public', true)
       .order('created_at', { ascending: false })
@@ -125,7 +125,7 @@ export default async function SitePage({
   // Projects with coordinates for the map
   const mapProjects = projects
     .filter(p => p.lat && p.lng)
-    .map(p => ({ id: p.id, title: p.title, city: p.city, lat: p.lat!, lng: p.lng! }));
+    .map(p => ({ id: p.id, title: p.name, city: p.city, lat: p.lat!, lng: p.lng! }));
 
   return (
     <div

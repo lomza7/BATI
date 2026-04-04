@@ -11,7 +11,7 @@ export function SiteProjects({ projects }: SiteProjectsProps) {
   const allPhotos = projects.flatMap((p) =>
     p.project_photos.map((photo) => ({
       ...photo,
-      projectTitle: p.title,
+      projectTitle: p.name,
       projectCity: p.city,
     }))
   );
@@ -76,7 +76,7 @@ export function SiteProjects({ projects }: SiteProjectsProps) {
                   className="text-lg font-semibold mb-1"
                   style={{ color: 'var(--site-heading)' }}
                 >
-                  {project.title}
+                  {project.name}
                 </h3>
                 {project.city && (
                   <p className="text-sm mb-2" style={{ color: 'var(--site-text-muted)' }}>

@@ -91,7 +91,7 @@ export interface SiteProfile {
 
 export interface SiteProject {
   id: string;
-  title: string;
+  name: string;
   description: string | null;
   address: string | null;
   city: string | null;
