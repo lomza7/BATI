@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,12 @@ export async function POST(request: Request) {
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+  }
+
+  // Check AI limit
+  const limitCheck = await checkAiLimit(user.id);
+  if (!limitCheck.allowed) {
+    return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
   }
 
   try {
@@ -144,6 +151,16 @@ Important :
     const rawText = data.content?.[0]?.text || '';
     const jsonStr = extractJson(rawText);
     const siteContent = JSON.parse(jsonStr);
+
+    // Track usage
+    trackAiUsage({
+      user_id: user.id,
+      route: 'ai/site-content',
+      model,
+      input_tokens: data.usage?.input_tokens || 0,
+      output_tokens: data.usage?.output_tokens || 0,
+      status: 'success',
+    }).catch(() => {});
 
     return NextResponse.json({ site_content: siteContent });
   } catch (err) {

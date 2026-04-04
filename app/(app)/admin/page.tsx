@@ -7,6 +7,7 @@ import {
   Receipt, Contact, Target, RefreshCw, Crown, Zap, ChevronDown,
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
   Save, Check, AlertCircle, ExternalLink, Loader2, Globe,
+  Brain, Ban, ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -65,6 +66,25 @@ interface AdminUser {
   client_count: number;
 }
 
+interface AiUsageUser {
+  user_id: string;
+  company_name: string;
+  full_name: string;
+  plan: string;
+  ai_blocked: boolean;
+  ai_blocked_reason: string;
+  calls: number;
+  tokens: number;
+  last_call: string | null;
+  routes: Record<string, number>;
+}
+
+interface AiPlanLimit {
+  plan: string;
+  monthly_calls: number;
+  monthly_tokens: number;
+}
+
 interface AdminSite {
   id: string;
   slug: string;
@@ -112,6 +132,10 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState('');
   const [adminSites, setAdminSites] = useState<AdminSite[]>([]);
   const [sitesLoading, setSitesLoading] = useState(false);
+  const [aiUsageUsers, setAiUsageUsers] = useState<AiUsageUser[]>([]);
+  const [aiLimits, setAiLimits] = useState<AiPlanLimit[]>([]);
+  const [aiUsageLoading, setAiUsageLoading] = useState(false);
+  const [blockingUser, setBlockingUser] = useState<string | null>(null);
 
   // Stripe / pricing config
   const [configLoading, setConfigLoading] = useState(true);
@@ -263,6 +287,60 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadAiUsage = useCallback(async () => {
+    setAiUsageLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/ai-usage', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiUsageUsers(data.users || []);
+        setAiLimits(data.limits || []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setAiUsageLoading(false);
+    }
+  }, []);
+
+  async function toggleBlockUser(userId: string, currentlyBlocked: boolean) {
+    setBlockingUser(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/ai-usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'toggle_block',
+          user_id: userId,
+          blocked: !currentlyBlocked,
+          reason: !currentlyBlocked ? 'Bloque par l\'administrateur' : '',
+        }),
+      });
+      if (res.ok) {
+        setAiUsageUsers(prev =>
+          prev.map(u =>
+            u.user_id === userId
+              ? { ...u, ai_blocked: !currentlyBlocked, ai_blocked_reason: !currentlyBlocked ? 'Bloque par l\'administrateur' : '' }
+              : u
+          )
+        );
+      }
+    } catch {
+      // silent
+    } finally {
+      setBlockingUser(null);
+    }
+  }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -296,7 +374,8 @@ export default function AdminPage() {
     loadData();
     loadConfig();
     loadSites();
-  }, [authLoading, user, router, loadData, loadConfig, loadSites]);
+    loadAiUsage();
+  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -723,6 +802,120 @@ export default function AdminPage() {
             )}
           </div>
 
+          {/* Utilisation IA */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-primary" /> Utilisation IA (ce mois)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {aiUsageUsers.reduce((s, u) => s + u.calls, 0)} appels — {formatTokens(aiUsageUsers.reduce((s, u) => s + u.tokens, 0))} tokens
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Limits display */}
+                <div className="hidden sm:flex items-center gap-3 text-[11px] text-muted-foreground mr-2">
+                  {aiLimits.map(l => (
+                    <span key={l.plan} className="capitalize">
+                      {l.plan}: {l.monthly_calls === -1 ? '∞' : l.monthly_calls} appels
+                    </span>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" onClick={loadAiUsage} disabled={aiUsageLoading} className="gap-1.5">
+                  <RefreshCw className={cn('h-3.5 w-3.5', aiUsageLoading && 'animate-spin')} />
+                </Button>
+              </div>
+            </div>
+            {aiUsageUsers.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {aiUsageLoading ? 'Chargement...' : 'Aucune utilisation IA ce mois'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Utilisateur</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Plan</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Appels</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Tokens</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Routes</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Dernier appel</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aiUsageUsers.map(u => {
+                      const limit = aiLimits.find(l => l.plan === u.plan);
+                      const overLimit = limit && limit.monthly_calls !== -1 && u.calls >= limit.monthly_calls;
+                      return (
+                        <tr key={u.user_id} className={cn('border-b border-border hover:bg-muted/20 transition-colors', u.ai_blocked && 'bg-red-50/50')}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-foreground text-xs">{u.company_name}</p>
+                            <p className="text-[11px] text-muted-foreground">{u.full_name}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn(
+                              'text-[11px] px-2 py-0.5 rounded-full font-medium capitalize',
+                              u.plan === 'business' ? 'bg-amber-100 text-amber-700' :
+                              u.plan === 'pro' ? 'bg-blue-100 text-blue-700' :
+                              'bg-slate-100 text-slate-700'
+                            )}>
+                              {u.plan}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={cn('text-xs font-semibold', overLimit ? 'text-red-600' : 'text-foreground')}>
+                              {u.calls}
+                              {limit && limit.monthly_calls !== -1 && (
+                                <span className="text-muted-foreground font-normal">/{limit.monthly_calls}</span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-xs text-foreground">{formatTokens(u.tokens)}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1.5 flex-wrap">
+                              {Object.entries(u.routes).map(([route, count]) => (
+                                <span key={route} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                  {route.replace('ai/', '')} ({count})
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-muted-foreground">
+                              {u.last_call ? formatShortDate(u.last_call) : '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              size="sm"
+                              variant={u.ai_blocked ? 'outline' : 'destructive'}
+                              className="h-7 text-xs gap-1"
+                              onClick={() => toggleBlockUser(u.user_id, u.ai_blocked)}
+                              disabled={blockingUser === u.user_id}
+                            >
+                              {blockingUser === u.user_id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : u.ai_blocked ? (
+                                <><ShieldCheck className="h-3 w-3" /> Debloquer</>
+                              ) : (
+                                <><Ban className="h-3 w-3" /> Bloquer</>
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Tableau utilisateurs */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -840,6 +1033,12 @@ function MiniKpi({ icon: Icon, label, value, accent }: { icon: React.ElementType
       <p className={cn('text-sm font-semibold', accent ? 'text-primary' : 'text-foreground')}>{value}</p>
     </div>
   );
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(tokens);
 }
 
 function formatShortDate(dateStr: string): string {

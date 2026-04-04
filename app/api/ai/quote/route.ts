@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { aiQuoteAnalysisSchema } from '@/lib/ai/quote-schema';
+import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +30,26 @@ export async function POST(request: Request) {
       { error: "ANTHROPIC_API_KEY est absente dans l'environnement du serveur." },
       { status: 503 }
     );
+  }
+
+  // Auth + limit check
+  const authHeader = request.headers.get('authorization');
+  let userId: string | null = null;
+  if (authHeader) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    userId = user?.id || null;
+  }
+
+  if (userId) {
+    const limitCheck = await checkAiLimit(userId);
+    if (!limitCheck.allowed) {
+      return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
+    }
   }
 
   try {
@@ -139,7 +161,21 @@ export async function POST(request: Request) {
 
     const responseJson = (await anthropicResponse.json()) as {
       content?: Array<{ type?: string; text?: string }>;
+      usage?: { input_tokens?: number; output_tokens?: number };
     };
+
+    // Track usage
+    const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+    if (userId) {
+      trackAiUsage({
+        user_id: userId,
+        route: 'ai/quote',
+        model,
+        input_tokens: responseJson.usage?.input_tokens || 0,
+        output_tokens: responseJson.usage?.output_tokens || 0,
+        status: 'success',
+      }).catch(() => {});
+    }
 
     const textContent = responseJson.content
       ?.filter((block) => block.type === 'text' && block.text)
