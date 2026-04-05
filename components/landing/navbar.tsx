@@ -63,7 +63,7 @@ export function Navbar() {
             onMouseLeave={() => setDropdownOpen(false)}
           >
             <button className="flex items-center gap-1 text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
-              Fonctionnalites
+              Fonctionnalités
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
 
@@ -92,7 +92,7 @@ export function Navbar() {
             Tarifs
           </Link>
           <Link href="#testimonials" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
-            Temoignages
+            Témoignages
           </Link>
         </div>
 

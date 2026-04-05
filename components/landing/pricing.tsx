@@ -43,7 +43,7 @@ export function Pricing() {
             Des tarifs <em className="italic text-[var(--landing-accent)]">transparents</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            Choisissez le plan qui correspond a votre activite. Changez a tout moment.
+            Choisissez le plan qui correspond à votre activité. Changez à tout moment.
           </p>
         </div>
 

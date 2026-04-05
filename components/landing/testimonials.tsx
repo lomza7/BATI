@@ -3,19 +3,19 @@ export function Testimonials() {
     {
       name: 'Thomas Renard',
       role: 'Plombier, Lyon',
-      text: 'Hellobat a transforme ma gestion quotidienne. Je passe moitie moins de temps sur l\'administratif et mes clients recoivent les devis en quelques minutes.',
+      text: 'Hellobat a transformé ma gestion quotidienne. Je passe moitié moins de temps sur l\'administratif et mes clients reçoivent les devis en quelques minutes.',
       avatar: 'TR',
     },
     {
       name: 'Marie Leclerc',
-      role: 'Electricienne, Bordeaux',
-      text: 'Le module de prospection est incroyable. En 3 mois, j\'ai augmente mon taux de conversion de 40%. Le CRM est vraiment adapte aux artisans.',
+      role: 'Électricienne, Bordeaux',
+      text: 'Le module de prospection est incroyable. En 3 mois, j\'ai augmenté mon taux de conversion de 40%. Le CRM est vraiment adapté aux artisans.',
       avatar: 'ML',
     },
     {
       name: 'David Moreau',
       role: 'Couvreur, Nantes',
-      text: 'Les agents IA me font gagner un temps fou. L\'agent devis genere des propositions precises en 30 secondes. Mes clients sont impressionnes.',
+      text: 'Les agents IA me font gagner un temps fou. L\'agent devis génère des propositions précises en 30 secondes. Mes clients sont impressionnés.',
       avatar: 'DM',
     },
   ];
@@ -28,7 +28,7 @@ export function Testimonials() {
             Ils nous font <em className="italic text-[var(--landing-accent)]">confiance</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg max-w-xl mx-auto">
-            Decouvrez ce que les artisans pensent de Hellobat au quotidien.
+            Découvrez ce que les artisans pensent de Hellobat au quotidien.
           </p>
         </div>
 

@@ -6,7 +6,7 @@ export function CTA() {
     <section className="py-12 sm:py-20 bg-[var(--landing-text)]">
       <div className="max-w-[800px] mx-auto px-6 text-center">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-white mb-4">
-          Prêt a simplifier votre gestion ?
+          Prêt à simplifier votre gestion ?
         </h2>
         <p className="text-[#a0a0a0] mb-8 max-w-md mx-auto">
           Rejoignez 2 400+ artisans qui gèrent leur activité plus efficacement avec Hellobat.
@@ -23,7 +23,7 @@ export function CTA() {
             href="#demo"
             className="inline-flex items-center gap-2 px-8 py-3.5 border border-[#333] text-white rounded-full text-sm hover:bg-white/5 transition-colors"
           >
-            Voir la demo
+            Voir la démo
           </Link>
         </div>
       </div>

@@ -19,6 +19,9 @@ import {
   BookOpen,
   Link2,
   HardHat,
+  ShieldCheck,
+  FileCheck2,
+  Archive,
 } from 'lucide-react';
 
 interface FeatureSectionProps {
@@ -85,12 +88,12 @@ export function SiteWebSection() {
       badge="Site Web"
       title="Votre vitrine en ligne,"
       titleAccent="sans effort"
-      description="Un site professionnel généré automatiquement à partir de vos informations. Présentez vos réalisations, recevez des demandes de devis et renforcez votre credibilité."
+      description="Un site professionnel généré automatiquement à partir de vos informations. Présentez vos réalisations, recevez des demandes de devis et renforcez votre crédibilité."
       bulletPoints={[
         'Mise en page professionnelle automatique',
         'Galerie de réalisations avec photos',
-        'Formulaire de contact integré',
-        'Optimise pour le réferencement (SEO)',
+        'Formulaire de contact intégré',
+        'Optimisé pour le référencement (SEO)',
       ]}
       visual={
         <MockBrowser url="www.martin-plomberie.fr">
@@ -108,7 +111,7 @@ export function SiteWebSection() {
                 <span className="text-xs text-white font-medium">Demander un devis</span>
               </div>
               <div className="h-8 flex-1 rounded-lg border border-[var(--landing-border)] flex items-center justify-center">
-                <span className="text-xs text-[var(--landing-text)]">Nos realisations</span>
+                <span className="text-xs text-[var(--landing-text)]">Nos réalisations</span>
               </div>
             </div>
           </div>
@@ -122,15 +125,15 @@ export function DevisSection() {
   return (
     <FeatureSection
       id="devis"
-      badge="Devis IA"
+      badge="Devis IA · Claude Sonnet"
       title="Vos devis,"
       titleAccent="pas comme tout le monde"
-      description="Hellobat vous aide a preparer vos devis a partir de la voix et des photos du chantier. L artisan parle naturellement, ajoute quelques images, puis l IA propose une base de chiffrage claire a relire."
+      description="Hellobat vous aide à préparer vos devis à partir de la voix et des photos du chantier. Propulsé par Claude Sonnet d'Anthropic, l'IA analyse votre demande vocale et vos photos pour proposer un chiffrage précis. Envoyez et faites signer électroniquement en illimité."
       bulletPoints={[
         'Description du besoin en parlant, comme sur chantier',
         'Ajout de photos pour enrichir le contexte',
-        'Analyse IA avec suggestions de lignes et hypotheses',
-        'Validation finale toujours humaine avant envoi',
+        'Analyse IA par Claude Sonnet — suggestions de lignes et hypothèses',
+        'Signature électronique illimitée intégrée (DocuSeal)',
       ]}
       visual={
         <MockBrowser url="hellobat.app/devis">
@@ -141,7 +144,7 @@ export function DevisSection() {
                 Demande vocale
               </div>
               <div className="mt-3 rounded-lg bg-white p-3 text-xs text-[var(--landing-text)] shadow-sm">
-                Bonjour, salle de bain a refaire completement, environ 6 m2, depose, plomberie douche, carrelage mural et meuble vasque.
+                Bonjour, salle de bain à refaire complètement, environ 6 m2, dépose, plomberie douche, carrelage mural et meuble vasque.
               </div>
 
               <div className="mt-4 flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
@@ -159,11 +162,12 @@ export function DevisSection() {
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
                 <Wand2 className="h-3.5 w-3.5" />
                 Analyse IA
+                <span className="ml-auto text-[9px] font-medium text-[#D97706] bg-[#D97706]/10 px-1.5 py-0.5 rounded-full">Claude Sonnet</span>
               </div>
               <div className="mt-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-semibold text-[var(--landing-text)]">Renovation salle de bain</div>
+                    <div className="text-xs font-semibold text-[var(--landing-text)]">Rénovation salle de bain</div>
                     <div className="text-[10px] text-[var(--landing-muted)]">Mme Petit</div>
                   </div>
                   <span className="rounded-full bg-[var(--landing-accent-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--landing-accent)]">
@@ -172,7 +176,7 @@ export function DevisSection() {
                 </div>
                 <div className="mt-3 space-y-2">
                   {[
-                    'Depose des equipements existants',
+                    'Dépose des équipements existants',
                     'Reprise plomberie douche / vasque',
                     'Pose receveur, paroi et meuble vasque',
                   ].map((line) => (
@@ -191,25 +195,92 @@ export function DevisSection() {
   );
 }
 
+export function FactureElectroniqueSection() {
+  return (
+    <FeatureSection
+      id="facture-electronique"
+      badge="Réforme 2026"
+      title="Facture électronique,"
+      titleAccent="vous êtes prêt"
+      description="La réforme de la facturation électronique entre en vigueur en 2026. Hellobat intègre dès aujourd'hui le format Factur-X, l'e-reporting et l'archivage légal pour que vous soyez conforme sans effort."
+      bulletPoints={[
+        'Format Factur-X (PDF/A-3 + XML) conforme aux normes EN 16931',
+        'E-reporting automatique vers la plateforme publique de facturation',
+        'Archivage légal 10 ans avec horodatage et intégrité garantie',
+        'Numérotation séquentielle et mentions obligatoires vérifiées',
+      ]}
+      reversed
+      visual={
+        <MockBrowser url="hellobat.app/factures">
+          <div className="space-y-4">
+            {/* Compliance banner */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-blue-900">Conforme facture électronique 2026</div>
+                <div className="text-[10px] text-blue-700">Factur-X · E-reporting · Archivage légal</div>
+              </div>
+              <span className="text-[9px] font-medium text-white bg-blue-600 px-2 py-1 rounded-full shrink-0">Actif</span>
+            </div>
+
+            {/* Sample invoice */}
+            <div className="p-4 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)]">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-xs font-semibold text-[var(--landing-text)]">Facture F-2026-089</div>
+                  <div className="text-[10px] text-[var(--landing-muted)]">M. Dupont · 3 200 EUR TTC</div>
+                </div>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Payée</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-[10px]">
+                  <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-[var(--landing-text)] font-medium">Factur-X</span>
+                  <span className="text-[var(--landing-muted)]">PDF/A-3 + données XML</span>
+                  <span className="ml-auto text-emerald-600 font-medium">Valide</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-[var(--landing-text)] font-medium">E-reporting</span>
+                  <span className="text-[var(--landing-muted)]">Transmis PPF</span>
+                  <span className="ml-auto text-emerald-600 font-medium">Envoyé</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <Archive className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-[var(--landing-text)] font-medium">Archivage</span>
+                  <span className="text-[var(--landing-muted)]">10 ans · horodaté</span>
+                  <span className="ml-auto text-emerald-600 font-medium">Archivé</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </MockBrowser>
+      }
+    />
+  );
+}
+
 export function ProspectionSection() {
   return (
     <FeatureSection
       id="prospection"
       badge="Prospection CRM"
       title="Convertissez vos prospects,"
-      titleAccent="methodiquement"
-      description="Un pipeline commercial visuel en kanban pour suivre chaque lead, du premier contact au chantier signe."
+      titleAccent="méthodiquement"
+      description="Un pipeline commercial visuel en kanban pour suivre chaque lead, du premier contact au chantier signé."
       bulletPoints={[
-        'Pipeline drag & drop par etapes',
-        'Fiches prospects detaillees',
-        'Historique des echanges',
+        'Pipeline drag & drop par étapes',
+        'Fiches prospects détaillées',
+        'Historique des échanges',
         'Relances automatiques',
       ]}
       reversed
       visual={
         <MockBrowser>
           <div className="flex gap-3 overflow-x-auto pb-1">
-            {['Nouveau', 'Contacte', 'Devis envoye', 'Gagne'].map((col) => (
+            {['Nouveau', 'Contacté', 'Devis envoyé', 'Gagné'].map((col) => (
               <div key={col} className="min-w-[100px] flex-1 space-y-2">
                 <div className="text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider whitespace-nowrap">{col}</div>
                 {[1, 2].map((i) => (
@@ -231,15 +302,15 @@ export function EmailSection() {
   return (
     <FeatureSection
       id="email"
-      badge="Emails"
-      title="Votre messagerie,"
-      titleAccent="centralisee"
-      description="Plus besoin de jongler entre votre boite mail et votre logiciel. Envoyez, recevez et suivez tous vos emails directement dans Hellobat."
+      badge="Gmail intégré"
+      title="Votre Gmail,"
+      titleAccent="dans Hellobat"
+      description="Connectez votre compte Gmail en un clic via OAuth. Envoyez, recevez et répondez à vos emails directement dans Hellobat, avec réponse IA contextuelle."
       bulletPoints={[
-        'Boite de reception integree',
-        'Envoi de devis et factures par email',
-        'Historique complet par client',
-        'Templates de reponses rapides',
+        'Synchronisation Gmail bidirectionnelle (OAuth sécurisé)',
+        'Réponse IA avec contexte client : devis, factures, chantiers',
+        'Envoi de devis et factures par email en un clic',
+        'Historique complet par client et recherche rapide',
       ]}
       visual={
         <MockBrowser>
@@ -247,7 +318,7 @@ export function EmailSection() {
             {[
               { from: 'M. Dupont', subject: 'Re: Devis salle de bain', time: '10:32' },
               { from: 'Mme Bernard', subject: 'Demande de devis toiture', time: '09:15' },
-              { from: 'SAS Martin', subject: 'Commande materiaux', time: 'Hier' },
+              { from: 'SAS Martin', subject: 'Commande matériaux', time: 'Hier' },
             ].map((email) => (
               <div key={email.subject} className="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--landing-off)] border border-transparent hover:border-[var(--landing-border)] transition-colors">
                 <div className="w-8 h-8 rounded-full bg-[var(--landing-stone)] flex items-center justify-center">
@@ -271,13 +342,13 @@ export function ComptaSection() {
   return (
     <FeatureSection
       id="compta"
-      badge="Comptabilite"
-      title="Comptabilite simplifiee,"
-      titleAccent="en un clin d'oeil"
-      description="Suivez vos revenus, depenses et marges en temps reel. Exportez vos donnees pour votre comptable en un clic."
+      badge="Comptabilité"
+      title="Comptabilité simplifiée,"
+      titleAccent="en un clin d'œil"
+      description="Suivez vos revenus, dépenses et marges en temps réel. Exportez vos données pour votre comptable en un clic."
       bulletPoints={[
-        'Tableau de bord financier en temps reel',
-        'Suivi des depenses par categorie',
+        'Tableau de bord financier en temps réel',
+        'Suivi des dépenses par catégorie',
         'Rapprochement bancaire automatique',
         'Export comptable (PDF, CSV)',
       ]}
@@ -291,7 +362,7 @@ export function ComptaSection() {
                 <div className="text-lg font-bold text-emerald-700">124 800 EUR</div>
               </div>
               <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                <div className="text-[10px] text-red-600 font-medium">Depenses</div>
+                <div className="text-[10px] text-red-600 font-medium">Dépenses</div>
                 <div className="text-lg font-bold text-red-700">43 200 EUR</div>
               </div>
             </div>
@@ -314,9 +385,9 @@ export function AvisSection() {
     <FeatureSection
       id="avis"
       badge="Avis Google"
-      title="Des avis 5 etoiles,"
+      title="Des avis 5 étoiles,"
       titleAccent="automatiquement"
-      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-reputation depuis Hellobat."
+      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-réputation depuis Hellobat."
       bulletPoints={[
         'Envoi automatique post-chantier',
         'Suivi de votre note Google',
@@ -333,7 +404,7 @@ export function AvisSection() {
             </div>
             {[
               { name: 'Pierre L.', text: 'Travail impeccable, je recommande !', stars: 5 },
-              { name: 'Sophie M.', text: 'Tres professionnel et ponctuel.', stars: 5 },
+              { name: 'Sophie M.', text: 'Très professionnel et ponctuel.', stars: 5 },
             ].map((review) => (
               <div key={review.name} className="p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
                 <div className="flex items-center gap-2 mb-1">
@@ -364,14 +435,14 @@ export function PlansSection() {
       bulletPoints={[
         'Stockage illimité de fichiers',
         'Organisation par chantier',
-        'Partage client par lien securisé',
-        'Visionneuse integrée (PDF, images)',
+        'Partage client par lien sécurisé',
+        'Visionneuse intégrée (PDF, images)',
       ]}
       reversed
       visual={
         <MockBrowser>
           <div className="grid grid-cols-3 gap-2">
-            {['Plan RDC.pdf', 'Facade.jpg', 'Devis.pdf', 'Photo 1.jpg', 'Rendu 3D.png', 'Plan etage.pdf'].map((file) => (
+            {['Plan RDC.pdf', 'Facade.jpg', 'Devis.pdf', 'Photo 1.jpg', 'Rendu 3D.png', 'Plan étage.pdf'].map((file) => (
               <div key={file} className="aspect-square rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)] flex items-center justify-center p-2">
                 <div className="text-center">
                   <FileImage className="w-5 h-5 text-[var(--landing-muted)] mx-auto mb-1" />
@@ -393,12 +464,12 @@ export function CarteSection() {
       badge="Carte"
       title="Vos chantiers,"
       titleAccent="sur une carte"
-      description="Visualisez l'ensemble de vos projets, prospects et interventions sur une carte interactive. Optimisez vos deplacements."
+      description="Visualisez l'ensemble de vos projets, prospects et interventions sur une carte interactive. Optimisez vos déplacements."
       bulletPoints={[
         'Vue carte de tous vos chantiers',
         'Filtrage par statut et type',
-        'Itineraire optimise',
-        'Geolocalisation des prospects',
+        'Itinéraire optimisé',
+        'Géolocalisation des prospects',
       ]}
       visual={
         <MockBrowser>
@@ -427,13 +498,13 @@ export function ContactsSection() {
       id="contacts"
       badge="Contacts"
       title="Votre carnet d'adresses,"
-      titleAccent="toujours a jour"
-      description="Clients, prospects et prestataires reunis dans un seul repertoire. Filtrez par type, consultez l'historique des devis, factures et chantiers lies en un clic."
+      titleAccent="toujours à jour"
+      description="Clients, prospects et prestataires réunis dans un seul répertoire. Filtrez par type, consultez l'historique des devis, factures et chantiers liés en un clic."
       bulletPoints={[
-        'Fiches contacts detaillees (telephone, email, adresse, notes)',
+        'Fiches contacts détaillées (téléphone, email, adresse, notes)',
         'Filtrage par type : client, prospect, prestataire',
-        'Historique complet : devis, factures et chantiers lies',
-        'KPI par contact : CA genere, factures payees',
+        'Historique complet : devis, factures et chantiers liés',
+        'KPI par contact : CA généré, factures payées',
       ]}
       reversed
       visual={
@@ -478,12 +549,12 @@ export function EquipeSection() {
   return (
     <FeatureSection
       id="equipe"
-      badge="Equipe"
-      title="Votre equipe,"
-      titleAccent="bien geree"
-      description="Salaries, sous-traitants, interimaires : gerez toute votre equipe au meme endroit. Suivi des heures, specialites, taux horaire et notes internes."
+      badge="Équipe"
+      title="Votre équipe,"
+      titleAccent="bien gérée"
+      description="Salariés, sous-traitants, intérimaires : gérez toute votre équipe au même endroit. Suivi des heures, spécialités, taux horaire et notes internes."
       bulletPoints={[
-        'Profils avec photo, specialite et type de contrat',
+        'Profils avec photo, spécialité et type de contrat',
         'Calcul automatique du taux horaire',
         'Suivi des heures par chantier',
         'Notes internes et historique',
@@ -492,9 +563,9 @@ export function EquipeSection() {
         <MockBrowser url="hellobat.app/equipe">
           <div className="space-y-3">
             {[
-              { name: 'Jean Martin', role: 'Salarie', specialty: 'Plomberie', hours: '142h', rate: '28 EUR/h' },
-              { name: 'Ahmed Benali', role: 'Sous-traitant', specialty: 'Electricite', hours: '86h', rate: '35 EUR/h' },
-              { name: 'Lucas Petit', role: 'Interimaire', specialty: 'Maconnerie', hours: '64h', rate: '22 EUR/h' },
+              { name: 'Jean Martin', role: 'Salarié', specialty: 'Plomberie', hours: '142h', rate: '28 EUR/h' },
+              { name: 'Ahmed Benali', role: 'Sous-traitant', specialty: 'Électricité', hours: '86h', rate: '35 EUR/h' },
+              { name: 'Lucas Petit', role: 'Intérimaire', specialty: 'Maçonnerie', hours: '64h', rate: '22 EUR/h' },
             ].map((m) => (
               <div key={m.name} className="flex items-center gap-3 p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
                 <div className="w-9 h-9 rounded-full bg-[var(--landing-accent)]/10 flex items-center justify-center shrink-0">
@@ -527,12 +598,12 @@ export function PlanningSection() {
       badge="Planning"
       title="Un planning visuel,"
       titleAccent="drag & drop"
-      description="Planifiez vos interventions avec un planning semaine ou mois interactif. Glissez-deposez les evenements, assignez votre equipe et visualisez la charge de travail."
+      description="Planifiez vos interventions avec un planning semaine ou mois interactif. Glissez-déposez les événements, assignez votre équipe et visualisez la charge de travail."
       bulletPoints={[
         'Vue semaine avec colonnes par jour',
         'Vue mois avec calendrier complet',
-        'Drag & drop pour deplacer les interventions',
-        'Code couleur par type : chantier, conge, reunion',
+        'Drag & drop pour déplacer les interventions',
+        'Code couleur par type : chantier, congé, réunion',
       ]}
       reversed
       visual={
@@ -550,11 +621,11 @@ export function PlanningSection() {
               <div className="col-span-3 p-1.5 rounded bg-blue-100 border border-blue-200">
                 <div className="flex items-center gap-1">
                   <GripVertical className="w-2.5 h-2.5 text-blue-400" />
-                  <span className="text-[9px] font-medium text-blue-700 truncate">Renov. Dupont</span>
+                  <span className="text-[9px] font-medium text-blue-700 truncate">Rénov. Dupont</span>
                 </div>
               </div>
               <div className="col-span-1 p-1.5 rounded bg-amber-100 border border-amber-200">
-                <span className="text-[9px] font-medium text-amber-700">Conge</span>
+                <span className="text-[9px] font-medium text-amber-700">Congé</span>
               </div>
               <div className="col-span-1 p-1.5 rounded bg-[var(--landing-off)] border border-[var(--landing-border)]" />
               {/* Row 2 - Ahmed */}
@@ -565,7 +636,7 @@ export function PlanningSection() {
                 </div>
               </div>
               <div className="col-span-1 p-1.5 rounded bg-purple-100 border border-purple-200">
-                <span className="text-[9px] font-medium text-purple-700">Reunion</span>
+                <span className="text-[9px] font-medium text-purple-700">Réunion</span>
               </div>
               <div className="col-span-2 p-1.5 rounded bg-blue-100 border border-blue-200">
                 <div className="flex items-center gap-1">
@@ -587,13 +658,13 @@ export function CataloguesSection() {
       id="catalogues"
       badge="Catalogues"
       title="Vos catalogues produits,"
-      titleAccent="partages en un lien"
-      description="Creez des catalogues visuels avec vos produits et collections. Partagez-les a vos clients via un lien magique sans qu'ils aient besoin de compte."
+      titleAccent="partagés en un lien"
+      description="Créez des catalogues visuels avec vos produits et collections. Partagez-les à vos clients via un lien magique sans qu'ils aient besoin de compte."
       bulletPoints={[
         'Builder visuel drag & drop',
         'Organisation par collections',
         'Partage par lien magique (sans compte client)',
-        'Suivi des consultations et selections',
+        'Suivi des consultations et sélections',
       ]}
       visual={
         <MockBrowser url="hellobat.app/catalogues">
@@ -625,15 +696,15 @@ export function PaiementSection() {
   return (
     <FeatureSection
       id="paiement"
-      badge="Paiements"
+      badge="Stripe Connect"
       title="Encaissez facilement,"
-      titleAccent="payez rapidement"
-      description="Acceptez les paiements par carte bancaire directement depuis vos factures. Integration Stripe native pour des paiements securises."
+      titleAccent="directement sur votre compte"
+      description="Vos clients paient par lien de paiement sécurisé, l'argent arrive directement sur votre compte Stripe. Commission plateforme à seulement 1%."
       bulletPoints={[
-        'Paiement par lien dans la facture',
-        'Carte bancaire et virement',
-        'Suivi des encaissements en temps reel',
-        'Relances automatiques pour impayes',
+        'Lien de paiement envoyé avec chaque facture',
+        'Paiement carte bancaire sécurisé via Stripe',
+        'Encaissement direct sur votre compte (Stripe Connect)',
+        'Commission plateforme réduite à 1%',
       ]}
       reversed
       visual={
@@ -648,7 +719,7 @@ export function PaiementSection() {
               </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-              <span className="text-xs font-medium text-emerald-700">Paiement recu</span>
+              <span className="text-xs font-medium text-emerald-700">Paiement reçu</span>
               <span className="text-sm font-bold text-emerald-700">3 200 EUR</span>
             </div>
           </div>
@@ -662,31 +733,41 @@ export function AbonnementsSection() {
   return (
     <FeatureSection
       id="abonnements"
-      badge="Contrats"
-      title="Contrats de maintenance,"
-      titleAccent="sous controle"
-      description="Gerez vos contrats d'entretien recurrents : chaudieres, climatisations, piscines. Ne manquez plus aucune echeance."
+      badge="Contrats récurrents"
+      title="Revenus récurrents,"
+      titleAccent="en pilote automatique"
+      description="Créez des contrats d'entretien depuis vos devis, choisissez la TVA et la fréquence. La facturation se déclenche automatiquement à chaque échéance avec envoi du lien de paiement Stripe."
       bulletPoints={[
-        'Suivi des contrats par type',
-        'Alertes avant echeance',
-        'Facturation recurrente automatique',
-        'Historique des interventions',
+        'Facturation automatique (cron quotidien à 9h)',
+        'Devis lié au contrat — signature requise avant activation',
+        'TVA configurable par contrat (0%, 5.5%, 10%, 20%)',
+        "Suivi MRR / ARR et taux d'encaissement en temps réel",
       ]}
       visual={
         <MockBrowser>
-          <div className="space-y-2">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div className="text-[9px] text-emerald-600 font-medium">MRR</div>
+                <div className="text-sm font-bold text-emerald-700">4 200 EUR</div>
+              </div>
+              <div className="p-2 rounded-lg bg-blue-50 border border-blue-200">
+                <div className="text-[9px] text-blue-600 font-medium">ARR</div>
+                <div className="text-sm font-bold text-blue-700">50 400 EUR</div>
+              </div>
+            </div>
             {[
-              { type: 'Chaudiere', client: 'M. Dupont', date: '15 Jan 2026', status: 'Actif' },
-              { type: 'Climatisation', client: 'Mme Bernard', date: '28 Fev 2026', status: 'A renouveler' },
-              { type: 'Piscine', client: 'SCI Martin', date: '10 Avr 2026', status: 'Actif' },
+              { type: 'Chaudière', client: 'M. Dupont', montant: '420 EUR/an', date: '15 Jun 2026', status: 'Actif', tva: '10%' },
+              { type: 'Clim', client: 'Mme Petit', montant: '350 EUR/trim.', date: '1 Jul 2026', status: 'Actif', tva: '20%' },
+              { type: 'Piscine', client: 'SCI Martin', montant: '250 EUR/mois', date: '1 Mai 2026', status: 'Actif', tva: '20%' },
             ].map((contract) => (
               <div key={contract.client} className="flex items-center gap-3 p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
-                <Repeat className="w-4 h-4 text-[var(--landing-accent)]" />
-                <div className="flex-1">
-                  <div className="text-xs font-semibold text-[var(--landing-text)]">{contract.type} - {contract.client}</div>
-                  <div className="text-[10px] text-[var(--landing-muted)]">Prochaine echeance : {contract.date}</div>
+                <Repeat className="w-4 h-4 text-[var(--landing-accent)] shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-[var(--landing-text)]">{contract.type} — {contract.client}</div>
+                  <div className="text-[10px] text-[var(--landing-muted)]">{contract.montant} · TVA {contract.tva} · {contract.date}</div>
                 </div>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full ${contract.status === 'Actif' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">
                   {contract.status}
                 </span>
               </div>
@@ -704,11 +785,11 @@ export function AgentsSection() {
       id="agents"
       badge="Agents IA"
       title="Des assistants IA,"
-      titleAccent="a votre service"
-      description="Configurez des agents intelligents qui repondent a vos clients, generent vos devis, et automatisent vos taches repetitives."
+      titleAccent="à votre service"
+      description="Configurez des agents intelligents qui répondent à vos clients, génèrent vos devis, et automatisent vos tâches répétitives."
       bulletPoints={[
-        'Agent de reponse client automatique',
-        'Generation de devis par IA',
+        'Agent de réponse client automatique',
+        'Génération de devis par IA',
         'Personnalisation du ton et du style',
         'Supervision et validation humaine',
       ]}
@@ -721,7 +802,7 @@ export function AgentsSection() {
                 <Bot className="w-3.5 h-3.5 text-emerald-600" />
               </div>
               <div className="p-3 rounded-xl rounded-tl-none bg-[var(--landing-off)] border border-[var(--landing-border)] text-[11px] text-[var(--landing-text)]">
-                Bonjour ! J&apos;ai analyse la demande de M. Dupont. Je vous propose un devis pour la renovation de sa salle de bain, budget estime a 8 500 EUR.
+                Bonjour ! J&apos;ai analysé la demande de M. Dupont. Je vous propose un devis pour la rénovation de sa salle de bain, budget estimé à 8 500 EUR.
               </div>
             </div>
             <div className="flex items-start gap-2 flex-row-reverse">
@@ -729,7 +810,7 @@ export function AgentsSection() {
                 <span className="text-[10px] font-bold text-[var(--landing-accent)]">V</span>
               </div>
               <div className="p-3 rounded-xl rounded-tr-none bg-[var(--landing-accent)] text-white text-[11px]">
-                Parfait, genere le devis et envoie-le.
+                Parfait, génère le devis et envoie-le.
               </div>
             </div>
             <div className="flex items-start gap-2">
@@ -737,7 +818,7 @@ export function AgentsSection() {
                 <Bot className="w-3.5 h-3.5 text-emerald-600" />
               </div>
               <div className="p-3 rounded-xl rounded-tl-none bg-[var(--landing-off)] border border-[var(--landing-border)] text-[11px] text-[var(--landing-text)]">
-                C&apos;est fait ! Le devis DEV-2026-047 a ete envoye a dupont@email.fr.
+                C&apos;est fait ! Le devis DEV-2026-047 a été envoyé à dupont@email.fr.
               </div>
             </div>
           </div>

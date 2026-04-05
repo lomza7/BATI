@@ -3,10 +3,10 @@ import { Hexagon } from 'lucide-react';
 
 const footerLinks = {
   Produit: [
-    { label: 'Fonctionnalites', href: '#features' },
+    { label: 'Fonctionnalités', href: '#features' },
     { label: 'Tarifs', href: '#pricing' },
-    { label: 'Demo', href: '#demo' },
-    { label: 'Temoignages', href: '#testimonials' },
+    { label: 'Démo', href: '#demo' },
+    { label: 'Témoignages', href: '#testimonials' },
   ],
   Ressources: [
     { label: 'Centre d\'aide', href: '#' },
@@ -15,16 +15,16 @@ const footerLinks = {
     { label: 'API', href: '#' },
   ],
   Entreprise: [
-    { label: 'A propos', href: '#' },
+    { label: 'À propos', href: '#' },
     { label: 'Contact', href: '#' },
-    { label: 'Carrieres', href: '#' },
+    { label: 'Carrières', href: '#' },
     { label: 'Presse', href: '#' },
   ],
-  Legal: [
+  Légal: [
     { label: 'CGU', href: '#' },
-    { label: 'Confidentialite', href: '#' },
+    { label: 'Confidentialité', href: '#' },
     { label: 'Cookies', href: '#' },
-    { label: 'Mentions legales', href: '#' },
+    { label: 'Mentions légales', href: '#' },
   ],
 };
 
@@ -41,7 +41,7 @@ export function Footer() {
               <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
             </Link>
             <p className="text-xs text-[var(--landing-muted)] leading-relaxed">
-              La plateforme tout-en-un pour les artisans du batiment.
+              La plateforme tout-en-un pour les artisans du bâtiment.
             </p>
           </div>
 
@@ -68,10 +68,10 @@ export function Footer() {
 
         <div className="border-t border-[var(--landing-border)] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-[var(--landing-muted)]">
-            &copy; 2026 Hellobat. Tous droits reserves.
+            &copy; 2026 Hellobat. Tous droits réservés.
           </span>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-[var(--landing-muted)]">Fait avec soin pour les artisans francais</span>
+            <span className="text-xs text-[var(--landing-muted)]">Fait avec soin pour les artisans français</span>
           </div>
         </div>
       </div>

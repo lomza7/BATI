@@ -9,24 +9,24 @@ const faqs = [
     answer: 'Oui, le plan Starter est 100% gratuit et sans engagement. Il inclut 5 devis par mois et 2 chantiers actifs. Aucune carte bancaire n\'est requise pour commencer.',
   },
   {
-    question: 'Puis-je importer mes donnees existantes ?',
-    answer: 'Absolument. Hellobat permet l\'import de vos contacts, devis et factures depuis Excel, CSV ou depuis d\'autres logiciels de gestion. Notre equipe peut vous accompagner dans la migration.',
+    question: 'Puis-je importer mes données existantes ?',
+    answer: 'Absolument. Hellobat permet l\'import de vos contacts, devis et factures depuis Excel, CSV ou depuis d\'autres logiciels de gestion. Notre équipe peut vous accompagner dans la migration.',
   },
   {
     question: 'Comment fonctionne le devis IA vocal ?',
-    answer: 'Vous dictez la description du chantier sur votre telephone, ajoutez quelques photos, et l IA analyse tout pour proposer un chiffrage avec lignes de devis, quantites et prix. Vous relisez, ajustez si besoin, et envoyez. Ca fonctionne sur Chrome et Edge.',
+    answer: 'Vous dictez la description du chantier sur votre téléphone, ajoutez quelques photos, et l\'IA analyse tout pour proposer un chiffrage avec lignes de devis, quantités et prix. Vous relisez, ajustez si besoin, et envoyez. Ça fonctionne sur Chrome et Edge.',
   },
   {
     question: 'Comment fonctionnent les agents IA ?',
-    answer: 'Les agents IA analysent vos donnees (demandes clients, historique de devis) pour generer automatiquement des reponses, devis et relances. Vous gardez toujours le controle et validez avant envoi.',
+    answer: 'Les agents IA analysent vos données (demandes clients, historique de devis) pour générer automatiquement des réponses, devis et relances. Vous gardez toujours le contrôle et validez avant envoi.',
   },
   {
-    question: 'Les paiements en ligne sont-ils securises ?',
-    answer: 'Oui, nous utilisons Stripe, le leader mondial du paiement en ligne. Toutes les transactions sont chiffrees et conformes PCI DSS. Vos clients paient en toute securite.',
+    question: 'Les paiements en ligne sont-ils sécurisés ?',
+    answer: 'Oui, nous utilisons Stripe, le leader mondial du paiement en ligne. Toutes les transactions sont chiffrées et conformes PCI DSS. Vos clients paient en toute sécurité.',
   },
   {
-    question: 'Puis-je changer de plan a tout moment ?',
-    answer: 'Oui, vous pouvez upgrader ou downgrader votre plan a tout moment. Le changement est immediat et la facturation est ajustee au prorata.',
+    question: 'Puis-je changer de plan à tout moment ?',
+    answer: 'Oui, vous pouvez upgrader ou downgrader votre plan à tout moment. Le changement est immédiat et la facturation est ajustée au prorata.',
   },
 ];
 
@@ -38,10 +38,10 @@ export function FAQ() {
       <div className="max-w-[800px] mx-auto px-6">
         <div className="text-center mb-10 sm:mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-4">
-            Questions <em className="italic text-[var(--landing-accent)]">frequentes</em>
+            Questions <em className="italic text-[var(--landing-accent)]">fréquentes</em>
           </h2>
           <p className="text-[var(--landing-muted)] text-lg">
-            Tout ce que vous devez savoir pour bien demarrer.
+            Tout ce que vous devez savoir pour bien démarrer.
           </p>
         </div>
 

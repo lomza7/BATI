@@ -4,6 +4,7 @@ import { Marquee } from '@/components/landing/marquee';
 import { FeaturesGrid } from '@/components/landing/features-grid';
 import {
   DevisSection,
+  FactureElectroniqueSection,
   ContactsSection,
   PlanningSection,
   EquipeSection,
@@ -35,6 +36,7 @@ export default function LandingPage() {
       <FeaturesGrid />
       <DemoApp />
       <DevisSection />
+      <FactureElectroniqueSection />
       <ContactsSection />
       <PlanningSection />
       <EquipeSection />
