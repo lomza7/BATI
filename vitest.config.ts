@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Only collect unit/component tests from src — e2e tests run via Playwright
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: 'istanbul',
       thresholds: {
