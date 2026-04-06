@@ -513,11 +513,53 @@ export async function createSituation(
     .single()
   const isAutoEntrepreneur = profile?.is_auto_entrepreneur ?? false
 
-  // Calculer TVA sur le total HT de la situation
-  // On prend le taux de TVA majoritaire de la facture mère (simplifié)
-  const defaultTvaRate = isAutoEntrepreneur ? 0 : 20
-  const totalTva = parseFloat((totalSituationHt * defaultTvaRate / 100).toFixed(2))
-  const totalTtc = parseFloat((totalSituationHt + totalTva).toFixed(2))
+  // Calculer TVA en respectant les taux réels de chaque lot de la facture mère.
+  // Un lot peut contenir des lignes à des taux différents (ex : 10% MO + 20% fournitures).
+  // On ventile le HT de chaque lot par taux de TVA proportionnellement à l'avancement.
+  const lotTvaBuckets = new Map<string, Map<number, number>>()
+
+  for (const av of avancements) {
+    const parentLot = factureMere.lots.find((l) => l.id === av.lot_id)!
+    const lignes = parentLot.lignes ?? []
+    const ratio = av.avancement_percent / 100
+    const buckets = new Map<number, number>()
+
+    if (lignes.length > 0) {
+      for (const ligne of lignes) {
+        const rate = isAutoEntrepreneur ? 0 : ligne.tva_rate
+        const ht = parseFloat((ligne.unit_price_ht * ligne.quantity * ratio).toFixed(2))
+        buckets.set(rate, (buckets.get(rate) ?? 0) + ht)
+      }
+    } else {
+      // Pas de lignes dans le lot parent — montant sans TVA (cas exceptionnel)
+      buckets.set(0, av.montant_situation_ht)
+    }
+
+    lotTvaBuckets.set(av.lot_id, buckets)
+  }
+
+  // Construire les LotInput pour calculerTotaux (ventilation TVA multi-taux correcte)
+  const situationLotsForCalc = avancements.map((av) => {
+    const buckets = lotTvaBuckets.get(av.lot_id)!
+    const parentLot = factureMere.lots.find((l) => l.id === av.lot_id)!
+    return {
+      name: parentLot.name,
+      montant_lot_ht: av.montant_situation_ht,
+      sort_order: 0,
+      postes: Array.from(buckets.entries()).map(([rate, ht], i) => ({
+        description: `Avancement ${av.avancement_percent}% — ${parentLot.name}`,
+        quantity: 1,
+        unit: 'forfait',
+        unit_price_ht: ht,
+        tva_rate: rate,
+        sort_order: i,
+      })),
+    }
+  })
+
+  const totaux = calculerTotaux(situationLotsForCalc, 0, 0, isAutoEntrepreneur)
+  const totalTva = totaux.total_tva
+  const totalTtc = totaux.total_ttc
 
   const reference = await nextReference(supabase, user.id, 'situation')
   const dueDate = new Date()
@@ -564,16 +606,23 @@ export async function createSituation(
       .single()
 
     if (lot && av.montant_situation_ht !== 0) {
-      await supabase.from('facture_lignes').insert({
-        facture_id: situation.id,
-        lot_id: lot.id,
-        description: `Avancement ${av.avancement_percent}% — ${av.lot_name}`,
-        quantity: 1,
-        unit: 'forfait',
-        unit_price_ht: av.montant_situation_ht,
-        tva_rate: defaultTvaRate,
-        sort_order: 0,
-      })
+      // Insérer une ligne par taux de TVA (ventilation multi-taux conforme Factur-X)
+      const buckets = lotTvaBuckets.get(av.lot_id)!
+      let sortOrder = 0
+      for (const [tvaRate, htAmount] of buckets.entries()) {
+        if (htAmount !== 0) {
+          await supabase.from('facture_lignes').insert({
+            facture_id: situation.id,
+            lot_id: lot.id,
+            description: `Avancement ${av.avancement_percent}% — ${av.lot_name}`,
+            quantity: 1,
+            unit: 'forfait',
+            unit_price_ht: htAmount,
+            tva_rate: tvaRate,
+            sort_order: sortOrder++,
+          })
+        }
+      }
 
       // Enregistrer l'avancement
       await supabase.from('facture_situations').insert({
