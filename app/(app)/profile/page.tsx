@@ -1,18 +1,45 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Save, Loader2, Shield, FileCheck, Building2, Zap, BadgeCheck } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
 import { ProfileForm } from '@/components/profile/profile-form';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+export interface FullProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  company_name: string | null;
+  phone: string | null;
+  siret: string | null;
+  naf_code: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  avatar_url: string | null;
+  onboarding_completed: boolean;
+  insurance_decennale_number: string | null;
+  insurance_decennale_company: string | null;
+  insurance_decennale_expiry: string | null;
+  rge_number: string | null;
+  rge_valid_until: string | null;
+  is_auto_entrepreneur: boolean;
+  tva_number: string | null;
+}
+
+export function isProfileComplete(profile: Pick<FullProfile, 'siret' | 'insurance_decennale_number' | 'insurance_decennale_company'>): boolean {
+  return Boolean(
+    profile.siret &&
+    profile.insurance_decennale_number &&
+    profile.insurance_decennale_company
+  );
+}
+
 export default function ProfilePage() {
-  const { user, profile: authProfile } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,40 +97,7 @@ export default function ProfilePage() {
         </Alert>
       )}
 
-      <ProfileForm
-        profile={profile}
-        onSaved={fetchProfile}
-      />
+      <ProfileForm profile={profile} onSaved={fetchProfile} />
     </div>
-  );
-}
-
-export interface FullProfile {
-  id: string;
-  email: string;
-  full_name: string | null;
-  company_name: string | null;
-  phone: string | null;
-  siret: string | null;
-  naf_code: string | null;
-  address: string | null;
-  city: string | null;
-  postal_code: string | null;
-  avatar_url: string | null;
-  onboarding_completed: boolean;
-  insurance_decennale_number: string | null;
-  insurance_decennale_company: string | null;
-  insurance_decennale_expiry: string | null;
-  rge_number: string | null;
-  rge_valid_until: string | null;
-  is_auto_entrepreneur: boolean;
-  tva_number: string | null;
-}
-
-export function isProfileComplete(profile: FullProfile): boolean {
-  return Boolean(
-    profile.siret &&
-    profile.insurance_decennale_number &&
-    profile.insurance_decennale_company
   );
 }

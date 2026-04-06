@@ -3,11 +3,22 @@
 import Link from 'next/link';
 import { Shield } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { isProfileComplete } from '@/app/(app)/profile/page';
 import { Button } from '@/components/ui/button';
 
 interface ProfileGateProps {
   children: React.ReactNode;
+}
+
+function isProfileComplete(profile: {
+  siret: string | null;
+  insurance_decennale_number: string | null;
+  insurance_decennale_company: string | null;
+}): boolean {
+  return Boolean(
+    profile.siret &&
+    profile.insurance_decennale_number &&
+    profile.insurance_decennale_company
+  );
 }
 
 /**
@@ -17,8 +28,7 @@ interface ProfileGateProps {
 export function ProfileGate({ children }: ProfileGateProps) {
   const { profile } = useAuth();
 
-  // Si le profil n'est pas encore chargé ou est complet, on rend les enfants
-  if (!profile || isProfileComplete(profile as Parameters<typeof isProfileComplete>[0])) {
+  if (!profile || isProfileComplete(profile)) {
     return <>{children}</>;
   }
 
