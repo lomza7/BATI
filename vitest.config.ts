@@ -37,6 +37,12 @@ export default defineConfig({
         // shadcn/ui primitives — tested indirectly via component tests
         'src/components/ui/card.tsx',
         'src/components/ui/separator.tsx',
+        // Service layer — makes live Supabase/Stripe/external calls, covered by E2E Playwright
+        'src/**/service.ts',
+        // PDF generation — requires browser context (pdf-lib blob output), covered by E2E
+        'src/lib/pdf/**',
+        // Factur-X embed — wraps pdf-lib to embed XML in PDF/A-3, covered by E2E
+        'src/lib/facturx/embed.ts',
       ],
     },
   },
