@@ -55,10 +55,10 @@
   "env": {
     "NEXT_PUBLIC_APP_URL": "https://hellobat.app"
   },
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "develop": false
+  "crons": [
+    {
+      "path": "/api/contrats/billing",
+      "schedule": "0 7 * * *"
     }
-  }
+  ]
 }
