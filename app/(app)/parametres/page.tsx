@@ -76,7 +76,7 @@ import {
   type WorkspaceRole,
 } from '@/lib/workspace';
 
-type SettingsTab = 'parametres' | 'documents' | 'chantier' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'documents' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -374,7 +374,7 @@ export default function ParametresPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres' || tab === 'chantier') {
+    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres' || tab === 'chantier' || tab === 'equipe') {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -950,6 +950,14 @@ export default function ParametresPage() {
   async function inviteWorkspaceMember() {
     if (!user || !teamInviteForm.email.trim()) return;
 
+    if (isWorkspaceOwner && currentPlan.key === 'starter') {
+      setInviteSuccess('');
+      setGeneratedInviteLink('');
+      setActiveTab('abonnement');
+      setError("Les comptes d'equipe ne sont pas inclus dans l'offre gratuite. Passez au plan Pro pour permettre a cette personne de rejoindre votre equipe.");
+      return;
+    }
+
     const accessToken = session?.access_token;
     if (!accessToken) {
       setError('Session utilisateur introuvable. Reconnectez-vous puis recommencez.');
@@ -1121,10 +1129,11 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-5 rounded-xl bg-muted/60 p-1">
+        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-6 rounded-xl bg-muted/60 p-1">
           <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
           <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
+          <TabsTrigger value="equipe" className="rounded-lg py-2.5 text-xs sm:text-sm">Equipe</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
           <TabsTrigger value="securite" className="rounded-lg py-2.5 text-xs sm:text-sm">Securite</TabsTrigger>
         </TabsList>
@@ -2071,6 +2080,270 @@ export default function ParametresPage() {
           <DocumentTemplateSettings />
         </TabsContent>
 
+        <TabsContent value="equipe" className="space-y-6">
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-5 w-5 text-primary" />
+                    Comptes d equipe
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Invitez les personnes qui doivent vraiment se connecter a Hellobat: chefs d equipe, commerciaux, assistantes ou conducteurs de travaux. Les salaries et sous-traitants terrain restent geres dans l onglet Equipe.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
+                    {activeWorkspaceMembers} actif{activeWorkspaceMembers > 1 ? 's' : ''}
+                  </span>
+                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
+                    {pendingWorkspaceInvites} invitation{pendingWorkspaceInvites > 1 ? 's' : ''} en attente
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border border-border bg-muted/20 p-4">
+                  <p className="text-sm text-muted-foreground">Espace courant</p>
+                  <p className="mt-1 font-medium text-foreground">
+                    {isWorkspaceOwner ? 'Votre entreprise' : 'Espace equipe partage'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isWorkspaceOwner
+                      ? 'Vous pilotez ici les acces applicatifs de votre entreprise.'
+                      : "Vous travaillez dans l espace d un autre dirigeant."}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/20 p-4">
+                  <p className="text-sm text-muted-foreground">Votre role</p>
+                  <p className="mt-1 font-medium text-foreground">
+                    {workspaceRole === 'owner' ? 'Dirigeant' : WORKSPACE_ROLE_LABELS[workspaceRole]}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {canManageWorkspaceAccounts
+                      ? 'Vous pouvez inviter et gerer les comptes de connexion.'
+                      : 'Vous avez un acces operationnel, sans gestion des invitations.'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-muted/20 p-4">
+                  <p className="text-sm text-muted-foreground">Suivi d activite</p>
+                  <p className="mt-1 font-medium text-foreground">Derniere presence</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Hellobat note la derniere page ouverte et la derniere presence de chaque compte actif.
+                  </p>
+                </div>
+              </div>
+
+              {!teamFeatureUnlocked && (
+                <Alert className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-700">
+                  <Users className="h-4 w-4" />
+                  <AlertTitle>Comptes d equipe reserves aux plans payants</AlertTitle>
+                  <AlertDescription>
+                    Vous pouvez preparer votre invitation ci-dessous, mais l envoi sera bloque tant que vous restez sur l offre gratuite.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="rounded-2xl border border-border bg-muted/10 p-5">
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-base font-semibold text-foreground">Inviter une personne</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Ajoutez simplement son email, choisissez son role, et Hellobat lui enverra un acces pour rejoindre votre equipe.
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end">
+                  <div className="grid flex-1 gap-4 md:grid-cols-3">
+                    <div className="space-y-2 md:col-span-1">
+                      <Label htmlFor="team_invite_email">Email du compte</Label>
+                      <Input
+                        id="team_invite_email"
+                        type="email"
+                        value={teamInviteForm.email}
+                        onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, email: e.target.value }))}
+                        placeholder="commercial@entreprise.fr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="team_invite_role">Role</Label>
+                      <select
+                        id="team_invite_role"
+                        value={teamInviteForm.role}
+                        onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, role: e.target.value as WorkspaceRole }))}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        {WORKSPACE_ROLE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2 md:col-span-1">
+                      <Label htmlFor="team_invite_note">Note interne</Label>
+                      <Input
+                        id="team_invite_note"
+                        value={teamInviteForm.note}
+                        onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, note: e.target.value }))}
+                        placeholder="Commercial secteur Sud"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={inviteWorkspaceMember} disabled={invitingTeamMember || !teamInviteForm.email.trim()}>
+                    {invitingTeamMember ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="mr-2 h-4 w-4" />
+                    )}
+                    Envoyer l invitation
+                  </Button>
+                </div>
+
+                {!teamFeatureUnlocked && isWorkspaceOwner && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex-1 text-sm text-amber-900">
+                      Au moment d envoyer l invitation, Hellobat bloquera l acces tant que vous restez sur Starter et vous proposera de passer au plan Pro.
+                    </div>
+                    <Button variant="outline" onClick={() => setActiveTab('abonnement')}>
+                      Voir le plan Pro
+                    </Button>
+                  </div>
+                )}
+
+                {(inviteSuccess || generatedInviteLink) && (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    {inviteSuccess && <p className="font-medium">{inviteSuccess}</p>}
+                    {generatedInviteLink && (
+                      <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+                        <Input value={generatedInviteLink} readOnly className="bg-white" />
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(generatedInviteLink);
+                          }}
+                        >
+                          Copier le lien
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">Acces deja en place</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Suivez qui est invite, qui est actif, et sur quelle page chaque personne a travaille en dernier.
+                    </p>
+                  </div>
+                </div>
+
+                {workspaceMemberships.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-5 text-sm text-muted-foreground">
+                    Aucun compte d equipe n a encore ete ajoute.
+                  </div>
+                ) : (
+                  workspaceMemberships.map((membership) => {
+                    const isUpdating = updatingWorkspaceMemberId === membership.id;
+                    const isEditable = canManageWorkspaceAccounts && membership.status !== 'revoked';
+
+                    return (
+                      <div
+                        key={membership.id}
+                        className="rounded-2xl border border-border bg-background p-4"
+                      >
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-foreground">{membership.invited_email}</p>
+                              <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                                {WORKSPACE_STATUS_LABELS[membership.status]}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {membership.status === 'active' && membership.accepted_at
+                                ? `Actif depuis le ${formatDate(membership.accepted_at)}`
+                                : membership.status === 'pending'
+                                  ? 'Invitation envoyee, en attente de connexion.'
+                                  : 'Acces retire pour ce compte.'}
+                            </p>
+                            {membership.note && (
+                              <p className="text-sm text-muted-foreground">{membership.note}</p>
+                            )}
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
+                            <div className="space-y-1">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Role</p>
+                              {isEditable ? (
+                                <select
+                                  value={membership.role}
+                                  onChange={(e) => void updateWorkspaceMemberRole(membership.id, e.target.value as WorkspaceRole)}
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                  disabled={isUpdating}
+                                >
+                                  {WORKSPACE_ROLE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <p className="text-sm font-medium text-foreground">
+                                  {WORKSPACE_ROLE_LABELS[membership.role]}
+                                </p>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Derniere activite</p>
+                              <p className="text-sm font-medium text-foreground">
+                                {membership.last_seen_at ? formatDate(membership.last_seen_at) : 'Aucune presence recente'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatWorkspacePathLabel(membership.last_active_path)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {canManageWorkspaceAccounts && membership.status !== 'revoked' && (
+                          <div className="mt-4 flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const origin = window.location.origin;
+                                const loginUrl = `${origin}/login?email=${encodeURIComponent(membership.invited_email)}&team=1`;
+                                void navigator.clipboard.writeText(loginUrl);
+                                setInviteSuccess(`Lien de connexion copie pour ${membership.invited_email}.`);
+                              }}
+                            >
+                              Copier le lien
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void revokeWorkspaceMember(membership.id)}
+                              disabled={isUpdating}
+                            >
+                              {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+                              Retirer l acces
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="abonnement" className="space-y-6">
           <Card className="rounded-2xl">
             <CardHeader>
@@ -2257,250 +2530,6 @@ export default function ParametresPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Users className="h-5 w-5 text-primary" />
-                    Comptes d equipe
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Invitez vos chefs d equipe, commerciaux et assistantes a se connecter a Hellobat. Les salaries et sous-traitants terrain continuent d etre geres dans l onglet Equipe.
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
-                    {activeWorkspaceMembers} actif{activeWorkspaceMembers > 1 ? 's' : ''}
-                  </span>
-                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
-                    {pendingWorkspaceInvites} invitation{pendingWorkspaceInvites > 1 ? 's' : ''} en attente
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {!teamFeatureUnlocked ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-amber-950">Les comptes d equipe ne sont pas inclus dans l offre gratuite.</p>
-                      <p className="mt-1 text-sm text-amber-800">
-                        Passez sur un plan payant pour inviter votre assistante, vos commerciaux ou vos chefs d equipe et suivre leur activite.
-                      </p>
-                    </div>
-                    <Button onClick={() => setActiveTab('abonnement')}>
-                      Voir les offres
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-xl border border-border bg-muted/20 p-4">
-                      <p className="text-sm text-muted-foreground">Espace courant</p>
-                      <p className="mt-1 font-medium text-foreground">
-                        {isWorkspaceOwner ? 'Votre entreprise' : 'Espace equipe partage'}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {isWorkspaceOwner
-                          ? 'Vous pilotez les acces applicatifs de votre equipe.'
-                          : "Vous travaillez dans l espace d un autre dirigeant."}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/20 p-4">
-                      <p className="text-sm text-muted-foreground">Votre role</p>
-                      <p className="mt-1 font-medium text-foreground">
-                        {workspaceRole === 'owner' ? 'Dirigeant' : WORKSPACE_ROLE_LABELS[workspaceRole]}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {canManageWorkspaceAccounts
-                          ? 'Vous pouvez inviter et gerer les comptes d equipe.'
-                          : 'Vous avez un acces operationnel, sans gestion des invitations.'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/20 p-4">
-                      <p className="text-sm text-muted-foreground">Suivi d activite</p>
-                      <p className="mt-1 font-medium text-foreground">Dernieres pages consultees</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Hellobat note simplement la derniere presence et la derniere page ouverte par chaque compte actif.
-                      </p>
-                    </div>
-                  </div>
-
-                  {canManageWorkspaceAccounts && (
-                    <div className="rounded-2xl border border-border bg-muted/10 p-5">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                        <div className="grid flex-1 gap-4 md:grid-cols-3">
-                          <div className="space-y-2 md:col-span-1">
-                            <Label htmlFor="team_invite_email">Email du compte</Label>
-                            <Input
-                              id="team_invite_email"
-                              type="email"
-                              value={teamInviteForm.email}
-                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, email: e.target.value }))}
-                              placeholder="commercial@entreprise.fr"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="team_invite_role">Role</Label>
-                            <select
-                              id="team_invite_role"
-                              value={teamInviteForm.role}
-                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, role: e.target.value as WorkspaceRole }))}
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            >
-                              {WORKSPACE_ROLE_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="space-y-2 md:col-span-1">
-                            <Label htmlFor="team_invite_note">Note interne</Label>
-                            <Input
-                              id="team_invite_note"
-                              value={teamInviteForm.note}
-                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, note: e.target.value }))}
-                              placeholder="Commercial secteur Sud"
-                            />
-                          </div>
-                        </div>
-                        <Button onClick={inviteWorkspaceMember} disabled={invitingTeamMember || !teamInviteForm.email.trim()}>
-                          {invitingTeamMember ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Plus className="mr-2 h-4 w-4" />
-                          )}
-                          Inviter
-                        </Button>
-                      </div>
-
-                      {(inviteSuccess || generatedInviteLink) && (
-                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                          {inviteSuccess && <p className="font-medium">{inviteSuccess}</p>}
-                          {generatedInviteLink && (
-                            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
-                              <Input value={generatedInviteLink} readOnly className="bg-white" />
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  void navigator.clipboard.writeText(generatedInviteLink);
-                                }}
-                              >
-                                Copier le lien
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    {workspaceMemberships.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-5 text-sm text-muted-foreground">
-                        Aucun compte d equipe n a encore ete ajoute.
-                      </div>
-                    ) : (
-                      workspaceMemberships.map((membership) => {
-                        const isUpdating = updatingWorkspaceMemberId === membership.id;
-                        const isEditable = canManageWorkspaceAccounts && membership.status !== 'revoked';
-
-                        return (
-                          <div
-                            key={membership.id}
-                            className="rounded-2xl border border-border bg-background p-4"
-                          >
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                              <div className="space-y-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-medium text-foreground">{membership.invited_email}</p>
-                                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
-                                    {WORKSPACE_STATUS_LABELS[membership.status]}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                  {membership.status === 'active' && membership.accepted_at
-                                    ? `Actif depuis le ${formatDate(membership.accepted_at)}`
-                                    : membership.status === 'pending'
-                                      ? 'Invitation envoyee, en attente de connexion.'
-                                      : 'Acces retire pour ce compte.'}
-                                </p>
-                                {membership.note && (
-                                  <p className="text-sm text-muted-foreground">{membership.note}</p>
-                                )}
-                              </div>
-
-                              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
-                                <div className="space-y-1">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Role</p>
-                                  {isEditable ? (
-                                    <select
-                                      value={membership.role}
-                                      onChange={(e) => void updateWorkspaceMemberRole(membership.id, e.target.value as WorkspaceRole)}
-                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                      disabled={isUpdating}
-                                    >
-                                      {WORKSPACE_ROLE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <p className="text-sm font-medium text-foreground">
-                                      {WORKSPACE_ROLE_LABELS[membership.role]}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Derniere activite</p>
-                                  <p className="text-sm font-medium text-foreground">
-                                    {membership.last_seen_at ? formatDate(membership.last_seen_at) : 'Aucune presence recente'}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatWorkspacePathLabel(membership.last_active_path)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            {canManageWorkspaceAccounts && membership.status !== 'revoked' && (
-                              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const origin = window.location.origin;
-                                    const loginUrl = `${origin}/login?email=${encodeURIComponent(membership.invited_email)}&team=1`;
-                                    void navigator.clipboard.writeText(loginUrl);
-                                    setInviteSuccess(`Lien de connexion copie pour ${membership.invited_email}.`);
-                                  }}
-                                >
-                                  Copier le lien
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => void revokeWorkspaceMember(membership.id)}
-                                  disabled={isUpdating}
-                                >
-                                  {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
-                                  Retirer l acces
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="chantier" className="space-y-6">
