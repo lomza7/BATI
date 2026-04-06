@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { ProfileGate } from '@/components/shared/profile-gate';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
@@ -510,6 +511,7 @@ export default function DevisPage() {
   const linesTotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
 
   return (
+    <ProfileGate>
     <div className="space-y-6">
       <PageHeader title="Devis" description="Creez, gerez et envoyez vos devis">
         <Button onClick={openCreateOptions} className="gap-2">
@@ -1145,5 +1147,6 @@ export default function DevisPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProfileGate>
   );
 }

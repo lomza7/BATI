@@ -19,6 +19,7 @@ import {
   TriangleAlert as AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { ProfileGate } from '@/components/shared/profile-gate';
 import { useAuth } from '@/lib/auth-context';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
@@ -550,6 +551,7 @@ export default function FacturesPage() {
   }
 
   return (
+    <ProfileGate>
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
         <Button onClick={() => setShowCreate(true)} className="gap-2">
@@ -807,5 +809,6 @@ export default function FacturesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProfileGate>
   );
 }
