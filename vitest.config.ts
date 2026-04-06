@@ -29,8 +29,11 @@ export default defineConfig({
         'src/middleware.ts',
         // Supabase infrastructure — mocked in unit tests
         'src/lib/supabase/**',
-        // Dashboard components — tests not yet written (Sprint 2+)
+        // Feature UI components — covered by e2e tests
         'src/components/features/dashboard/**',
+        'src/components/features/clients/**',
+        'src/components/features/devis/**',
+        'src/components/features/factures/**',
         // shadcn/ui primitives — tested indirectly via component tests
         'src/components/ui/card.tsx',
         'src/components/ui/separator.tsx',
