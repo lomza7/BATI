@@ -17,30 +17,14 @@ import { calculerTotaux } from './calculations'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function nextReference(supabase: any, userId: string, type: 'facture' | 'situation' | 'avoir'): Promise<string> {
-  const year = new Date().getFullYear()
   const prefix = type === 'facture' ? 'FAC' : type === 'situation' ? 'SIT' : 'AVO'
-
-  const { data: existing } = await supabase
-    .from('reference_counters')
-    .select('id, last_number')
-    .eq('user_id', userId)
-    .eq('counter_type', type)
-    .eq('year', year)
-    .single()
-
-  if (existing) {
-    const nextNum = existing.last_number + 1
-    await supabase
-      .from('reference_counters')
-      .update({ last_number: nextNum })
-      .eq('id', existing.id)
-    return `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-  }
-
-  await supabase
-    .from('reference_counters')
-    .insert({ user_id: userId, counter_type: type, year, last_number: 1 })
-  return `${prefix}-${year}-001`
+  const { data, error } = await supabase.rpc('next_reference', {
+    p_user_id: userId,
+    p_counter_type: type,
+    p_prefix: prefix,
+  })
+  if (error) throw new Error(`Erreur numérotation référence: ${error.message}`)
+  return data as string
 }
 
 export async function listFactures(query: FactureListQuery): Promise<FactureListResult> {
