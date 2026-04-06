@@ -137,7 +137,7 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
   return (
     <Dialog open={open} modal>
       <DialogContent
-        className="sm:max-w-[540px] p-0 gap-0 border-0 shadow-2xl overflow-hidden bg-white rounded-2xl [&>button]:hidden"
+        className="w-[calc(100vw-2rem)] sm:max-w-[540px] max-h-[92vh] p-0 gap-0 border-0 shadow-2xl overflow-hidden bg-white rounded-2xl flex flex-col [&>button]:hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
@@ -167,7 +167,7 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
           </p>
         </div>
 
-        <div className="px-8 pb-8 min-h-[380px] flex flex-col">
+        <div className="px-8 pb-8 min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {step === 0 && (
             <StepWelcome data={data} onChange={updateData} onNext={next} onSkip={skip} />
           )}
