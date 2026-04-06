@@ -30,7 +30,7 @@ export interface FullProfile {
   tva_number: string | null;
 }
 
-export function isProfileComplete(profile: Pick<FullProfile, 'siret' | 'insurance_decennale_number' | 'insurance_decennale_company'>): boolean {
+function isProfileComplete(profile: Pick<FullProfile, 'siret' | 'insurance_decennale_number' | 'insurance_decennale_company'>): boolean {
   return Boolean(
     profile.siret &&
     profile.insurance_decennale_number &&
