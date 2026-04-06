@@ -33,6 +33,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Optionnel : envoyer l'email via Resend si RESEND_API_KEY configurée
     if (process.env.RESEND_API_KEY) {
       const devis = await getDevis(id)
+      const esc = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
       await resend.emails.send({
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         subject: `Devis ${devis?.reference ?? id} — ${devis?.title ?? ''}`,
         html: `
           <p>Bonjour,</p>
-          <p>Veuillez trouver ci-joint votre devis <strong>${devis?.reference}</strong>.</p>
+          <p>Veuillez trouver ci-joint votre devis <strong>${esc(devis?.reference ?? '')}</strong>.</p>
           <p>Ce devis est valable jusqu'au ${devis?.valid_until ? new Intl.DateTimeFormat('fr-FR').format(new Date(devis.valid_until)) : '—'}.</p>
           <p>Pour l'accepter, répondez à cet email avec la mention "Bon pour accord".</p>
           <p>Cordialement</p>

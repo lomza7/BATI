@@ -9,33 +9,13 @@ async function nextReference(
   userId: string,
   type: 'devis'
 ): Promise<string> {
-  const year = new Date().getFullYear()
-  const prefix = 'DEV'
-
-  // Upsert counter with pessimistic lock via RPC — fallback to simple upsert
-  // We rely on UNIQUE(user_id, counter_type, year) + select for update pattern
-  const { data: existing } = await supabase
-    .from('reference_counters')
-    .select('id, last_number')
-    .eq('user_id', userId)
-    .eq('counter_type', type)
-    .eq('year', year)
-    .single()
-
-  if (existing) {
-    const nextNum = existing.last_number + 1
-    await supabase
-      .from('reference_counters')
-      .update({ last_number: nextNum })
-      .eq('id', existing.id)
-    return `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-  }
-
-  // First devis of the year
-  await supabase
-    .from('reference_counters')
-    .insert({ user_id: userId, counter_type: type, year, last_number: 1 })
-  return `${prefix}-${year}-001`
+  const { data, error } = await supabase.rpc('next_reference', {
+    p_user_id: userId,
+    p_counter_type: type,
+    p_prefix: 'DEV',
+  })
+  if (error) throw new Error(`Erreur numérotation référence: ${error.message}`)
+  return data as string
 }
 
 export async function listDevis(query: DevisListQuery): Promise<DevisListResult> {

@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts, type RGB } from 'pdf-lib'
 import type { DevisWithDetails } from '@/types/devis'
-import { calculerTotaux } from '@/lib/devis/calculations'
+import { calculerTotaux, formatMontant } from '@/lib/devis/calculations'
 import type { LotInput } from '@/lib/devis/schemas'
 
 interface ArtisanProfile {
@@ -31,14 +31,6 @@ const MARGINS = { top: 50, bottom: 50, left: 50, right: 50 }
 const PAGE_WIDTH = 595 // A4
 const PAGE_HEIGHT = 842
 const CONTENT_WIDTH = PAGE_WIDTH - MARGINS.left - MARGINS.right
-
-function formatMontant(value: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-  }).format(value)
-}
 
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR').format(new Date(iso))
