@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Hexagon, Eye, EyeOff, ArrowRight, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -15,13 +15,22 @@ const benefits = [
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const teamInvite = searchParams.get('team') === '1';
+  const invitedEmail = searchParams.get('email') || '';
 
   const passwordStrength = getPasswordStrength(password);
+
+  useEffect(() => {
+    if (invitedEmail) {
+      setEmail(invitedEmail);
+    }
+  }, [invitedEmail]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -111,6 +120,12 @@ export default function SignupPage() {
               Commencez a gérer vos chantiers en quelques minutes
             </p>
           </div>
+
+          {teamInvite && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Vous avez ete invite a rejoindre un espace equipe Hellobat. Creez votre acces avec cet email et nous activerons automatiquement votre place dans l equipe.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (

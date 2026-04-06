@@ -1,21 +1,50 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar/sidebar';
 import { useAuth } from '@/lib/auth-context';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
 import { Hexagon } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading, showOnboarding, completeOnboarding } = useAuth();
+  const { user, session, loading, showOnboarding, completeOnboarding } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (!session?.access_token || !user) return;
+
+    void fetch('/api/team/claim-pending', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    }).catch(() => {
+      // Silence volontaire: le flux principal ne doit pas etre bloque par la revendication d'une invitation.
+    });
+  }, [session?.access_token, user, user?.id]);
+
+  useEffect(() => {
+    if (!session?.access_token || !user || !pathname) return;
+
+    void fetch('/api/team/presence', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ path: pathname }),
+    }).catch(() => {
+      // Fire-and-forget: on ne penalise jamais la navigation si le suivi d'activite echoue.
+    });
+  }, [pathname, session?.access_token, user, user?.id]);
 
   if (loading) {
     return (

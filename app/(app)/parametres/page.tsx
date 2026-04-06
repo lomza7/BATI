@@ -67,6 +67,14 @@ import {
   normalizeLeadStageSlug,
   type LeadStageConfig,
 } from '@/lib/lead-pipeline';
+import {
+  WORKSPACE_ROLE_LABELS,
+  WORKSPACE_ROLE_OPTIONS,
+  WORKSPACE_STATUS_LABELS,
+  canManageWorkspaceTeam,
+  formatWorkspacePathLabel,
+  type WorkspaceRole,
+} from '@/lib/workspace';
 
 type SettingsTab = 'parametres' | 'documents' | 'chantier' | 'abonnement' | 'securite';
 
@@ -155,6 +163,29 @@ interface LeadStageFormState {
   label: string;
   color: string;
   position: number;
+}
+
+interface WorkspaceMembership {
+  id: string;
+  owner_user_id: string;
+  member_user_id: string | null;
+  invited_email: string;
+  role: WorkspaceRole;
+  status: 'pending' | 'active' | 'revoked';
+  invited_by: string | null;
+  invite_token: string;
+  note: string;
+  last_seen_at: string | null;
+  last_active_path: string;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TeamInviteFormState {
+  email: string;
+  role: WorkspaceRole;
+  note: string;
 }
 
 const planIcons = {
@@ -277,7 +308,7 @@ function buildPrefilledReminderSettings(
 
 export default function ParametresPage() {
   const searchParams = useSearchParams();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, session, signOut, loading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('parametres');
   const [loading, setLoading] = useState(true);
@@ -322,6 +353,19 @@ export default function ParametresPage() {
     color: DEFAULT_LEAD_STAGES[1]?.color || 'bg-blue-50 text-blue-700',
     position: DEFAULT_LEAD_STAGES.length,
   });
+  const [workspaceMemberships, setWorkspaceMemberships] = useState<WorkspaceMembership[]>([]);
+  const [myWorkspaceMembership, setMyWorkspaceMembership] = useState<WorkspaceMembership | null>(null);
+  const [workspaceUserId, setWorkspaceUserId] = useState<string | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<'owner' | WorkspaceRole>('owner');
+  const [teamInviteForm, setTeamInviteForm] = useState<TeamInviteFormState>({
+    email: '',
+    role: 'commercial',
+    note: '',
+  });
+  const [invitingTeamMember, setInvitingTeamMember] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [generatedInviteLink, setGeneratedInviteLink] = useState('');
+  const [updatingWorkspaceMemberId, setUpdatingWorkspaceMemberId] = useState<string | null>(null);
 
   // Phases chantier
   const [phases, setPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
@@ -340,7 +384,7 @@ export default function ParametresPage() {
     setLoading(true);
     setError('');
 
-    const [profileRes, configRes, reminderSettingsRes, leadSourcesRes, leadStagesRes] = await Promise.all([
+    const [profileRes, configRes, currentMembershipRes] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -350,20 +394,11 @@ export default function ParametresPage() {
         .maybeSingle(),
       supabase.rpc('get_platform_config'),
       supabase
-        .from('business_reminder_settings')
-        .select(
-          'user_id, legal_form, benefit_tax_regime, vat_regime, vat_frequency, vat_reminder_day, has_employees, employee_count, payroll_day, dsn_due_day, fiscal_year_end_day, fiscal_year_end_month, social_contributions_day, cfe_applicable, apprenticeship_tax_applicable, accountant_notes'
-        )
-        .eq('user_id', user.id)
+        .from('workspace_memberships')
+        .select('*')
+        .eq('member_user_id', user.id)
+        .eq('status', 'active')
         .maybeSingle(),
-      supabase
-        .from('lead_sources')
-        .select('*')
-        .order('position', { ascending: true }),
-      supabase
-        .from('lead_stages')
-        .select('*')
-        .order('position', { ascending: true }),
     ]);
 
     if (profileRes.error) {
@@ -372,8 +407,55 @@ export default function ParametresPage() {
       return;
     }
 
+    const activeMembership = (currentMembershipRes.data as WorkspaceMembership | null) || null;
+    const nextWorkspaceUserId = activeMembership?.owner_user_id || user.id;
+    const nextWorkspaceRole = activeMembership?.role || 'owner';
+
+    const [reminderSettingsRes, leadSourcesRes, leadStagesRes] = await Promise.all([
+      supabase
+        .from('business_reminder_settings')
+        .select(
+          'user_id, legal_form, benefit_tax_regime, vat_regime, vat_frequency, vat_reminder_day, has_employees, employee_count, payroll_day, dsn_due_day, fiscal_year_end_day, fiscal_year_end_month, social_contributions_day, cfe_applicable, apprenticeship_tax_applicable, accountant_notes'
+        )
+        .eq('user_id', nextWorkspaceUserId)
+        .maybeSingle(),
+      supabase
+        .from('lead_sources')
+        .select('*')
+        .eq('user_id', nextWorkspaceUserId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('lead_stages')
+        .select('*')
+        .eq('user_id', nextWorkspaceUserId)
+        .order('position', { ascending: true }),
+    ]);
+
     const nextProfile = profileRes.data as SettingsProfile | null;
+    let workspaceMembershipRows: WorkspaceMembership[] = [];
+    if (!activeMembership || activeMembership.role === 'admin') {
+      const { data: membershipsRes, error: membershipsError } = await supabase
+        .from('workspace_memberships')
+        .select('*')
+        .eq('owner_user_id', nextWorkspaceUserId)
+        .order('created_at', { ascending: true });
+
+      if (membershipsError) {
+        setError(membershipsError.message);
+        setLoading(false);
+        return;
+      }
+
+      workspaceMembershipRows = (membershipsRes as WorkspaceMembership[]) || [];
+    } else if (activeMembership) {
+      workspaceMembershipRows = [activeMembership];
+    }
+
     setProfile(nextProfile);
+    setMyWorkspaceMembership(activeMembership);
+    setWorkspaceUserId(nextWorkspaceUserId);
+    setWorkspaceRole(nextWorkspaceRole);
+    setWorkspaceMemberships(workspaceMembershipRows);
     setForm({
       full_name: nextProfile?.full_name || '',
       company_name: nextProfile?.company_name || '',
@@ -400,7 +482,7 @@ export default function ParametresPage() {
         ? (leadSourcesRes.data as LeadSource[])
         : DEFAULT_LEAD_SOURCES.map((source, index) => ({
             id: `default-${source.slug}`,
-            user_id: user.id,
+            user_id: nextWorkspaceUserId,
             name: source.name,
             slug: source.slug,
             source_type: source.source_type,
@@ -415,7 +497,7 @@ export default function ParametresPage() {
         ? (leadStagesRes.data as LeadStageConfig[])
         : DEFAULT_LEAD_STAGES.map((stage, index) => ({
             id: `default-${stage.slug}`,
-            user_id: user.id,
+            user_id: nextWorkspaceUserId,
             slug: stage.slug,
             label: stage.label,
             color: stage.color,
@@ -486,13 +568,14 @@ export default function ParametresPage() {
 
   async function saveReminderPreferences() {
     if (!user) return;
+    const ownerId = workspaceUserId || user.id;
 
     setSavingReminders(true);
     setSaveReminderSuccess(false);
     setError('');
 
     const payload = {
-      user_id: user.id,
+      user_id: ownerId,
       ...reminderSettings,
       updated_at: new Date().toISOString(),
     };
@@ -603,6 +686,7 @@ export default function ParametresPage() {
 
   async function saveLeadSource(source: LeadSource) {
     if (!user || !source.name.trim()) return;
+    const ownerId = workspaceUserId || user.id;
 
     setSavingSourceId(source.id);
     setSaveSourceSuccess(false);
@@ -610,7 +694,7 @@ export default function ParametresPage() {
     const isTempSource = source.id.startsWith('default-');
 
     const payload = {
-      user_id: user.id,
+      user_id: ownerId,
       name: source.name.trim(),
       slug: isTempSource ? normalizeLeadSourceSlug(source.name) : source.slug,
       source_type: source.source_type,
@@ -644,6 +728,7 @@ export default function ParametresPage() {
 
   async function createLeadSource() {
     if (!user || !newLeadSource.name.trim()) return;
+    const ownerId = workspaceUserId || user.id;
 
     setCreatingSource(true);
     setSaveSourceSuccess(false);
@@ -657,7 +742,7 @@ export default function ParametresPage() {
     }
 
     const payload = {
-      user_id: user.id,
+      user_id: ownerId,
       name: newLeadSource.name.trim(),
       slug,
       source_type: newLeadSource.source_type,
@@ -702,12 +787,13 @@ export default function ParametresPage() {
 
   async function saveLeadStage(stage: LeadStageConfig) {
     if (!user || !stage.label.trim()) return;
+    const ownerId = workspaceUserId || user.id;
 
     setSavingStageId(stage.id);
     setError('');
     const isTempStage = stage.id.startsWith('default-');
     const payload = {
-      user_id: user.id,
+      user_id: ownerId,
       slug: stage.slug,
       label: stage.label.trim(),
       color: stage.color,
@@ -737,6 +823,7 @@ export default function ParametresPage() {
 
   async function createLeadStage() {
     if (!user || !newLeadStage.label.trim()) return;
+    const ownerId = workspaceUserId || user.id;
 
     setCreatingStage(true);
     setError('');
@@ -755,7 +842,7 @@ export default function ParametresPage() {
     }
 
     const payload = {
-      user_id: user.id,
+      user_id: ownerId,
       slug,
       label: newLeadStage.label.trim(),
       color: newLeadStage.color,
@@ -860,6 +947,101 @@ export default function ParametresPage() {
     }
   }
 
+  async function inviteWorkspaceMember() {
+    if (!user || !teamInviteForm.email.trim()) return;
+
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setError('Session utilisateur introuvable. Reconnectez-vous puis recommencez.');
+      return;
+    }
+
+    setInvitingTeamMember(true);
+    setInviteSuccess('');
+    setGeneratedInviteLink('');
+    setError('');
+
+    try {
+      const response = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(teamInviteForm),
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Impossible d'inviter ce compte.");
+      }
+
+      setInviteSuccess(
+        data.email_sent
+          ? `Invitation envoyee a ${teamInviteForm.email.trim()}.`
+          : `Invitation preparee pour ${teamInviteForm.email.trim()}.`
+      );
+      setGeneratedInviteLink(data.login_url || data.signup_url || '');
+      setTeamInviteForm({
+        email: '',
+        role: 'commercial',
+        note: '',
+      });
+      await loadData();
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "Erreur d'invitation");
+    } finally {
+      setInvitingTeamMember(false);
+    }
+  }
+
+  async function updateWorkspaceMemberRole(membershipId: string, role: WorkspaceRole) {
+    setUpdatingWorkspaceMemberId(membershipId);
+    setError('');
+
+    const { error: membershipError } = await supabase
+      .from('workspace_memberships')
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq('id', membershipId);
+
+    if (membershipError) {
+      setError(membershipError.message);
+      setUpdatingWorkspaceMemberId(null);
+      return;
+    }
+
+    setWorkspaceMemberships((prev) => prev.map((membership) => (
+      membership.id === membershipId ? { ...membership, role } : membership
+    )));
+    setUpdatingWorkspaceMemberId(null);
+  }
+
+  async function revokeWorkspaceMember(membershipId: string) {
+    setUpdatingWorkspaceMemberId(membershipId);
+    setError('');
+
+    const { error: membershipError } = await supabase
+      .from('workspace_memberships')
+      .update({
+        status: 'revoked',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', membershipId);
+
+    if (membershipError) {
+      setError(membershipError.message);
+      setUpdatingWorkspaceMemberId(null);
+      return;
+    }
+
+    setWorkspaceMemberships((prev) => prev.map((membership) => (
+      membership.id === membershipId
+        ? { ...membership, status: 'revoked', last_seen_at: null, last_active_path: '' }
+        : membership
+    )));
+    setUpdatingWorkspaceMemberId(null);
+  }
+
   const plans = useMemo(() => {
     return PRICING_PLAN_DEFAULTS.map((plan) => ({
       ...plan,
@@ -888,6 +1070,11 @@ export default function ParametresPage() {
   ].filter(Boolean).length;
   const reminderCompletionPercent = Math.round((reminderCompletionScore / 7) * 100);
   const partnerSourcesCount = leadSources.filter((source) => source.source_type === 'partner' && source.is_active).length;
+  const isWorkspaceOwner = !myWorkspaceMembership;
+  const canManageWorkspaceAccounts = canManageWorkspaceTeam(workspaceRole);
+  const teamFeatureUnlocked = isWorkspaceOwner ? currentPlan.key !== 'starter' : true;
+  const activeWorkspaceMembers = workspaceMemberships.filter((membership) => membership.status === 'active').length;
+  const pendingWorkspaceInvites = workspaceMemberships.filter((membership) => membership.status === 'pending').length;
 
   if (authLoading || loading) {
     return (
@@ -2067,6 +2254,251 @@ export default function ParametresPage() {
                   Se deconnecter
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-5 w-5 text-primary" />
+                    Comptes d equipe
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Invitez vos chefs d equipe, commerciaux et assistantes a se connecter a Hellobat. Les salaries et sous-traitants terrain continuent d etre geres dans l onglet Equipe.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
+                    {activeWorkspaceMembers} actif{activeWorkspaceMembers > 1 ? 's' : ''}
+                  </span>
+                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1.5 text-muted-foreground">
+                    {pendingWorkspaceInvites} invitation{pendingWorkspaceInvites > 1 ? 's' : ''} en attente
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {!teamFeatureUnlocked ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-950">Les comptes d equipe ne sont pas inclus dans l offre gratuite.</p>
+                      <p className="mt-1 text-sm text-amber-800">
+                        Passez sur un plan payant pour inviter votre assistante, vos commerciaux ou vos chefs d equipe et suivre leur activite.
+                      </p>
+                    </div>
+                    <Button onClick={() => setActiveTab('abonnement')}>
+                      Voir les offres
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">Espace courant</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {isWorkspaceOwner ? 'Votre entreprise' : 'Espace equipe partage'}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isWorkspaceOwner
+                          ? 'Vous pilotez les acces applicatifs de votre equipe.'
+                          : "Vous travaillez dans l espace d un autre dirigeant."}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">Votre role</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {workspaceRole === 'owner' ? 'Dirigeant' : WORKSPACE_ROLE_LABELS[workspaceRole]}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {canManageWorkspaceAccounts
+                          ? 'Vous pouvez inviter et gerer les comptes d equipe.'
+                          : 'Vous avez un acces operationnel, sans gestion des invitations.'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">Suivi d activite</p>
+                      <p className="mt-1 font-medium text-foreground">Dernieres pages consultees</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Hellobat note simplement la derniere presence et la derniere page ouverte par chaque compte actif.
+                      </p>
+                    </div>
+                  </div>
+
+                  {canManageWorkspaceAccounts && (
+                    <div className="rounded-2xl border border-border bg-muted/10 p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+                        <div className="grid flex-1 gap-4 md:grid-cols-3">
+                          <div className="space-y-2 md:col-span-1">
+                            <Label htmlFor="team_invite_email">Email du compte</Label>
+                            <Input
+                              id="team_invite_email"
+                              type="email"
+                              value={teamInviteForm.email}
+                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, email: e.target.value }))}
+                              placeholder="commercial@entreprise.fr"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="team_invite_role">Role</Label>
+                            <select
+                              id="team_invite_role"
+                              value={teamInviteForm.role}
+                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, role: e.target.value as WorkspaceRole }))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              {WORKSPACE_ROLE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-2 md:col-span-1">
+                            <Label htmlFor="team_invite_note">Note interne</Label>
+                            <Input
+                              id="team_invite_note"
+                              value={teamInviteForm.note}
+                              onChange={(e) => setTeamInviteForm((prev) => ({ ...prev, note: e.target.value }))}
+                              placeholder="Commercial secteur Sud"
+                            />
+                          </div>
+                        </div>
+                        <Button onClick={inviteWorkspaceMember} disabled={invitingTeamMember || !teamInviteForm.email.trim()}>
+                          {invitingTeamMember ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="mr-2 h-4 w-4" />
+                          )}
+                          Inviter
+                        </Button>
+                      </div>
+
+                      {(inviteSuccess || generatedInviteLink) && (
+                        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                          {inviteSuccess && <p className="font-medium">{inviteSuccess}</p>}
+                          {generatedInviteLink && (
+                            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+                              <Input value={generatedInviteLink} readOnly className="bg-white" />
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  void navigator.clipboard.writeText(generatedInviteLink);
+                                }}
+                              >
+                                Copier le lien
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {workspaceMemberships.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-5 text-sm text-muted-foreground">
+                        Aucun compte d equipe n a encore ete ajoute.
+                      </div>
+                    ) : (
+                      workspaceMemberships.map((membership) => {
+                        const isUpdating = updatingWorkspaceMemberId === membership.id;
+                        const isEditable = canManageWorkspaceAccounts && membership.status !== 'revoked';
+
+                        return (
+                          <div
+                            key={membership.id}
+                            className="rounded-2xl border border-border bg-background p-4"
+                          >
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-medium text-foreground">{membership.invited_email}</p>
+                                  <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                                    {WORKSPACE_STATUS_LABELS[membership.status]}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {membership.status === 'active' && membership.accepted_at
+                                    ? `Actif depuis le ${formatDate(membership.accepted_at)}`
+                                    : membership.status === 'pending'
+                                      ? 'Invitation envoyee, en attente de connexion.'
+                                      : 'Acces retire pour ce compte.'}
+                                </p>
+                                {membership.note && (
+                                  <p className="text-sm text-muted-foreground">{membership.note}</p>
+                                )}
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
+                                <div className="space-y-1">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Role</p>
+                                  {isEditable ? (
+                                    <select
+                                      value={membership.role}
+                                      onChange={(e) => void updateWorkspaceMemberRole(membership.id, e.target.value as WorkspaceRole)}
+                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                      disabled={isUpdating}
+                                    >
+                                      {WORKSPACE_ROLE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <p className="text-sm font-medium text-foreground">
+                                      {WORKSPACE_ROLE_LABELS[membership.role]}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Derniere activite</p>
+                                  <p className="text-sm font-medium text-foreground">
+                                    {membership.last_seen_at ? formatDate(membership.last_seen_at) : 'Aucune presence recente'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatWorkspacePathLabel(membership.last_active_path)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {canManageWorkspaceAccounts && membership.status !== 'revoked' && (
+                              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const origin = window.location.origin;
+                                    const loginUrl = `${origin}/login?email=${encodeURIComponent(membership.invited_email)}&team=1`;
+                                    void navigator.clipboard.writeText(loginUrl);
+                                    setInviteSuccess(`Lien de connexion copie pour ${membership.invited_email}.`);
+                                  }}
+                                >
+                                  Copier le lien
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => void revokeWorkspaceMember(membership.id)}
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+                                  Retirer l acces
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
