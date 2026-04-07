@@ -76,7 +76,7 @@ export default function ConfidentialitePage() {
                 <li><strong>Anthropic PBC</strong> — traitement IA (génération de devis, réponses email, agents IA)</li>
                 <li><strong>DocuSeal</strong> — signature électronique des documents</li>
                 <li><strong>Resend Inc.</strong> — envoi d&apos;emails transactionnels</li>
-                <li><strong>Google LLC</strong> — synchronisation Calendar, Gmail et Business (sur votre consentement)</li>
+                <li><strong>Google LLC</strong> — synchronisation Calendar, Gmail et Business (sur votre consentement), mesure d&apos;audience (Google Analytics)</li>
                 <li><strong>Pappers SAS</strong> — recherche d&apos;informations d&apos;entreprise</li>
               </ul>
               <p>

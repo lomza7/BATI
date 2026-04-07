@@ -65,6 +65,18 @@ export default function CookiesPage() {
                       <td className="py-2 pr-4">Prévisualisation Vercel (développement uniquement)</td>
                       <td className="py-2">Session</td>
                     </tr>
+                    <tr className="border-b border-[var(--landing-border)]/50">
+                      <td className="py-2 pr-4 font-mono text-xs">_ga</td>
+                      <td className="py-2 pr-4">Analytique</td>
+                      <td className="py-2 pr-4">Identification unique du visiteur (Google Analytics)</td>
+                      <td className="py-2">2 ans</td>
+                    </tr>
+                    <tr className="border-b border-[var(--landing-border)]/50">
+                      <td className="py-2 pr-4 font-mono text-xs">_ga_*</td>
+                      <td className="py-2 pr-4">Analytique</td>
+                      <td className="py-2 pr-4">Conservation de l&apos;état de session (Google Analytics)</td>
+                      <td className="py-2">2 ans</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -78,13 +90,39 @@ export default function CookiesPage() {
                 car le service ne fonctionnerait pas sans eux.
               </p>
               <p>
-                <strong>Hellobat n&apos;utilise aucun cookie publicitaire ni de tracking
-                tiers.</strong> Nous n&apos;utilisons pas Google Analytics, Facebook Pixel ou
-                tout autre outil de suivi marketing.
+                <strong>Hellobat n&apos;utilise aucun cookie publicitaire.</strong> Nous
+                n&apos;utilisons pas Facebook Pixel ni tout autre outil de suivi marketing.
               </p>
             </Section>
 
-            <Section title="4. Cookies tiers">
+            <Section title="4. Cookies analytiques (Google Analytics)">
+              <p>
+                Hellobat utilise Google Analytics 4 (GA4) pour mesurer la fréquentation
+                du site et comprendre comment les visiteurs utilisent la plateforme :
+                pages consultées, durée des visites, provenance du trafic.
+              </p>
+              <p>
+                Ces cookies sont déposés par Google LLC. Les données collectées sont
+                anonymisées (pas de collecte d&apos;adresse IP complète) et ne sont pas
+                croisées avec d&apos;autres services Google à des fins publicitaires.
+              </p>
+              <p>
+                Vous pouvez refuser ces cookies via le bandeau de consentement affiché
+                lors de votre première visite, ou à tout moment via les paramètres de
+                votre navigateur. Vous pouvez également installer l&apos;extension{' '}
+                <a
+                  href="https://tools.google.com/dlpage/gaoptout"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--landing-accent)] underline"
+                >
+                  Google Analytics Opt-out
+                </a>{' '}
+                pour désactiver le suivi sur tous les sites.
+              </p>
+            </Section>
+
+            <Section title="5. Cookies tiers">
               <p>
                 Lorsque vous connectez votre compte Google (Calendar, Gmail ou Business),
                 Google peut déposer ses propres cookies conformément à sa politique de
@@ -93,7 +131,7 @@ export default function CookiesPage() {
               </p>
             </Section>
 
-            <Section title="5. Gestion des cookies">
+            <Section title="6. Gestion des cookies">
               <p>
                 Vous pouvez gérer les cookies via les paramètres de votre navigateur :
               </p>
@@ -109,7 +147,7 @@ export default function CookiesPage() {
               </p>
             </Section>
 
-            <Section title="6. Durée de conservation">
+            <Section title="7. Durée de conservation">
               <p>
                 Les cookies essentiels d&apos;Hellobat ont une durée de vie limitée à la
                 session de navigation ou à 13 mois maximum, conformément aux
@@ -117,7 +155,7 @@ export default function CookiesPage() {
               </p>
             </Section>
 
-            <Section title="7. Contact">
+            <Section title="8. Contact">
               <p>
                 Pour toute question relative aux cookies :<br />
                 <strong>Hellobat SAS</strong> — contact@hellobat.app
