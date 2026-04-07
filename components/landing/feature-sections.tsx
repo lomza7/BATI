@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import {
+  ArrowRight,
   Camera,
   FileImage,
   FileText,
@@ -33,9 +35,10 @@ interface FeatureSectionProps {
   bulletPoints: string[];
   reversed?: boolean;
   visual: React.ReactNode;
+  slug?: string;
 }
 
-function FeatureSection({ id, badge, title, titleAccent, description, bulletPoints, reversed, visual }: FeatureSectionProps) {
+function FeatureSection({ id, badge, title, titleAccent, description, bulletPoints, reversed, visual, slug }: FeatureSectionProps) {
   return (
     <section id={id} className="py-12 sm:py-24 bg-[var(--landing-off)]">
       <div className="max-w-[1200px] mx-auto px-6">
@@ -57,6 +60,14 @@ function FeatureSection({ id, badge, title, titleAccent, description, bulletPoin
                 </li>
               ))}
             </ul>
+            {slug && (
+              <Link
+                href={`/fonctionnalites/${slug}`}
+                className="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-full bg-[var(--landing-accent)] text-white text-sm font-medium hover:bg-[#b94800] transition-colors"
+              >
+                En savoir plus <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
           </div>
           <div className="flex-1 w-full">{visual}</div>
         </div>
@@ -85,6 +96,7 @@ export function SiteWebSection() {
   return (
     <FeatureSection
       id="siteweb"
+      slug="site-vitrine"
       badge="Site Web"
       title="Votre vitrine en ligne,"
       titleAccent="sans effort"
@@ -125,6 +137,7 @@ export function DevisSection() {
   return (
     <FeatureSection
       id="devis"
+      slug="devis-factures"
       badge="Devis IA · Claude Sonnet"
       title="Vos devis,"
       titleAccent="pas comme tout le monde"
@@ -199,6 +212,7 @@ export function FactureElectroniqueSection() {
   return (
     <FeatureSection
       id="facture-electronique"
+      slug="facture-electronique"
       badge="Réforme 2026"
       title="Facture électronique,"
       titleAccent="vous êtes prêt"
@@ -266,6 +280,7 @@ export function ProspectionSection() {
   return (
     <FeatureSection
       id="prospection"
+      slug="prospection-crm"
       badge="Prospection CRM"
       title="Convertissez vos prospects,"
       titleAccent="méthodiquement"
@@ -302,6 +317,7 @@ export function EmailSection() {
   return (
     <FeatureSection
       id="email"
+      slug="gmail-integre"
       badge="Gmail intégré"
       title="Votre Gmail,"
       titleAccent="dans Hellobat"
@@ -342,6 +358,7 @@ export function ComptaSection() {
   return (
     <FeatureSection
       id="compta"
+      slug="comptabilite-ia"
       badge="Comptabilité"
       title="Comptabilité simplifiée,"
       titleAccent="en un clin d'œil"
@@ -384,6 +401,7 @@ export function AvisSection() {
   return (
     <FeatureSection
       id="avis"
+      slug="avis-google"
       badge="Avis Google"
       title="Des avis 5 étoiles,"
       titleAccent="automatiquement"
@@ -428,6 +446,7 @@ export function PlansSection() {
   return (
     <FeatureSection
       id="plans"
+      slug="plans-rendus-ia"
       badge="Plans & Rendus"
       title="Vos documents,"
       titleAccent="toujours accessibles"
@@ -461,6 +480,7 @@ export function CarteSection() {
   return (
     <FeatureSection
       id="carte"
+      slug="carte-interactive"
       badge="Carte"
       title="Vos chantiers,"
       titleAccent="sur une carte"
@@ -496,6 +516,7 @@ export function ContactsSection() {
   return (
     <FeatureSection
       id="contacts"
+      slug="contacts"
       badge="Contacts"
       title="Votre carnet d'adresses,"
       titleAccent="toujours à jour"
@@ -549,6 +570,7 @@ export function EquipeSection() {
   return (
     <FeatureSection
       id="equipe"
+      slug="equipe"
       badge="Équipe"
       title="Votre équipe,"
       titleAccent="bien gérée"
@@ -595,6 +617,7 @@ export function PlanningSection() {
   return (
     <FeatureSection
       id="planning"
+      slug="planning-equipe"
       badge="Planning"
       title="Un planning visuel,"
       titleAccent="drag & drop"
@@ -656,6 +679,7 @@ export function CataloguesSection() {
   return (
     <FeatureSection
       id="catalogues"
+      slug="catalogues"
       badge="Catalogues"
       title="Vos catalogues produits,"
       titleAccent="partagés en un lien"
@@ -696,6 +720,7 @@ export function PaiementSection() {
   return (
     <FeatureSection
       id="paiement"
+      slug="paiements-stripe"
       badge="Stripe Connect"
       title="Encaissez facilement,"
       titleAccent="directement sur votre compte"
@@ -733,6 +758,7 @@ export function AbonnementsSection() {
   return (
     <FeatureSection
       id="abonnements"
+      slug="contrats-recurrents"
       badge="Contrats récurrents"
       title="Revenus récurrents,"
       titleAccent="en pilote automatique"
@@ -783,6 +809,7 @@ export function AgentsSection() {
   return (
     <FeatureSection
       id="agents"
+      slug="agents-ia"
       badge="Agents IA"
       title="Des assistants IA,"
       titleAccent="à votre service"
