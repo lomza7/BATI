@@ -9,10 +9,7 @@ const footerLinks = {
     { label: 'Témoignages', href: '#testimonials' },
   ],
   Ressources: [
-    { label: 'Centre d\'aide', href: '#' },
-    { label: 'Blog', href: '#' },
-    { label: 'Guides', href: '#' },
-    { label: 'API', href: '#' },
+    { label: 'Blog', href: '/blog' },
   ],
   Entreprise: [
     { label: 'À propos', href: '/a-propos' },

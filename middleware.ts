@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicPaths = ['/', '/login', '/signup', '/carte/publique', '/mentions-legales', '/confidentialite', '/cookies', '/cgu', '/a-propos', '/contact', '/carrieres', '/presse'];
+const publicPaths = ['/', '/login', '/signup', '/carte/publique', '/mentions-legales', '/confidentialite', '/cookies', '/cgu', '/a-propos', '/contact', '/carrieres', '/presse', '/blog'];
 const publicPrefixes = ['/site/', '/c/', '/d/', '/f/', '/fonctionnalites/'];
 
 export default function middleware(request: NextRequest) {
