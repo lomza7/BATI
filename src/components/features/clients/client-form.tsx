@@ -71,9 +71,19 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
     setFieldErrors({})
 
     const payload: ClientCreateInput = {
-      ...form,
-      client_type: clientType,
       name: form.name ?? '',
+      client_type: clientType,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      city: form.city,
+      postal_code: form.postal_code,
+      notes: form.notes,
+      company_name: form.company_name,
+      siret: form.siret,
+      billing_address: form.billing_address,
+      billing_city: form.billing_city,
+      billing_postal_code: form.billing_postal_code,
     }
 
     try {
@@ -176,7 +186,7 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
             value={form.siret ?? ''}
             onChange={(v) => setField('siret', v)}
             onFound={handleSiretFound}
-            error={fieldErrors['siret']?.[0]}
+            {...(fieldErrors['siret']?.[0] !== undefined ? { error: fieldErrors['siret'][0] } : {})}
           />
         </>
       )}

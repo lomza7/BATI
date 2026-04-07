@@ -20,7 +20,7 @@ export default async function EditDevisPage({ params }: Params) {
     redirect(`/dashboard/devis/${id}`)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   const [clientsResult, profileResult] = await Promise.all([
     (supabase as any)
       .from('clients')
@@ -33,6 +33,7 @@ export default async function EditDevisPage({ params }: Params) {
       .eq('id', user.id)
       .single(),
   ])
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   const clients = (clientsResult.data ?? []) as Array<{
     id: string

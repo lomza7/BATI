@@ -204,7 +204,7 @@ function buildPartyXml(party: FacturxParty, defaultCountry: string): string {
     ${siretXml}`
 }
 
-function buildLineXml(line: FacturxLine, currency: string): string {
+function buildLineXml(line: FacturxLine, _currency: string): string {
   return `<ram:IncludedSupplyChainTradeLineItem>
     <ram:AssociatedDocumentLineDocument>
       <ram:LineID>${line.id}</ram:LineID>
@@ -233,7 +233,7 @@ function buildLineXml(line: FacturxLine, currency: string): string {
   </ram:IncludedSupplyChainTradeLineItem>`
 }
 
-function buildTaxXml(t: FacturxTvaTotal, currency: string): string {
+function buildTaxXml(t: FacturxTvaTotal, _currency: string): string {
   return `<ram:ApplicableTradeTax>
     <ram:CalculatedAmount>${amt(t.montant_tva)}</ram:CalculatedAmount>
     <ram:TypeCode>VAT</ram:TypeCode>

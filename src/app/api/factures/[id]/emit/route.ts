@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getFacture, emitFacture } from '@/lib/factures/service'
 import { validateFacturx } from '@/lib/facturx/validate'
@@ -85,23 +85,23 @@ export async function POST(_req: NextRequest, { params }: Params) {
       invoice_number: facture.reference,
       invoice_type_code: facture.type === 'avoir' ? '381' : '380',
       issue_date: issueDate,
-      due_date: dueDate,
+      ...(dueDate !== undefined ? { due_date: dueDate } : {}),
       currency_code: 'EUR',
       seller: {
         name: profile.company_name ?? profile.full_name ?? '',
-        siret: profile.siret ?? undefined,
-        tva_number: profile.tva_number ?? undefined,
-        address: profile.address ?? undefined,
-        city: profile.city ?? undefined,
-        postal_code: profile.postal_code ?? undefined,
+        ...(profile.siret ? { siret: profile.siret } : {}),
+        ...(profile.tva_number ? { tva_number: profile.tva_number } : {}),
+        ...(profile.address ? { address: profile.address } : {}),
+        ...(profile.city ? { city: profile.city } : {}),
+        ...(profile.postal_code ? { postal_code: profile.postal_code } : {}),
         country_code: 'FR',
       },
       buyer: {
         name: facture.client?.company_name ?? facture.client?.name ?? '',
-        siret: facture.client?.siret ?? undefined,
-        address: facture.client?.billing_address ?? undefined,
-        city: facture.client?.billing_city ?? undefined,
-        postal_code: facture.client?.billing_postal_code ?? undefined,
+        ...(facture.client?.siret ? { siret: facture.client.siret } : {}),
+        ...(facture.client?.billing_address ? { address: facture.client.billing_address } : {}),
+        ...(facture.client?.billing_city ? { city: facture.client.billing_city } : {}),
+        ...(facture.client?.billing_postal_code ? { postal_code: facture.client.billing_postal_code } : {}),
         country_code: 'FR',
       },
       lines: allLignes,
@@ -109,7 +109,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       total_ht: facture.total_ht,
       total_tva: facture.total_tva,
       total_ttc: facture.total_ttc,
-      note: isAutoEntrepreneur ? 'TVA non applicable, art. 293 B du CGI' : undefined,
+      ...(isAutoEntrepreneur ? { note: 'TVA non applicable, art. 293 B du CGI' } : {}),
     })
 
     // Générer le PDF

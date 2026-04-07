@@ -12,6 +12,7 @@ import type {
   FactureListQuery,
   SituationInput,
   PayInput,
+  LotInput,
 } from './schemas'
 import { calculerTotaux } from './calculations'
 
@@ -786,7 +787,7 @@ export async function getDashboard(): Promise<FactureDashboard> {
 // ── helpers ────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function insertLots(supabase: any, factureId: string, lots: import('./schemas').LotInput[], isAutoEntrepreneur: boolean): Promise<void> {
+async function insertLots(supabase: any, factureId: string, lots: LotInput[], isAutoEntrepreneur: boolean): Promise<void> {
   for (const lotInput of lots) {
     const lotHt = lotInput.postes.reduce((sum, p) => sum + p.quantity * p.unit_price_ht, 0)
     const { data: lot, error: lotError } = await supabase

@@ -61,7 +61,7 @@ export function LotEditor({
   function movePoste(i: number, direction: 'up' | 'down') {
     const postes = [...lot.postes]
     const target = direction === 'up' ? i - 1 : i + 1
-    ;[postes[i], postes[target]] = [postes[target], postes[i]]
+    ;[postes[i], postes[target]] = [postes[target]!, postes[i]!]
     onChange({
       ...lot,
       postes: postes.map((p, idx) => ({ ...p, sort_order: idx })),

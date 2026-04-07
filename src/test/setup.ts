@@ -1,4 +1,5 @@
-process.env['NODE_ENV'] = 'test'
+// @ts-expect-error — NODE_ENV is typed as read-only but writable at runtime in Node
+process.env.NODE_ENV = 'test'
 
 import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'

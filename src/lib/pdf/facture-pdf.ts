@@ -67,7 +67,7 @@ export async function generateFacturePdf(
     const font = opts.bold ? fontBold : fontRegular
     const size = opts.size ?? 9
     const color = opts.color ?? COLORS.dark
-    page.drawText(str, { x, y: yPos, size, font, color, maxWidth: opts.maxWidth })
+    page.drawText(str, { x, y: yPos, size, font, color, ...(opts.maxWidth !== undefined ? { maxWidth: opts.maxWidth } : {}) })
   }
 
   function newPageIfNeeded(neededHeight: number) {

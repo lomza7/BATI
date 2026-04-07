@@ -32,8 +32,7 @@ export function DevisActions({
     try {
       const res = await fetch(`/api/devis/${devisId}/${action}`, {
         method: 'POST',
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
+        ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) {
         const data = await res.json()

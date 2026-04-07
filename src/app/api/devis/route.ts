@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { devisCreateSchema, devisListQuerySchema } from '@/lib/devis/schemas'
 import { listDevis, createDevis } from '@/lib/devis/service'

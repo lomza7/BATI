@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { clientCreateSchema, clientListQuerySchema } from '@/lib/clients/schemas'
 import { listClients, createClient_ } from '@/lib/clients/service'

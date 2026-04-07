@@ -9,7 +9,7 @@ export default async function NewDevisPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   const [clientsResult, profileResult] = await Promise.all([
     (supabase as any)
       .from('clients')
@@ -22,6 +22,7 @@ export default async function NewDevisPage() {
       .eq('id', user.id)
       .single(),
   ])
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   const clients = (clientsResult.data ?? []) as Array<{
     id: string

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import { sendDevis, getDevis } from '@/lib/devis/service'

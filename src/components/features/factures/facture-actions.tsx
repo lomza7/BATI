@@ -21,8 +21,7 @@ export function FactureActions({ facture }: Props) {
     try {
       const res = await fetch(`/api/factures/${facture.id}/${path}`, {
         method,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
+        ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) {
         const data = await res.json()

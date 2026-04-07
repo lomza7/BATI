@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
 import Papa from 'papaparse'
 import { clientCreateSchema } from '@/lib/clients/schemas'
@@ -136,7 +136,7 @@ async function processImport(
     .eq('user_id', userId)
     .is('deleted_at', null)
 
-  const existing = existingClients ?? []
+  const existing: Array<{ email?: string | null; phone?: string | null; siret?: string | null }> = existingClients ?? []
 
   for (let i = 0; i < rows.length; i++) {
     const rawRow = rows[i]!
@@ -164,13 +164,15 @@ async function processImport(
     const input = validation.data
 
     // Duplicate detection
-    const isDuplicate = existing.some((ex) => isDuplicateClient(input, ex))
+    const candidate = { ...(input.email !== undefined ? { email: input.email } : {}), ...(input.phone !== undefined ? { phone: input.phone } : {}), ...(input.siret !== undefined ? { siret: input.siret } : {}) }
+    const isDuplicate = existing.some((ex) => isDuplicateClient(candidate, ex))
     if (isDuplicate) {
       report.skipped++
       continue
     }
 
-    const { error } = await supabase.from('clients').insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from('clients').insert({
       ...input,
       user_id: userId,
     })

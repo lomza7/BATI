@@ -94,7 +94,7 @@ export function DevisForm({ clients, initialValues, isAutoEntrepreneur = false }
     setLots((prev) => {
       const updated = [...prev]
       const target = direction === 'up' ? index - 1 : index + 1
-      ;[updated[index], updated[target]] = [updated[target], updated[index]]
+      ;[updated[index], updated[target]] = [updated[target]!, updated[index]!]
       return updated.map((l, i) => ({ ...l, sort_order: i }))
     })
   }
