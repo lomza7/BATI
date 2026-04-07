@@ -15,10 +15,10 @@ const footerLinks = {
     { label: 'API', href: '#' },
   ],
   Entreprise: [
-    { label: 'À propos', href: '#' },
-    { label: 'Contact', href: '#' },
-    { label: 'Carrières', href: '#' },
-    { label: 'Presse', href: '#' },
+    { label: 'À propos', href: '/a-propos' },
+    { label: 'Contact', href: '/contact' },
+    { label: 'Carrières', href: '/carrieres' },
+    { label: 'Presse', href: '/presse' },
   ],
   Légal: [
     { label: 'CGU', href: '/cgu' },
