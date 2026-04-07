@@ -21,9 +21,9 @@ import {
 } from 'lucide-react';
 
 const features = [
-  { icon: FileText, label: 'Devis & Factures', href: '#features' },
-  { icon: HardHat, label: 'Chantiers', href: '#features' },
-  { icon: CalendarDays, label: 'Planning', href: '#features' },
+  { icon: FileText, label: 'Devis & Factures', href: '#devis' },
+  { icon: HardHat, label: 'Chantiers', href: '#planning' },
+  { icon: CalendarDays, label: 'Planning', href: '#planning' },
   { icon: MapPin, label: 'Carte', href: '#carte' },
   { icon: Globe, label: 'Site Web', href: '#siteweb' },
   { icon: Target, label: 'Prospection', href: '#prospection' },
