@@ -21,10 +21,10 @@ const footerLinks = {
     { label: 'Presse', href: '#' },
   ],
   Légal: [
-    { label: 'CGU', href: '#' },
-    { label: 'Confidentialité', href: '#' },
-    { label: 'Cookies', href: '#' },
-    { label: 'Mentions légales', href: '#' },
+    { label: 'CGU', href: '/cgu' },
+    { label: 'Confidentialité', href: '/confidentialite' },
+    { label: 'Cookies', href: '/cookies' },
+    { label: 'Mentions légales', href: '/mentions-legales' },
   ],
 };
 
