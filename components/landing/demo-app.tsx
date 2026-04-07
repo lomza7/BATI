@@ -142,7 +142,7 @@ export function DemoApp() {
   );
 }
 
-function DemoViewContent({ view }: { view: string }) {
+export function DemoViewContent({ view }: { view: string }) {
   switch (view) {
     case 'dashboard':
       return <DashboardView />;

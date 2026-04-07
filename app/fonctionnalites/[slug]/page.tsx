@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Sparkles } from 'lucide-react';
 import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 import { CTA } from '@/components/landing/cta';
+import { FeatureDemo } from '@/components/landing/feature-demo';
 import { getFeatureBySlug, getAllFeatureSlugs } from '@/lib/feature-details';
 
 export function generateStaticParams() {
@@ -65,6 +66,13 @@ export default function FeatureDetailPage({ params }: { params: { slug: string }
       </section>
 
       <section className="py-12 sm:py-20 bg-[var(--landing-off)]">
+        <div className="max-w-4xl mx-auto px-6 mb-16">
+          <p className="text-center text-sm font-medium uppercase tracking-wider text-[var(--landing-muted)] mb-6">
+            Apercu de l&apos;application
+          </p>
+          <FeatureDemo slug={params.slug} />
+        </div>
+
         <div className="max-w-3xl mx-auto px-6">
           <div className="grid gap-3 sm:grid-cols-2 mb-16">
             {feature.highlights.map((h) => (
