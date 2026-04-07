@@ -36,7 +36,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
     if (!profile) return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 })
 
     // Validation bloquante avant émission
-    const validation = validateFacturx(invoice, profile)
+    const validation = validateFacturx({ ...invoice, reference: invoice.invoice_number }, profile)
     if (!validation.valid) {
       return NextResponse.json({ error: 'Validation Factur-X échouée', details: validation.errors }, { status: 422 })
     }
