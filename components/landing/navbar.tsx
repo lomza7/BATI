@@ -21,17 +21,17 @@ import {
 } from 'lucide-react';
 
 const features = [
-  { icon: FileText, label: 'Devis & Factures', href: '#devis' },
-  { icon: HardHat, label: 'Chantiers', href: '#planning' },
-  { icon: CalendarDays, label: 'Planning', href: '#planning' },
-  { icon: MapPin, label: 'Carte', href: '#carte' },
-  { icon: Globe, label: 'Site Web', href: '#siteweb' },
-  { icon: Target, label: 'Prospection', href: '#prospection' },
-  { icon: Mail, label: 'Emails', href: '#email' },
-  { icon: Star, label: 'Avis Google', href: '#avis' },
-  { icon: FileImage, label: 'Plans & Rendus', href: '#plans' },
-  { icon: CreditCard, label: 'Paiements', href: '#paiement' },
-  { icon: Bot, label: 'Agents IA', href: '#agents' },
+  { icon: FileText, label: 'Devis & Factures', href: '/#devis' },
+  { icon: HardHat, label: 'Chantiers', href: '/#planning' },
+  { icon: CalendarDays, label: 'Planning', href: '/#planning' },
+  { icon: MapPin, label: 'Carte', href: '/#carte' },
+  { icon: Globe, label: 'Site Web', href: '/#siteweb' },
+  { icon: Target, label: 'Prospection', href: '/#prospection' },
+  { icon: Mail, label: 'Emails', href: '/#email' },
+  { icon: Star, label: 'Avis Google', href: '/#avis' },
+  { icon: FileImage, label: 'Plans & Rendus', href: '/#plans' },
+  { icon: CreditCard, label: 'Paiements', href: '/#paiement' },
+  { icon: Bot, label: 'Agents IA', href: '/#agents' },
 ];
 
 export function Navbar() {
@@ -88,10 +88,10 @@ export function Navbar() {
             )}
           </div>
 
-          <Link href="#pricing" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
+          <Link href="/#pricing" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
             Tarifs
           </Link>
-          <Link href="#testimonials" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
+          <Link href="/#testimonials" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
             Témoignages
           </Link>
         </div>
@@ -140,7 +140,7 @@ export function Navbar() {
           </div>
           <div className="border-t border-[var(--landing-border)] pt-4 space-y-2">
             <Link
-              href="#pricing"
+              href="/#pricing"
               className="block text-sm text-[var(--landing-muted)] py-2"
               onClick={() => setMobileOpen(false)}
             >
