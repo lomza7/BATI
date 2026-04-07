@@ -3,10 +3,10 @@ import { Hexagon } from 'lucide-react';
 
 const footerLinks = {
   Produit: [
-    { label: 'Fonctionnalités', href: '#features' },
-    { label: 'Tarifs', href: '#pricing' },
-    { label: 'Démo', href: '#demo' },
-    { label: 'Témoignages', href: '#testimonials' },
+    { label: 'Fonctionnalités', href: '/#features' },
+    { label: 'Tarifs', href: '/#pricing' },
+    { label: 'Démo', href: '/#demo' },
+    { label: 'Témoignages', href: '/#testimonials' },
   ],
   Ressources: [
     { label: 'Blog', href: '/blog' },
