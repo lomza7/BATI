@@ -36,6 +36,7 @@ export type WorkspacePermissionKey =
   | 'devis'
   | 'factures'
   | 'prestations'
+  | 'documents'
   | 'chantiers'
   | 'planning'
   | 'carte'
@@ -62,6 +63,7 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
   devis: true,
   factures: true,
   prestations: true,
+  documents: true,
   chantiers: true,
   planning: true,
   carte: true,
@@ -87,6 +89,7 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
   devis: 'Devis',
   factures: 'Factures',
   prestations: 'Prestations',
+  documents: 'Mes documents',
   chantiers: 'Chantiers',
   planning: 'Planning',
   carte: 'Carte',
@@ -105,7 +108,7 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
 };
 
 export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermissionKey[] }[] = [
-  { title: 'Principal', keys: ['dashboard', 'calendrier', 'taches', 'clients', 'devis', 'factures', 'prestations'] },
+  { title: 'Principal', keys: ['dashboard', 'calendrier', 'taches', 'clients', 'devis', 'factures', 'prestations', 'documents'] },
   { title: 'Chantiers', keys: ['chantiers', 'planning', 'carte', 'equipe'] },
   { title: 'Commercial', keys: ['catalogues', 'prospection'] },
   { title: 'Communication', keys: ['mail', 'avis'] },
@@ -123,6 +126,7 @@ const ROUTE_PERMISSION_MAP: Record<string, WorkspacePermissionKey> = {
   '/devis': 'devis',
   '/factures': 'factures',
   '/prestations': 'prestations',
+  '/documents': 'documents',
   '/chantiers': 'chantiers',
   '/planning': 'planning',
   '/carte': 'carte',
@@ -177,6 +181,7 @@ export function formatWorkspacePathLabel(path: string | null | undefined) {
     '/clients': 'Contacts',
     '/devis': 'Devis',
     '/factures': 'Factures',
+    '/documents': 'Mes documents',
     '/chantiers': 'Chantiers',
     '/planning': 'Planning',
     '/prospection': 'Prospection',

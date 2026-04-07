@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package, Ruler } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package, Ruler, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { cn } from '@/lib/utils';
@@ -25,11 +25,12 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Tableau de bord', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Calendrier', href: '/calendrier', icon: CalendarCheck },
-      { label: 'Mes taches', href: '/taches', icon: CheckSquare },
+      { label: 'Mes tâches', href: '/taches', icon: CheckSquare },
       { label: 'Contacts', href: '/clients', icon: Contact },
       { label: 'Devis', href: '/devis', icon: FileText },
       { label: 'Factures', href: '/factures', icon: Receipt },
       { label: 'Mes prestations', href: '/prestations', icon: Package },
+      { label: 'Mes documents', href: '/documents', icon: FolderOpen },
     ],
   },
   {
@@ -38,7 +39,7 @@ const navGroups: NavGroup[] = [
       { label: 'Mes chantiers', href: '/chantiers', icon: HardHat },
       { label: 'Planning', href: '/planning', icon: CalendarDays },
       { label: 'Carte', href: '/carte', icon: MapPin },
-      { label: 'Equipe', href: '/equipe', icon: UsersRound },
+      { label: 'Équipe', href: '/equipe', icon: UsersRound },
     ],
   },
   {
@@ -51,7 +52,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Communication',
     items: [
-      { label: 'Boite mail', href: '/mail', icon: Mail },
+      { label: 'Boîte mail', href: '/mail', icon: Mail },
       { label: 'Avis Google', href: '/avis', icon: Star },
     ],
   },
@@ -68,8 +69,8 @@ const navGroups: NavGroup[] = [
     title: 'Finance',
     items: [
       { label: 'Paiement Stripe', href: '/paiements', icon: CreditCard },
-      { label: 'Contrats recurrents', href: '/contrats', icon: RefreshCw },
-      { label: 'Comptabilite IA', href: '/comptabilite', icon: Calculator },
+      { label: 'Contrats récurrents', href: '/contrats', icon: RefreshCw },
+      { label: 'Comptabilité IA', href: '/comptabilite', icon: Calculator },
     ],
   },
 ];
@@ -80,18 +81,18 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { hasPermission } = useWorkspace();
   const isAdmin = user?.email === 'louis@maaza.pro';
 
-  const allGroups = isAdmin
-    ? [...navGroups, { title: 'Admin', items: [{ label: 'Administration', href: '/admin', icon: Shield }] }]
-    : navGroups;
-
   const filteredGroups = useMemo(() => {
+    const allGroups = isAdmin
+      ? [...navGroups, { title: 'Admin', items: [{ label: 'Administration', href: '/admin', icon: Shield }] }]
+      : navGroups;
+
     return allGroups
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => hasPermission(item.href)),
       }))
       .filter((group) => group.items.length > 0);
-  }, [allGroups, hasPermission]);
+  }, [hasPermission, isAdmin]);
 
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">

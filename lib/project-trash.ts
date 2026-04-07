@@ -16,6 +16,11 @@ interface DeletedProjectForCleanup {
   project_photos: ProjectPhotoForCleanup[];
 }
 
+interface ProjectDocumentForCleanup {
+  storage_path: string;
+  storage_bucket: string;
+}
+
 export function extractProjectPhotoPath(url: string) {
   const marker = '/storage/v1/object/public/project-photos/';
   const index = url.indexOf(marker);
@@ -76,10 +81,31 @@ export async function permanentlyDeleteProject(projectId: string) {
     .map((photo) => extractProjectPhotoPath(photo.url))
     .filter((path): path is string => Boolean(path));
 
+  const { data: projectDocuments, error: documentsError } = await supabase
+    .from('document_files')
+    .select('storage_path, storage_bucket')
+    .eq('project_id', projectId)
+    .eq('storage_bucket', 'documents');
+
+  if (documentsError) {
+    throw documentsError;
+  }
+
   if (storagePaths.length > 0) {
     const { error: storageError } = await supabase.storage.from('project-photos').remove(storagePaths);
     if (storageError) {
       console.error('Erreur suppression photos corbeille:', storageError);
+    }
+  }
+
+  const documentStoragePaths = ((projectDocuments as ProjectDocumentForCleanup[]) || [])
+    .map((document) => document.storage_path)
+    .filter(Boolean);
+
+  if (documentStoragePaths.length > 0) {
+    const { error: documentsStorageError } = await supabase.storage.from('documents').remove(documentStoragePaths);
+    if (documentsStorageError) {
+      console.error('Erreur suppression documents chantier:', documentsStorageError);
     }
   }
 

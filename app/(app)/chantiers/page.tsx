@@ -32,6 +32,8 @@ import { INVOICE_STATUSES, DEFAULT_PROJECT_PHASES, MEMBER_TYPES, PROJECT_STATUSE
 import { cn } from '@/lib/utils';
 import { extractProjectPhotoPath, moveProjectToTrash as moveProjectToTrashRecord } from '@/lib/project-trash';
 import { useAuth } from '@/lib/auth-context';
+import { useWorkspace } from '@/hooks/use-workspace';
+import { ensureProjectDocumentsFolder, syncProjectPhotoIntoDocuments } from '@/lib/documents-drive';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -201,7 +203,9 @@ function formatTrackedHours(hours: number) {
 
 export default function ChantiersPage() {
   const { user } = useAuth();
+  const { workspaceUserId } = useWorkspace();
   const router = useRouter();
+  const ownerId = workspaceUserId || user?.id || null;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
   const [detailUploading, setDetailUploading] = useState(false);
@@ -538,12 +542,14 @@ export default function ChantiersPage() {
     setExistingPhotos((current) => current.filter((photo) => photo.id !== photoId));
   }
 
-  async function uploadQueuedPhotos(projectId: string) {
-    if (!pendingPhotos.length || !user) return;
+  async function uploadQueuedPhotos(projectId: string, projectName: string) {
+    if (!pendingPhotos.length || !user || !ownerId) return;
+
+    await ensureProjectDocumentsFolder(projectId, projectName, ownerId);
 
     for (const photo of pendingPhotos) {
       const ext = photo.file.name.split('.').pop() || 'jpg';
-      const fileName = `${user.id}/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const fileName = `${ownerId}/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from('project-photos')
@@ -557,25 +563,41 @@ export default function ChantiersPage() {
         .from('project-photos')
         .getPublicUrl(fileName);
 
-      const { error: photoInsertError } = await supabase.from('project_photos').insert({
-        user_id: user.id,
+      const { data: insertedPhoto, error: photoInsertError } = await supabase.from('project_photos').insert({
+        user_id: ownerId,
         project_id: projectId,
         url: urlData.publicUrl,
         category: photo.category,
-      });
+      }).select('id').single();
 
       if (photoInsertError) {
         throw new Error(photoInsertError.message);
       }
+
+      if (insertedPhoto?.id) {
+        await syncProjectPhotoIntoDocuments({
+          userId: ownerId,
+          projectId,
+          projectName,
+          projectPhotoId: insertedPhoto.id,
+          fileName: photo.file.name,
+          mimeType: photo.file.type,
+          sizeBytes: photo.file.size,
+          storagePath: fileName,
+        });
+      }
     }
   }
 
-  async function uploadPhotosDirect(files: FileList | File[], category: PhotoCategory, projectId: string) {
-    if (!user || !files.length) return;
+  async function uploadPhotosDirect(files: FileList | File[], category: PhotoCategory, projectId: string, projectName?: string) {
+    if (!user || !ownerId || !files.length) return;
     setDetailUploading(true);
 
     const accepted = Array.from(files).filter(f => f.type.startsWith('image/') && f.size <= 10 * 1024 * 1024);
     const filesToUpload = category === 'presentation' ? accepted.slice(0, 1) : accepted;
+    const effectiveProjectName = projectName || selectedProject?.name || 'Chantier';
+
+    await ensureProjectDocumentsFolder(projectId, effectiveProjectName, ownerId);
 
     // Si présentation, supprimer l'ancienne
     if (category === 'presentation') {
@@ -589,19 +611,37 @@ export default function ChantiersPage() {
 
     for (const file of filesToUpload) {
       const ext = file.name.split('.').pop() || 'jpg';
-      const fileName = `${user.id}/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const fileName = `${ownerId}/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('project-photos')
         .upload(fileName, file, { contentType: file.type, upsert: false });
       if (uploadError) { console.error(uploadError); continue; }
 
       const { data: urlData } = supabase.storage.from('project-photos').getPublicUrl(fileName);
-      await supabase.from('project_photos').insert({
-        user_id: user.id,
+      const { data: insertedPhoto, error: photoInsertError } = await supabase.from('project_photos').insert({
+        user_id: ownerId,
         project_id: projectId,
         url: urlData.publicUrl,
         category,
-      });
+      }).select('id').single();
+
+      if (photoInsertError) {
+        console.error(photoInsertError);
+        continue;
+      }
+
+      if (insertedPhoto?.id) {
+        await syncProjectPhotoIntoDocuments({
+          userId: ownerId,
+          projectId,
+          projectName: effectiveProjectName,
+          projectPhotoId: insertedPhoto.id,
+          fileName: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          storagePath: fileName,
+        });
+      }
     }
 
     // Rafraîchir les photos du projet
@@ -661,6 +701,11 @@ export default function ChantiersPage() {
       return;
     }
 
+    if (!ownerId) {
+      setFormError("Le workspace actif n'a pas pu etre determine.");
+      return;
+    }
+
     if (pendingPhotos.length > 0 && !user) {
       setFormError("La session utilisateur est requise pour envoyer des photos.");
       return;
@@ -692,7 +737,7 @@ export default function ChantiersPage() {
           .from('projects')
           .insert({
             ...payload,
-            user_id: user!.id,
+            user_id: ownerId,
             client_id: clientId,
           })
           .select('id')
@@ -723,8 +768,9 @@ export default function ChantiersPage() {
         projectId = selectedProject.id;
       }
 
+      await ensureProjectDocumentsFolder(projectId, payload.name, ownerId);
       await deleteRemovedPhotos();
-      await uploadQueuedPhotos(projectId);
+      await uploadQueuedPhotos(projectId, payload.name);
       await loadProjects();
       closeEditor();
     } catch (error) {
@@ -1573,7 +1619,7 @@ export default function ChantiersPage() {
                           input.accept = 'image/*';
                           input.onchange = (e) => {
                             const files = (e.target as HTMLInputElement).files;
-                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id);
+                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id, activeProject.name);
                           };
                           input.click();
                         }}
@@ -1594,14 +1640,14 @@ export default function ChantiersPage() {
                       <div
                         className="flex h-[180px] sm:h-[220px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted/20 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all"
                         onDragOver={(e) => { e.preventDefault(); }}
-                        onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, 'presentation', activeProject.id); }}
+                        onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, 'presentation', activeProject.id, activeProject.name); }}
                         onClick={() => {
                           const input = document.createElement('input');
                           input.type = 'file';
                           input.accept = 'image/*';
                           input.onchange = (e) => {
                             const files = (e.target as HTMLInputElement).files;
-                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id);
+                            if (files) uploadPhotosDirect(files, 'presentation', activeProject.id, activeProject.name);
                           };
                           input.click();
                         }}
@@ -1670,7 +1716,7 @@ export default function ChantiersPage() {
                           {/* Zone d'ajout */}
                           <div
                             onDragOver={(e) => { e.preventDefault(); }}
-                            onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, detailPhotoTab, activeProject.id); }}
+                            onDrop={(e) => { e.preventDefault(); uploadPhotosDirect(e.dataTransfer.files, detailPhotoTab, activeProject.id, activeProject.name); }}
                             onClick={() => detailFileInputRef.current?.click()}
                             className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-4 text-center transition-all hover:border-primary/40 hover:bg-primary/5"
                           >
@@ -1691,7 +1737,7 @@ export default function ChantiersPage() {
                               multiple
                               className="hidden"
                               onChange={(e) => {
-                                if (e.target.files) uploadPhotosDirect(e.target.files, detailPhotoTab, activeProject.id);
+                                if (e.target.files) uploadPhotosDirect(e.target.files, detailPhotoTab, activeProject.id, activeProject.name);
                                 e.target.value = '';
                               }}
                             />
