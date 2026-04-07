@@ -236,13 +236,13 @@ export default function CarrieresPage() {
                   </ul>
                 </div>
 
-                <a
-                  href="mailto:contact@hellobat.app?subject=Candidature — {job.title}"
+                <Link
+                  href="/contact"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--landing-accent)] text-white text-sm font-medium hover:bg-[#b94800] transition-colors"
                 >
                   Postuler
                   <ArrowRight className="w-4 h-4" />
-                </a>
+                </Link>
               </div>
             ))}
           </div>
