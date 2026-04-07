@@ -187,7 +187,7 @@ describe('isDuplicateClient()', () => {
 
   it('does not flag as duplicate when both emails are absent', () => {
     expect(isDuplicateClient(
-      { phone: undefined },
+      {},
       { email: null, phone: null }
     )).toBe(false)
   })

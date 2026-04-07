@@ -23,7 +23,8 @@ describe('checkOnboardingComplete()', () => {
   // ── Missing fields ──────────────────────────────────────────────────────────
 
   it('flags missing siret', () => {
-    const result = checkOnboardingComplete({ ...completeProfile, siret: undefined })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = checkOnboardingComplete({ ...completeProfile, siret: undefined } as any)
     expect(result.complete).toBe(false)
     expect(result.missing).toContain('siret')
   })
@@ -65,10 +66,11 @@ describe('checkOnboardingComplete()', () => {
   })
 
   it('flags undefined is_auto_entrepreneur (not yet set)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = checkOnboardingComplete({
       ...completeProfile,
       is_auto_entrepreneur: undefined,
-    })
+    } as any)
     expect(result.complete).toBe(false)
     expect(result.missing).toContain('is_auto_entrepreneur')
   })

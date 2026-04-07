@@ -54,7 +54,7 @@ export function CsvImporter() {
       const data: ImportReport = await res.json()
 
       if (!res.ok && res.status !== 202) {
-        throw new Error(data.message ?? 'Erreur lors de l'import')
+        throw new Error(data.message ?? "Erreur lors de l'import")
       }
 
       setReport(data)
