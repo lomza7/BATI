@@ -42,6 +42,7 @@ export default function CartePubliquePage() {
         .from('projects')
         .select('id, name, address, city, postal_code, lat, lng, status, progress, clients(name)')
         .eq('is_public', true)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       setProjects((data as unknown as Project[]) || []);
 

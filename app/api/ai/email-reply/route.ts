@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       .select('id, name, email, phone, address, city, postal_code, company, contact_type, notes')
       .ilike('email', senderEmail)
       .eq('user_id', user.id)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (client) {
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
         .select('quote_number, title, status, total_ttc, created_at')
         .eq('client_id', client.id)
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -108,6 +110,7 @@ export async function POST(request: Request) {
         .select('name, status, budget, start_date, end_date, description')
         .eq('client_id', client.id)
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(5);
 

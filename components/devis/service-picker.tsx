@@ -50,6 +50,7 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
       .from('services')
       .select('id, name, description, unit, unit_price, category, is_recurring, frequency')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('category')
       .order('name');
     setServices((data as Service[]) || []);

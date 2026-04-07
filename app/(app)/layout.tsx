@@ -1,22 +1,33 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar/sidebar';
 import { useAuth } from '@/lib/auth-context';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
+import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
 import { Hexagon } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, session, loading, showOnboarding, completeOnboarding } = useAuth();
+  const { hasPermission, loading: workspaceLoading } = useWorkspace();
   const router = useRouter();
   const pathname = usePathname();
+  const purgeTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (loading || workspaceLoading || !user || !pathname) return;
+    if (!hasPermission(pathname)) {
+      router.replace('/dashboard');
+    }
+  }, [loading, workspaceLoading, user, pathname, hasPermission, router]);
 
   useEffect(() => {
     if (!session?.access_token || !user) return;
@@ -45,6 +56,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       // Fire-and-forget: on ne penalise jamais la navigation si le suivi d'activite echoue.
     });
   }, [pathname, session?.access_token, user, user?.id]);
+
+  useEffect(() => {
+    if (!user || purgeTriggeredRef.current) return;
+
+    purgeTriggeredRef.current = true;
+    void purgeExpiredRecycleBinItems().catch((error) => {
+      console.error('Erreur purge corbeille:', error);
+    });
+  }, [user]);
 
   if (loading) {
     return (

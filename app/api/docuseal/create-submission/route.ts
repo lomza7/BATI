@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     // Fetch quote + lines + client + artisan profile
     const [quoteRes, linesRes, profileRes] = await Promise.all([
-      admin.from('quotes').select('*, clients(*)').eq('id', quote_id).single(),
+      admin.from('quotes').select('*, clients(*)').eq('id', quote_id).is('deleted_at', null).single(),
       admin.from('quote_lines').select('*').eq('quote_id', quote_id).order('position'),
       admin.from('profiles').select('company_name, full_name, siret, company_address, company_postal_code, company_city, company_phone, tva_number, logo_url, document_config').eq('id', user.id).single(),
     ]);

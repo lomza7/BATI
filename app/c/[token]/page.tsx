@@ -92,12 +92,17 @@ export default function ClientCatalogPage() {
       .from('catalogs')
       .select('name, description')
       .eq('id', send.catalog_id)
+      .is('deleted_at', null)
       .maybeSingle();
 
-    if (catalog) {
-      setCatalogName(catalog.name);
-      setCatalogDesc(catalog.description);
+    if (!catalog) {
+      setError('Ce catalogue n est plus disponible.');
+      setLoading(false);
+      return;
     }
+
+    setCatalogName(catalog.name);
+    setCatalogDesc(catalog.description);
 
     const { data: links } = await anonClient
       .from('catalog_catalog_collections')

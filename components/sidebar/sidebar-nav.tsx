@@ -1,9 +1,11 @@
 'use client';
 
+import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, FileText, Receipt, HardHat, CalendarDays, CalendarCheck, MapPin, Globe, Users, Mail, Star, Paintbrush, Bot, CreditCard, RefreshCw, Calculator, SquareCheck as CheckSquare, BookOpen, UsersRound, Contact, Shield, Package, Ruler } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useWorkspace } from '@/hooks/use-workspace';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -75,15 +77,25 @@ const navGroups: NavGroup[] = [
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { hasPermission } = useWorkspace();
   const isAdmin = user?.email === 'louis@maaza.pro';
 
   const allGroups = isAdmin
     ? [...navGroups, { title: 'Admin', items: [{ label: 'Administration', href: '/admin', icon: Shield }] }]
     : navGroups;
 
+  const filteredGroups = useMemo(() => {
+    return allGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => hasPermission(item.href)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [allGroups, hasPermission]);
+
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-      {allGroups.map((group) => (
+      {filteredGroups.map((group) => (
         <div key={group.title}>
           <p className="px-3 mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
             {group.title}

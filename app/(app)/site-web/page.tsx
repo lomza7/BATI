@@ -140,6 +140,7 @@ export default function SiteWebPage() {
         .from('services')
         .select('name, description')
         .eq('user_id', user!.id)
+        .is('deleted_at', null)
         .limit(10);
 
       const { data: reviews } = await supabase

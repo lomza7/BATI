@@ -139,16 +139,23 @@ export default function CalendrierPage() {
     // Fetch personal calendar events + owner's planning events (team_member_id IS NULL)
     const [calRes, planRes] = await Promise.all([
       supabase.from('calendar_events').select('*, clients(name)').order('start_date'),
-      supabase.from('planning_events').select('id, title, event_type, start_date, end_date, half_day, notes, project_id, projects(name)').is('team_member_id', null).order('start_date'),
+      supabase.from('planning_events').select('id, title, event_type, start_date, end_date, half_day, notes, project_id, projects(name, deleted_at)').is('team_member_id', null).order('start_date'),
     ]);
 
     const calEvents = ((calRes.data || []) as CalendarEvent[]);
 
     // Map planning events to CalendarEvent shape
-    const planningAsCalendar: CalendarEvent[] = ((planRes.data || []) as {
+    const planningRows = ((planRes.data || []) as unknown as {
       id: string; title: string; event_type: string; start_date: string; end_date: string;
-      half_day: string; notes: string; project_id: string | null; projects: { name: string }[] | null;
-    }[]).map(pe => ({
+      half_day: string; notes: string; project_id: string | null; projects: { name: string; deleted_at: string | null }[] | { name: string; deleted_at: string | null } | null;
+    }[]);
+
+    const planningAsCalendar: CalendarEvent[] = planningRows
+      .filter((pe) => {
+        const relatedProject = Array.isArray(pe.projects) ? (pe.projects[0] || null) : pe.projects;
+        return !pe.project_id || !relatedProject?.deleted_at;
+      })
+      .map((pe) => ({
       id: pe.id,
       title: pe.title,
       description: pe.notes || '',

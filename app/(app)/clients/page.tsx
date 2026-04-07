@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { formatCurrency, formatDate, CONTACT_TYPES } from '@/lib/constants';
 import { DEFAULT_LEAD_SOURCES } from '@/lib/lead-sources';
 import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constants';
@@ -77,7 +78,7 @@ export default function ClientsPage() {
   useEffect(() => { loadClients(); }, []);
 
   async function loadClients() {
-    const { data } = await supabase.from('clients').select('*').order('name');
+    const { data } = await supabase.from('clients').select('*').is('deleted_at', null).order('name');
     setClients((data as Client[]) || []);
     setLoading(false);
   }
@@ -85,10 +86,10 @@ export default function ClientsPage() {
   async function loadClientDetails(id: string) {
     setSelectedId(id);
     const [q, inv, proj, td] = await Promise.all([
-      supabase.from('quotes').select('id, quote_number, title, status, total_ttc, created_at').eq('client_id', id).order('created_at', { ascending: false }),
+      supabase.from('quotes').select('id, quote_number, title, status, total_ttc, created_at').eq('client_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('invoices').select('id, invoice_number, title, status, total_ttc, created_at').eq('client_id', id).order('created_at', { ascending: false }),
-      supabase.from('projects').select('id, name, status, city, progress').eq('client_id', id).order('created_at', { ascending: false }),
-      supabase.from('todos').select('*').eq('client_id', id).order('completed', { ascending: true }).order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name, status, city, progress').eq('client_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
+      supabase.from('todos').select('*').eq('client_id', id).is('deleted_at', null).order('completed', { ascending: true }).order('created_at', { ascending: false }),
     ]);
     setQuotes((q.data as ClientQuote[]) || []);
     setInvoices((inv.data as ClientInvoice[]) || []);
@@ -112,7 +113,8 @@ export default function ClientsPage() {
   }
 
   async function deleteClient(id: string) {
-    await supabase.from('clients').delete().eq('id', id);
+    if (!user) return;
+    await moveEntityToTrash('client', id, user.id);
     setShowDelete(null);
     if (selectedId === id) setSelectedId(null);
     loadClients();

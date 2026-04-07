@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     // Recuperer le devis et le profil artisan
     const [quoteRes, profileRes] = await Promise.all([
-      admin.from('quotes').select('*').eq('id', quote_id).single(),
+      admin.from('quotes').select('*').eq('id', quote_id).is('deleted_at', null).single(),
       admin.from('profiles').select('company_name, full_name, document_config').eq('id', user.id).single(),
     ]);
 

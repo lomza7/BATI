@@ -14,7 +14,7 @@ interface SendItem {
   expires_at: string;
   viewed_at: string | null;
   created_at: string;
-  catalogs: { name: string } | null;
+  catalogs: { name: string; deleted_at: string | null } | null;
   selections_count: number;
 }
 
@@ -32,7 +32,7 @@ export function SendsHistory({ onBack }: Props) {
     if (!user) return;
     const { data } = await supabase
       .from('catalog_sends')
-      .select('*, catalogs(name), catalog_client_selections(count)')
+      .select('*, catalogs(name, deleted_at), catalog_client_selections(count)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -40,7 +40,7 @@ export function SendsHistory({ onBack }: Props) {
       const mapped = data.map((s: any) => ({
         ...s,
         selections_count: s.catalog_client_selections?.[0]?.count || 0,
-      }));
+      })).filter((s: SendItem) => !s.catalogs?.deleted_at);
       setSends(mapped);
     }
     setLoading(false);

@@ -24,6 +24,146 @@ export const WORKSPACE_STATUS_LABELS = {
 
 export type WorkspaceStatus = keyof typeof WORKSPACE_STATUS_LABELS;
 
+// ---------------------------------------------------------------------------
+// Permissions — controle d'acces par section pour les membres d'equipe
+// ---------------------------------------------------------------------------
+
+export type WorkspacePermissionKey =
+  | 'dashboard'
+  | 'calendrier'
+  | 'taches'
+  | 'clients'
+  | 'devis'
+  | 'factures'
+  | 'prestations'
+  | 'chantiers'
+  | 'planning'
+  | 'carte'
+  | 'equipe'
+  | 'catalogues'
+  | 'prospection'
+  | 'site_web'
+  | 'mail'
+  | 'avis'
+  | 'plans_rendus'
+  | 'agents'
+  | 'paiements'
+  | 'contrats'
+  | 'comptabilite'
+  | 'parametres';
+
+export type WorkspacePermissions = Record<WorkspacePermissionKey, boolean>;
+
+export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
+  dashboard: true,
+  calendrier: true,
+  taches: true,
+  clients: true,
+  devis: true,
+  factures: true,
+  prestations: true,
+  chantiers: true,
+  planning: true,
+  carte: true,
+  equipe: true,
+  catalogues: true,
+  prospection: true,
+  site_web: true,
+  mail: true,
+  avis: true,
+  plans_rendus: true,
+  agents: true,
+  paiements: true,
+  contrats: true,
+  comptabilite: true,
+  parametres: true,
+};
+
+export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string> = {
+  dashboard: 'Tableau de bord',
+  calendrier: 'Calendrier',
+  taches: 'Taches',
+  clients: 'Contacts',
+  devis: 'Devis',
+  factures: 'Factures',
+  prestations: 'Prestations',
+  chantiers: 'Chantiers',
+  planning: 'Planning',
+  carte: 'Carte',
+  equipe: 'Equipe',
+  catalogues: 'Catalogues',
+  prospection: 'Prospection',
+  site_web: 'Site web IA',
+  mail: 'Boite mail',
+  avis: 'Avis Google',
+  plans_rendus: 'Plans & Rendus IA',
+  agents: 'Agents IA',
+  paiements: 'Paiements',
+  contrats: 'Contrats recurrents',
+  comptabilite: 'Comptabilite IA',
+  parametres: 'Parametres',
+};
+
+export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermissionKey[] }[] = [
+  { title: 'Principal', keys: ['dashboard', 'calendrier', 'taches', 'clients', 'devis', 'factures', 'prestations'] },
+  { title: 'Chantiers', keys: ['chantiers', 'planning', 'carte', 'equipe'] },
+  { title: 'Commercial', keys: ['catalogues', 'prospection'] },
+  { title: 'Communication', keys: ['mail', 'avis'] },
+  { title: 'IA', keys: ['agents', 'plans_rendus', 'site_web'] },
+  { title: 'Finance', keys: ['paiements', 'contrats', 'comptabilite'] },
+  { title: 'Systeme', keys: ['parametres'] },
+];
+
+/** Map route paths to permission keys */
+const ROUTE_PERMISSION_MAP: Record<string, WorkspacePermissionKey> = {
+  '/dashboard': 'dashboard',
+  '/calendrier': 'calendrier',
+  '/taches': 'taches',
+  '/clients': 'clients',
+  '/devis': 'devis',
+  '/factures': 'factures',
+  '/prestations': 'prestations',
+  '/chantiers': 'chantiers',
+  '/planning': 'planning',
+  '/carte': 'carte',
+  '/equipe': 'equipe',
+  '/catalogues': 'catalogues',
+  '/prospection': 'prospection',
+  '/site-web': 'site_web',
+  '/mail': 'mail',
+  '/avis': 'avis',
+  '/plans': 'plans_rendus',
+  '/rendus': 'plans_rendus',
+  '/agents': 'agents',
+  '/paiements': 'paiements',
+  '/contrats': 'contrats',
+  '/comptabilite': 'comptabilite',
+  '/parametres': 'parametres',
+};
+
+/** Returns the permission key for a given route, or null if no restriction applies */
+export function getPermissionKeyForRoute(pathname: string): WorkspacePermissionKey | null {
+  for (const [route, key] of Object.entries(ROUTE_PERMISSION_MAP)) {
+    if (pathname === route || pathname.startsWith(route + '/')) {
+      return key;
+    }
+  }
+  return null;
+}
+
+/** Safely parse permissions from DB, falling back to defaults for missing keys */
+export function parseWorkspacePermissions(raw: unknown): WorkspacePermissions {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_WORKSPACE_PERMISSIONS };
+  const parsed = raw as Record<string, unknown>;
+  const result = { ...DEFAULT_WORKSPACE_PERMISSIONS };
+  for (const key of Object.keys(DEFAULT_WORKSPACE_PERMISSIONS) as WorkspacePermissionKey[]) {
+    if (typeof parsed[key] === 'boolean') {
+      result[key] = parsed[key] as boolean;
+    }
+  }
+  return result;
+}
+
 export function canManageWorkspaceTeam(role: string | null | undefined) {
   return role === 'owner' || role === 'admin';
 }

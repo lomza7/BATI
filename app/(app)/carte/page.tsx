@@ -78,9 +78,18 @@ export default function CartePage() {
   async function loadProjects() {
     const { data } = await supabase
       .from('projects')
-      .select('id, name, address, city, postal_code, lat, lng, status, progress, is_public, clients(name)')
+      .select('id, name, address, city, postal_code, lat, lng, status, progress, is_public, clients(name, deleted_at)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
-    setProjects((data as unknown as Project[]) || []);
+    setProjects((((data as unknown as Array<Record<string, unknown>>) || [])).map((project) => {
+      const clientValue = Array.isArray(project.clients) ? project.clients[0] : project.clients;
+      return {
+        ...project,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
+      } as Project;
+    }));
     setLoading(false);
   }
 
@@ -89,7 +98,7 @@ export default function CartePage() {
 
     let clientId: string | null = null;
     if (form.clientName.trim()) {
-      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
+      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).is('deleted_at', null).maybeSingle();
       if (existing) { clientId = existing.id; }
       else {
         const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();

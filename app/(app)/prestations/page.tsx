@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Pencil, Trash2, Package, Filter, GripVertical, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { formatCurrency } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -88,6 +89,7 @@ export default function PrestationsPage() {
     const { data } = await supabase
       .from('services')
       .select('*')
+      .is('deleted_at', null)
       .order('category', { ascending: true })
       .order('name', { ascending: true });
     setServices((data as Service[]) || []);
@@ -159,7 +161,8 @@ export default function PrestationsPage() {
   }
 
   async function deleteService(id: string) {
-    await supabase.from('services').delete().eq('id', id);
+    if (!user) return;
+    await moveEntityToTrash('service', id, user.id);
     loadServices();
   }
 

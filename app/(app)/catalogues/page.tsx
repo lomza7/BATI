@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Plus, FolderOpen, Send, Eye, MoveHorizontal as MoreHorizontal, Trash2, Pencil, Package, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { CollectionsPanel } from '@/components/catalogs/collections-panel';
 import { CatalogBuilder } from '@/components/catalogs/catalog-builder';
 import { SendCatalogDialog } from '@/components/catalogs/send-catalog-dialog';
@@ -43,6 +44,7 @@ export default function CataloguesPage() {
       .from('catalogs')
       .select('*')
       .eq('user_id', user.id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (data) setCatalogs(data);
   }, [user]);
@@ -79,7 +81,8 @@ export default function CataloguesPage() {
   }
 
   async function deleteCatalog(id: string) {
-    await supabase.from('catalogs').delete().eq('id', id);
+    if (!user) return;
+    await moveEntityToTrash('catalog', id, user.id);
     setCatalogs((prev) => prev.filter((c) => c.id !== id));
     setMenuOpen(null);
   }

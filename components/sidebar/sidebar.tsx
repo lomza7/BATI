@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Hexagon, Settings, CircleHelp as HelpCircle, Menu } from 'lucide-react';
+import { Hexagon, Settings, CircleHelp as HelpCircle, Menu, Trash2 } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -29,6 +29,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         >
           <Settings className="h-4 w-4" />
           <span>Parametres</span>
+        </a>
+        <a
+          href="/corbeille"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span>Corbeille</span>
         </a>
         <a
           href="/aide"

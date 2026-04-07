@@ -157,6 +157,7 @@ interface PlanningEventRow {
   start_date: string;
   end_date: string;
   team_member_id: string | null;
+  project_id: string | null;
   team_members: { name: string; color: string | null } | null;
 }
 
@@ -719,19 +720,22 @@ export default function DashboardPage() {
     const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes, contractsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name, deleted_at)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ttc, due_date, paid_at, created_at, updated_at, clients(name)')
+        .select('id, invoice_number, title, status, total_ttc, due_date, paid_at, created_at, updated_at, clients(name, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('projects')
-        .select('id, name, status, budget, start_date, end_date, created_at, updated_at, clients(name)')
+        .select('id, name, status, budget, start_date, end_date, created_at, updated_at, clients(name, deleted_at)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('leads')
         .select('id, source, stage, value')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false }),
       supabase
         .from('lead_sources')
@@ -747,7 +751,7 @@ export default function DashboardPage() {
         .order('name'),
       supabase
         .from('planning_events')
-        .select('id, title, event_type, start_date, end_date, team_member_id, team_members(name, color)')
+        .select('id, title, event_type, start_date, end_date, team_member_id, project_id, team_members(name, color)')
         .order('start_date'),
       supabase
         .from('business_reminder_settings')
@@ -763,25 +767,47 @@ export default function DashboardPage() {
         .maybeSingle(),
       supabase
         .from('todos')
-        .select('id, title, description, priority, category, due_date, completed, completed_at, time_spent, position, client_id, created_at, updated_at'),
+        .select('id, title, description, priority, category, due_date, completed, completed_at, time_spent, position, client_id, created_at, updated_at')
+        .is('deleted_at', null),
       supabase
         .from('recurring_contracts')
-        .select('id, title, amount, frequency, status, next_billing, created_at, cancelled_at, clients(name)')
+        .select('id, title, amount, frequency, status, next_billing, created_at, cancelled_at, clients(name, deleted_at)')
         .order('next_billing', { ascending: true }),
     ]);
 
-    setQuotes(((quotesRes.data as unknown as QuoteRow[]) || []).map((quote) => ({
-      ...quote,
-      total_ttc: toNumber(quote.total_ttc),
-    })));
-    setInvoices(((invoicesRes.data as unknown as InvoiceRow[]) || []).map((invoice) => ({
-      ...invoice,
-      total_ttc: toNumber(invoice.total_ttc),
-    })));
-    setProjects(((projectsRes.data as unknown as ProjectRow[]) || []).map((project) => ({
-      ...project,
-      budget: toNumber(project.budget),
-    })));
+    setQuotes((((quotesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((quote) => {
+      const clientValue = Array.isArray(quote.clients) ? quote.clients[0] : quote.clients;
+      return {
+        ...quote,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
+        total_ttc: toNumber(quote.total_ttc as string | number | null | undefined),
+      } as QuoteRow;
+    }));
+    setInvoices((((invoicesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
+      const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
+      return {
+        ...invoice,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
+        total_ttc: toNumber(invoice.total_ttc as string | number | null | undefined),
+      } as InvoiceRow;
+    }));
+    const loadedProjects = (((projectsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((project) => {
+      const clientValue = Array.isArray(project.clients) ? project.clients[0] : project.clients;
+      return {
+        ...project,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
+        budget: toNumber(project.budget as string | number | null | undefined),
+      } as ProjectRow;
+    });
+    const activeProjectIds = new Set(loadedProjects.map((project) => project.id));
+
+    setProjects(loadedProjects);
     setLeads((((leadsRes.data as LeadDashboardRow[]) || [])).map((lead) => ({
       ...lead,
       value: toNumber(lead.value),
@@ -797,11 +823,24 @@ export default function DashboardPage() {
       is_terminal: stage.is_terminal,
     })));
     setTeamMembers((teamMembersRes.data as TeamMemberRow[]) || []);
-    setPlanningEvents((planningEventsRes.data as unknown as PlanningEventRow[]) || []);
+    setPlanningEvents(
+      ((planningEventsRes.data as unknown as PlanningEventRow[]) || []).filter(
+        (event) => !event.project_id || activeProjectIds.has(event.project_id)
+      )
+    );
     setReminderSettings((reminderSettingsRes.data as ReminderSettingsRow | null) || null);
     setCompanyProfile((profileRes.data as CompanyProfileRow | null) || null);
     setDashTodos(((todosRes.data as unknown as Todo[]) || []).map(t => ({ ...t, client_name: undefined })));
-    setContracts(((contractsRes.data as unknown as ContractDashboardRow[]) || []).map(c => ({ ...c, amount: toNumber(c.amount) })));
+    setContracts((((contractsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((contract) => {
+      const clientValue = Array.isArray(contract.clients) ? contract.clients[0] : contract.clients;
+      return {
+        ...contract,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
+        amount: toNumber(contract.amount as string | number | null | undefined),
+      } as ContractDashboardRow;
+    }));
     setLoading(false);
   }, [user]);
 

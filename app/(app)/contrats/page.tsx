@@ -188,12 +188,32 @@ export default function ContratsPage() {
       .select(`
         id, title, description, contract_type, amount, frequency, tva_rate, status,
         start_date, end_date, next_billing, auto_send, notes, created_at, last_billed_at,
-        quote_id, quotes(id, quote_number, status),
-        clients(id, name, email),
+        quote_id, quotes(id, quote_number, status, deleted_at),
+        clients(id, name, email, deleted_at),
         contract_invoices(id, invoice_id, billing_period_start, billing_period_end, created_at, invoices(id, invoice_number, title, status, total_ttc, paid_at))
       `)
       .order('created_at', { ascending: false });
-    setContracts((data as unknown as Contract[]) || []);
+    setContracts((((data as unknown as Array<Record<string, unknown>>) || [])).map((contract) => {
+      const quoteValue = Array.isArray(contract.quotes) ? contract.quotes[0] : contract.quotes;
+      const clientValue = Array.isArray(contract.clients) ? contract.clients[0] : contract.clients;
+      return {
+        ...contract,
+        quotes: quoteValue && typeof quoteValue === 'object' && !(quoteValue as { deleted_at?: string | null }).deleted_at
+          ? {
+              id: String((quoteValue as { id?: string }).id || ''),
+              quote_number: String((quoteValue as { quote_number?: string }).quote_number || ''),
+              status: String((quoteValue as { status?: string }).status || ''),
+            }
+          : null,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? {
+              id: String((clientValue as { id?: string }).id || ''),
+              name: String((clientValue as { name?: string }).name || ''),
+              email: (clientValue as { email?: string | null }).email || null,
+            }
+          : null,
+      } as Contract;
+    }));
     setLoading(false);
   }
 

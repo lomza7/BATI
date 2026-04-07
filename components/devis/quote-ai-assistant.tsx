@@ -290,6 +290,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
         .from('services')
         .select('name, description, unit, unit_price, category')
         .eq('is_active', true)
+        .is('deleted_at', null)
         .order('category')
         .order('name');
 

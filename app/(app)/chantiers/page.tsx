@@ -22,6 +22,7 @@ import {
   Plus,
   Receipt,
   Search,
+  Trash2,
   UploadCloud,
   Users,
   X,
@@ -29,6 +30,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { INVOICE_STATUSES, DEFAULT_PROJECT_PHASES, MEMBER_TYPES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate, type ProjectPhase } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { extractProjectPhotoPath, moveProjectToTrash as moveProjectToTrashRecord } from '@/lib/project-trash';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -51,6 +53,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -196,14 +199,6 @@ function formatTrackedHours(hours: number) {
   return `${wholeHours} h ${minutes.toString().padStart(2, '0')}`;
 }
 
-function extractProjectPhotoPath(url: string) {
-  const marker = '/storage/v1/object/public/project-photos/';
-  const index = url.indexOf(marker);
-  if (index === -1) return null;
-
-  return decodeURIComponent(url.slice(index + marker.length));
-}
-
 export default function ChantiersPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -233,6 +228,7 @@ export default function ChantiersPage() {
   const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
+  const [projectActionId, setProjectActionId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadProjects();
@@ -258,7 +254,8 @@ export default function ChantiersPage() {
       await Promise.all([
         supabase
           .from('projects')
-          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name), project_photos(id, url, caption, category, created_at)')
+          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name, deleted_at), project_photos(id, url, caption, category, created_at)')
+          .is('deleted_at', null)
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
         supabase.from('planning_events').select('project_id, start_date, end_date, half_day').eq('event_type', 'chantier').not('project_id', 'is', null),
@@ -302,8 +299,12 @@ export default function ChantiersPage() {
 
     const mappedProjects = ((projectRows as unknown as Project[]) || []).map((project) => {
       const planned = plannedByProject.get(project.id);
+      const clientValue = Array.isArray(project.clients) ? project.clients[0] : project.clients;
       return {
         ...project,
+        clients: clientValue && !(clientValue as { deleted_at?: string | null } | null)?.deleted_at
+          ? { name: (clientValue as { name: string }).name }
+          : null,
         notes: project.notes || '',
         completed_phases: Array.isArray(project.completed_phases) ? project.completed_phases : [],
         project_photos: [...(project.project_photos || [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
@@ -383,6 +384,7 @@ export default function ChantiersPage() {
         .from('quotes')
         .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
         .eq('project_id', project.id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('team_assignments')
@@ -740,6 +742,7 @@ export default function ChantiersPage() {
       .from('quotes')
       .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
       .eq('project_id', projectId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     const loadedQuotes = (quotes as ProjectQuote[]) || [];
     setProjectQuotes(loadedQuotes);
@@ -818,6 +821,39 @@ export default function ChantiersPage() {
     await loadProjects();
   }
 
+  async function moveProjectToTrash(project: Project) {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      `Envoyer "${project.name}" dans la corbeille ? Vous pourrez le restaurer pendant 30 jours.`
+    );
+    if (!confirmed) return;
+
+    setProjectActionId(project.id);
+
+    try {
+      const { error } = await moveProjectToTrashRecord(project.id, user.id);
+      if (error) {
+        throw error;
+      }
+
+      if (selectedProject?.id === project.id) {
+        setShowDetails(false);
+      }
+
+      if (showEditor && selectedProject?.id === project.id) {
+        closeEditor();
+      }
+
+      await loadProjects();
+    } catch (error) {
+      console.error('Erreur envoi chantier corbeille:', error);
+      window.alert("Impossible d'envoyer ce chantier dans la corbeille.");
+    } finally {
+      setProjectActionId(null);
+    }
+  }
+
   const filteredProjects = useMemo(
     () =>
       projects.filter((project) =>
@@ -839,10 +875,16 @@ export default function ChantiersPage() {
         title="Mes chantiers"
         description="Suivez vos photos, vos durees et l'avancement de chaque chantier au meme endroit."
       >
-        <Button onClick={openCreateEditor} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nouveau chantier
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => router.push('/corbeille')} className="gap-2">
+            <Trash2 className="h-4 w-4" />
+            Corbeille
+          </Button>
+          <Button onClick={openCreateEditor} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nouveau chantier
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -981,6 +1023,18 @@ export default function ChantiersPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatus(project.id, 'en_pause')}>
                             Mettre en pause
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            disabled={projectActionId === project.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void moveProjectToTrash(project);
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Envoyer en corbeille
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1490,6 +1544,16 @@ export default function ChantiersPage() {
                     >
                       <Pencil className="h-4 w-4" />
                       Modifier
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+                      disabled={projectActionId === activeProject.id}
+                      onClick={() => void moveProjectToTrash(activeProject)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Corbeille
                     </Button>
                   </div>
                 </div>

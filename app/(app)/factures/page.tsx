@@ -127,7 +127,7 @@ export default function FacturesPage() {
     if (paramClientId || paramProjectId) {
       if (paramProjectId) prefillProjectId.current = paramProjectId;
       if (paramClientId) {
-        supabase.from('clients').select('name').eq('id', paramClientId).single().then(({ data }) => {
+        supabase.from('clients').select('name').eq('id', paramClientId).is('deleted_at', null).single().then(({ data }) => {
           if (data) setForm(prev => ({ ...prev, clientName: data.name }));
         });
       }
@@ -142,7 +142,7 @@ export default function FacturesPage() {
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email)')
+        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -155,18 +155,31 @@ export default function FacturesPage() {
           total_ttc,
           created_at,
           valid_until,
-          clients(name),
+          clients(name, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, total, position),
           invoices(id, invoice_number, status)
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
     ]);
 
-    setInvoices((invoiceRes.data as unknown as Invoice[]) || []);
+    setInvoices((((invoiceRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
+      const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
+      return {
+        ...invoice,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? {
+              name: String((clientValue as { name?: string }).name || ''),
+              email: (clientValue as { email?: string | null }).email || null,
+            }
+          : null,
+      } as Invoice;
+    }));
 
     const nextQuotes = (((quoteRes.data as unknown as Array<Record<string, unknown>>) || []).map((quote) => {
       const linkedInvoices = Array.isArray(quote.invoices) ? (quote.invoices as Array<Record<string, unknown>>) : [];
       const latestInvoice = linkedInvoices[0] || null;
+      const clientValue = Array.isArray(quote.clients) ? quote.clients[0] : quote.clients;
 
       return {
         id: String(quote.id),
@@ -177,7 +190,9 @@ export default function FacturesPage() {
         total_ttc: Number(quote.total_ttc || 0),
         created_at: String(quote.created_at || ''),
         valid_until: quote.valid_until ? String(quote.valid_until) : null,
-        clients: (quote.clients as { name: string } | null) || null,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? { name: String((clientValue as { name?: string }).name || '') }
+          : null,
         invoice_id: latestInvoice?.id ? String(latestInvoice.id) : null,
         invoice_number: latestInvoice?.invoice_number ? String(latestInvoice.invoice_number) : null,
         invoice_status: (latestInvoice?.status as QuoteCandidate['invoice_status']) || null,
@@ -202,7 +217,7 @@ export default function FacturesPage() {
 
     let clientId: string | null = null;
     if (form.clientName.trim()) {
-      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).maybeSingle();
+      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).is('deleted_at', null).maybeSingle();
       if (existing) {
         clientId = existing.id;
       } else {
@@ -245,7 +260,7 @@ export default function FacturesPage() {
       dueDate.setDate(dueDate.getDate() + 30);
 
       const { data: client } = quote.clients?.name
-        ? await supabase.from('clients').select('id').eq('name', quote.clients.name).maybeSingle()
+        ? await supabase.from('clients').select('id').eq('name', quote.clients.name).is('deleted_at', null).maybeSingle()
         : { data: null };
 
       const { data: invoice, error: invoiceError } = await supabase

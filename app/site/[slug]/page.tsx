@@ -58,6 +58,7 @@ async function getSiteData(slug: string) {
       .select('id, name, description, address, city, status, lat, lng, project_photos(id, photo_url, caption)')
       .eq('user_id', typedSite.user_id)
       .eq('is_public', true)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(20),
     sb
@@ -70,6 +71,7 @@ async function getSiteData(slug: string) {
       .from('services')
       .select('id, name, description, category, unit_price')
       .eq('user_id', typedSite.user_id)
+      .is('deleted_at', null)
       .limit(20),
   ]);
 

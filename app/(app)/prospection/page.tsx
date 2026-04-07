@@ -16,10 +16,12 @@ import {
   Plus,
   Search,
   Target,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
 import {
   DEFAULT_LEAD_SOURCES,
@@ -178,6 +180,7 @@ export default function ProspectionPage() {
       supabase
         .from('leads')
         .select('*')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false }),
       supabase
         .from('lead_sources')
@@ -267,6 +270,7 @@ export default function ProspectionPage() {
         .from('clients')
         .select('id')
         .eq('name', clientName)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (existingClient?.id) {
@@ -412,6 +416,21 @@ export default function ProspectionPage() {
     await loadLeads();
   }
 
+  async function deleteLead(id: string) {
+    if (!user) return;
+
+    setActionLeadId(id);
+    try {
+      await moveEntityToTrash('lead', id, user.id);
+      if (editingLead?.id === id) {
+        closeFormDialog();
+      }
+      await loadLeads();
+    } finally {
+      setActionLeadId(null);
+    }
+  }
+
   async function handleDropOnStage(stageSlug: string) {
     if (!draggingLeadId) return;
 
@@ -434,6 +453,7 @@ export default function ProspectionPage() {
       .from('clients')
       .select('id')
       .eq('name', clientName.trim())
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (existingClient) return existingClient.id;
@@ -836,6 +856,7 @@ export default function ProspectionPage() {
                       onMoveStage={moveStage}
                       onConvertToQuote={convertLeadToQuote}
                       onConvertToProject={convertLeadToProject}
+                      onDelete={deleteLead}
                       actioning={actionLeadId === lead.id}
                     />
                   ))}
@@ -1092,6 +1113,15 @@ export default function ProspectionPage() {
                     <HardHat className="h-4 w-4" />
                     Creer un chantier
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void deleteLead(editingLead.id)}
+                    disabled={submitting || actionLeadId === editingLead.id}
+                    className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Corbeille
+                  </Button>
                 </>
               )}
               <Button variant="outline" onClick={closeFormDialog}>Annuler</Button>
@@ -1117,6 +1147,7 @@ function LeadCard({
   onMoveStage,
   onConvertToQuote,
   onConvertToProject,
+  onDelete,
   actioning,
 }: {
   lead: Lead;
@@ -1129,6 +1160,7 @@ function LeadCard({
   onMoveStage: (id: string, stage: string) => Promise<void>;
   onConvertToQuote: (lead: Lead) => Promise<void>;
   onConvertToProject: (lead: Lead) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   actioning: boolean;
 }) {
   const stage = stageMap.get(lead.stage) || stageMap.get('nouveau') || { label: 'Nouveau', color: 'bg-slate-100 text-slate-700' };
@@ -1171,6 +1203,10 @@ function LeadCard({
             <DropdownMenuItem onClick={() => onConvertToProject(lead)}>
               <HardHat className="mr-2 h-4 w-4" />
               Creer un chantier
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(lead.id)}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Envoyer en corbeille
             </DropdownMenuItem>
             {pipelineStages.filter((item) => item.slug !== lead.stage).map((item) => (
               <DropdownMenuItem key={item.slug} onClick={() => onMoveStage(lead.id, item.slug)}>

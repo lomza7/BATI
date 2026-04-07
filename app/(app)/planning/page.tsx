@@ -151,10 +151,13 @@ export default function PlanningPage() {
     const [eventsRes, membersRes, projectsRes] = await Promise.all([
       supabase.from('planning_events').select('id, title, event_type, start_date, end_date, half_day, team_member_id, project_id, notes, projects(name), team_members(name, color)').order('start_date'),
       supabase.from('team_members').select('id, name, role, color, specialty, type, avatar_url').order('name'),
-      supabase.from('projects').select('id, name, status, city').in('status', ['a_planifier', 'en_cours']).order('name'),
+      supabase.from('projects').select('id, name, status, city').is('deleted_at', null).in('status', ['a_planifier', 'en_cours']).order('name'),
     ]);
+    const activeProjectIds = new Set((((projectsRes.data as unknown as Project[]) || []).map((project) => project.id)));
     // Map events with team_member_id=null to the owner virtual member
-    const rawEvents = (eventsRes.data as unknown as PlanningEvent[]) || [];
+    const rawEvents = ((eventsRes.data as unknown as PlanningEvent[]) || []).filter(
+      (event) => !event.project_id || activeProjectIds.has(event.project_id)
+    );
     const mappedEvents = rawEvents.map(e => ({
       ...e,
       team_member_id: e.team_member_id ?? OWNER_MEMBER_ID,

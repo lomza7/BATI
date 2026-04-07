@@ -28,9 +28,13 @@ import {
   HardHat,
   Trash2,
   X,
+  ChevronDown,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { cn } from '@/lib/utils';
 import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
@@ -71,8 +75,13 @@ import {
   WORKSPACE_ROLE_LABELS,
   WORKSPACE_ROLE_OPTIONS,
   WORKSPACE_STATUS_LABELS,
+  WORKSPACE_PERMISSION_GROUPS,
+  WORKSPACE_PERMISSION_LABELS,
   canManageWorkspaceTeam,
   formatWorkspacePathLabel,
+  parseWorkspacePermissions,
+  type WorkspacePermissions,
+  type WorkspacePermissionKey,
   type WorkspaceRole,
 } from '@/lib/workspace';
 
@@ -180,6 +189,7 @@ interface WorkspaceMembership {
   accepted_at: string | null;
   created_at: string;
   updated_at: string;
+  permissions: WorkspacePermissions;
 }
 
 interface TeamInviteFormState {
@@ -366,6 +376,7 @@ export default function ParametresPage() {
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [generatedInviteLink, setGeneratedInviteLink] = useState('');
   const [updatingWorkspaceMemberId, setUpdatingWorkspaceMemberId] = useState<string | null>(null);
+  const [expandedPermissionsMemberId, setExpandedPermissionsMemberId] = useState<string | null>(null);
 
   // Phases chantier
   const [phases, setPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
@@ -446,9 +457,15 @@ export default function ParametresPage() {
         return;
       }
 
-      workspaceMembershipRows = (membershipsRes as WorkspaceMembership[]) || [];
+      workspaceMembershipRows = ((membershipsRes || []) as Array<Omit<WorkspaceMembership, 'permissions'> & { permissions: unknown }>).map((m) => ({
+        ...m,
+        permissions: parseWorkspacePermissions(m.permissions),
+      }));
     } else if (activeMembership) {
-      workspaceMembershipRows = [activeMembership];
+      workspaceMembershipRows = [{
+        ...activeMembership,
+        permissions: parseWorkspacePermissions((activeMembership as unknown as { permissions: unknown }).permissions),
+      }];
     }
 
     setProfile(nextProfile);
@@ -1048,6 +1065,59 @@ export default function ParametresPage() {
         : membership
     )));
     setUpdatingWorkspaceMemberId(null);
+  }
+
+  async function updateWorkspaceMemberPermissions(
+    membershipId: string,
+    key: WorkspacePermissionKey,
+    value: boolean,
+  ) {
+    const membership = workspaceMemberships.find((m) => m.id === membershipId);
+    if (!membership) return;
+
+    const updated: WorkspacePermissions = { ...membership.permissions, [key]: value };
+
+    setWorkspaceMemberships((prev) =>
+      prev.map((m) => (m.id === membershipId ? { ...m, permissions: updated } : m)),
+    );
+
+    const { error: membershipError } = await supabase
+      .from('workspace_memberships')
+      .update({ permissions: updated, updated_at: new Date().toISOString() })
+      .eq('id', membershipId);
+
+    if (membershipError) {
+      setError(membershipError.message);
+      setWorkspaceMemberships((prev) =>
+        prev.map((m) => (m.id === membershipId ? { ...m, permissions: membership.permissions } : m)),
+      );
+    }
+  }
+
+  function toggleAllPermissions(membershipId: string, value: boolean) {
+    const membership = workspaceMemberships.find((m) => m.id === membershipId);
+    if (!membership) return;
+
+    const updated = Object.fromEntries(
+      Object.keys(membership.permissions).map((k) => [k, value]),
+    ) as WorkspacePermissions;
+
+    setWorkspaceMemberships((prev) =>
+      prev.map((m) => (m.id === membershipId ? { ...m, permissions: updated } : m)),
+    );
+
+    void supabase
+      .from('workspace_memberships')
+      .update({ permissions: updated, updated_at: new Date().toISOString() })
+      .eq('id', membershipId)
+      .then(({ error: membershipError }) => {
+        if (membershipError) {
+          setError(membershipError.message);
+          setWorkspaceMemberships((prev) =>
+            prev.map((m) => (m.id === membershipId ? { ...m, permissions: membership.permissions } : m)),
+          );
+        }
+      });
   }
 
   const plans = useMemo(() => {
@@ -2315,6 +2385,28 @@ export default function ParametresPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() =>
+                                setExpandedPermissionsMemberId(
+                                  expandedPermissionsMemberId === membership.id ? null : membership.id,
+                                )
+                              }
+                            >
+                              {expandedPermissionsMemberId === membership.id ? (
+                                <EyeOff className="mr-2 h-4 w-4" />
+                              ) : (
+                                <Eye className="mr-2 h-4 w-4" />
+                              )}
+                              Permissions
+                              <ChevronDown
+                                className={cn(
+                                  'ml-1 h-3.5 w-3.5 transition-transform',
+                                  expandedPermissionsMemberId === membership.id && 'rotate-180',
+                                )}
+                              />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => {
                                 const origin = window.location.origin;
                                 const loginUrl = `${origin}/login?email=${encodeURIComponent(membership.invited_email)}&team=1`;
@@ -2333,6 +2425,59 @@ export default function ParametresPage() {
                               {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
                               Retirer l acces
                             </Button>
+                          </div>
+                        )}
+
+                        {expandedPermissionsMemberId === membership.id && isEditable && (
+                          <div className="mt-4 rounded-xl border border-border bg-muted/10 p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-sm font-medium text-foreground">
+                                Acces aux sections
+                              </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleAllPermissions(membership.id, true)}
+                                >
+                                  Tout activer
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleAllPermissions(membership.id, false)}
+                                >
+                                  Tout desactiver
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-4">
+                              {WORKSPACE_PERMISSION_GROUPS.map((group) => (
+                                <div key={group.title}>
+                                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                                    {group.title}
+                                  </p>
+                                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                    {group.keys.map((key) => (
+                                      <label
+                                        key={key}
+                                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                                      >
+                                        <Switch
+                                          checked={membership.permissions[key]}
+                                          onCheckedChange={(checked) =>
+                                            void updateWorkspaceMemberPermissions(membership.id, key, checked)
+                                          }
+                                        />
+                                        <span className="text-sm text-foreground">
+                                          {WORKSPACE_PERMISSION_LABELS[key]}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>

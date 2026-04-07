@@ -1,5 +1,8 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Ensure profiles.plan column exists (needed by workspace_team_feature_enabled)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'starter';
+
 CREATE TABLE IF NOT EXISTS public.workspace_memberships (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -171,6 +174,25 @@ CREATE TRIGGER normalize_workspace_membership_before_write
 BEFORE INSERT OR UPDATE ON public.workspace_memberships
 FOR EACH ROW EXECUTE FUNCTION public.normalize_workspace_membership();
 
+-- Helper to check admin membership (SECURITY DEFINER bypasses RLS, avoids infinite recursion)
+CREATE OR REPLACE FUNCTION public.is_workspace_admin_of(p_owner_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.workspace_memberships wm
+    WHERE wm.owner_user_id = p_owner_user_id
+      AND wm.member_user_id = auth.uid()
+      AND wm.status = 'active'
+      AND wm.role = 'admin'
+      AND public.workspace_team_feature_enabled(p_owner_user_id)
+  );
+$$;
+
 DROP POLICY IF EXISTS workspace_memberships_select ON public.workspace_memberships;
 DROP POLICY IF EXISTS workspace_memberships_insert ON public.workspace_memberships;
 DROP POLICY IF EXISTS workspace_memberships_update ON public.workspace_memberships;
@@ -181,15 +203,7 @@ CREATE POLICY workspace_memberships_select
   USING (
     auth.uid() = owner_user_id
     OR member_user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1
-      FROM public.workspace_memberships admin_row
-      WHERE admin_row.owner_user_id = workspace_memberships.owner_user_id
-        AND admin_row.member_user_id = auth.uid()
-        AND admin_row.status = 'active'
-        AND admin_row.role = 'admin'
-        AND public.workspace_team_feature_enabled(workspace_memberships.owner_user_id)
-    )
+    OR public.is_workspace_admin_of(owner_user_id)
   );
 
 CREATE POLICY workspace_memberships_insert
@@ -227,8 +241,7 @@ $$;
 DO $$
 DECLARE
   tbl text;
-BEGIN
-  FOREACH tbl IN ARRAY ARRAY[
+  target_tables text[] := ARRAY[
     'clients',
     'quotes',
     'quote_lines',
@@ -253,8 +266,21 @@ BEGIN
     'lead_sources',
     'lead_stages',
     'quote_sends',
-    'invoice_sends'
-  ] LOOP
+    'invoice_sends',
+    'devis',
+    'factures',
+    'chantiers'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY target_tables LOOP
+    -- Skip tables that don't exist or don't have a user_id column
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = tbl AND column_name = 'user_id'
+    ) THEN
+      CONTINUE;
+    END IF;
+
     EXECUTE format(
       'ALTER TABLE public.%I ALTER COLUMN user_id SET DEFAULT public.current_workspace_user_id()',
       tbl
@@ -311,13 +337,20 @@ BEGIN
   ON CONFLICT (id) DO UPDATE
     SET onboarding_completed = public.profiles.onboarding_completed OR EXCLUDED.onboarding_completed;
 
-  INSERT INTO public.business_reminder_settings (user_id)
-  VALUES (NEW.id)
-  ON CONFLICT (user_id) DO NOTHING;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'business_reminder_settings') THEN
+    EXECUTE 'INSERT INTO public.business_reminder_settings (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING' USING NEW.id;
+  END IF;
 
-  PERFORM public.seed_ai_agents_for_user(NEW.id);
-  PERFORM public.seed_default_lead_sources_for_user(NEW.id);
-  PERFORM public.seed_default_lead_stages_for_user(NEW.id);
+  -- Call seed functions only if they exist (dynamic SQL to avoid compile-time check)
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'seed_ai_agents_for_user') THEN
+    EXECUTE 'SELECT public.seed_ai_agents_for_user($1)' USING NEW.id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'seed_default_lead_sources_for_user') THEN
+    EXECUTE 'SELECT public.seed_default_lead_sources_for_user($1)' USING NEW.id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'seed_default_lead_stages_for_user') THEN
+    EXECUTE 'SELECT public.seed_default_lead_stages_for_user($1)' USING NEW.id;
+  END IF;
 
   UPDATE public.workspace_memberships
   SET member_user_id = NEW.id,

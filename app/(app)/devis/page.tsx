@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
@@ -111,7 +112,8 @@ export default function DevisPage() {
     const [quotesRes, sendsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email), recurring_contracts(id)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email, deleted_at), recurring_contracts(id)')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
@@ -121,8 +123,15 @@ export default function DevisPage() {
 
     setQuotes(((quotesRes.data as unknown as Array<Record<string, unknown>>) || []).map(q => {
       const contracts = Array.isArray(q.recurring_contracts) ? q.recurring_contracts as Array<{ id: string }> : [];
+      const clientValue = Array.isArray(q.clients) ? q.clients[0] : q.clients;
       return {
         ...q,
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? {
+              name: String((clientValue as { name?: string }).name || ''),
+              email: (clientValue as { email?: string | null }).email || null,
+            }
+          : null,
         recurring_contract_id: contracts[0]?.id || null,
       } as Quote;
     }));
@@ -353,11 +362,8 @@ export default function DevisPage() {
   }
 
   async function deleteQuote(id: string) {
-    // Delete associated lead first
-    await supabase.from('leads').delete().eq('quote_id', id);
-    await supabase.from('quote_lines').delete().eq('quote_id', id);
-    await supabase.from('quote_sends').delete().eq('quote_id', id);
-    await supabase.from('quotes').delete().eq('id', id);
+    if (!user) return;
+    await moveEntityToTrash('quote', id, user.id);
     loadQuotes();
   }
 
@@ -502,6 +508,7 @@ export default function DevisPage() {
         .from('clients')
         .select('id')
         .ilike('name', draft.clientName.trim())
+        .is('deleted_at', null)
         .maybeSingle();
       if (data) setSelectedClientId(data.id);
     }

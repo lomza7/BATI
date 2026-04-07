@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, SquareCheck as CheckSquare, Filter, ListTodo, CalendarDays, CircleCheck as CheckCircle2, Circle, Clock, Sparkles, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { formatDate } from '@/lib/constants';
 import { ClientPicker } from '@/components/shared/client-picker';
 import {
@@ -70,13 +71,14 @@ export default function TachesPage() {
   async function loadTodos() {
     const { data } = await supabase
       .from('todos')
-      .select('*, clients(name)')
+      .select('*, clients(name, deleted_at)')
+      .is('deleted_at', null)
       .order('completed', { ascending: true })
       .order('position', { ascending: true })
       .order('created_at', { ascending: false });
     const mapped = ((data as any[]) || []).map(t => ({
       ...t,
-      client_name: t.clients?.name || null,
+      client_name: t.clients?.deleted_at ? null : t.clients?.name || null,
       clients: undefined,
     })) as Todo[];
     setTodos(mapped);
@@ -142,12 +144,15 @@ export default function TachesPage() {
   }
 
   async function deleteTodo(id: string) {
-    await supabase.from('todos').delete().eq('id', id);
+    if (!user) return;
+    await moveEntityToTrash('todo', id, user.id);
     loadTodos();
   }
 
   async function clearCompleted() {
-    await supabase.from('todos').delete().eq('completed', true);
+    if (!user) return;
+    const completedIds = todos.filter((todo) => todo.completed).map((todo) => todo.id);
+    await Promise.all(completedIds.map((id) => moveEntityToTrash('todo', id, user.id)));
     loadTodos();
   }
 

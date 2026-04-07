@@ -116,7 +116,7 @@ interface TeamAssignment {
   date: string;
   hours: number;
   description: string;
-  projects: { name: string } | null;
+  projects: { id: string; name: string; deleted_at: string | null } | null;
 }
 
 const emptyForm: {
@@ -170,7 +170,7 @@ export default function EquipePage() {
   }
 
   async function loadProjects() {
-    const { data } = await supabase.from('projects').select('id, name').order('name');
+    const { data } = await supabase.from('projects').select('id, name').is('deleted_at', null).order('name');
     setProjects(data || []);
   }
 
@@ -178,10 +178,14 @@ export default function EquipePage() {
     setSelectedId(id);
     const [notesRes, assignRes] = await Promise.all([
       supabase.from('team_notes').select('*').eq('team_member_id', id).order('created_at', { ascending: false }),
-      supabase.from('team_assignments').select('*, projects(name)').eq('team_member_id', id).order('date', { ascending: false }).limit(50),
+      supabase.from('team_assignments').select('*, projects(id, name, deleted_at)').eq('team_member_id', id).order('date', { ascending: false }).limit(50),
     ]);
     setNotes((notesRes.data as TeamNote[]) || []);
-    setAssignments((assignRes.data as unknown as TeamAssignment[]) || []);
+    setAssignments(
+      ((assignRes.data as unknown as TeamAssignment[]) || []).filter(
+        (assignment) => !assignment.projects?.deleted_at
+      )
+    );
   }
 
   async function saveMember() {

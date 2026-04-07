@@ -180,11 +180,16 @@ export default function PublicQuotePage() {
       .from('quotes')
       .select('id, quote_number, title, description, status, total_ht, tva_rate, total_ttc, valid_until, signed_at, created_at, clients(name, email, phone, address, city, postal_code)')
       .eq('id', send.quote_id)
+      .is('deleted_at', null)
       .maybeSingle();
 
-    if (quoteData) {
-      setQuote(quoteData as unknown as QuoteData);
+    if (!quoteData) {
+      setError('Ce devis n est plus disponible.');
+      setLoading(false);
+      return;
     }
+
+    setQuote(quoteData as unknown as QuoteData);
 
     // 3. Fetch quote lines
     const { data: linesData } = await anonClient
