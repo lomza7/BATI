@@ -2,19 +2,20 @@ import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 import Link from 'next/link';
 import {
-  Wrench,
-  BookOpen,
-  Calculator,
-  Scale,
-  Leaf,
   CheckCircle2,
   Clock,
   MapPin,
   Briefcase,
   GraduationCap,
   ArrowRight,
-  Bot,
   Mail,
+  Code,
+  Megaphone,
+  TrendingUp,
+  PenLine,
+  Shield,
+  Headphones,
+  BarChart3,
 } from 'lucide-react';
 
 export const metadata = {
@@ -24,43 +25,108 @@ export const metadata = {
 
 const FILLED_POSITIONS = [
   {
-    title: 'Expert Diagnostic Pannes',
-    department: 'Équipe IA',
-    location: 'Cloud (24/7)',
-    hiredAs: 'Marcel',
-    icon: Wrench,
-    color: 'bg-red-500',
+    title: 'CTO',
+    department: 'Direction',
+    hiredAs: 'Hector',
+    icon: Code,
+    color: 'bg-slate-800',
   },
   {
-    title: 'Expert Réglementation DTU',
-    department: 'Équipe IA',
-    location: 'Cloud (24/7)',
-    hiredAs: 'Norbert',
-    icon: BookOpen,
+    title: 'CPO',
+    department: 'Direction',
+    hiredAs: 'Myriam',
+    icon: PenLine,
+    color: 'bg-violet-600',
+  },
+  {
+    title: 'CRO',
+    department: 'Direction',
+    hiredAs: 'Amine',
+    icon: TrendingUp,
+    color: 'bg-blue-700',
+  },
+  {
+    title: 'CMO',
+    department: 'Direction',
+    hiredAs: 'Sophie',
+    icon: Megaphone,
+    color: 'bg-pink-600',
+  },
+  {
+    title: 'Responsable Sécurité',
+    department: 'Direction',
+    hiredAs: 'Kenza',
+    icon: Shield,
+    color: 'bg-red-700',
+  },
+  {
+    title: 'Fullstack Engineer',
+    department: 'Tech',
+    hiredAs: 'Max',
+    icon: Code,
+    color: 'bg-slate-600',
+  },
+  {
+    title: 'QA Engineer',
+    department: 'Tech',
+    hiredAs: 'Thomas',
+    icon: Code,
+    color: 'bg-slate-500',
+  },
+  {
+    title: 'DevOps',
+    department: 'Tech',
+    hiredAs: 'Romain',
+    icon: Code,
+    color: 'bg-slate-700',
+  },
+  {
+    title: 'Account Executive',
+    department: 'Revenue',
+    hiredAs: 'Lucas',
+    icon: TrendingUp,
     color: 'bg-blue-600',
   },
   {
-    title: 'Chiffreur Senior',
-    department: 'Équipe IA',
-    location: 'Cloud (24/7)',
-    hiredAs: 'Simone',
-    icon: Calculator,
-    color: 'bg-amber-500',
+    title: 'SDR',
+    department: 'Revenue',
+    hiredAs: 'Yasmine',
+    icon: TrendingUp,
+    color: 'bg-blue-500',
   },
   {
-    title: 'Juriste BTP',
-    department: 'Équipe IA',
-    location: 'Cloud (24/7)',
-    hiredAs: 'Gérard',
-    icon: Scale,
-    color: 'bg-purple-600',
+    title: 'Blog Writer',
+    department: 'Marketing',
+    hiredAs: 'Jules',
+    icon: PenLine,
+    color: 'bg-pink-500',
   },
   {
-    title: 'Consultant RGE & CEE',
-    department: 'Équipe IA',
-    location: 'Cloud (24/7)',
-    hiredAs: 'Colette',
-    icon: Leaf,
+    title: 'SEO Specialist',
+    department: 'Marketing',
+    hiredAs: 'Nabil',
+    icon: BarChart3,
+    color: 'bg-pink-400',
+  },
+  {
+    title: 'Community Manager',
+    department: 'Marketing',
+    hiredAs: 'Aya',
+    icon: Megaphone,
+    color: 'bg-pink-400',
+  },
+  {
+    title: 'Data Analyst',
+    department: 'Opérations',
+    hiredAs: 'Nora',
+    icon: BarChart3,
+    color: 'bg-teal-600',
+  },
+  {
+    title: 'Support Client',
+    department: 'Opérations',
+    hiredAs: 'Inès',
+    icon: Headphones,
     color: 'bg-emerald-600',
   },
 ];
@@ -187,14 +253,13 @@ export default function CarrieresPage() {
       <section className="py-12 sm:py-20 bg-[var(--landing-off)]">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex items-center gap-3 mb-3">
-            <Bot className="w-5 h-5 text-[var(--landing-muted)]" />
+            <CheckCircle2 className="w-5 h-5 text-[var(--landing-muted)]" />
             <h2 className="text-xl sm:text-2xl font-serif text-[var(--landing-text)]">
               Postes pourvus
             </h2>
           </div>
           <p className="text-sm text-[var(--landing-muted)] mb-8">
-            Ces postes ont été pourvus par nos agents IA. Ils travaillent 24h/24,
-            ne prennent jamais de congés, et ne se plaignent jamais de la machine à café.
+            Ces postes ont été pourvus récemment. Merci à tous les candidats !
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -212,7 +277,7 @@ export default function CarrieresPage() {
                       {job.title}
                     </div>
                     <div className="text-[10px] text-[var(--landing-muted)]">
-                      {job.location}
+                      {job.department}
                     </div>
                   </div>
                 </div>

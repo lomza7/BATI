@@ -62,12 +62,12 @@ export default function BlogPage() {
               <PenLine className="w-6 h-6 text-[var(--landing-accent)]" />
             </div>
             <h2 className="text-xl sm:text-2xl font-serif text-[var(--landing-text)] mb-3">
-              Norbert est sur le coup
+              Jules est sur le coup
             </h2>
             <p className="text-sm sm:text-base text-[var(--landing-muted)] leading-relaxed max-w-lg mx-auto mb-2">
-              Notre expert réglementation prépare les premiers articles du blog.
-              Entre deux consultations DTU, il rédige des guides pratiques pour
-              vous aider à gagner du temps et rester conforme.
+              Notre rédacteur prépare les premiers articles du blog. Il travaille
+              avec toute l&apos;équipe pour vous proposer des guides pratiques, des
+              décryptages réglementaires et des conseils terrain.
             </p>
             <p className="text-xs text-[var(--landing-muted)]">
               Les premiers articles arrivent très bientôt.

@@ -2,15 +2,7 @@ import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 import { CTA } from '@/components/landing/cta';
 import Link from 'next/link';
-import {
-  Wrench,
-  BookOpen,
-  Calculator,
-  Scale,
-  Leaf,
-  ArrowRight,
-  Hexagon,
-} from 'lucide-react';
+import { ArrowRight, Hexagon } from 'lucide-react';
 
 export const metadata = {
   title: 'À propos — Hellobat',
@@ -32,58 +24,117 @@ const VALUES = [
   },
 ];
 
-const TEAM = [
+/* ── Leadership ── */
+const LEADERSHIP = [
   {
     name: 'Louis Maaza',
     role: 'Fondateur & CEO',
-    bio: 'Passionné par le bâtiment et la tech, Louis a créé Hellobat après avoir vu trop d\'artisans talentueux perdre leurs soirées sur de la paperasse. Son obsession : que chaque artisan puisse gérer son entreprise aussi facilement qu\'il manie ses outils.',
+    bio: 'Passionné par le bâtiment et la tech, Louis a créé Hellobat après avoir vu trop d\'artisans talentueux perdre leurs soirées sur de la paperasse.',
     initials: 'LM',
     color: 'bg-[var(--landing-accent)]',
   },
   {
-    name: 'Marcel',
-    role: 'Expert Diagnostic Pannes',
-    bio: 'Marcel a 30 ans d\'expérience (virtuelle) dans le diagnostic de pannes sur chantier. Fuites, fissures, courts-circuits — il a tout vu. Il analyse vos problèmes et vous guide vers la solution, 24h/24.',
-    initials: 'MC',
-    color: 'bg-red-500',
-    icon: Wrench,
-    isAI: true,
+    name: 'Hector',
+    role: 'CTO',
+    bio: 'Architecture technique, supervision des développeurs et vision technologique long terme. Le gardien de la qualité du code.',
+    initials: 'HC',
+    color: 'bg-slate-800',
   },
   {
-    name: 'Norbert',
-    role: 'Expert Réglementation DTU',
-    bio: 'Norbert connaît les DTU sur le bout des doigts. Épaisseurs minimales, pentes réglementaires, tolérances — demandez-lui n\'importe quelle norme, il vous répond en 3 secondes. Le collègue que tout chef de chantier rêve d\'avoir.',
-    initials: 'NB',
-    color: 'bg-blue-600',
-    icon: BookOpen,
-    isAI: true,
+    name: 'Myriam',
+    role: 'CPO',
+    bio: 'Stratégie produit et roadmap. Elle s\'assure que chaque fonctionnalité répond à un vrai besoin terrain des artisans.',
+    initials: 'MY',
+    color: 'bg-violet-600',
   },
   {
-    name: 'Simone',
-    role: 'Chiffreuse Senior',
-    bio: 'Simone transforme une description de travaux en estimation budgétaire en un clin d\'œil. Elle connaît les prix du marché, les marges habituelles et les pièges à éviter. Votre premier réflexe avant chaque devis.',
-    initials: 'SM',
-    color: 'bg-amber-500',
-    icon: Calculator,
-    isAI: true,
+    name: 'Amine',
+    role: 'CRO',
+    bio: 'Revenue et stratégie commerciale. Il structure la croissance et pilote l\'acquisition de nouveaux artisans.',
+    initials: 'AM',
+    color: 'bg-blue-700',
   },
   {
-    name: 'Gérard',
-    role: 'Juriste BTP',
-    bio: 'Gérard veille sur vos droits et obligations. Garantie décennale, assurance, litiges, responsabilités — il vous oriente avec la rigueur d\'un juriste et la clarté d\'un ami qui vous explique les choses simplement.',
-    initials: 'GR',
-    color: 'bg-purple-600',
-    icon: Scale,
-    isAI: true,
+    name: 'Sophie',
+    role: 'CMO',
+    bio: 'Marketing et acquisition. Elle fait connaître Hellobat aux artisans qui en ont besoin, avec les bons mots et les bons canaux.',
+    initials: 'SP',
+    color: 'bg-pink-600',
   },
   {
-    name: 'Colette',
-    role: 'Consultante RGE & CEE',
-    bio: 'Colette maîtrise les certifications RGE, les Certificats d\'Économies d\'Énergie et toutes les aides à la rénovation énergétique. Elle accompagne vos clients dans leurs démarches et vous aide à décrocher les bons labels.',
-    initials: 'CL',
-    color: 'bg-emerald-600',
-    icon: Leaf,
-    isAI: true,
+    name: 'Kenza',
+    role: 'Responsable Sécurité',
+    bio: 'Cybersécurité et audits. Elle veille sur la protection des données de chaque artisan comme si c\'étaient les siennes.',
+    initials: 'KZ',
+    color: 'bg-red-700',
+  },
+];
+
+/* ── Departments ── */
+interface TeamMember {
+  name: string;
+  role: string;
+  initials: string;
+  color: string;
+}
+
+interface Department {
+  name: string;
+  lead: string | null;
+  members: TeamMember[];
+}
+
+const DEPARTMENTS: Department[] = [
+  {
+    name: 'Tech',
+    lead: 'Hector',
+    members: [
+      { name: 'Max', role: 'Fullstack Engineer', initials: 'MX', color: 'bg-slate-600' },
+      { name: 'Thomas', role: 'QA Engineer', initials: 'TH', color: 'bg-slate-500' },
+      { name: 'Romain', role: 'DevOps', initials: 'RM', color: 'bg-slate-700' },
+      { name: 'Omar', role: 'Scraper Grand Public', initials: 'OM', color: 'bg-gray-600' },
+      { name: 'Lina', role: 'Scraper Négoce Pro', initials: 'LN', color: 'bg-gray-500' },
+      { name: 'Sami', role: 'Normaliseur prix', initials: 'SM', color: 'bg-slate-500' },
+    ],
+  },
+  {
+    name: 'Produit',
+    lead: 'Myriam',
+    members: [
+      { name: 'Théo', role: 'Product Manager', initials: 'TH', color: 'bg-violet-500' },
+      { name: 'Camille', role: 'Technical Writer', initials: 'CM', color: 'bg-violet-400' },
+    ],
+  },
+  {
+    name: 'Revenue',
+    lead: 'Amine',
+    members: [
+      { name: 'Yasmine', role: 'SDR', initials: 'YS', color: 'bg-blue-500' },
+      { name: 'Farid', role: 'Inbox Analyst', initials: 'FR', color: 'bg-blue-400' },
+      { name: 'Lucas', role: 'Account Executive', initials: 'LC', color: 'bg-blue-600' },
+    ],
+  },
+  {
+    name: 'Marketing',
+    lead: 'Sophie',
+    members: [
+      { name: 'Jules', role: 'Blog Writer', initials: 'JL', color: 'bg-pink-500' },
+      { name: 'Nabil', role: 'SEO Specialist', initials: 'NB', color: 'bg-pink-400' },
+      { name: 'Inaya', role: 'GEO/AIO Specialist', initials: 'IN', color: 'bg-pink-500' },
+      { name: 'Aya', role: 'Community Manager', initials: 'AY', color: 'bg-pink-400' },
+      { name: 'Karim', role: 'Growth Analyst', initials: 'KR', color: 'bg-pink-600' },
+    ],
+  },
+  {
+    name: 'Opérations transverses',
+    lead: null,
+    members: [
+      { name: 'Saïd', role: 'Automation Architect', initials: 'SD', color: 'bg-amber-600' },
+      { name: 'Nora', role: 'Data Analyst', initials: 'NR', color: 'bg-teal-600' },
+      { name: 'Rayan', role: 'Competitive Analyst', initials: 'RY', color: 'bg-indigo-500' },
+      { name: 'Sentinel', role: 'Cohérence organisationnelle', initials: 'SN', color: 'bg-gray-700' },
+      { name: 'Inès', role: 'Support Client', initials: 'IS', color: 'bg-emerald-600' },
+    ],
   },
 ];
 
@@ -100,7 +151,7 @@ export default function AProposPage() {
               <Hexagon className="h-5 w-5 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[var(--landing-text)] mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif leading-[1.1] text-[var(--landing-text)] mb-6">
             On construit Hellobat comme vous construisez vos chantiers :{' '}
             <em className="text-[var(--landing-accent)]">avec passion</em>
           </h1>
@@ -144,8 +195,9 @@ export default function AProposPage() {
             <p>
               Aujourd&apos;hui, Hellobat gère tout : devis vocaux depuis le chantier,
               factures conformes 2026, signature électronique, planning d&apos;équipe, CRM,
-              site web, comptabilité, paiements en ligne. Et notre équipe — mi-humaine,
-              mi-IA — est disponible 24h/24 pour accompagner chaque artisan.
+              site web, comptabilité, paiements en ligne. Et notre équipe de 30 personnes
+              travaille chaque jour pour que les artisans n&apos;aient plus jamais à
+              choisir entre bien travailler et bien gérer.
             </p>
           </div>
         </div>
@@ -172,36 +224,27 @@ export default function AProposPage() {
         </div>
       </section>
 
-      {/* Team */}
+      {/* Leadership */}
       <section className="py-12 sm:py-20">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-serif text-[var(--landing-text)] mb-3">
-              L&apos;équipe
+              L&apos;équipe dirigeante
             </h2>
             <p className="text-sm sm:text-base text-[var(--landing-muted)]">
-              Une équipe hybride, mi-humaine mi-IA, disponible 24h/24 pour les artisans.
+              Les personnes qui définissent la vision et pilotent Hellobat au quotidien.
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {TEAM.map((member) => (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {LEADERSHIP.map((member) => (
               <div
                 key={member.name}
-                className="rounded-2xl border border-[var(--landing-border)] bg-white p-6 relative overflow-hidden"
+                className="rounded-2xl border border-[var(--landing-border)] bg-white p-6"
               >
-                {member.isAI && (
-                  <span className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-[10px] font-semibold">
-                    Agent IA
-                  </span>
-                )}
                 <div className="flex items-center gap-3 mb-4">
                   <div className={`w-12 h-12 rounded-full ${member.color} flex items-center justify-center text-white font-semibold text-sm`}>
-                    {member.icon ? (
-                      <member.icon className="w-5 h-5" />
-                    ) : (
-                      member.initials
-                    )}
+                    {member.initials}
                   </div>
                   <div>
                     <div className="font-semibold text-sm text-[var(--landing-text)]">
@@ -221,14 +264,65 @@ export default function AProposPage() {
         </div>
       </section>
 
-      {/* Numbers */}
+      {/* Departments */}
       <section className="py-12 sm:py-20 bg-[var(--landing-off)]">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-serif text-[var(--landing-text)] mb-3">
+              Nos équipes
+            </h2>
+            <p className="text-sm sm:text-base text-[var(--landing-muted)]">
+              30 personnes réparties en 5 pôles qui font tourner Hellobat.
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            {DEPARTMENTS.map((dept) => (
+              <div key={dept.name}>
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-sm font-semibold text-[var(--landing-text)] uppercase tracking-wider">
+                    {dept.name}
+                  </h3>
+                  {dept.lead && (
+                    <span className="text-xs text-[var(--landing-muted)]">
+                      — dirigé par {dept.lead}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {dept.members.map((m) => (
+                    <div
+                      key={m.name}
+                      className="flex items-center gap-2.5 rounded-xl border border-[var(--landing-border)] bg-white p-3"
+                    >
+                      <div className={`w-8 h-8 rounded-full ${m.color} flex items-center justify-center text-white text-[10px] font-semibold shrink-0`}>
+                        {m.initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-[var(--landing-text)] truncate">
+                          {m.name}
+                        </div>
+                        <div className="text-[10px] text-[var(--landing-muted)] truncate">
+                          {m.role}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Numbers */}
+      <section className="py-12 sm:py-20">
         <div className="max-w-4xl mx-auto px-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
             {[
               { value: '2 400+', label: 'Artisans inscrits' },
-              { value: '6', label: 'Membres dans l\'équipe' },
-              { value: '5', label: 'Agents IA spécialisés' },
+              { value: '30', label: 'Membres dans l\'équipe' },
+              { value: '5', label: 'Pôles métier' },
               { value: '24/7', label: 'Disponibilité' },
             ].map((stat) => (
               <div key={stat.label}>
@@ -245,7 +339,7 @@ export default function AProposPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-12 sm:py-16 bg-[var(--landing-white)]">
+      <section className="py-12 sm:py-16 bg-[var(--landing-off)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-2xl sm:text-3xl font-serif text-[var(--landing-text)] mb-4">
             Envie de rejoindre l&apos;aventure ?
@@ -263,7 +357,7 @@ export default function AProposPage() {
             </Link>
             <Link
               href="/carrieres"
-              className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-[var(--landing-stone)] text-[var(--landing-text)] font-medium hover:bg-[var(--landing-border)] transition-colors"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-white border border-[var(--landing-border)] text-[var(--landing-text)] font-medium hover:bg-[var(--landing-stone)] transition-colors"
             >
               Voir les postes
             </Link>
