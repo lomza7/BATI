@@ -28,7 +28,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const pdfBytes = await generateDevisPdf(devis, profile)
     const filename = `${devis.reference}.pdf`
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

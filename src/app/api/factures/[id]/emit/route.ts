@@ -78,7 +78,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       montant_tva: montant,
     }))
 
-    const issueDate = toYYYYMMDD(new Date().toISOString().split('T')[0])
+    const issueDate = toYYYYMMDD(new Date().toISOString().split('T').at(0) ?? '')
     const dueDate = facture.due_date ? toYYYYMMDD(facture.due_date) : undefined
 
     const xmlContent = generateFacturxXml({

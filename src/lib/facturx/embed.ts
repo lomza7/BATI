@@ -11,7 +11,7 @@
  * intent color profile. We add the required XMP properties here.
  */
 
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, AFRelationship } from 'pdf-lib'
 
 const FACTURX_FILENAME = 'factur-x.xml'
 
@@ -30,7 +30,7 @@ export async function embedFacturxInPdf(pdfBytes: Uint8Array, xmlContent: string
     description: 'Factur-X EN16931 invoice data',
     creationDate: new Date(),
     modificationDate: new Date(),
-    afRelationship: 'Alternative',
+    afRelationship: AFRelationship.Alternative,
   })
 
   // Set XMP metadata for PDF/A-3b conformance

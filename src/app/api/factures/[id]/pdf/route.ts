@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const pdfBytes = await generateFacturePdf(facture, artisanProfile)
     const filename = `${facture.reference}.pdf`
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
