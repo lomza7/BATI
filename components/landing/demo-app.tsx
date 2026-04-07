@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { LandingMap } from './landing-map';
 import {
   LayoutDashboard,
   SquareCheck as CheckSquare,
@@ -698,32 +699,34 @@ function ÉquipeView() {
 
 /* ─── CARTE ─── */
 function CarteView() {
+  const [filter, setFilter] = useState('all');
+  const filters = [
+    { key: 'all', label: 'Tous' },
+    { key: 'en_cours', label: 'En cours' },
+    { key: 'termine', label: 'Terminés' },
+    { key: 'prospect', label: 'Prospects' },
+  ];
+
   return (
     <div>
       <ViewHeader title="Carte des chantiers" />
-      <div className="h-[260px] sm:h-[380px] rounded-xl bg-[#e8e4da] relative overflow-hidden border border-[var(--landing-border)]">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 30px, #bbb 30px, #bbb 31px), repeating-linear-gradient(90deg, transparent, transparent 30px, #bbb 30px, #bbb 31px)' }} />
-        {[
-          { top: '15%', left: '25%', color: 'bg-emerald-500', label: 'Dupont' },
-          { top: '35%', left: '55%', color: 'bg-[var(--landing-accent)]', label: 'Bernard' },
-          { top: '55%', left: '20%', color: 'bg-blue-500', label: 'Martin' },
-          { top: '25%', left: '70%', color: 'bg-amber-500', label: 'Leroy' },
-          { top: '65%', left: '60%', color: 'bg-emerald-500', label: 'Petit' },
-        ].map((pin) => (
-          <div key={pin.label} className="absolute group" style={{ top: pin.top, left: pin.left }}>
-            <div className={`w-5 h-5 rounded-full ${pin.color} border-2 border-white shadow-lg cursor-pointer`} />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-white rounded-md shadow-md text-[9px] font-medium text-[var(--landing-text)] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              {pin.label}
-            </div>
-          </div>
+      <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              filter === f.key
+                ? 'bg-[var(--landing-accent)] text-white'
+                : 'bg-[var(--landing-off)] border border-[var(--landing-border)] text-[var(--landing-muted)] hover:bg-[var(--landing-stone)]'
+            }`}
+          >
+            {f.label}
+          </button>
         ))}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1 sm:gap-2">
-          {['Tous', 'En cours', 'Terminés', 'Prospects'].map((f) => (
-            <button key={f} className="px-2 py-1 rounded-md bg-white/90 text-[8px] sm:text-[9px] font-medium text-[var(--landing-text)] shadow-sm border border-[var(--landing-border)]">
-              {f}
-            </button>
-          ))}
-        </div>
+      </div>
+      <div className="border border-[var(--landing-border)] rounded-xl overflow-hidden">
+        <LandingMap className="h-[260px] sm:h-[380px]" filter={filter} />
       </div>
     </div>
   );

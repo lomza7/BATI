@@ -1,6 +1,6 @@
 export const WORKSPACE_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
-  { value: 'chef_equipe', label: "Chef d'equipe" },
+  { value: 'chef_equipe', label: "Chef d'équipe" },
   { value: 'commercial', label: 'Commercial' },
   { value: 'assistante', label: 'Assistante' },
   { value: 'conducteur_travaux', label: 'Conducteur de travaux' },
@@ -10,7 +10,7 @@ export type WorkspaceRole = (typeof WORKSPACE_ROLE_OPTIONS)[number]['value'];
 
 export const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
   admin: 'Admin',
-  chef_equipe: "Chef d'equipe",
+  chef_equipe: "Chef d'équipe",
   commercial: 'Commercial',
   assistante: 'Assistante',
   conducteur_travaux: 'Conducteur de travaux',
@@ -19,7 +19,7 @@ export const WORKSPACE_ROLE_LABELS: Record<WorkspaceRole, string> = {
 export const WORKSPACE_STATUS_LABELS = {
   pending: 'Invitation en attente',
   active: 'Actif',
-  revoked: 'Acces retire',
+  revoked: 'Accès retiré',
 } as const;
 
 export type WorkspaceStatus = keyof typeof WORKSPACE_STATUS_LABELS;
@@ -82,7 +82,7 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
 export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string> = {
   dashboard: 'Tableau de bord',
   calendrier: 'Calendrier',
-  taches: 'Taches',
+  taches: 'Tâches',
   clients: 'Contacts',
   devis: 'Devis',
   factures: 'Factures',
@@ -90,18 +90,18 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
   chantiers: 'Chantiers',
   planning: 'Planning',
   carte: 'Carte',
-  equipe: 'Equipe',
+  equipe: 'Équipe',
   catalogues: 'Catalogues',
   prospection: 'Prospection',
   site_web: 'Site web IA',
-  mail: 'Boite mail',
+  mail: 'Boîte mail',
   avis: 'Avis Google',
   plans_rendus: 'Plans & Rendus IA',
   agents: 'Agents IA',
   paiements: 'Paiements',
-  contrats: 'Contrats recurrents',
-  comptabilite: 'Comptabilite IA',
-  parametres: 'Parametres',
+  contrats: 'Contrats récurrents',
+  comptabilite: 'Comptabilité IA',
+  parametres: 'Paramètres',
 };
 
 export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermissionKey[] }[] = [
@@ -111,7 +111,7 @@ export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermis
   { title: 'Communication', keys: ['mail', 'avis'] },
   { title: 'IA', keys: ['agents', 'plans_rendus', 'site_web'] },
   { title: 'Finance', keys: ['paiements', 'contrats', 'comptabilite'] },
-  { title: 'Systeme', keys: ['parametres'] },
+  { title: 'Système', keys: ['parametres'] },
 ];
 
 /** Map route paths to permission keys */
@@ -169,7 +169,7 @@ export function canManageWorkspaceTeam(role: string | null | undefined) {
 }
 
 export function formatWorkspacePathLabel(path: string | null | undefined) {
-  if (!path) return 'Aucune page recente';
+  if (!path) return 'Aucune page récente';
 
   const cleaned = path.replace(/\?.*$/, '');
   const labels: Record<string, string> = {
@@ -180,9 +180,9 @@ export function formatWorkspacePathLabel(path: string | null | undefined) {
     '/chantiers': 'Chantiers',
     '/planning': 'Planning',
     '/prospection': 'Prospection',
-    '/equipe': 'Equipe',
-    '/parametres': 'Parametres',
-    '/mail': 'Boite mail',
+    '/equipe': 'Équipe',
+    '/parametres': 'Paramètres',
+    '/mail': 'Boîte mail',
     '/avis': 'Avis Google',
   };
 

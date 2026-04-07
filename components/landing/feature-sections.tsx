@@ -25,6 +25,7 @@ import {
   FileCheck2,
   Archive,
 } from 'lucide-react';
+import { LandingMap } from './landing-map';
 
 interface FeatureSectionProps {
   id: string;
@@ -492,20 +493,8 @@ export function CarteSection() {
         'Géolocalisation des prospects',
       ]}
       visual={
-        <MockBrowser>
-          <div className="h-48 rounded-lg bg-[#e8e4da] relative overflow-hidden">
-            <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 20px, #ccc 20px, #ccc 21px), repeating-linear-gradient(90deg, transparent, transparent 20px, #ccc 20px, #ccc 21px)' }} />
-            {[
-              { top: '20%', left: '30%', color: 'bg-emerald-500' },
-              { top: '40%', left: '60%', color: 'bg-[var(--landing-accent)]' },
-              { top: '60%', left: '25%', color: 'bg-blue-500' },
-              { top: '35%', left: '75%', color: 'bg-amber-500' },
-            ].map((pin, i) => (
-              <div key={i} className="absolute" style={{ top: pin.top, left: pin.left }}>
-                <div className={`w-4 h-4 rounded-full ${pin.color} border-2 border-white shadow-md`} />
-              </div>
-            ))}
-          </div>
+        <MockBrowser url="hellobat.app/carte">
+          <LandingMap className="h-48" />
         </MockBrowser>
       }
     />

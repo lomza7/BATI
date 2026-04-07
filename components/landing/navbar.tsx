@@ -21,17 +21,17 @@ import {
 } from 'lucide-react';
 
 const features = [
-  { icon: FileText, label: 'Devis & Factures', href: '/#devis' },
-  { icon: HardHat, label: 'Chantiers', href: '/#planning' },
-  { icon: CalendarDays, label: 'Planning', href: '/#planning' },
-  { icon: MapPin, label: 'Carte', href: '/#carte' },
-  { icon: Globe, label: 'Site Web', href: '/#siteweb' },
-  { icon: Target, label: 'Prospection', href: '/#prospection' },
-  { icon: Mail, label: 'Emails', href: '/#email' },
-  { icon: Star, label: 'Avis Google', href: '/#avis' },
-  { icon: FileImage, label: 'Plans & Rendus', href: '/#plans' },
-  { icon: CreditCard, label: 'Paiements', href: '/#paiement' },
-  { icon: Bot, label: 'Agents IA', href: '/#agents' },
+  { icon: FileText, label: 'Devis & Factures', href: '/fonctionnalites/devis-factures' },
+  { icon: HardHat, label: 'Suivi chantiers', href: '/fonctionnalites/suivi-chantiers' },
+  { icon: CalendarDays, label: 'Planning équipe', href: '/fonctionnalites/planning-equipe' },
+  { icon: MapPin, label: 'Carte interactive', href: '/fonctionnalites/carte-interactive' },
+  { icon: Globe, label: 'Site vitrine IA', href: '/fonctionnalites/site-vitrine' },
+  { icon: Target, label: 'Prospection CRM', href: '/fonctionnalites/prospection-crm' },
+  { icon: Mail, label: 'Gmail intégré', href: '/fonctionnalites/gmail-integre' },
+  { icon: Star, label: 'Avis Google', href: '/fonctionnalites/avis-google' },
+  { icon: FileImage, label: 'Plans & Rendus IA', href: '/fonctionnalites/plans-rendus-ia' },
+  { icon: CreditCard, label: 'Paiements Stripe', href: '/fonctionnalites/paiements-stripe' },
+  { icon: Bot, label: 'Agents IA', href: '/fonctionnalites/agents-ia' },
 ];
 
 export function Navbar() {

@@ -176,3 +176,16 @@
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
+
+.landing-map-popup .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  padding: 0;
+}
+.landing-map-popup .leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.4;
+}
+.landing-map-popup .leaflet-popup-tip {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}

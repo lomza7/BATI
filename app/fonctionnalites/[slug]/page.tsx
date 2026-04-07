@@ -22,7 +22,7 @@ export function generateMetadata({ params }: { params: { slug: string } }) {
 
 const PLAN_LABELS: Record<string, { label: string; color: string }> = {
   starter: { label: 'Inclus dans Starter (gratuit)', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  pro: { label: 'Inclus des le plan Pro', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  pro: { label: 'Inclus dès le plan Pro', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   business: { label: 'Inclus dans le plan Business', color: 'bg-purple-50 text-purple-700 border-purple-200' },
 };
 
@@ -43,7 +43,7 @@ export default function FeatureDetailPage({ params }: { params: { slug: string }
             className="inline-flex items-center gap-2 text-sm text-[var(--landing-muted)] hover:text-[var(--landing-accent)] transition-colors mb-8"
           >
             <ArrowLeft className="w-4 h-4" />
-            Toutes les fonctionnalites
+            Toutes les fonctionnalités
           </Link>
 
           <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -68,7 +68,7 @@ export default function FeatureDetailPage({ params }: { params: { slug: string }
       <section className="py-12 sm:py-20 bg-[var(--landing-off)]">
         <div className="max-w-4xl mx-auto px-6 mb-16">
           <p className="text-center text-sm font-medium uppercase tracking-wider text-[var(--landing-muted)] mb-6">
-            Apercu de l&apos;application
+            Aperçu de l&apos;application
           </p>
           <FeatureDemo slug={params.slug} />
         </div>
@@ -101,10 +101,10 @@ export default function FeatureDetailPage({ params }: { params: { slug: string }
       <section className="py-12 bg-[var(--landing-white)]">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-2xl sm:text-3xl font-serif text-[var(--landing-text)] mb-4">
-            Pret a essayer ?
+            Prêt à essayer ?
           </h2>
           <p className="text-[var(--landing-muted)] mb-8">
-            Creez votre compte gratuitement et testez toutes les fonctionnalites.
+            Créez votre compte gratuitement et testez toutes les fonctionnalités.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link
