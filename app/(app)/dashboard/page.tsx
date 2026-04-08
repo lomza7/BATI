@@ -40,6 +40,7 @@ import {
   formatDate,
 } from '@/lib/constants';
 import { KpiCard } from '@/components/dashboard/kpi-card';
+import { DemoBanner } from '@/components/dashboard/demo-banner';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -1573,6 +1574,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5 sm:space-y-8">
+      <DemoBanner />
       <PageHeader
         title="Tableau de bord"
         description="Le cockpit de votre activite : tresorerie, pipeline, chantiers et actions a lancer."
