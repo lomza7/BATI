@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Site introuvable' }, { status: 404 });
     }
 
+    // Revalide la home du site et l'ensemble des pages realisations via layout.
     revalidatePath(`/site/${slug}`);
+    revalidatePath(`/site/${slug}/realisations/[projectSlug]`, 'page');
+    // Revalide aussi le sitemap pour les nouveaux chantiers/avis publies.
+    revalidatePath('/site/sitemap.xml');
 
     return NextResponse.json({ revalidated: true });
   } catch {

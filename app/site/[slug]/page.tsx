@@ -55,17 +55,19 @@ async function getSiteData(slug: string) {
     sb.from('profiles').select('*').eq('id', typedSite.user_id).maybeSingle(),
     sb
       .from('projects')
-      .select('id, name, description, address, city, status, lat, lng, project_photos(id, photo_url, caption)')
+      .select('id, name, description, public_description, public_category, public_slug, public_completion_date, published_at, address, city, status, lat, lng, project_photos(id, url, caption, category)')
       .eq('user_id', typedSite.user_id)
       .eq('is_public', true)
+      .not('published_at', 'is', null)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(20),
+      .order('published_at', { ascending: false })
+      .limit(30),
     sb
       .from('reviews')
-      .select('id, client_name, rating, comment, created_at')
+      .select('id, client_name, rating, comment, created_at, review_date')
       .eq('user_id', typedSite.user_id)
-      .order('created_at', { ascending: false })
+      .eq('is_published_on_site', true)
+      .order('review_date', { ascending: false, nullsFirst: false })
       .limit(12),
     sb
       .from('services')
@@ -79,12 +81,12 @@ async function getSiteData(slug: string) {
     site: typedSite,
     profile: profileRes.data as SiteProfile | null,
     projects: (projectsRes.data || []) as (SiteProject & { lat?: number; lng?: number })[],
-    reviews: (reviewsRes.data || []).map((r: { id: string; client_name: string; rating: number; comment: string | null; created_at: string }) => ({
+    reviews: (reviewsRes.data || []).map((r: { id: string; client_name: string; rating: number; comment: string | null; created_at: string; review_date?: string | null }) => ({
       id: r.id,
       author_name: r.client_name,
       rating: r.rating,
       comment: r.comment,
-      created_at: r.created_at,
+      created_at: r.review_date || r.created_at,
     })) as SiteReview[],
     services: (servicesRes.data || []) as SiteService[],
   };
@@ -102,18 +104,77 @@ export async function generateMetadata({
   const content = data.site.site_content as SiteContent;
   const seo = content.seo;
   const siteUrl = `https://hellobat.app/site/${slug}`;
+  const companyName = data.profile?.company_name || 'Artisan du batiment';
+  const city = data.profile?.company_city || '';
+  const activity = data.profile?.company_activity || 'Batiment';
+
+  const title =
+    seo?.meta_title ||
+    (city ? `${companyName} — ${activity} a ${city}` : `${companyName} — ${activity}`);
+  const description =
+    seo?.meta_description ||
+    `${companyName}, ${activity.toLowerCase()}${city ? ` a ${city}` : ''}. Decouvrez nos realisations, services et avis clients.`;
+
+  // Mots cles longue traine : activite + villes + categories de chantiers
+  const keywords = Array.from(
+    new Set(
+      [
+        activity,
+        city && `${activity} ${city}`,
+        city && `artisan ${city}`,
+        ...data.projects.map((p) => p.public_category).filter(Boolean),
+        ...data.projects
+          .map((p) => (p.public_category && p.city ? `${p.public_category} ${p.city}` : null))
+          .filter(Boolean),
+        ...data.services.slice(0, 8).map((s) => s.name),
+      ].filter(Boolean) as string[]
+    )
+  ).slice(0, 20);
 
   return {
-    title: seo?.meta_title || data.profile?.company_name || 'Site artisan',
-    description: seo?.meta_description || '',
+    title,
+    description,
+    keywords,
+    authors: [{ name: companyName }],
+    creator: companyName,
+    publisher: companyName,
     openGraph: {
-      title: seo?.meta_title || data.profile?.company_name || 'Site artisan',
-      description: seo?.meta_description || '',
+      title,
+      description,
       url: siteUrl,
       type: 'website',
-      ...(data.profile?.logo_url && { images: [{ url: data.profile.logo_url }] }),
+      locale: 'fr_FR',
+      siteName: companyName,
+      ...(data.profile?.logo_url && {
+        images: [
+          {
+            url: data.site.hero_image_url || data.profile.logo_url,
+            width: 1200,
+            height: 630,
+            alt: companyName,
+          },
+        ],
+      }),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(data.profile?.logo_url && {
+        images: [data.site.hero_image_url || data.profile.logo_url],
+      }),
     },
     alternates: { canonical: siteUrl },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   };
 }
 
@@ -145,7 +206,15 @@ export default async function SitePage({
         fontFamily: 'var(--site-font)',
       }}
     >
-      <SiteJsonLd profile={profile} reviews={reviews} siteUrl={siteUrl} />
+      <SiteJsonLd
+        profile={profile}
+        reviews={reviews}
+        services={services}
+        projects={projects}
+        faq={content.faq}
+        description={content.seo?.meta_description}
+        siteUrl={siteUrl}
+      />
 
       <SiteHeader
         profile={profile}
@@ -198,7 +267,7 @@ export default async function SitePage({
       )}
 
       {site.show_projects && projects.length > 0 && (
-        <SiteProjects projects={projects} />
+        <SiteProjects projects={projects} siteSlug={slug} />
       )}
 
       {/* Map of projects */}

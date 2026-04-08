@@ -1,6 +1,9 @@
 'use client';
 
-import { ArrowLeft, Rocket, Loader as Loader2, Check } from 'lucide-react';
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { ArrowLeft, Rocket, Loader2, Check, PartyPopper } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
 
 interface Props {
@@ -10,74 +13,120 @@ interface Props {
   saving: boolean;
 }
 
-const summaryLabels: Record<string, string> = {
-  google: 'Recherche Google',
-  social: 'Reseaux sociaux',
-  bouche_a_oreille: 'Bouche a oreille',
-  pub: 'Publicite en ligne',
-  salon: 'Salon / Evenement pro',
-  youtube: 'YouTube',
-  presse: 'Article / Blog',
-  autre: 'Autre',
-};
-
 export function StepReady({ data, onBack, onFinish, saving }: Props) {
   const firstName = data.fullName.split(' ')[0] || 'vous';
+
+  useEffect(() => {
+    // Fire confetti when landing on the final step
+    const duration = 1500;
+    const end = Date.now() + duration;
+
+    const fire = () => {
+      confetti({
+        particleCount: 3,
+        startVelocity: 20,
+        spread: 60,
+        origin: { x: Math.random(), y: Math.random() * 0.3 + 0.1 },
+        colors: ['#D35400', '#059669', '#2563eb', '#7c3aed'],
+      });
+      if (Date.now() < end) {
+        requestAnimationFrame(fire);
+      }
+    };
+    fire();
+
+    // Initial burst
+    confetti({
+      particleCount: 80,
+      spread: 80,
+      origin: { y: 0.4 },
+      colors: ['#D35400', '#059669', '#2563eb', '#7c3aed'],
+    });
+  }, []);
+
+  // Build checklist based on what the user actually configured
+  const checklist: { label: string; done: boolean }[] = [
+    { label: 'Profil entreprise enregistre', done: !!data.companyName },
+    { label: 'Identite visuelle configuree', done: !!data.logoUrl || !!data.primaryColor },
+    {
+      label: data.wantsHellobatSite
+        ? 'Site web Hellobat en preparation'
+        : data.hasExistingWebsite
+        ? 'Site externe conserve'
+        : 'Site web a configurer plus tard',
+      done: data.hasExistingWebsite !== null,
+    },
+    { label: 'Rappels TVA & fiscalite actives', done: !!data.vatRegime },
+    {
+      label:
+        data.hasEmployees && data.invitedEmployees.filter((e) => e.email).length > 0
+          ? `${data.invitedEmployees.filter((e) => e.email).length} salarie(s) invite(s)`
+          : data.wantsMaurice
+          ? 'Maurice IA active pour la compta'
+          : 'Comptabilite configuree',
+      done: data.hasAccountingSoftware !== null || data.hasEmployees !== null,
+    },
+    {
+      label:
+        data.serviceCategories.length > 0
+          ? `${data.serviceCategories.length} categorie(s) de prestations`
+          : 'Prestations a ajouter plus tard',
+      done: data.serviceCategories.length > 0,
+    },
+  ];
 
   return (
     <div className="flex flex-col flex-1 animate-fade-up">
       <div className="flex items-center gap-3 mb-2">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Rocket className="h-5 w-5 text-primary" />
-        </div>
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+          className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center"
+        >
+          <PartyPopper className="h-6 w-6 text-primary" />
+        </motion.div>
       </div>
 
-      <h2 className="text-xl font-semibold text-foreground mt-3">
-        Tout est pret, {firstName} !
-      </h2>
-      <p className="text-sm text-muted-foreground mt-2">
-        Voici un recapitulatif de vos informations.
-      </p>
+      <motion.h2
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="text-2xl font-bold text-foreground mt-3"
+      >
+        Bravo {firstName} !
+      </motion.h2>
+      <motion.p
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="text-sm text-muted-foreground mt-2"
+      >
+        Votre espace Hellobat est pret. Voici ce qui a ete configure pour vous :
+      </motion.p>
 
-      <div className="mt-6 flex-1 space-y-3 max-h-[300px] overflow-y-auto pr-1">
-        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-          {data.fullName && <SummaryRow label="Nom" value={data.fullName} />}
-          {data.companyName && <SummaryRow label="Entreprise" value={data.companyName} />}
-          {data.siren && <SummaryRow label="SIREN" value={data.siren} />}
-          {data.siret && <SummaryRow label="SIRET" value={data.siret} />}
-          {data.legalForm && <SummaryRow label="Forme juridique" value={data.legalForm} />}
-          {data.companyActivity && <SummaryRow label="Activite" value={data.companyActivity} />}
-          {data.nafLabel && <SummaryRow label="Code NAF" value={`${data.nafCode} — ${data.nafLabel}`} />}
-          {data.tvaNumber && <SummaryRow label="N° TVA" value={data.tvaNumber} />}
-          {(data.companyAddress || data.companyCity) && (
-            <SummaryRow label="Adresse" value={[data.companyAddress, data.companyPostalCode, data.companyCity].filter(Boolean).join(', ')} />
-          )}
-          {data.companyPhone && <SummaryRow label="Telephone" value={data.companyPhone} />}
-          {data.companyWebsite && <SummaryRow label="Site web" value={data.companyWebsite} />}
-          <SummaryRow label="Equipe" value={teamSizeLabel(data.teamSize)} />
-          {data.teamMembers.filter((m) => m.name.trim()).length > 0 && (
-            <SummaryRow
-              label="Membres"
-              value={data.teamMembers
-                .filter((m) => m.name.trim())
-                .map((m) => m.role ? `${m.name} (${m.role})` : m.name)
-                .join(', ')}
-            />
-          )}
-          {data.referralSource && (
-            <SummaryRow
-              label="Source"
-              value={summaryLabels[data.referralSource] || data.referralSource}
-            />
-          )}
-        </div>
-
-        <div className="flex items-start gap-3 rounded-xl bg-primary/5 border border-primary/10 p-4">
-          <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-foreground leading-relaxed">
-            Vous pourrez modifier toutes ces informations plus tard dans les parametres de votre compte.
-          </p>
-        </div>
+      <div className="mt-6 flex-1 space-y-2">
+        {checklist.map((item, i) => (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 + i * 0.1 }}
+            className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 p-3"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.4 + i * 0.1, type: 'spring', stiffness: 300 }}
+              className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              <Check className="h-4 w-4" strokeWidth={3} />
+            </motion.div>
+            <p className="text-sm text-foreground font-medium">{item.label}</p>
+          </motion.div>
+        ))}
       </div>
 
       <div className="flex justify-between mt-6">
@@ -89,43 +138,26 @@ export function StepReady({ data, onBack, onFinish, saving }: Props) {
           <ArrowLeft className="h-4 w-4" />
           Retour
         </button>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
           onClick={onFinish}
           disabled={saving}
-          className="h-11 px-7 rounded-xl bg-primary text-primary-foreground font-medium text-sm flex items-center gap-2 hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+          className="h-11 px-7 rounded-xl bg-primary text-primary-foreground font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary/20"
         >
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Sauvegarde...
+              Finalisation...
             </>
           ) : (
             <>
               <Rocket className="h-4 w-4" />
-              Acceder a mon espace
+              Acceder a mon tableau de bord
             </>
           )}
-        </button>
+        </motion.button>
       </div>
     </div>
   );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-xs text-muted-foreground flex-shrink-0">{label}</span>
-      <span className="text-sm text-foreground text-right font-medium">{value}</span>
-    </div>
-  );
-}
-
-function teamSizeLabel(size: string) {
-  const labels: Record<string, string> = {
-    seul: 'Travailleur independant',
-    '2-5': '2 a 5 personnes',
-    '6-10': '6 a 10 personnes',
-    '10+': 'Plus de 10 personnes',
-  };
-  return labels[size] || size;
 }

@@ -12,6 +12,7 @@ import {
   Clock3,
   Compass,
   FileText,
+  Globe2,
   Grid3x3 as LayoutGrid,
   HardHat,
   ImagePlus,
@@ -61,6 +62,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PublishSiteDialog } from '@/components/chantiers/publish-site-dialog';
 
 type PhotoCategory = 'presentation' | 'avant' | 'pendant' | 'apres';
 
@@ -148,6 +150,12 @@ interface Project {
   trackedHours: number;
   plannedHours: number;
   plannedDays: number;
+  is_public: boolean;
+  public_description: string | null;
+  public_category: string | null;
+  public_slug: string | null;
+  public_completion_date: string | null;
+  published_at: string | null;
 }
 
 interface PendingPhoto {
@@ -250,6 +258,9 @@ export default function ChantiersPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
   const [projectActionId, setProjectActionId] = useState<string | null>(null);
+  const [siteSlug, setSiteSlug] = useState<string | null>(null);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [publishProject, setPublishProject] = useState<Project | null>(null);
 
   // Synthese financiere du chantier ouvert (boussole de marge)
   const projectFinance = useMemo(() => {
@@ -286,7 +297,18 @@ export default function ChantiersPage() {
   useEffect(() => {
     void loadProjects();
     void loadPhasesConfig();
+    void loadSiteSlug();
   }, []);
+
+  async function loadSiteSlug() {
+    if (!user) return;
+    const { data } = await supabase
+      .from('artisan_sites')
+      .select('slug, status')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data?.status === 'published') setSiteSlug(data.slug);
+  }
 
   async function loadPhasesConfig() {
     if (!user) return;
@@ -307,7 +329,7 @@ export default function ChantiersPage() {
       await Promise.all([
         supabase
           .from('projects')
-          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, clients(name, deleted_at), project_photos(id, url, caption, category, created_at)')
+          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, is_public, public_description, public_category, public_slug, public_completion_date, published_at, clients(name, deleted_at), project_photos(id, url, caption, category, created_at)')
           .is('deleted_at', null)
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
@@ -1106,6 +1128,16 @@ export default function ChantiersPage() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Modifier
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPublishProject(project);
+                              setShowPublishDialog(true);
+                            }}
+                          >
+                            <Globe2 className="mr-2 h-4 w-4" />
+                            {project.is_public ? 'Gerer la publication' : 'Publier sur mon site'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatus(project.id, 'en_cours')}>
                             Passer en cours
                           </DropdownMenuItem>
@@ -1623,6 +1655,23 @@ export default function ChantiersPage() {
                       router.push(`/factures?${params.toString()}`);
                     }}>
                       <Receipt className="h-3.5 w-3.5" /> Nouvelle facture
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        'gap-2',
+                        activeProject.is_public
+                          ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                          : 'border-orange-200 text-[#D35400] hover:bg-orange-50'
+                      )}
+                      onClick={() => {
+                        setPublishProject(activeProject);
+                        setShowPublishDialog(true);
+                      }}
+                    >
+                      <Globe2 className="h-4 w-4" />
+                      {activeProject.is_public ? 'Publie sur le site' : 'Publier sur le site'}
                     </Button>
                     <Button
                       variant="outline"
@@ -2457,6 +2506,16 @@ export default function ChantiersPage() {
         </DialogContent>
       </Dialog>
 
+      <PublishSiteDialog
+        open={showPublishDialog}
+        onOpenChange={(open) => {
+          setShowPublishDialog(open);
+          if (!open) setPublishProject(null);
+        }}
+        project={publishProject}
+        siteSlug={siteSlug}
+        onPublished={() => void loadProjects()}
+      />
     </div>
   );
 }

@@ -93,10 +93,15 @@ export interface SiteProject {
   id: string;
   name: string;
   description: string | null;
+  public_description?: string | null;
+  public_category?: string | null;
+  public_slug?: string | null;
+  public_completion_date?: string | null;
+  published_at?: string | null;
   address: string | null;
   city: string | null;
   status: string;
-  project_photos: { id: string; photo_url: string; caption: string | null }[];
+  project_photos: { id: string; url: string; caption: string | null; category?: string | null }[];
 }
 
 export interface SiteReview {
@@ -119,13 +124,22 @@ export interface SiteService {
 
 export function generateSlug(companyName: string, city?: string | null): string {
   const parts = [companyName, city].filter(Boolean).join(' ');
-  return parts
+  return slugify(parts, 60);
+}
+
+export function slugify(input: string, max = 80): string {
+  return input
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z0-9]+/g, '-')     // non-alphanum → dash
-    .replace(/^-+|-+$/g, '')          // trim dashes
-    .substring(0, 60);                // max length
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, max);
+}
+
+export function generateProjectSlug(name: string, city?: string | null): string {
+  const parts = [name, city].filter(Boolean).join(' ');
+  return slugify(parts, 80);
 }
 
 // ── Theme definitions ──

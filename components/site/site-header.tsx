@@ -9,6 +9,12 @@ interface SiteHeaderProps {
   hasServices: boolean;
   hasProjects: boolean;
   hasReviews: boolean;
+  /**
+   * Prefix absolu pour les ancres du menu, ex: "/site/mon-artisan".
+   * Utilise quand le header est monte sur une page interne (detail chantier)
+   * pour que les liens ramenent bien a la home du site et scrollent a la section.
+   */
+  basePath?: string;
 }
 
 export function SiteHeader({
@@ -20,14 +26,18 @@ export function SiteHeader({
   hasServices,
   hasProjects,
   hasReviews,
+  basePath = '',
 }: SiteHeaderProps) {
+  const prefix = (anchor: string) => `${basePath}${anchor}`;
+  const homeHref = basePath || '#';
+
   const links: { label: string; href: string }[] = [];
 
-  links.push({ label: 'A propos', href: '#a-propos' });
-  if (showServices && hasServices) links.push({ label: 'Services', href: '#services' });
-  if (showProjects && hasProjects) links.push({ label: 'Realisations', href: '#realisations' });
-  if (showReviews && hasReviews) links.push({ label: 'Avis', href: '#avis' });
-  if (showContact) links.push({ label: 'Contact', href: '#contact' });
+  links.push({ label: 'A propos', href: prefix('#a-propos') });
+  if (showServices && hasServices) links.push({ label: 'Services', href: prefix('#services') });
+  if (showProjects && hasProjects) links.push({ label: 'Realisations', href: prefix('#realisations') });
+  if (showReviews && hasReviews) links.push({ label: 'Avis', href: prefix('#avis') });
+  if (showContact) links.push({ label: 'Contact', href: prefix('#contact') });
 
   return (
     <header
@@ -40,7 +50,7 @@ export function SiteHeader({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo + company name */}
         <a
-          href="#"
+          href={homeHref}
           className="flex items-center gap-3 font-bold text-lg truncate"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
@@ -67,7 +77,7 @@ export function SiteHeader({
             </a>
           ))}
           <a
-            href="#contact"
+            href={prefix('#contact')}
             className="text-sm font-semibold px-4 py-2 rounded-md transition-colors"
             style={{
               backgroundColor: 'var(--site-accent)',

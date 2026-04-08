@@ -6,6 +6,8 @@ import {
   ArrowUpRight,
   BadgeCheck,
   Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
   Globe2,
   Link2,
@@ -18,6 +20,7 @@ import {
   Unplug,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -93,8 +96,14 @@ function normalizePhone(phone: string) {
   return phone.replace(/[^\d+]/g, '');
 }
 
+interface LocalReviewRow {
+  id: string;
+  external_id: string | null;
+  is_published_on_site: boolean;
+}
+
 export default function AvisPage() {
-  const { loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -113,6 +122,59 @@ export default function AvisPage() {
   const [responseText, setResponseText] = useState('');
   const [copiedState, setCopiedState] = useState<'link' | 'message' | null>(null);
   const [replyLoading, setReplyLoading] = useState(false);
+  // Map external_id -> { id local, is_published_on_site } pour toggle publication sur le site
+  const [localReviewsMap, setLocalReviewsMap] = useState<Map<string, LocalReviewRow>>(new Map());
+  const [togglingReview, setTogglingReview] = useState<string | null>(null);
+  const [siteSlug, setSiteSlug] = useState<string | null>(null);
+
+  const loadLocalReviews = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('reviews')
+      .select('id, external_id, is_published_on_site')
+      .eq('user_id', user.id)
+      .eq('external_source', 'google');
+    const map = new Map<string, LocalReviewRow>();
+    for (const row of (data || []) as LocalReviewRow[]) {
+      if (row.external_id) map.set(row.external_id, row);
+    }
+    setLocalReviewsMap(map);
+  }, [user]);
+
+  const loadSiteSlug = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('artisan_sites')
+      .select('slug, status')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data && data.status === 'published') {
+      setSiteSlug(data.slug);
+    } else {
+      setSiteSlug(null);
+    }
+  }, [user]);
+
+  const syncGoogleReviews = useCallback(async () => {
+    // Sync les avis Google vers la table reviews locale pour que l'artisan
+    // puisse les publier/masquer sur son site vitrine.
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch('/api/reviews/sync-google', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch {
+      // best-effort, ne bloque pas la page
+    }
+    await loadLocalReviews();
+  }, [loadLocalReviews]);
 
   const loadGoogleData = useCallback(async () => {
     setLoading(true);
@@ -127,17 +189,78 @@ export default function AvisPage() {
       }
 
       setStatus(data);
+
+      // Si Google est connecte, on sync vers la table locale pour les toggles publish/hide.
+      if (data.connected && data.reviews.length > 0) {
+        await syncGoogleReviews();
+      }
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger Google Business Profile');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncGoogleReviews]);
 
   useEffect(() => {
     if (authLoading) return;
+    loadSiteSlug();
+    loadLocalReviews();
     loadGoogleData();
-  }, [authLoading, loadGoogleData]);
+  }, [authLoading, loadGoogleData, loadLocalReviews, loadSiteSlug]);
+
+  async function toggleReviewPublished(review: GoogleReview) {
+    if (togglingReview) return;
+    setTogglingReview(review.name);
+    try {
+      const existing = localReviewsMap.get(review.name);
+      if (!existing) {
+        // Pas encore synchronise : on force un sync puis on reouvre
+        await syncGoogleReviews();
+        setTogglingReview(null);
+        return;
+      }
+      const nextValue = !existing.is_published_on_site;
+      const { error: updateError } = await supabase
+        .from('reviews')
+        .update({ is_published_on_site: nextValue })
+        .eq('id', existing.id);
+      if (updateError) throw updateError;
+
+      // Mise a jour locale optimiste
+      const nextMap = new Map(localReviewsMap);
+      nextMap.set(review.name, { ...existing, is_published_on_site: nextValue });
+      setLocalReviewsMap(nextMap);
+
+      // Revalidate le site publie (ISR) pour que le changement apparaisse en ligne
+      if (siteSlug) {
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session) {
+            await fetch('/api/site/revalidate', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ slug: siteSlug }),
+            });
+          }
+        } catch {
+          // silencieux : le toggle en DB est deja fait, ISR regenerera dans l'heure
+        }
+      }
+    } catch (toggleError) {
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : 'Impossible de modifier la publication de cet avis'
+      );
+    } finally {
+      setTogglingReview(null);
+    }
+  }
 
   useEffect(() => {
     const googleError = searchParams.get('google_error');
@@ -487,7 +610,11 @@ export default function AvisPage() {
                     </Button>
                   </EmptyState>
                 ) : (
-                  status.reviews.map((review) => (
+                  status.reviews.map((review) => {
+                    const localRow = localReviewsMap.get(review.name);
+                    const isPublishedOnSite = localRow?.is_published_on_site ?? true;
+                    const isToggling = togglingReview === review.name;
+                    return (
                     <div key={review.name} className="rounded-xl border border-border bg-background p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -501,43 +628,89 @@ export default function AvisPage() {
                             </div>
                           </div>
                         </div>
-                        <span
-                          className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-medium',
-                            review.reviewReplyComment ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                          )}
-                        >
-                          {review.reviewReplyComment ? 'Repondu' : 'En attente'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-xs font-medium',
+                              isPublishedOnSite
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-muted text-muted-foreground'
+                            )}
+                            title={
+                              isPublishedOnSite
+                                ? 'Cet avis est affiche sur votre site vitrine'
+                                : 'Cet avis est masque de votre site vitrine'
+                            }
+                          >
+                            {isPublishedOnSite ? 'Sur le site' : 'Masque'}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-xs font-medium',
+                              review.reviewReplyComment ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                            )}
+                          >
+                            {review.reviewReplyComment ? 'Repondu' : 'En attente'}
+                          </span>
+                        </div>
                       </div>
 
                       {review.comment && <p className="mt-3 text-sm text-foreground">{review.comment}</p>}
 
-                      {review.reviewReplyComment ? (
+                      {review.reviewReplyComment && (
                         <div className="mt-3 rounded-lg bg-muted/50 p-3">
                           <p className="mb-1 text-xs font-medium text-muted-foreground">Votre reponse</p>
                           <p className="text-sm text-foreground">{review.reviewReplyComment}</p>
                         </div>
-                      ) : (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => {
-                              setShowRespond(review);
-                              setResponseText('');
-                            }}
-                          >
-                            <MessageSquare className="h-3 w-3" /> Repondre
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
-                            <Sparkles className="h-3 w-3" /> Reponse IA
-                          </Button>
-                        </div>
                       )}
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {!review.reviewReplyComment && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => {
+                                setShowRespond(review);
+                                setResponseText('');
+                              }}
+                            >
+                              <MessageSquare className="h-3 w-3" /> Repondre
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Sparkles className="h-3 w-3" /> Reponse IA
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => toggleReviewPublished(review)}
+                          disabled={isToggling || !siteSlug}
+                          title={
+                            !siteSlug
+                              ? 'Publiez d abord votre site vitrine pour gerer la visibilite des avis'
+                              : undefined
+                          }
+                        >
+                          {isPublishedOnSite ? (
+                            <>
+                              <EyeOff className="h-3 w-3" />{' '}
+                              {isToggling ? 'Masquage...' : 'Masquer du site'}
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3 w-3" />{' '}
+                              {isToggling ? 'Publication...' : 'Afficher sur le site'}
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
             </div>
