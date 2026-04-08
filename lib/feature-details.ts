@@ -571,22 +571,17 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
     plan: 'business',
   },
   {
-    slug: 'plans-rendus-ia',
-    title: 'Plans & Rendus IA',
+    slug: 'rendus-ia',
+    title: 'Rendus IA',
     subtitle: 'Visualisez vos projets avant de construire',
-    heroDescription: 'Générez des plans et des rendus visuels à partir de descriptions textuelles. L\'IA crée des représentations de vos projets pour aider vos clients à se projeter.',
+    heroDescription: 'Générez des rendus visuels à partir de photos ou de descriptions textuelles. L\'IA crée des représentations de vos projets pour aider vos clients à se projeter.',
     sections: [
-      {
-        title: 'Génération de plans',
-        content: 'Décrivez votre projet et l\'IA génère un plan schématique. Utile pour les premiers échanges avec le client, avant de passer par un architecte pour les plans définitifs.',
-      },
       {
         title: 'Rendus visuels',
         content: 'Obtenez des rendus visuels de vos projets : façades, aménagements intérieurs, extérieur. Les rendus aident vos clients à visualiser le résultat final et facilitent la prise de décision.',
       },
     ],
     highlights: [
-      'Plans générés par IA',
       'Rendus visuels de projets',
       'Aide à la décision client',
     ],

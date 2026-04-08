@@ -130,9 +130,108 @@ export function generateSlug(companyName: string, city?: string | null): string 
 
 // ── Theme definitions ──
 
-export const SITE_THEMES: Record<SiteTheme, { name: string; preview_bg: string; preview_accent: string }> = {
-  modern: { name: 'Moderne', preview_bg: 'bg-slate-900', preview_accent: 'bg-blue-500' },
-  warm: { name: 'Chaleureux', preview_bg: 'bg-amber-50', preview_accent: 'bg-amber-600' },
-  clean: { name: 'Epure', preview_bg: 'bg-white', preview_accent: 'bg-emerald-500' },
-  bold: { name: 'Dynamique', preview_bg: 'bg-slate-800', preview_accent: 'bg-red-500' },
+export interface SiteThemeStyle {
+  name: string;
+  tagline: string;
+  description: string;
+  target: string;
+  // Tailwind classes for the legacy small swatch
+  preview_bg: string;
+  preview_accent: string;
+  // Inline color values used by the realistic preview cards / modal
+  bg: string;
+  bgAlt: string;
+  cardBg: string;
+  border: string;
+  text: string;
+  textMuted: string;
+  heading: string;
+  accent: string;
+  accentText: string;
+  fontFamily: string;
+  fontLabel: string;
+  radius: string;
+}
+
+export const SITE_THEMES: Record<SiteTheme, SiteThemeStyle> = {
+  modern: {
+    name: 'Moderne',
+    tagline: 'Sobre, sombre, technologique',
+    description: "Fond sombre elegant, accents bleus, typographie sans-serif. Donne une image high-tech et premium.",
+    target: "Electriciens, domotique, energies renouvelables, photovoltaique, climatisation",
+    preview_bg: 'bg-slate-900',
+    preview_accent: 'bg-blue-500',
+    bg: '#0f172a',
+    bgAlt: '#1e293b',
+    cardBg: '#1e293b',
+    border: '#334155',
+    text: '#f1f5f9',
+    textMuted: '#94a3b8',
+    heading: '#ffffff',
+    accent: '#3b82f6',
+    accentText: '#ffffff',
+    fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
+    fontLabel: 'Inter',
+    radius: '0.75rem',
+  },
+  warm: {
+    name: 'Chaleureux',
+    tagline: 'Authentique, traditionnel, artisanal',
+    description: "Tons creme et ambre, typographie serif elegante. Inspire confiance et savoir-faire traditionnel.",
+    target: "Macons, charpentiers, menuisiers, ebenistes, couvreurs, artisans du patrimoine",
+    preview_bg: 'bg-amber-50',
+    preview_accent: 'bg-amber-600',
+    bg: '#fffbf5',
+    bgAlt: '#fef3e2',
+    cardBg: '#ffffff',
+    border: '#e7e5e4',
+    text: '#44403c',
+    textMuted: '#78716c',
+    heading: '#292524',
+    accent: '#d97706',
+    accentText: '#ffffff',
+    fontFamily: "'Georgia', 'Times New Roman', serif",
+    fontLabel: 'Georgia',
+    radius: '1rem',
+  },
+  clean: {
+    name: 'Epure',
+    tagline: 'Minimaliste, lumineux, professionnel',
+    description: "Fond blanc, beaucoup d'espace, accents emeraude. Look pro et rassurant, parfait pour la conversion.",
+    target: "Plombiers, peintres, carreleurs, platriers, multi-services, generalistes",
+    preview_bg: 'bg-white',
+    preview_accent: 'bg-emerald-500',
+    bg: '#ffffff',
+    bgAlt: '#f8faf9',
+    cardBg: '#ffffff',
+    border: '#e5e7eb',
+    text: '#374151',
+    textMuted: '#6b7280',
+    heading: '#111827',
+    accent: '#059669',
+    accentText: '#ffffff',
+    fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
+    fontLabel: 'Inter',
+    radius: '0.5rem',
+  },
+  bold: {
+    name: 'Dynamique',
+    tagline: 'Impactant, energique, moderne',
+    description: "Fond charbon, accents rouges puissants. Pour se demarquer et exprimer une identite forte.",
+    target: "Depannage urgent, serruriers, chauffagistes, paysagistes, jeunes entreprises",
+    preview_bg: 'bg-slate-800',
+    preview_accent: 'bg-red-500',
+    bg: '#18181b',
+    bgAlt: '#27272a',
+    cardBg: '#27272a',
+    border: '#3f3f46',
+    text: '#e4e4e7',
+    textMuted: '#a1a1aa',
+    heading: '#ffffff',
+    accent: '#ef4444',
+    accentText: '#ffffff',
+    fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
+    fontLabel: 'Inter',
+    radius: '0.75rem',
+  },
 };

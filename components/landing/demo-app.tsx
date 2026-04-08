@@ -52,7 +52,7 @@ const views = [
   { id: 'site-web', label: 'Site web IA', icon: Globe },
   { id: 'mail', label: 'Boîte mail', icon: Mail },
   { id: 'avis', label: 'Avis Google', icon: Star },
-  { id: 'plans-rendus', label: 'Plans & Rendus IA', icon: Paintbrush },
+  { id: 'plans-rendus', label: 'Rendus IA', icon: Paintbrush },
   { id: 'agents', label: 'Mes Agents', icon: Bot },
   { id: 'paiements', label: 'Paiement Stripe', icon: CreditCard },
   { id: 'contrats', label: 'Contrats récurrents', icon: RefreshCw },
@@ -922,20 +922,20 @@ function AvisView() {
   );
 }
 
-/* ─── PLANS & RENDUS ─── */
+/* ─── RENDUS IA ─── */
 function PlansView() {
   const files = [
-    { name: 'Plan RDC.pdf', type: 'PDF', size: '2.4 MB' },
     { name: 'Facade avant.jpg', type: 'Image', size: '1.8 MB' },
-    { name: 'Devis detaille.pdf', type: 'PDF', size: '450 KB' },
-    { name: 'Photo chantier 1.jpg', type: 'Image', size: '3.1 MB' },
+    { name: 'Rendu facade IA.png', type: 'Image', size: '4.1 MB' },
+    { name: 'Salon avant.jpg', type: 'Image', size: '2.2 MB' },
     { name: 'Rendu 3D salon.png', type: 'Image', size: '5.2 MB' },
-    { name: 'Plan etage.pdf', type: 'PDF', size: '1.9 MB' },
+    { name: 'Cuisine avant.jpg', type: 'Image', size: '3.1 MB' },
+    { name: 'Rendu cuisine IA.png', type: 'Image', size: '4.8 MB' },
   ];
 
   return (
     <div>
-      <ViewHeader title="Plans & Documents" count={files.length} />
+      <ViewHeader title="Rendus IA" count={files.length} />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {files.map((f) => (
           <div key={f.name} className="group p-4 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] hover:shadow-md transition-shadow cursor-pointer">

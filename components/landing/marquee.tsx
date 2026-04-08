@@ -37,7 +37,7 @@ const items = [
   { icon: Target, label: 'Prospection CRM' },
   { icon: Mail, label: 'Gmail intégré' },
   { icon: Star, label: 'Avis Google' },
-  { icon: FileImage, label: 'Plans & Rendus' },
+  { icon: FileImage, label: 'Rendus IA' },
   { icon: CreditCard, label: 'Paiements Stripe' },
   { icon: RefreshCw, label: 'Contrats récurrents' },
   { icon: Calculator, label: 'Comptabilité IA' },

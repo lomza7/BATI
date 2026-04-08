@@ -18,11 +18,13 @@ import {
   Calendar,
   CalendarClock,
   CircleAlert,
+  Compass,
   Euro,
   FileText,
   FolderKanban,
   Receipt,
   RefreshCw,
+  TrendingDown,
   TrendingUp,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -114,6 +116,7 @@ interface QuoteRow {
   valid_until: string | null;
   created_at: string;
   updated_at: string;
+  project_id: string | null;
   clients: { name: string } | null;
 }
 
@@ -122,12 +125,32 @@ interface InvoiceRow {
   invoice_number: string;
   title: string;
   status: keyof typeof INVOICE_STATUSES;
+  total_ht: number;
   total_ttc: number;
   due_date: string | null;
   paid_at: string | null;
   created_at: string;
   updated_at: string;
+  project_id: string | null;
+  quote_id: string | null;
   clients: { name: string } | null;
+}
+
+interface ExpenseRow {
+  id: string;
+  date: string;
+  amount: number;
+  amount_ht: number;
+  project_id: string | null;
+}
+
+interface TeamAssignmentRow {
+  id: string;
+  project_id: string | null;
+  date: string;
+  hours: number;
+  team_member_id: string;
+  team_members: { hourly_rate: number | null } | null;
 }
 
 interface ProjectRow {
@@ -300,6 +323,12 @@ const leadSourceChartConfig = {
 
 const mrrChartConfig = {
   mrr: { label: 'MRR', color: 'hsl(var(--chart-4))' },
+} satisfies ChartConfig;
+
+const marginChartConfig = {
+  ca: { label: 'CA HT', color: 'hsl(var(--chart-1))' },
+  cout: { label: "Coût engagé", color: 'hsl(var(--chart-5))' },
+  marge: { label: 'Marge brute', color: 'hsl(var(--chart-2))' },
 } satisfies ChartConfig;
 
 function differenceInDays(targetDate: string, now = new Date()) {
@@ -708,6 +737,8 @@ export default function DashboardPage() {
   const [companyProfile, setCompanyProfile] = useState<CompanyProfileRow | null>(null);
   const [dashTodos, setDashTodos] = useState<Todo[]>([]);
   const [contracts, setContracts] = useState<ContractDashboardRow[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [teamAssignments, setTeamAssignments] = useState<TeamAssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState<DatePreset>('annee');
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
@@ -717,15 +748,15 @@ export default function DashboardPage() {
     if (!user) return;
     setLoading(true);
 
-    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes, contractsRes] = await Promise.all([
+    const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes, contractsRes, expensesRes, assignmentsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, updated_at, clients(name, deleted_at)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, project_id, created_at, updated_at, clients(name, deleted_at)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ttc, due_date, paid_at, created_at, updated_at, clients(name, deleted_at)')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, created_at, updated_at, clients(name, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('projects')
@@ -773,6 +804,14 @@ export default function DashboardPage() {
         .from('recurring_contracts')
         .select('id, title, amount, frequency, status, next_billing, created_at, cancelled_at, clients(name, deleted_at)')
         .order('next_billing', { ascending: true }),
+      supabase
+        .from('expenses')
+        .select('id, date, amount, amount_ht, project_id')
+        .not('project_id', 'is', null),
+      supabase
+        .from('team_assignments')
+        .select('id, project_id, date, hours, team_member_id, team_members(hourly_rate)')
+        .not('project_id', 'is', null),
     ]);
 
     setQuotes((((quotesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((quote) => {
@@ -783,6 +822,7 @@ export default function DashboardPage() {
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
         total_ttc: toNumber(quote.total_ttc as string | number | null | undefined),
+        project_id: (quote.project_id as string | null) || null,
       } as QuoteRow;
     }));
     setInvoices((((invoicesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
@@ -792,7 +832,10 @@ export default function DashboardPage() {
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
+        total_ht: toNumber(invoice.total_ht as string | number | null | undefined),
         total_ttc: toNumber(invoice.total_ttc as string | number | null | undefined),
+        project_id: (invoice.project_id as string | null) || null,
+        quote_id: (invoice.quote_id as string | null) || null,
       } as InvoiceRow;
     }));
     const loadedProjects = (((projectsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((project) => {
@@ -840,6 +883,26 @@ export default function DashboardPage() {
           : null,
         amount: toNumber(contract.amount as string | number | null | undefined),
       } as ContractDashboardRow;
+    }));
+    setExpenses((((expensesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((expense) => ({
+      id: String(expense.id),
+      date: String(expense.date),
+      amount: toNumber(expense.amount as string | number | null | undefined),
+      amount_ht: toNumber(expense.amount_ht as string | number | null | undefined),
+      project_id: (expense.project_id as string | null) || null,
+    })));
+    setTeamAssignments((((assignmentsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((assignment) => {
+      const memberValue = Array.isArray(assignment.team_members) ? assignment.team_members[0] : assignment.team_members;
+      return {
+        id: String(assignment.id),
+        project_id: (assignment.project_id as string | null) || null,
+        date: String(assignment.date),
+        hours: toNumber(assignment.hours as string | number | null | undefined),
+        team_member_id: String(assignment.team_member_id),
+        team_members: memberValue && typeof memberValue === 'object'
+          ? { hourly_rate: toNumber((memberValue as { hourly_rate?: number | string | null }).hourly_rate) }
+          : null,
+      };
     }));
     setLoading(false);
   }, [user]);
@@ -1254,6 +1317,160 @@ export default function DashboardPage() {
       mrrChartData.push({ month: label, mrr: Math.round(monthMrr) });
     }
 
+    // ── Marge chantiers ──
+    // Helper: resolve a project_id from an invoice (direct link, then fallback via quote_id)
+    const quotesById = new Map<string, QuoteRow>();
+    quotes.forEach((q) => quotesById.set(q.id, q));
+    function invoiceProjectId(inv: InvoiceRow): string | null {
+      if (inv.project_id) return inv.project_id;
+      if (inv.quote_id) {
+        const q = quotesById.get(inv.quote_id);
+        if (q?.project_id) return q.project_id;
+      }
+      return null;
+    }
+
+    // Build per-project finance over the SELECTED period (filterRange)
+    type ProjectFinance = {
+      id: string;
+      name: string;
+      caHT: number;
+      mainOeuvreHT: number;
+      depensesHT: number;
+      coutTotal: number;
+      margeBrute: number;
+      margePct: number | null;
+    };
+    const projectFinanceMap = new Map<string, ProjectFinance>();
+    projects.forEach((p) => {
+      projectFinanceMap.set(p.id, {
+        id: p.id,
+        name: p.name,
+        caHT: 0,
+        mainOeuvreHT: 0,
+        depensesHT: 0,
+        coutTotal: 0,
+        margeBrute: 0,
+        margePct: null,
+      });
+    });
+
+    // CA HT: invoices émises (any status) dans la période, rattachées à un chantier
+    invoices.forEach((inv) => {
+      const projectId = invoiceProjectId(inv);
+      if (!projectId) return;
+      const entry = projectFinanceMap.get(projectId);
+      if (!entry) return;
+      // Use created_at for period filter (date d'émission)
+      if (!isBetween(inv.created_at, filterRange.start, filterRange.end)) return;
+      entry.caHT += inv.total_ht || 0;
+    });
+
+    // Dépenses HT
+    expenses.forEach((e) => {
+      if (!e.project_id) return;
+      const entry = projectFinanceMap.get(e.project_id);
+      if (!entry) return;
+      if (!isBetween(e.date, filterRange.start, filterRange.end)) return;
+      entry.depensesHT += e.amount_ht || 0;
+    });
+
+    // Main d'oeuvre = heures pointées × taux horaire
+    teamAssignments.forEach((a) => {
+      if (!a.project_id) return;
+      const entry = projectFinanceMap.get(a.project_id);
+      if (!entry) return;
+      if (!isBetween(a.date, filterRange.start, filterRange.end)) return;
+      const rate = a.team_members?.hourly_rate || 0;
+      entry.mainOeuvreHT += (a.hours || 0) * rate;
+    });
+
+    // Compute totals per project
+    projectFinanceMap.forEach((p) => {
+      p.coutTotal = p.mainOeuvreHT + p.depensesHT;
+      p.margeBrute = p.caHT - p.coutTotal;
+      p.margePct = p.caHT > 0 ? (p.margeBrute / p.caHT) * 100 : null;
+    });
+
+    const projectMargins = Array.from(projectFinanceMap.values())
+      .filter((p) => p.caHT > 0 || p.coutTotal > 0);
+
+    // Aggregated metrics on the period (weighted average across all chantiers actifs)
+    const totalCA = projectMargins.reduce((s, p) => s + p.caHT, 0);
+    const totalCost = projectMargins.reduce((s, p) => s + p.coutTotal, 0);
+    const totalMargeBrute = totalCA - totalCost;
+    const avgMargePct = totalCA > 0 ? (totalMargeBrute / totalCA) * 100 : null;
+
+    // Average margin % among individual chantiers (simple mean of margePct, only those with caHT > 0)
+    const billedProjects = projectMargins.filter((p) => p.margePct !== null);
+    const avgMargePctPerChantier = billedProjects.length > 0
+      ? billedProjects.reduce((s, p) => s + (p.margePct || 0), 0) / billedProjects.length
+      : null;
+
+    // Top 5 / Bottom 5 chantiers (only ceux avec marge calculable)
+    const topMargins = [...billedProjects].sort((a, b) => (b.margePct || 0) - (a.margePct || 0)).slice(0, 5);
+    const worstMargins = [...billedProjects].sort((a, b) => (a.margePct || 0) - (b.margePct || 0)).slice(0, 5);
+
+    // Annual aggregated (year-to-date, not period-filtered)
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    let yearCA = 0;
+    let yearCost = 0;
+    invoices.forEach((inv) => {
+      const projectId = invoiceProjectId(inv);
+      if (!projectId) return;
+      if (!isBetween(inv.created_at, yearStart, yearEnd)) return;
+      yearCA += inv.total_ht || 0;
+    });
+    expenses.forEach((e) => {
+      if (!e.project_id) return;
+      if (!isBetween(e.date, yearStart, yearEnd)) return;
+      yearCost += e.amount_ht || 0;
+    });
+    teamAssignments.forEach((a) => {
+      if (!a.project_id) return;
+      if (!isBetween(a.date, yearStart, yearEnd)) return;
+      const rate = a.team_members?.hourly_rate || 0;
+      yearCost += (a.hours || 0) * rate;
+    });
+    const yearMarge = yearCA - yearCost;
+    const yearMargePct = yearCA > 0 ? (yearMarge / yearCA) * 100 : null;
+
+    // Monthly margin chart — last 12 months
+    const marginChartData: { month: string; ca: number; cout: number; marge: number; margePct: number | null }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      const label = monthStart.toLocaleDateString('fr-FR', { month: 'short' });
+      let ca = 0;
+      let cout = 0;
+      invoices.forEach((inv) => {
+        const projectId = invoiceProjectId(inv);
+        if (!projectId) return;
+        if (!isBetween(inv.created_at, monthStart, monthEnd)) return;
+        ca += inv.total_ht || 0;
+      });
+      expenses.forEach((e) => {
+        if (!e.project_id) return;
+        if (!isBetween(e.date, monthStart, monthEnd)) return;
+        cout += e.amount_ht || 0;
+      });
+      teamAssignments.forEach((a) => {
+        if (!a.project_id) return;
+        if (!isBetween(a.date, monthStart, monthEnd)) return;
+        const rate = a.team_members?.hourly_rate || 0;
+        cout += (a.hours || 0) * rate;
+      });
+      const marge = ca - cout;
+      marginChartData.push({
+        month: label,
+        ca: Math.round(ca),
+        cout: Math.round(cout),
+        marge: Math.round(marge),
+        margePct: ca > 0 ? Math.round((marge / ca) * 100) : null,
+      });
+    }
+
     return {
       revenueThisMonth,
       revenuePreviousMonth,
@@ -1295,8 +1512,21 @@ export default function DashboardPage() {
       activeTeamMembers: teamMembers.filter((member) => member.status === 'actif'),
       nextPlanningEvents: fEvents.slice(0, 3),
       planningThisWeekCount: fEvents.length,
+      // Marge chantiers
+      marginPeriodCA: totalCA,
+      marginPeriodCost: totalCost,
+      marginPeriodAmount: totalMargeBrute,
+      marginPeriodPct: avgMargePct,
+      marginAvgPctPerChantier: avgMargePctPerChantier,
+      marginBilledChantiersCount: billedProjects.length,
+      marginYearCA: yearCA,
+      marginYearAmount: yearMarge,
+      marginYearPct: yearMargePct,
+      marginChartData,
+      marginTopProjects: topMargins,
+      marginWorstProjects: worstMargins,
     };
-  }, [companyProfile, contracts, customRange, datePreset, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamMembers]);
+  }, [companyProfile, contracts, customRange, datePreset, expenses, invoices, leadSources, leadStages, leads, planningEvents, projects, quotes, reminderSettings, teamAssignments, teamMembers]);
 
   const periodLabel = datePreset === 'custom' && customRange.from
     ? customRange.to
@@ -1554,6 +1784,194 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* ─── Marge chantiers ─── */}
+          {(dashboardData.marginPeriodCA > 0 || dashboardData.marginPeriodCost > 0 || dashboardData.marginYearCA > 0) && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Compass className="h-4 w-4 text-[#D35400]" />
+                    <h2 className="text-base font-semibold text-foreground">Marge chantiers</h2>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Rentabilité de vos chantiers — CA HT facturé moins coûts engagés (main-d&apos;œuvre + achats)
+                  </p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/chantiers">Voir les chantiers</Link>
+                </Button>
+              </div>
+
+              {/* KPIs marge */}
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* Marge sur la période */}
+                {(() => {
+                  const pct = dashboardData.marginPeriodPct;
+                  const color = pct === null ? 'text-muted-foreground' : pct < 0 ? 'text-red-600' : pct < 15 ? 'text-amber-600' : 'text-emerald-600';
+                  return (
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card to-muted/30 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Marge — {periodLabel.toLowerCase()}</p>
+                          <p className={`mt-1 text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
+                            {pct !== null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%` : '—'}
+                          </p>
+                        </div>
+                        {pct !== null && (
+                          pct >= 15 ? <TrendingUp className={`h-5 w-5 ${color}`} /> : pct < 0 ? <TrendingDown className={`h-5 w-5 ${color}`} /> : null
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{formatCurrency(dashboardData.marginPeriodCA)} HT facturé</span>
+                        <span className={dashboardData.marginPeriodAmount >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-red-700'}>
+                          {dashboardData.marginPeriodAmount >= 0 ? '+' : ''}{formatCurrency(dashboardData.marginPeriodAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Marge moyenne par chantier */}
+                {(() => {
+                  const pct = dashboardData.marginAvgPctPerChantier;
+                  const color = pct === null ? 'text-muted-foreground' : pct < 0 ? 'text-red-600' : pct < 15 ? 'text-amber-600' : 'text-emerald-600';
+                  return (
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card to-muted/30 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Marge moyenne / chantier</p>
+                          <p className={`mt-1 text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
+                            {pct !== null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%` : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        {dashboardData.marginBilledChantiersCount > 0
+                          ? `Sur ${dashboardData.marginBilledChantiersCount} chantier${dashboardData.marginBilledChantiersCount > 1 ? 's' : ''} facturé${dashboardData.marginBilledChantiersCount > 1 ? 's' : ''}`
+                          : 'Aucun chantier facturé sur cette période'}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* Marge annuelle */}
+                {(() => {
+                  const pct = dashboardData.marginYearPct;
+                  const color = pct === null ? 'text-muted-foreground' : pct < 0 ? 'text-red-600' : pct < 15 ? 'text-amber-600' : 'text-emerald-600';
+                  const year = new Date().getFullYear();
+                  return (
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-card via-card to-muted/30 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-muted-foreground">Marge annuelle {year}</p>
+                          <p className={`mt-1 text-2xl sm:text-3xl font-bold tabular-nums ${color}`}>
+                            {pct !== null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%` : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{formatCurrency(dashboardData.marginYearCA)} HT</span>
+                        <span className={dashboardData.marginYearAmount >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-red-700'}>
+                          {dashboardData.marginYearAmount >= 0 ? '+' : ''}{formatCurrency(dashboardData.marginYearAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Chart mensuel */}
+              <div className="mt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Marge mensuelle — 12 derniers mois</p>
+                <div className="mt-2 h-[220px] sm:h-[260px]">
+                  <ChartContainer config={marginChartConfig} className="h-full w-full">
+                    <BarChart data={dashboardData.marginChartData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={11} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={11} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} width={40} />
+                      <ChartTooltip
+                        cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name) => (
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span>{name}</span>
+                                <span className="font-medium text-foreground">{formatCurrency(Number(value || 0))}</span>
+                              </div>
+                            )}
+                          />
+                        }
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="ca" fill="var(--color-ca)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="cout" fill="var(--color-cout)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="marge" fill="var(--color-marge)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </div>
+
+              {/* Top + worst chantiers */}
+              {(dashboardData.marginTopProjects.length > 0 || dashboardData.marginWorstProjects.length > 0) && (
+                <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/40 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
+                      <p className="text-sm font-semibold text-foreground">Chantiers les plus rentables</p>
+                    </div>
+                    {dashboardData.marginTopProjects.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Aucun chantier facturé sur la période.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {dashboardData.marginTopProjects.map((p) => (
+                          <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
+                            <Link href="/chantiers" className="truncate font-medium text-foreground hover:text-[#D35400] transition-colors">
+                              {p.name}
+                            </Link>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] text-muted-foreground tabular-nums">{formatCurrency(p.margeBrute)}</span>
+                              <span className="text-sm font-bold text-emerald-700 tabular-nums">
+                                {(p.margePct ?? 0) >= 0 ? '+' : ''}{(p.margePct ?? 0).toFixed(0)}%
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-red-200/60 bg-red-50/40 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                      <p className="text-sm font-semibold text-foreground">Chantiers à surveiller</p>
+                    </div>
+                    {dashboardData.marginWorstProjects.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Tous vos chantiers sont rentables.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {dashboardData.marginWorstProjects.map((p) => {
+                          const pct = p.margePct ?? 0;
+                          return (
+                            <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
+                              <Link href="/chantiers" className="truncate font-medium text-foreground hover:text-[#D35400] transition-colors">
+                                {p.name}
+                              </Link>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[11px] text-muted-foreground tabular-nums">{formatCurrency(p.margeBrute)}</span>
+                                <span className={`text-sm font-bold tabular-nums ${pct < 0 ? 'text-red-700' : pct < 15 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                  {pct >= 0 ? '+' : ''}{pct.toFixed(0)}%
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {dashboardData.activeContractsCount > 0 && (
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">

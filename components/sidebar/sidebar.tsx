@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Hexagon, Settings, CircleHelp as HelpCircle, Menu, Trash2 } from 'lucide-react';
+import { Hexagon, Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -22,6 +22,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <SidebarNav onNavigate={onNavigate} />
 
       <div className="border-t border-sidebar-border p-3 space-y-0.5">
+        <a
+          href="/parrainage"
+          onClick={onNavigate}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+        >
+          <Gift className="h-4 w-4" />
+          <span>Lien de parrainage</span>
+        </a>
         <a
           href="/parametres"
           onClick={onNavigate}

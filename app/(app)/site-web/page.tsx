@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Globe, Sparkles, Eye, Palette, Type, ArrowRight, Check,
   RefreshCw, ExternalLink, Copy, CheckCircle2, Pencil, X,
-  Plus, Trash2, ChevronDown, ChevronUp, MapPin, Image,
+  Plus, Trash2, MapPin, Image, Lock, Info,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { generateSlug, SITE_THEMES, type SiteTheme, type SiteContent, type ArtisanSite } from '@/lib/site-utils';
 import { SiteImageUpload } from '@/components/site/site-image-upload';
+import { ThemePreviewCard } from '@/components/site/theme-preview-card';
+import { ThemePreviewModal } from '@/components/site/theme-preview-modal';
 
 const STEPS = [
   { id: 1, label: 'Informations', icon: Type },
@@ -80,6 +82,9 @@ export default function SiteWebPage() {
 
   // Edit mode
   const [editing, setEditing] = useState<string | null>(null);
+
+  // Theme preview modal
+  const [previewTheme, setPreviewTheme] = useState<SiteTheme | null>(null);
 
   // Load existing profile + site
   const loadData = useCallback(async () => {
@@ -524,30 +529,73 @@ export default function SiteWebPage() {
 
       {/* ═══ Step 2: Theme ═══ */}
       {step === 2 && (
-        <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-8 space-y-5">
-          <h2 className="font-semibold text-foreground">Choisissez un theme</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="max-w-5xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <Palette className="h-6 w-6 text-primary" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Choisissez le style de votre site</h2>
+            <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+              Quatre styles pensés pour les artisans. Cliquez sur <span className="font-medium text-foreground">Visualiser en grand</span> pour voir un apercu complet de chaque theme avec un contenu d&apos;exemple.
+            </p>
+          </div>
+
+          {/* Lock warning */}
+          {published ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+              <Lock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-amber-900">Theme verrouille</p>
+                <p className="text-amber-800 mt-0.5">
+                  Votre site est deja publie. Le theme ne peut plus etre modifie pour preserver l&apos;identite visuelle de votre site.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-blue-900">Choix definitif</p>
+                <p className="text-blue-800 mt-0.5">
+                  Le theme ne pourra plus etre change apres la publication de votre site. Prenez le temps de le visualiser avant de valider.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
             {(Object.keys(SITE_THEMES) as SiteTheme[]).map(t => (
-              <button
+              <ThemePreviewCard
                 key={t}
-                onClick={() => setTheme(t)}
-                className={cn(
-                  'rounded-lg border-2 p-4 transition-all',
-                  theme === t ? 'border-primary shadow-md' : 'border-border hover:border-border/80'
-                )}
-              >
-                <div className={cn('h-20 rounded-md flex items-end p-2', SITE_THEMES[t].preview_bg)}>
-                  <div className={cn('h-2 w-12 rounded-full', SITE_THEMES[t].preview_accent)} />
-                </div>
-                <p className="mt-2 text-sm font-medium text-foreground">{SITE_THEMES[t].name}</p>
-              </button>
+                theme={t}
+                selected={theme === t}
+                onSelect={() => { if (!published) setTheme(t); }}
+                onPreview={() => setPreviewTheme(t)}
+              />
             ))}
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={() => setStep(1)}>Retour</Button>
-            <Button className="flex-1" onClick={() => setStep(3)}>Suivant <ArrowRight className="ml-2 h-4 w-4" /></Button>
+            <Button className="flex-1" onClick={() => setStep(3)}>
+              Suivant <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         </div>
+      )}
+
+      {/* Theme preview modal */}
+      {previewTheme && (
+        <ThemePreviewModal
+          open={!!previewTheme}
+          theme={previewTheme}
+          isCurrentSelection={theme === previewTheme}
+          onClose={() => setPreviewTheme(null)}
+          onConfirm={() => {
+            if (!published) setTheme(previewTheme);
+            setPreviewTheme(null);
+          }}
+        />
       )}
 
       {/* ═══ Step 3: Sections + generate ═══ */}
@@ -609,46 +657,82 @@ export default function SiteWebPage() {
             </div>
           ) : siteContent ? (
             <>
-              {/* Action bar */}
-              <div className="rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {published ? 'Votre site est en ligne' : 'Apercu du site genere'}
-                  </p>
-                  {published && siteUrl && (
-                    <p className="text-xs text-primary mt-0.5 font-mono">{siteUrl}</p>
-                  )}
+              {/* Published banner */}
+              {published && siteUrl && (
+                <div className="rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-emerald-50/50 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500 text-white shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-emerald-900">Votre site est en ligne</p>
+                    <a
+                      href={siteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald-700 font-mono hover:underline break-all inline-flex items-center gap-1"
+                    >
+                      {siteUrl} <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="outline" size="sm" onClick={handleCopyUrl} className="gap-1.5 flex-1 sm:flex-none">
+                      {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                      {copied ? 'Copie' : 'Copier'}
+                    </Button>
+                    <Button size="sm" asChild className="gap-1.5 flex-1 sm:flex-none">
+                      <a href={siteUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4" /> Visiter
+                      </a>
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 flex-wrap justify-center">
+              )}
+
+              {/* Editor toolbar */}
+              <div className="rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sticky top-4 z-20 shadow-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                    <Pencil className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {published ? 'Mode edition' : 'Apercu du site genere'}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      {published
+                        ? 'Modifiez chaque section puis cliquez sur Enregistrer pour mettre a jour votre site en ligne.'
+                        : 'Verifiez le contenu, modifiez si besoin, puis publiez votre site.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap justify-end w-full sm:w-auto">
                   <Button variant="outline" size="sm" onClick={() => { setSiteContent(null); handleGenerate(); }} disabled={generating}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> Regenerer
+                    <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerer
                   </Button>
                   {published ? (
-                    <>
-                      <Button variant="outline" size="sm" onClick={handlePublish} disabled={publishing}>
-                        {publishing ? 'Mise a jour...' : 'Mettre a jour'}
-                      </Button>
-                      <Button size="sm" asChild>
-                        <a href={siteUrl} target="_blank" rel="noopener noreferrer">
-                          <Globe className="mr-2 h-4 w-4" /> Voir le site
-                        </a>
-                      </Button>
-                    </>
+                    <Button size="sm" onClick={handlePublish} disabled={publishing}>
+                      {publishing ? (
+                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Enregistrement...</>
+                      ) : (
+                        <><CheckCircle2 className="mr-1.5 h-4 w-4" /> Enregistrer les modifications</>
+                      )}
+                    </Button>
                   ) : (
                     <Button size="sm" onClick={handlePublish} disabled={publishing}>
                       {publishing ? (
-                        <><div className="h-4 w-4 mr-2 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Publication...</>
+                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Publication...</>
                       ) : (
-                        <><Globe className="mr-2 h-4 w-4" /> Publier</>
+                        <><Globe className="mr-1.5 h-4 w-4" /> Publier mon site</>
                       )}
                     </Button>
                   )}
                 </div>
               </div>
 
-              <p className="text-xs text-center text-muted-foreground">
-                Cliquez sur <Pencil className="inline h-3 w-3" /> pour modifier chaque section
-              </p>
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+                <Pencil className="h-3 w-3 text-primary shrink-0" />
+                <span>Cliquez sur <span className="font-medium text-foreground">Modifier</span> sur chaque section pour personnaliser le contenu.</span>
+              </div>
 
               {/* ── Hero ── */}
               <EditableSection title="Hero" editing={editing} section="hero" setEditing={setEditing}>

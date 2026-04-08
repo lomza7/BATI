@@ -24,7 +24,7 @@ const SLUG_TO_VIEW: Record<string, string> = {
   'contrats-recurrents': 'contrats',
   'comptabilite-ia': 'comptabilite',
   'agents-ia': 'agents',
-  'plans-rendus-ia': 'plans-rendus',
+  'rendus-ia': 'plans-rendus',
 };
 
 const SLUG_TO_PATH: Record<string, string> = {
@@ -48,7 +48,7 @@ const SLUG_TO_PATH: Record<string, string> = {
   'contrats-recurrents': 'hellobat.app/contrats',
   'comptabilite-ia': 'hellobat.app/comptabilite',
   'agents-ia': 'hellobat.app/agents',
-  'plans-rendus-ia': 'hellobat.app/plans-rendus',
+  'rendus-ia': 'hellobat.app/rendus',
 };
 
 export function FeatureDemo({ slug }: { slug: string }) {

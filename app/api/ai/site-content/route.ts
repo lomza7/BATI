@@ -194,8 +194,18 @@ Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdo
 
     if (!res.ok) {
       const text = await res.text();
-      console.error('Anthropic API error:', text);
-      return NextResponse.json({ error: 'Erreur API IA' }, { status: 502 });
+      console.error('Anthropic API error:', res.status, text);
+      let detail = text;
+      try {
+        const parsed = JSON.parse(text);
+        detail = parsed?.error?.message || text;
+      } catch {
+        // keep raw text
+      }
+      return NextResponse.json(
+        { error: `Erreur API IA (${res.status}): ${detail}` },
+        { status: 502 }
+      );
     }
 
     const data = await res.json();

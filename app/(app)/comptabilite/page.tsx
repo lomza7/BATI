@@ -398,6 +398,10 @@ export default function ComptabilitePage() {
   const [fluxPage, setFluxPage] = useState(1);
   const [fluxPageSize, setFluxPageSize] = useState<25 | 50 | 100>(25);
   const [fluxSelected, setFluxSelected] = useState<Set<string>>(new Set());
+  // Période Flux : 'all' | 'month:YYYY-MM' | 'quarter:YYYY:Q' | 'year:YYYY' | 'custom'
+  const [fluxPeriod, setFluxPeriod] = useState<string>('all');
+  const [fluxCustomStart, setFluxCustomStart] = useState<string>('');
+  const [fluxCustomEnd, setFluxCustomEnd] = useState<string>('');
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1047,8 +1051,15 @@ export default function ComptabilitePage() {
           if (f.kind !== 'invoice' || f.statusKey !== fluxSubTab) return false;
         }
       }
-      if (filterYear !== 'all' && f.date) {
-        if (new Date(f.date).getFullYear() !== Number(filterYear)) return false;
+      // Filtre période Flux
+      if (fluxPeriod !== 'all') {
+        if (!f.date) return false;
+        if (fluxPeriod === 'custom') {
+          if (fluxCustomStart && f.date < fluxCustomStart) return false;
+          if (fluxCustomEnd && f.date > fluxCustomEnd) return false;
+        } else if (!isInPeriod(f.date, fluxPeriod)) {
+          return false;
+        }
       }
       return true;
     });
@@ -1066,7 +1077,17 @@ export default function ComptabilitePage() {
       return (a.amountTtc - b.amountTtc) * dir;
     });
     return filtered;
-  }, [flux, fluxType, fluxSearch, fluxSubTab, filterYear, fluxSortKey, fluxSortDir]);
+  }, [
+    flux,
+    fluxType,
+    fluxSearch,
+    fluxSubTab,
+    fluxPeriod,
+    fluxCustomStart,
+    fluxCustomEnd,
+    fluxSortKey,
+    fluxSortDir,
+  ]);
 
   const fluxTotalPages = Math.max(1, Math.ceil(filteredFlux.length / fluxPageSize));
   const pagedFlux = useMemo(
@@ -1082,7 +1103,15 @@ export default function ComptabilitePage() {
   useEffect(() => {
     setFluxPage(1);
     setFluxSelected(new Set());
-  }, [fluxSubTab, fluxType, fluxSearch, filterYear, fluxPageSize]);
+  }, [
+    fluxSubTab,
+    fluxType,
+    fluxSearch,
+    fluxPeriod,
+    fluxCustomStart,
+    fluxCustomEnd,
+    fluxPageSize,
+  ]);
 
   // Clamp page if data shrinks below current page
   useEffect(() => {
@@ -1875,39 +1904,109 @@ export default function ComptabilitePage() {
           </div>
 
           {/* Filter bar */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-            <div className="relative sm:col-span-2">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={fluxSearch}
-                onChange={(e) => setFluxSearch(e.target.value)}
-                placeholder="Rechercher un flux, un fournisseur, un client…"
-                className="pl-9"
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+              <div className="relative sm:col-span-2">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={fluxSearch}
+                  onChange={(e) => setFluxSearch(e.target.value)}
+                  placeholder="Rechercher un flux, un fournisseur, un client…"
+                  className="pl-9"
+                />
+              </div>
+              <Select value={fluxType} onValueChange={(v) => setFluxType(v as typeof fluxType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  <SelectItem value="expense">Dépenses</SelectItem>
+                  <SelectItem value="invoice">Factures émises</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={fluxPeriod} onValueChange={setFluxPeriod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Période" />
+                </SelectTrigger>
+                <SelectContent className="max-h-96">
+                  <SelectItem value="all">Toutes les périodes</SelectItem>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Périodes courantes</SelectLabel>
+                    {periodOptionGroups.current.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>12 derniers mois</SelectLabel>
+                    {periodOptionGroups.months.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Trimestres</SelectLabel>
+                    {periodOptionGroups.quarters.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Années</SelectLabel>
+                    {periodOptionGroups.years.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectItem value="custom">Période personnalisée…</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={fluxType} onValueChange={(v) => setFluxType(v as typeof fluxType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="expense">Dépenses</SelectItem>
-                <SelectItem value="invoice">Factures émises</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les années</SelectItem>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Bandeau date range — visible uniquement quand "Période personnalisée" est sélectionnée */}
+            {fluxPeriod === 'custom' && (
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-center">
+                <span className="text-xs font-medium text-muted-foreground">Du</span>
+                <Input
+                  type="date"
+                  value={fluxCustomStart}
+                  onChange={(e) => setFluxCustomStart(e.target.value)}
+                  className="h-9 sm:w-44"
+                  max={fluxCustomEnd || undefined}
+                />
+                <span className="text-xs font-medium text-muted-foreground">au</span>
+                <Input
+                  type="date"
+                  value={fluxCustomEnd}
+                  onChange={(e) => setFluxCustomEnd(e.target.value)}
+                  className="h-9 sm:w-44"
+                  min={fluxCustomStart || undefined}
+                />
+                {(fluxCustomStart || fluxCustomEnd) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFluxCustomStart('');
+                      setFluxCustomEnd('');
+                    }}
+                    className="h-8 text-xs sm:ml-auto"
+                  >
+                    Effacer les dates
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Selection toolbar */}

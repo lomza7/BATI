@@ -10,6 +10,7 @@ import {
   CircleCheck,
   Clock,
   Clock3,
+  Compass,
   FileText,
   Grid3x3 as LayoutGrid,
   HardHat,
@@ -23,6 +24,8 @@ import {
   Receipt,
   Search,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   UploadCloud,
   Users,
   Wallet,
@@ -244,8 +247,41 @@ export default function ChantiersPage() {
   const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [projectExpenses, setProjectExpenses] = useState<ProjectExpense[]>([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
   const [projectActionId, setProjectActionId] = useState<string | null>(null);
+
+  // Synthese financiere du chantier ouvert (boussole de marge)
+  const projectFinance = useMemo(() => {
+    const totalDevis = projectQuotes.reduce((s, q) => s + q.total_ttc, 0);
+    const totalFacture = projectInvoices.reduce((s, i) => s + i.total_ttc, 0);
+    const totalEncaisse = projectInvoices
+      .filter((i) => i.status === 'payee')
+      .reduce((s, i) => s + i.total_ttc, 0);
+    const totalEnAttente = projectInvoices
+      .filter((i) => i.status === 'envoyee' || i.status === 'en_retard')
+      .reduce((s, i) => s + i.total_ttc, 0);
+    const totalMainOeuvre = projectAssignments.reduce((s, a) => s + a.total_cost, 0);
+    const totalDepensesHT = projectExpenses.reduce((s, e) => s + e.amount_ht, 0);
+    const totalDepensesTTC = projectExpenses.reduce((s, e) => s + e.amount, 0);
+    const coutRevient = totalMainOeuvre + totalDepensesHT;
+    const caHT = projectInvoices.reduce((s, i) => s + i.total_ht, 0);
+    const margeBrute = caHT - coutRevient;
+    const margePct = caHT > 0 ? (margeBrute / caHT) * 100 : null;
+    return {
+      totalDevis,
+      totalFacture,
+      totalEncaisse,
+      totalEnAttente,
+      totalMainOeuvre,
+      totalDepensesHT,
+      totalDepensesTTC,
+      coutRevient,
+      caHT,
+      margeBrute,
+      margePct,
+    };
+  }, [projectQuotes, projectInvoices, projectAssignments, projectExpenses]);
 
   useEffect(() => {
     void loadProjects();
@@ -395,6 +431,7 @@ export default function ChantiersPage() {
     setProjectInvoices([]);
     setProjectAssignments([]);
     setProjectExpenses([]);
+    setDetailsLoading(true);
     setShowDetails(true);
 
     const [{ data: quotes }, { data: assignmentRows }, { data: planningRows }, { data: expensesRows }] = await Promise.all([
@@ -513,6 +550,7 @@ export default function ChantiersPage() {
     });
 
     setProjectAssignments(Array.from(memberMap.values()).sort((a, b) => b.total_hours - a.total_hours));
+    setDetailsLoading(false);
   }
 
   function handleAddressSelect(result: AddressResult) {
@@ -1612,7 +1650,138 @@ export default function ChantiersPage() {
                 </div>
               </DialogHeader>
 
-              <div className="grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
+              {/* Boussole de marge — visible immediatement a l'ouverture */}
+              {(() => {
+                const { caHT, coutRevient, margeBrute, margePct, totalMainOeuvre, totalDepensesHT } = projectFinance;
+                const margeColor = margePct === null
+                  ? 'text-muted-foreground'
+                  : margePct < 0
+                    ? 'text-red-600'
+                    : margePct < 15
+                      ? 'text-amber-600'
+                      : 'text-emerald-600';
+                const margeBg = margePct === null
+                  ? 'bg-muted'
+                  : margePct < 0
+                    ? 'bg-red-500'
+                    : margePct < 15
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500';
+                // Indicator position on a [-30%, +70%] scale
+                const indicatorLeft = margePct === null ? 30 : Math.max(0, Math.min(100, margePct + 30));
+                const margeLabel = margePct === null
+                  ? 'En attente'
+                  : margePct < 0
+                    ? 'Chantier en perte'
+                    : margePct < 15
+                      ? 'Rentabilite faible'
+                      : margePct < 30
+                        ? 'Marge correcte'
+                        : 'Excellente marge';
+
+                return (
+                  <div className="mt-3 sm:mt-4 rounded-2xl sm:rounded-3xl border border-border bg-gradient-to-br from-card via-card to-muted/40 p-4 sm:p-5 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-[#D35400]/10">
+                          <Compass className="h-5 w-5 sm:h-5.5 sm:w-5.5 text-[#D35400]" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-[#D35400]">Boussole de marge</p>
+                          <p className="text-sm sm:text-base font-semibold text-foreground truncate">{margeLabel}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 sm:ml-auto">
+                        {detailsLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        ) : margePct !== null ? (
+                          <>
+                            {margePct >= 15 ? (
+                              <TrendingUp className={cn('h-5 w-5 sm:h-6 sm:w-6', margeColor)} />
+                            ) : margePct < 0 ? (
+                              <TrendingDown className={cn('h-5 w-5 sm:h-6 sm:w-6', margeColor)} />
+                            ) : null}
+                            <div className="text-right">
+                              <div className={cn('text-3xl sm:text-4xl font-bold tabular-nums leading-none', margeColor)}>
+                                {margePct >= 0 ? '+' : ''}{margePct.toFixed(0)}%
+                              </div>
+                              <div className={cn('mt-1 text-xs sm:text-sm font-semibold tabular-nums', margeColor)}>
+                                {margeBrute >= 0 ? '+' : ''}{formatCurrency(margeBrute)}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-muted-foreground">Aucune facture émise</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">La marge apparaitra dès la première facture</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Jauge */}
+                    <div className="mt-4 sm:mt-5">
+                      <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="absolute inset-0 flex">
+                          <div className="h-full w-[30%] bg-gradient-to-r from-red-300/70 to-red-200/50" />
+                          <div className="h-full w-[15%] bg-gradient-to-r from-amber-200/60 to-amber-100/40" />
+                          <div className="h-full w-[55%] bg-gradient-to-r from-emerald-200/60 to-emerald-100/30" />
+                        </div>
+                        {margePct !== null && (
+                          <div
+                            className={cn(
+                              'absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-4 w-4 rounded-full border-2 border-white shadow-md transition-all',
+                              margeBg
+                            )}
+                            style={{ left: `${indicatorLeft}%` }}
+                          />
+                        )}
+                      </div>
+                      <div className="mt-1.5 flex justify-between text-[9px] sm:text-[10px] font-medium text-muted-foreground">
+                        <span>−30%</span>
+                        <span>0%</span>
+                        <span>+15%</span>
+                        <span>+30%</span>
+                        <span>+70%</span>
+                      </div>
+                    </div>
+
+                    {/* Detail */}
+                    <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                      <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
+                        <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">CA facturé HT</p>
+                        <p className="mt-0.5 text-xs sm:text-sm font-bold text-foreground tabular-nums truncate">
+                          {detailsLoading ? '…' : caHT > 0 ? formatCurrency(caHT) : '—'}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
+                        <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Coût engagé</p>
+                        <p className="mt-0.5 text-xs sm:text-sm font-bold text-[#D35400] tabular-nums truncate">
+                          {detailsLoading ? '…' : coutRevient > 0 ? formatCurrency(coutRevient) : '—'}
+                        </p>
+                        {(totalMainOeuvre > 0 || totalDepensesHT > 0) && !detailsLoading && (
+                          <p className="mt-0.5 text-[9px] sm:text-[10px] text-muted-foreground truncate">
+                            {totalMainOeuvre > 0 && `MO ${formatCurrency(totalMainOeuvre)}`}
+                            {totalMainOeuvre > 0 && totalDepensesHT > 0 && ' · '}
+                            {totalDepensesHT > 0 && `Achats ${formatCurrency(totalDepensesHT)}`}
+                          </p>
+                        )}
+                      </div>
+                      <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
+                        <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Marge brute</p>
+                        <p className={cn(
+                          'mt-0.5 text-xs sm:text-sm font-bold tabular-nums truncate',
+                          margeBrute < 0 ? 'text-red-700' : margeBrute > 0 ? 'text-emerald-700' : 'text-foreground'
+                        )}>
+                          {detailsLoading ? '…' : caHT > 0 ? formatCurrency(margeBrute) : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-4 grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
                 <div className="space-y-4">
                   {/* Photo de présentation — cliquable pour changer */}
                   {(() => {
@@ -1890,17 +2059,19 @@ export default function ChantiersPage() {
 
               {/* Synthèse financière */}
               {(() => {
-                const totalDevis = projectQuotes.reduce((s, q) => s + q.total_ttc, 0);
-                const totalFacture = projectInvoices.reduce((s, i) => s + i.total_ttc, 0);
-                const totalEncaisse = projectInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
-                const totalEnAttente = projectInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
-                const totalMainOeuvre = projectAssignments.reduce((s, a) => s + a.total_cost, 0);
-                const totalDepensesHT = projectExpenses.reduce((s, e) => s + e.amount_ht, 0);
-                const totalDepensesTTC = projectExpenses.reduce((s, e) => s + e.amount, 0);
-                const coutRevient = totalMainOeuvre + totalDepensesHT;
-                const caHT = projectInvoices.reduce((s, i) => s + i.total_ht, 0);
-                const margeBrute = caHT - coutRevient;
-                const margePct = caHT > 0 ? (margeBrute / caHT) * 100 : null;
+                const {
+                  totalDevis,
+                  totalFacture,
+                  totalEncaisse,
+                  totalEnAttente,
+                  totalMainOeuvre,
+                  totalDepensesHT,
+                  totalDepensesTTC,
+                  coutRevient,
+                  caHT,
+                  margeBrute,
+                  margePct,
+                } = projectFinance;
 
                 return (
                   <div className="mt-4 space-y-4">

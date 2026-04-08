@@ -49,7 +49,7 @@ app/
 │   ├── site-web/               # Générateur de site web IA
 │   ├── mail/                   # Boîte mail Gmail intégrée
 │   ├── avis/                   # Avis Google Business
-│   ├── plans-rendus/           # Plans et rendus IA
+│   ├── rendus/                 # Rendus IA
 │   ├── agents/                 # Agents IA (pannes, DTU, chiffrage, juridique, RGE/CEE)
 │   ├── paiements/              # Paiements Stripe
 │   ├── contrats/               # Contrats récurrents
@@ -157,7 +157,7 @@ hooks/
 2. **Chantiers** : Mes chantiers, Planning, Carte, Équipe
 3. **Commercial** : Catalogues, Prospection, Site web IA
 4. **Communication** : Boîte mail, Avis Google
-5. **Créativité** : Plans & Rendus IA
+5. **Créativité** : Rendus IA
 6. **Agents IA** : Mes Agents
 7. **Finance** : Paiement Stripe, Contrats récurrents, Comptabilité IA
 8. **Admin** : Administration (restreint)

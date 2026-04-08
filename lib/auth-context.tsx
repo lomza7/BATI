@@ -39,6 +39,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  const claimPendingReferral = useCallback(async (accessToken: string) => {
+    if (typeof window === 'undefined') return;
+    let code: string | null = null;
+    try {
+      code = window.localStorage.getItem('hellobat_referral_code');
+    } catch {
+      return;
+    }
+    if (!code) return;
+    try {
+      const res = await fetch('/api/referral/claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      // Whether claimed, already claimed, or failed (e.g. self-referral) — don't retry forever.
+      if (res.ok) {
+        window.localStorage.removeItem('hellobat_referral_code');
+      } else if (res.status === 400 || res.status === 404) {
+        window.localStorage.removeItem('hellobat_referral_code');
+      }
+    } catch {
+      // network error: keep the code in storage to retry on next session
+    }
+  }, []);
+
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -80,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (nextSession?.user) {
         setLoading(false);
         void fetchProfile(nextSession.user.id);
+        void claimPendingReferral(nextSession.access_token);
       } else {
         setProfile(null);
         setShowOnboarding(false);
@@ -117,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(loadingSafetyTimer);
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, claimPendingReferral]);
 
   const completeOnboarding = useCallback(() => {
     setShowOnboarding(false);

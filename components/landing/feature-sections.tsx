@@ -446,23 +446,23 @@ export function AvisSection() {
 export function PlansSection() {
   return (
     <FeatureSection
-      id="plans"
-      slug="plans-rendus-ia"
-      badge="Plans & Rendus"
-      title="Vos documents,"
-      titleAccent="toujours accessibles"
-      description="Centralisez plans, photos de chantier, rendus 3D et documents techniques. Partagez-les avec vos clients en un lien."
+      id="rendus"
+      slug="rendus-ia"
+      badge="Rendus IA"
+      title="Vos rendus,"
+      titleAccent="générés par IA"
+      description="Transformez vos photos et plans en rendus 3D photoréalistes. Aidez vos clients à visualiser le résultat avant le début des travaux."
       bulletPoints={[
-        'Stockage illimité de fichiers',
-        'Organisation par chantier',
+        'Rendus 3D photoréalistes',
+        'Génération depuis photo ou description',
         'Partage client par lien sécurisé',
-        'Visionneuse intégrée (PDF, images)',
+        'Plusieurs styles disponibles',
       ]}
       reversed
       visual={
         <MockBrowser>
           <div className="grid grid-cols-3 gap-2">
-            {['Plan RDC.pdf', 'Facade.jpg', 'Devis.pdf', 'Photo 1.jpg', 'Rendu 3D.png', 'Plan étage.pdf'].map((file) => (
+            {['Facade.jpg', 'Salon 3D.png', 'Cuisine.jpg', 'Photo 1.jpg', 'Rendu 3D.png', 'Salle de bain.png'].map((file) => (
               <div key={file} className="aspect-square rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)] flex items-center justify-center p-2">
                 <div className="text-center">
                   <FileImage className="w-5 h-5 text-[var(--landing-muted)] mx-auto mb-1" />

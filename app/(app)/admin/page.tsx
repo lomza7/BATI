@@ -7,7 +7,7 @@ import {
   Receipt, Contact, Target, RefreshCw, Crown, Zap, ChevronDown,
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
   Save, Check, AlertCircle, ExternalLink, Loader2, Globe,
-  Brain, Ban, ShieldCheck,
+  Brain, Ban, ShieldCheck, Wand2, Eye, EyeOff, Gift, Mail, Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -159,6 +159,44 @@ export default function AdminPage() {
     business: DEFAULT_PLAN_FEATURES.business.join('\n'),
   });
 
+  // AI image generation secrets (admin-only)
+  const [imageSecrets, setImageSecrets] = useState({
+    image_provider: 'openai',
+    openai_api_key: '',
+    openai_image_model: 'gpt-image-1',
+    gemini_api_key: '',
+    gemini_image_model: 'gemini-2.5-flash-image',
+  });
+  const [imageSecretsLoading, setImageSecretsLoading] = useState(true);
+  const [imageSecretsSaving, setImageSecretsSaving] = useState(false);
+  const [imageSecretsSaved, setImageSecretsSaved] = useState(false);
+  const [imageSecretsError, setImageSecretsError] = useState('');
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+
+  // Referrals
+  const [referralStats, setReferralStats] = useState<{
+    codes_total: number;
+    invites_total: number;
+    invites_opened: number;
+    signups_total: number;
+    subscribed_total: number;
+    months_credited: number;
+  } | null>(null);
+  const [referralUsers, setReferralUsers] = useState<Array<{
+    user_id: string;
+    email: string;
+    full_name: string | null;
+    company_name: string | null;
+    code: string;
+    invites_sent: number;
+    invites_opened: number;
+    signups: number;
+    subscribed: number;
+    months_earned: number;
+  }>>([]);
+  const [referralLoading, setReferralLoading] = useState(false);
+
   const isAdmin = user?.email === ADMIN_EMAIL;
 
   const loadConfig = useCallback(async () => {
@@ -288,6 +326,60 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadImageSecrets = useCallback(async () => {
+    setImageSecretsLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/secrets', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const json = await res.json() as { secrets?: Record<string, { value: string }> };
+        const s = json.secrets || {};
+        setImageSecrets({
+          image_provider: s.image_provider?.value || 'openai',
+          openai_api_key: s.openai_api_key?.value || '',
+          openai_image_model: s.openai_image_model?.value || 'gpt-image-1',
+          gemini_api_key: s.gemini_api_key?.value || '',
+          gemini_image_model: s.gemini_image_model?.value || 'gemini-2.5-flash-image',
+        });
+      }
+    } catch {
+      // silent
+    } finally {
+      setImageSecretsLoading(false);
+    }
+  }, []);
+
+  async function saveImageSecrets() {
+    setImageSecretsSaving(true);
+    setImageSecretsSaved(false);
+    setImageSecretsError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Session expiree');
+      const res = await fetch('/api/admin/secrets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ updates: imageSecrets }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Erreur de sauvegarde');
+      }
+      setImageSecretsSaved(true);
+      setTimeout(() => setImageSecretsSaved(false), 3000);
+    } catch (e) {
+      setImageSecretsError(e instanceof Error ? e.message : 'Erreur de sauvegarde');
+    } finally {
+      setImageSecretsSaving(false);
+    }
+  }
+
   const loadAiUsage = useCallback(async () => {
     setAiUsageLoading(true);
     try {
@@ -305,6 +397,26 @@ export default function AdminPage() {
       // silent
     } finally {
       setAiUsageLoading(false);
+    }
+  }, []);
+
+  const loadReferrals = useCallback(async () => {
+    setReferralLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/referrals', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReferralStats(data.stats || null);
+        setReferralUsers(data.referrers || []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setReferralLoading(false);
     }
   }, []);
 
@@ -376,7 +488,9 @@ export default function AdminPage() {
     loadConfig();
     loadSites();
     loadAiUsage();
-  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage]);
+    loadImageSecrets();
+    loadReferrals();
+  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage, loadImageSecrets, loadReferrals]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -723,6 +837,174 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {/* Generation d'images IA */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Wand2 className="h-4 w-4 text-primary" /> Generation d'images IA
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cles API utilisees pour les Rendus IA. Choisis le provider actif et renseigne sa cle.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={saveImageSecrets}
+                disabled={imageSecretsSaving || imageSecretsLoading}
+                className="gap-1.5"
+              >
+                {imageSecretsSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : imageSecretsSaved ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {imageSecretsSaved ? 'Enregistre !' : 'Enregistrer'}
+              </Button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-5">
+              {imageSecretsError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {imageSecretsError}
+                </div>
+              )}
+
+              {/* Provider selector */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Provider actif</label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {([
+                    { key: 'openai', label: 'OpenAI', sub: 'gpt-image-1' },
+                    { key: 'gemini', label: 'Google Gemini', sub: 'gemini image' },
+                  ] as const).map((p) => {
+                    const active = imageSecrets.image_provider === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => setImageSecrets((prev) => ({ ...prev, image_provider: p.key }))}
+                        className={cn(
+                          'rounded-lg border p-3 text-left transition-colors',
+                          active
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border hover:bg-muted/40'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wand2 className={cn('h-4 w-4', active ? 'text-primary' : 'text-muted-foreground')} />
+                          <span className="text-sm font-medium">{p.label}</span>
+                          {active && <Check className="h-3.5 w-3.5 text-primary ml-auto" />}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">{p.sub}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* OpenAI config */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">OpenAI</p>
+                  <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Cle API (sk-...)</label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type={showOpenaiKey ? 'text' : 'password'}
+                      placeholder="sk-..."
+                      className="text-xs font-mono"
+                      value={imageSecrets.openai_api_key}
+                      onChange={(e) => setImageSecrets((prev) => ({ ...prev, openai_api_key: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowOpenaiKey((v) => !v)}
+                      className="shrink-0"
+                    >
+                      {showOpenaiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Modele</label>
+                  <Input
+                    className="mt-1 text-xs font-mono"
+                    value={imageSecrets.openai_image_model}
+                    onChange={(e) => setImageSecrets((prev) => ({ ...prev, openai_image_model: e.target.value }))}
+                    placeholder="gpt-image-1"
+                  />
+                </div>
+              </div>
+
+              {/* Gemini config */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">Google Gemini</p>
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Cle API</label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type={showGeminiKey ? 'text' : 'password'}
+                      placeholder="AIza..."
+                      className="text-xs font-mono"
+                      value={imageSecrets.gemini_api_key}
+                      onChange={(e) => setImageSecrets((prev) => ({ ...prev, gemini_api_key: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowGeminiKey((v) => !v)}
+                      className="shrink-0"
+                    >
+                      {showGeminiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Modele</label>
+                  <Input
+                    className="mt-1 text-xs font-mono"
+                    value={imageSecrets.gemini_image_model}
+                    onChange={(e) => setImageSecrets((prev) => ({ ...prev, gemini_image_model: e.target.value }))}
+                    placeholder="gemini-2.5-flash-image"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  Les cles sont stockees dans une table protegee par RLS, accessible uniquement par toi.
+                  Elles ne sont jamais exposees aux autres utilisateurs ni cote client.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Sites deployes */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
@@ -917,6 +1199,81 @@ export default function AdminPage() {
             )}
           </div>
 
+          {/* Parrainages */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-primary" /> Parrainages
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Suivez l&apos;efficacite du programme de parrainage (2 mois offerts par filleul abonne).
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={loadReferrals} disabled={referralLoading} className="gap-1.5">
+                <RefreshCw className={cn('h-3.5 w-3.5', referralLoading && 'animate-spin')} />
+              </Button>
+            </div>
+
+            {/* KPIs parrainage */}
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 p-4 sm:p-5 border-b border-border bg-muted/20">
+              <ReferralKpi label="Codes generes" value={referralStats?.codes_total || 0} icon={Gift} />
+              <ReferralKpi label="Emails envoyes" value={referralStats?.invites_total || 0} icon={Mail} />
+              <ReferralKpi label="Emails ouverts" value={referralStats?.invites_opened || 0} icon={Eye} />
+              <ReferralKpi label="Inscriptions" value={referralStats?.signups_total || 0} icon={UserCheck} />
+              <ReferralKpi label="Abonnes" value={referralStats?.subscribed_total || 0} icon={CreditCard} accent />
+              <ReferralKpi label="Mois credites" value={referralStats?.months_credited || 0} icon={Sparkles} accent />
+            </div>
+
+            {referralUsers.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {referralLoading ? 'Chargement...' : 'Aucun parrain pour le moment'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Parrain</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Code</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Envoyes</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Ouverts</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Inscrits</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Abonnes</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Mois gagnes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {referralUsers.map(r => (
+                      <tr key={r.user_id} className="border-b border-border hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-foreground text-xs">{r.full_name || r.company_name || '—'}</p>
+                          <p className="text-[11px] text-muted-foreground">{r.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-mono text-muted-foreground">{r.code}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-xs text-foreground">{r.invites_sent}</td>
+                        <td className="px-4 py-3 text-right text-xs text-foreground">{r.invites_opened}</td>
+                        <td className="px-4 py-3 text-right text-xs text-foreground">{r.signups}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={cn('text-xs font-semibold', r.subscribed > 0 ? 'text-emerald-600' : 'text-foreground')}>
+                            {r.subscribed}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={cn('text-xs font-semibold', r.months_earned > 0 ? 'text-primary' : 'text-muted-foreground')}>
+                            {r.months_earned}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Agents IA plateforme */}
           <AdminAgentsSection />
 
@@ -1035,6 +1392,18 @@ function MiniKpi({ icon: Icon, label, value, accent }: { icon: React.ElementType
         <p className="text-xs text-muted-foreground">{label}</p>
       </div>
       <p className={cn('text-sm font-semibold', accent ? 'text-primary' : 'text-foreground')}>{value}</p>
+    </div>
+  );
+}
+
+function ReferralKpi({ icon: Icon, label, value, accent }: { icon: React.ElementType; label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
+        <Icon className={cn('h-3.5 w-3.5', accent ? 'text-primary' : 'text-muted-foreground')} />
+      </div>
+      <p className={cn('text-lg font-bold', accent ? 'text-primary' : 'text-foreground')}>{value}</p>
     </div>
   );
 }

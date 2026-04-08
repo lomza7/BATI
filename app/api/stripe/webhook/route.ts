@@ -39,6 +39,14 @@ export async function POST(request: Request) {
           p_checkout_session_id: session.id,
         });
       }
+
+      // Referral reward: subscription mode only
+      if (session.mode === 'subscription' && session.metadata?.user_id) {
+        await applyReferralReward({
+          referredUserId: session.metadata.user_id,
+          referralCode: session.metadata?.referral_code || '',
+        });
+      }
       break;
     }
 
@@ -59,4 +67,61 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+async function applyReferralReward(args: { referredUserId: string; referralCode: string }) {
+  try {
+    // Find the signup row for this referred user
+    const { data: signup } = await supabaseAdmin
+      .from('referral_signups')
+      .select('id, referrer_user_id, referrer_credit_granted, referred_credit_granted, code')
+      .eq('referred_user_id', args.referredUserId)
+      .maybeSingle();
+
+    if (!signup) return;
+
+    const now = new Date().toISOString();
+
+    // Mark the signup as subscribed and grant the referred-side credit (the trial was applied at checkout)
+    await supabaseAdmin
+      .from('referral_signups')
+      .update({
+        subscribed_at: now,
+        referred_credit_granted: true,
+        referred_credit_granted_at: signup.referred_credit_granted ? null : now,
+      })
+      .eq('id', signup.id);
+
+    // Credit the referrer with 2 months — only once per signup
+    if (!signup.referrer_credit_granted) {
+      const { data: referrerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('referral_credit_months')
+        .eq('id', signup.referrer_user_id)
+        .maybeSingle();
+
+      const currentMonths = referrerProfile?.referral_credit_months || 0;
+
+      await supabaseAdmin
+        .from('profiles')
+        .update({ referral_credit_months: currentMonths + 2 })
+        .eq('id', signup.referrer_user_id);
+
+      await supabaseAdmin
+        .from('referral_signups')
+        .update({
+          referrer_credit_granted: true,
+          referrer_credit_granted_at: now,
+        })
+        .eq('id', signup.id);
+    }
+
+    // Clear the pending_referral_code so it isn't applied twice
+    await supabaseAdmin
+      .from('profiles')
+      .update({ pending_referral_code: null })
+      .eq('id', args.referredUserId);
+  } catch (e) {
+    console.error('applyReferralReward error', e);
+  }
 }
