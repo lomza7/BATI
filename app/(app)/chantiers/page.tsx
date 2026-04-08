@@ -25,6 +25,7 @@ import {
   Trash2,
   UploadCloud,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -111,6 +112,18 @@ interface ProjectAssignment {
   total_hours: number;
   total_cost: number;
   dates: string[];
+}
+
+interface ProjectExpense {
+  id: string;
+  date: string;
+  description: string;
+  supplier: string;
+  amount_ht: number;
+  tva_amount: number;
+  amount: number;
+  category_name: string | null;
+  source: string | null;
 }
 
 interface Project {
@@ -230,6 +243,7 @@ export default function ChantiersPage() {
   const [projectQuotes, setProjectQuotes] = useState<ProjectQuote[]>([]);
   const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [projectExpenses, setProjectExpenses] = useState<ProjectExpense[]>([]);
   const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
   const [projectActionId, setProjectActionId] = useState<string | null>(null);
 
@@ -380,9 +394,10 @@ export default function ChantiersPage() {
     setProjectQuotes([]);
     setProjectInvoices([]);
     setProjectAssignments([]);
+    setProjectExpenses([]);
     setShowDetails(true);
 
-    const [{ data: quotes }, { data: assignmentRows }, { data: planningRows }] = await Promise.all([
+    const [{ data: quotes }, { data: assignmentRows }, { data: planningRows }, { data: expensesRows }] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ht, total_ttc, created_at')
@@ -399,7 +414,29 @@ export default function ChantiersPage() {
         .select('team_member_id, start_date, end_date, half_day, team_members(name, type, specialty, hourly_rate)')
         .eq('project_id', project.id)
         .eq('event_type', 'chantier'),
+      supabase
+        .from('expenses')
+        .select('id, date, description, supplier, amount_ht, tva_amount, amount, source, expense_categories(name)')
+        .eq('project_id', project.id)
+        .order('date', { ascending: false }),
     ]);
+
+    const loadedExpenses: ProjectExpense[] = ((expensesRows as any[]) || []).map((row) => {
+      const cat = row.expense_categories;
+      const categoryName = Array.isArray(cat) ? cat[0]?.name ?? null : cat?.name ?? null;
+      return {
+        id: row.id,
+        date: row.date,
+        description: row.description || '',
+        supplier: row.supplier || '',
+        amount_ht: Number(row.amount_ht || 0),
+        tva_amount: Number(row.tva_amount || 0),
+        amount: Number(row.amount || 0),
+        category_name: categoryName,
+        source: row.source || null,
+      };
+    });
+    setProjectExpenses(loadedExpenses);
 
     const loadedQuotes = (quotes as ProjectQuote[]) || [];
     setProjectQuotes(loadedQuotes);
@@ -1857,6 +1894,13 @@ export default function ChantiersPage() {
                 const totalFacture = projectInvoices.reduce((s, i) => s + i.total_ttc, 0);
                 const totalEncaisse = projectInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
                 const totalEnAttente = projectInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
+                const totalMainOeuvre = projectAssignments.reduce((s, a) => s + a.total_cost, 0);
+                const totalDepensesHT = projectExpenses.reduce((s, e) => s + e.amount_ht, 0);
+                const totalDepensesTTC = projectExpenses.reduce((s, e) => s + e.amount, 0);
+                const coutRevient = totalMainOeuvre + totalDepensesHT;
+                const caHT = projectInvoices.reduce((s, i) => s + i.total_ht, 0);
+                const margeBrute = caHT - coutRevient;
+                const margePct = caHT > 0 ? (margeBrute / caHT) * 100 : null;
 
                 return (
                   <div className="mt-4 space-y-4">
@@ -1877,6 +1921,58 @@ export default function ChantiersPage() {
                         <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Clock className="h-3 w-3 text-blue-500" /> En attente</div>
                         <p className="mt-1 text-lg font-semibold text-blue-600">{totalEnAttente > 0 ? formatCurrency(totalEnAttente) : '—'}</p>
                       </div>
+                    </div>
+
+                    {/* Coût de revient du chantier */}
+                    <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wallet className="h-4 w-4 text-[#D35400]" />
+                        <p className="text-sm font-semibold text-foreground">Coût de revient du chantier</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-xl border border-border bg-muted/25 p-3">
+                          <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"><Users className="h-3 w-3" /> Main-d&apos;œuvre</div>
+                          <p className="mt-1 text-base font-semibold text-foreground">{totalMainOeuvre > 0 ? formatCurrency(totalMainOeuvre) : '—'}</p>
+                        </div>
+                        <div className="rounded-xl border border-border bg-muted/25 p-3">
+                          <div className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"><Receipt className="h-3 w-3" /> Dépenses HT</div>
+                          <p className="mt-1 text-base font-semibold text-foreground">{totalDepensesHT > 0 ? formatCurrency(totalDepensesHT) : '—'}</p>
+                        </div>
+                        <div className="rounded-xl border border-[#D35400]/30 bg-orange-50/40 p-3">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Coût total</p>
+                          <p className="mt-1 text-base font-bold text-[#D35400]">{coutRevient > 0 ? formatCurrency(coutRevient) : '—'}</p>
+                        </div>
+                        <div className={`rounded-xl border p-3 ${margeBrute >= 0 && caHT > 0 ? 'border-emerald-300/50 bg-emerald-50/40' : margeBrute < 0 ? 'border-red-300/50 bg-red-50/40' : 'border-border bg-muted/25'}`}>
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Marge brute</p>
+                          <p className={`mt-1 text-base font-bold ${margeBrute >= 0 && caHT > 0 ? 'text-emerald-700' : margeBrute < 0 ? 'text-red-700' : 'text-foreground'}`}>
+                            {caHT > 0 ? formatCurrency(margeBrute) : '—'}
+                            {margePct != null && (
+                              <span className="ml-1 text-[11px] font-medium">({margePct.toFixed(0)}%)</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {activeProject.budget > 0 && (
+                        <div className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                          {coutRevient > 0 ? (
+                            <>
+                              {((coutRevient / activeProject.budget) * 100).toFixed(0)}% du budget consommé —{' '}
+                              {coutRevient <= activeProject.budget ? (
+                                <span className="text-emerald-700">{formatCurrency(activeProject.budget - coutRevient)} restant</span>
+                              ) : (
+                                <span className="text-red-700">Dépassement de {formatCurrency(coutRevient - activeProject.budget)}</span>
+                              )}
+                            </>
+                          ) : (
+                            'Aucun coût engagé pour le moment.'
+                          )}
+                        </div>
+                      )}
+                      {caHT === 0 && coutRevient > 0 && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          Marge calculée sur factures émises. Aucune facture n&apos;a encore été émise pour ce chantier.
+                        </p>
+                      )}
                     </div>
 
                     {/* Devis */}
@@ -2060,6 +2156,122 @@ export default function ChantiersPage() {
                                 <td className="px-4 py-3 text-center font-semibold text-foreground">{formatTrackedHours(projectAssignments.reduce((s, a) => s + a.total_hours, 0))}</td>
                                 <td className="px-4 py-3" />
                                 <td className="px-4 py-3 text-right font-bold text-foreground">{formatCurrency(projectAssignments.reduce((s, a) => s + a.total_cost, 0))}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Dépenses du chantier */}
+                    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                      <div className="flex flex-col gap-1 border-b border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:gap-2">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-sm font-semibold text-foreground">Dépenses ({projectExpenses.length})</p>
+                        </div>
+                        {projectExpenses.length > 0 && (
+                          <span className="text-xs font-medium text-muted-foreground sm:ml-auto sm:text-sm sm:text-foreground">
+                            {formatCurrency(totalDepensesHT)} HT — {formatCurrency(totalDepensesTTC)} TTC
+                          </span>
+                        )}
+                      </div>
+                      {projectExpenses.length === 0 ? (
+                        <p className="px-4 py-4 text-sm text-muted-foreground">
+                          Aucune dépense liée à ce chantier. Attribuez vos achats à ce chantier depuis le module{' '}
+                          <button
+                            type="button"
+                            onClick={() => router.push('/comptabilite')}
+                            className="font-medium text-[#D35400] underline-offset-2 hover:underline"
+                          >
+                            Comptabilité IA
+                          </button>
+                          {' '}pour suivre le coût réel.
+                        </p>
+                      ) : (
+                        <>
+                          {/* Mobile : cartes */}
+                          <div className="divide-y divide-border sm:hidden">
+                            {projectExpenses.map(e => (
+                              <div key={e.id} className="px-4 py-3 space-y-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate font-medium text-foreground">{e.supplier || e.description}</p>
+                                    {e.supplier && e.description && (
+                                      <p className="truncate text-xs text-muted-foreground">{e.description}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="text-sm font-semibold text-foreground">{formatCurrency(e.amount_ht)}</p>
+                                    <p className="text-[10px] text-muted-foreground">HT</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                  <span>{formatDate(e.date)}</span>
+                                  {e.category_name && (
+                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                      {e.category_name}
+                                    </span>
+                                  )}
+                                  {e.source === 'ocr' && (
+                                    <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-[#D35400]">
+                                      IA
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            <div className="flex items-center justify-between bg-muted/20 px-4 py-3">
+                              <span className="text-sm font-semibold text-foreground">Total HT</span>
+                              <span className="text-sm font-bold text-foreground">{formatCurrency(totalDepensesHT)}</span>
+                            </div>
+                          </div>
+                          {/* Desktop : tableau */}
+                          <table className="hidden sm:table w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                                <th className="px-4 py-2 font-medium">Date</th>
+                                <th className="px-4 py-2 font-medium">Fournisseur</th>
+                                <th className="px-4 py-2 font-medium">Description</th>
+                                <th className="px-4 py-2 font-medium">Catégorie</th>
+                                <th className="px-4 py-2 font-medium text-right">HT</th>
+                                <th className="px-4 py-2 font-medium text-right">TTC</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {projectExpenses.map(e => (
+                                <tr key={e.id} className="hover:bg-muted/10">
+                                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatDate(e.date)}</td>
+                                  <td className="px-4 py-3 font-medium text-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                      {e.supplier || '—'}
+                                      {e.source === 'ocr' && (
+                                        <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-[#D35400]">
+                                          IA
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{e.description || '—'}</td>
+                                  <td className="px-4 py-3">
+                                    {e.category_name ? (
+                                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                        {e.category_name}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">{formatCurrency(e.amount_ht)}</td>
+                                  <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{formatCurrency(e.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-border bg-muted/20">
+                                <td className="px-4 py-3 font-semibold text-foreground" colSpan={4}>Total</td>
+                                <td className="px-4 py-3 text-right font-bold text-foreground tabular-nums">{formatCurrency(totalDepensesHT)}</td>
+                                <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">{formatCurrency(totalDepensesTTC)}</td>
                               </tr>
                             </tfoot>
                           </table>

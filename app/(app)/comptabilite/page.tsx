@@ -1,20 +1,68 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Calculator, Upload, Search, TrendingUp, TrendingDown, Receipt, Sparkles, MessageSquare } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Plus,
+  Search,
+  Receipt,
+  TrendingDown,
+  TrendingUp,
+  Trash2,
+  Pencil,
+  Mail,
+  Copy,
+  Link as LinkIcon,
+  ShieldOff,
+  Calendar,
+  Eye,
+  ExternalLink,
+  Sparkles,
+  BarChart3,
+  Calculator,
+  Camera,
+  Bot,
+  FileText,
+  FileCheck2,
+  FileX2,
+  Download,
+  Filter,
+  ArrowLeftRight,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  MailCheck,
+  MailX,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import { EXPENSE_CATEGORIES, formatCurrency, formatDate } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -22,221 +70,2124 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { ExpenseOcrDropzone } from '@/components/comptabilite/expense-ocr-dropzone';
+import {
+  ExpenseFormDialog,
+  type ExpenseFormValues,
+} from '@/components/comptabilite/expense-form-dialog';
+import { TvaPanel } from '@/components/comptabilite/tva-panel';
+import {
+  AccountantInviteDialog,
+  type AccountantInviteValues,
+} from '@/components/comptabilite/accountant-invite-dialog';
 
-interface Expense {
+interface ExpenseRow {
   id: string;
-  description: string;
-  amount: number;
-  category: string;
   date: string;
+  description: string;
   supplier: string;
-  tva_amount: number;
+  amount_ht: number | null;
+  tva_rate: number | null;
+  tva_amount: number | null;
+  amount: number | null;
+  expense_category_id: string | null;
+  payment_method: string | null;
+  is_autoliquidation: boolean | null;
+  project_id: string | null;
+  source: string | null;
+  ocr_confidence: number | null;
+  receipt_storage_path: string | null;
+}
+
+interface CategoryRow {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+interface ProjectRow {
+  id: string;
+  name: string;
+}
+
+interface InvoiceRow {
+  id: string;
+  invoice_number: string;
+  title: string;
+  status: string;
+  total_ht: number | null;
+  total_ttc: number | null;
+  tva_rate: number | null;
+  paid_at: string | null;
+  issued_at: string | null;
+  due_date: string | null;
   created_at: string;
+  clients: { name: string } | { name: string }[] | null;
+}
+
+interface AccessRow {
+  id: string;
+  accountant_email: string;
+  accountant_name: string | null;
+  token: string;
+  scope: string;
+  scope_year: number | null;
+  scope_start: string | null;
+  scope_end: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+  created_at: string;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual: 'Manuel',
+  ocr: 'OCR IA',
+  recurring: 'Récurrent',
+};
+
+const PIE_COLORS = ['#D35400', '#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#EF4444', '#6366F1', '#14B8A6', '#F97316', '#64748B'];
+
+type FluxStatusKey =
+  | 'draft'
+  | 'upcoming'
+  | 'late'
+  | 'paid'
+  | 'justified'
+  | 'missing';
+
+const FLUX_STATUS_LABELS: Record<FluxStatusKey, { label: string; color: string }> = {
+  draft: { label: 'Brouillon', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+  upcoming: { label: 'À venir', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  late: { label: 'En retard', color: 'bg-red-100 text-red-800 border-red-200' },
+  paid: { label: 'Payée', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  justified: { label: 'Justifiée', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  missing: { label: 'Justificatif manquant', color: 'bg-red-100 text-red-800 border-red-200' },
+};
+
+function fmtEur(n: number | null | undefined) {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
+}
+
+function fmtDate(d: string | null | undefined) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getClientName(c: InvoiceRow['clients']): string {
+  if (!c) return '—';
+  if (Array.isArray(c)) return c[0]?.name || '—';
+  return c.name || '—';
 }
 
 export default function ComptabilitePage() {
   const { user } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const { toast } = useToast();
+
+  const [tab, setTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+
+  // Data
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [accesses, setAccesses] = useState<AccessRow[]>([]);
+  const [vatRegime, setVatRegime] = useState<string | null>(null);
+  const [tvaMethod, setTvaMethod] = useState<'encaissements' | 'debits'>('encaissements');
+
+  // OCR state
+  const [ocrBusy, setOcrBusy] = useState(false);
+
+  // Expense form state
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseInitial, setExpenseInitial] = useState<Partial<ExpenseFormValues> | null>(null);
+
+  // Delete confirm state
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Accountant
+  const [showInvite, setShowInvite] = useState(false);
+  const [revokeId, setRevokeId] = useState<string | null>(null);
+
+  // Filters
   const [search, setSearch] = useState('');
-  const [showCreate, setShowCreate] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [form, setForm] = useState({ description: '', amount: 0, category: 'materiaux', date: '', supplier: '', tvaAmount: 0 });
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterSource, setFilterSource] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
 
-  useEffect(() => { loadExpenses(); }, []);
+  // Flux tab state
+  const [fluxSearch, setFluxSearch] = useState('');
+  const [fluxType, setFluxType] = useState<'all' | 'expense' | 'invoice'>('all');
+  const [fluxSubTab, setFluxSubTab] = useState<
+    'all' | 'draft' | 'upcoming' | 'late' | 'paid' | 'missing'
+  >('all');
+  const [fluxSortKey, setFluxSortKey] = useState<'date' | 'amountHt' | 'amountTtc'>('date');
+  const [fluxSortDir, setFluxSortDir] = useState<'asc' | 'desc'>('desc');
+  const [fluxPage, setFluxPage] = useState(1);
+  const [fluxPageSize, setFluxPageSize] = useState<25 | 50 | 100>(25);
+  const [fluxSelected, setFluxSelected] = useState<Set<string>>(new Set());
+  const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
-  async function loadExpenses() {
-    const { data } = await supabase.from('expenses').select('*').order('date', { ascending: false });
-    setExpenses((data as unknown as Expense[]) || []);
-    setLoading(false);
+  useEffect(() => {
+    if (!user) return;
+    void loadAll();
+  }, [user]);
+
+  async function loadAll() {
+    setLoading(true);
+    try {
+      const [expRes, catRes, projRes, invRes, accRes, settingsRes] = await Promise.all([
+        supabase
+          .from('expenses')
+          .select(
+            `id, date, description, supplier, amount_ht, tva_rate, tva_amount, amount,
+             expense_category_id, payment_method, is_autoliquidation, project_id,
+             source, ocr_confidence, receipt_storage_path`,
+          )
+          .order('date', { ascending: false }),
+        supabase.from('expense_categories').select('id, slug, name').order('sort_order'),
+        supabase.from('projects').select('id, name').order('name'),
+        supabase
+          .from('invoices')
+          .select(
+            `id, invoice_number, title, status, total_ht, total_ttc, tva_rate,
+             paid_at, issued_at, due_date, created_at, clients(name)`,
+          )
+          .order('issued_at', { ascending: false, nullsFirst: false }),
+        supabase
+          .from('accountant_access')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('business_reminder_settings')
+          .select('vat_regime, tva_method')
+          .maybeSingle(),
+      ]);
+
+      setExpenses((expRes.data as ExpenseRow[]) || []);
+      setCategories((catRes.data as CategoryRow[]) || []);
+      setProjects((projRes.data as ProjectRow[]) || []);
+      setInvoices((invRes.data as InvoiceRow[]) || []);
+      setAccesses((accRes.data as AccessRow[]) || []);
+      setVatRegime(settingsRes.data?.vat_regime || null);
+      setTvaMethod((settingsRes.data?.tva_method as 'encaissements' | 'debits') || 'encaissements');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function createExpense() {
+  // ───────────────────────── OCR ─────────────────────────
+
+  async function handleOcrFile(file: File) {
+    if (!user) return;
+    setOcrBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Session expirée', variant: 'destructive' });
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/ai/expense-ocr', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: 'Échec de l\'analyse',
+          description: data.error || 'Erreur OCR',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const ex = data.extracted;
+
+      // Match category by slug
+      const cat = categories.find((c) => c.slug === ex.category_slug);
+
+      const initial: Partial<ExpenseFormValues> = {
+        description: ex.description || '',
+        supplier: ex.supplier || '',
+        date: ex.date || new Date().toISOString().split('T')[0],
+        amount_ht: Number(ex.amount_ht || 0),
+        tva_rate: ex.tva_breakdown?.[0]?.rate ?? 20,
+        tva_amount: Number(ex.tva_total || 0),
+        amount: Number(ex.amount_ttc || 0),
+        expense_category_id: cat?.id || null,
+        payment_method: ex.payment_method || null,
+        is_autoliquidation: Boolean(ex.is_autoliquidation),
+        source: 'ocr',
+        ocr_confidence: ex.confidence ?? null,
+        receipt_storage_path: data.receipt_storage_path || null,
+      };
+      setExpenseInitial(initial);
+      setShowExpenseForm(true);
+    } catch (e) {
+      toast({
+        title: "Erreur lors de l'analyse",
+        description: e instanceof Error ? e.message : 'Erreur inconnue',
+        variant: 'destructive',
+      });
+    } finally {
+      setOcrBusy(false);
+    }
+  }
+
+  // ───────────────────────── CRUD ─────────────────────────
+
+  function openCreate() {
+    setExpenseInitial(null);
+    setShowExpenseForm(true);
+  }
+
+  function openEdit(e: ExpenseRow) {
+    setExpenseInitial({
+      id: e.id,
+      description: e.description,
+      supplier: e.supplier,
+      date: e.date,
+      amount_ht: Number(e.amount_ht || 0),
+      tva_rate: Number(e.tva_rate || 20),
+      tva_amount: Number(e.tva_amount || 0),
+      amount: Number(e.amount || 0),
+      expense_category_id: e.expense_category_id,
+      payment_method: e.payment_method,
+      is_autoliquidation: Boolean(e.is_autoliquidation),
+      project_id: e.project_id,
+      source: (e.source as 'manual' | 'ocr' | 'recurring') || 'manual',
+      ocr_confidence: e.ocr_confidence,
+      receipt_storage_path: e.receipt_storage_path,
+    });
+    setShowExpenseForm(true);
+  }
+
+  async function handleExpenseSubmit(values: ExpenseFormValues, newReceiptFile: File | null) {
     if (!user) return;
 
-    await supabase.from('expenses').insert({
-      user_id: user.id,
-      description: form.description,
-      amount: form.amount,
-      category: form.category,
-      date: form.date || new Date().toISOString().split('T')[0],
-      supplier: form.supplier,
-      tva_amount: form.tvaAmount,
-    });
-    setShowCreate(false);
-    setForm({ description: '', amount: 0, category: 'materiaux', date: '', supplier: '', tvaAmount: 0 });
-    loadExpenses();
+    // Upload the new receipt first (mandatory — enforced by the form)
+    let receiptPath = values.receipt_storage_path ?? null;
+    if (newReceiptFile) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Session expirée', variant: 'destructive' });
+        throw new Error('Session expirée');
+      }
+      const uploadForm = new FormData();
+      uploadForm.append('file', newReceiptFile);
+      const uploadRes = await fetch('/api/comptabilite/expenses/upload-receipt', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: uploadForm,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        toast({
+          title: 'Échec du dépôt du justificatif',
+          description: uploadData.error || 'Erreur inconnue',
+          variant: 'destructive',
+        });
+        throw new Error(uploadData.error || 'upload failed');
+      }
+      receiptPath = uploadData.path;
+    }
+
+    const payload = {
+      description: values.description,
+      supplier: values.supplier,
+      date: values.date,
+      amount_ht: values.amount_ht,
+      tva_rate: values.tva_rate,
+      tva_amount: values.tva_amount,
+      amount: values.amount,
+      expense_category_id: values.expense_category_id,
+      payment_method: values.payment_method,
+      is_autoliquidation: values.is_autoliquidation,
+      project_id: values.project_id,
+      source: values.source,
+      ocr_confidence: values.ocr_confidence ?? null,
+      receipt_storage_path: receiptPath,
+      // Legacy "category" column kept as slug for backward compat
+      category:
+        categories.find((c) => c.id === values.expense_category_id)?.slug || 'autres',
+    };
+
+    if (values.id) {
+      const { error } = await supabase.from('expenses').update(payload).eq('id', values.id);
+      if (error) {
+        toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+        throw error;
+      }
+      toast({ title: 'Dépense mise à jour' });
+    } else {
+      const { error } = await supabase
+        .from('expenses')
+        .insert({ ...payload, user_id: user.id });
+      if (error) {
+        toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+        throw error;
+      }
+      toast({ title: 'Dépense enregistrée' });
+    }
+    await loadAll();
   }
 
-  const filtered = expenses.filter(e =>
-    e.description.toLowerCase().includes(search.toLowerCase()) ||
-    e.supplier.toLowerCase().includes(search.toLowerCase())
+  async function handleDelete() {
+    if (!deleteId) return;
+    const { error } = await supabase.from('expenses').delete().eq('id', deleteId);
+    if (error) {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Dépense supprimée' });
+      setExpenses((prev) => prev.filter((e) => e.id !== deleteId));
+    }
+    setDeleteId(null);
+  }
+
+  // ───────────────────────── Accountant ─────────────────────────
+
+  async function handleInviteSubmit(values: AccountantInviteValues) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Session expirée');
+    const res = await fetch('/api/comptabilite/accountant/invite', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(values),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Impossible d'envoyer l'invitation");
+    toast({
+      title: 'Invitation envoyée',
+      description: data.email_sent
+        ? `Email envoyé à ${values.accountant_email}`
+        : 'Lien créé (email non envoyé)',
+    });
+    await loadAll();
+  }
+
+  async function handleRevoke() {
+    if (!revokeId) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const res = await fetch(`/api/comptabilite/accountant/${revokeId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (res.ok) {
+      toast({ title: 'Accès révoqué' });
+      await loadAll();
+    } else {
+      toast({ title: 'Erreur', variant: 'destructive' });
+    }
+    setRevokeId(null);
+  }
+
+  function copyAccessLink(token: string) {
+    const url = `${window.location.origin}/comptable/${token}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: 'Lien copié' });
+  }
+
+  // ───────────────────────── Receipt view/download ─────────────────────────
+
+  async function fetchReceiptUrl(expenseId: string): Promise<string | null> {
+    setLoadingReceiptId(expenseId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: 'Session expirée', variant: 'destructive' });
+        return null;
+      }
+      const res = await fetch(`/api/comptabilite/expenses/${expenseId}/receipt-url`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: 'Justificatif indisponible',
+          description: data.error || 'Erreur',
+          variant: 'destructive',
+        });
+        return null;
+      }
+      return data.url as string;
+    } finally {
+      setLoadingReceiptId(null);
+    }
+  }
+
+  async function handleViewReceipt(expenseId: string) {
+    const url = await fetchReceiptUrl(expenseId);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  async function handleDownloadReceipt(expenseId: string, filename: string) {
+    const url = await fetchReceiptUrl(expenseId);
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      toast({
+        title: 'Téléchargement impossible',
+        description: e instanceof Error ? e.message : 'Erreur',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  // ───────────────────────── Computed ─────────────────────────
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      if (search) {
+        const s = search.toLowerCase();
+        if (
+          !e.description?.toLowerCase().includes(s) &&
+          !e.supplier?.toLowerCase().includes(s)
+        ) {
+          return false;
+        }
+      }
+      if (filterCategory !== 'all' && e.expense_category_id !== filterCategory) return false;
+      if (filterSource !== 'all' && e.source !== filterSource) return false;
+      if (filterYear !== 'all' && e.date) {
+        if (new Date(e.date).getFullYear() !== Number(filterYear)) return false;
+      }
+      return true;
+    });
+  }, [expenses, search, filterCategory, filterSource, filterYear]);
+
+  const yearExpenses = useMemo(
+    () => expenses.filter((e) => e.date && new Date(e.date).getFullYear() === Number(filterYear)),
+    [expenses, filterYear],
   );
 
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalTva = expenses.reduce((s, e) => s + e.tva_amount, 0);
+  const yearTotalHt = yearExpenses.reduce((s, e) => s + Number(e.amount_ht || 0), 0);
+  const yearTotalTtc = yearExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const yearTvaDeductible = yearExpenses.reduce(
+    (s, e) => (e.is_autoliquidation ? s : s + Number(e.tva_amount || 0)),
+    0,
+  );
 
-  const categorySums = Object.keys(EXPENSE_CATEGORIES).map(cat => ({
-    key: cat,
-    ...EXPENSE_CATEGORIES[cat as keyof typeof EXPENSE_CATEGORIES],
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
-  }));
+  const monthlyData = useMemo(() => {
+    const months: { month: string; total: number }[] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('fr-FR', { month: 'short' });
+      months.push({ month: label, total: 0 });
+      const sum = expenses
+        .filter((e) => e.date?.startsWith(key))
+        .reduce((s, e) => s + Number(e.amount_ht || 0), 0);
+      months[months.length - 1].total = +sum.toFixed(2);
+    }
+    return months;
+  }, [expenses]);
+
+  const categoryData = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of yearExpenses) {
+      const slug =
+        categories.find((c) => c.id === e.expense_category_id)?.slug || 'autres';
+      map[slug] = (map[slug] || 0) + Number(e.amount_ht || 0);
+    }
+    return Object.entries(map)
+      .map(([slug, total]) => ({
+        name: categories.find((c) => c.slug === slug)?.name || slug,
+        value: +total.toFixed(2),
+      }))
+      .filter((d) => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [yearExpenses, categories]);
+
+  const topCategoryName = categoryData[0]?.name || '—';
+
+  const monthExpenses = useMemo(() => {
+    const now = new Date();
+    return expenses
+      .filter(
+        (e) =>
+          e.date &&
+          new Date(e.date).getFullYear() === now.getFullYear() &&
+          new Date(e.date).getMonth() === now.getMonth(),
+      )
+      .reduce((s, e) => s + Number(e.amount_ht || 0), 0);
+  }, [expenses]);
+
+  // Recettes (paid invoices)
+  const revenueRows = useMemo(
+    () =>
+      invoices.filter(
+        (i) =>
+          (i.status === 'paid' || i.paid_at) &&
+          (filterYear === 'all' ||
+            (i.paid_at &&
+              new Date(i.paid_at).getFullYear() === Number(filterYear)) ||
+            (i.issued_at &&
+              new Date(i.issued_at).getFullYear() === Number(filterYear))),
+      ),
+    [invoices, filterYear],
+  );
+  const revenueHt = revenueRows.reduce((s, i) => s + Number(i.total_ht || 0), 0);
+  const revenueTtc = revenueRows.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
+  const revenueTva = revenueTtc - revenueHt;
+
+  // Available years for filter
+  const yearOptions = useMemo(() => {
+    const years = new Set<number>();
+    expenses.forEach((e) => e.date && years.add(new Date(e.date).getFullYear()));
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [expenses]);
+
+  // ───────────────────────── Flux (unified view : dépenses + factures) ─────────────────────────
+
+  type FluxRow = {
+    key: string;
+    kind: 'expense' | 'invoice';
+    date: string;
+    deadline: string | null;
+    label: string;
+    sublabel: string;
+    amountHt: number;
+    amountTtc: number;
+    tva: number;
+    statusKey: FluxStatusKey;
+    statusLabel: string;
+    statusColor: string;
+    sending: 'sent' | 'none' | null; // pour factures uniquement
+    source: string;
+    categoryName: string | null;
+    hasReceipt: boolean;
+    expenseId?: string;
+    invoiceId?: string;
+    receiptFilename?: string;
+  };
+
+  const flux = useMemo<FluxRow[]>(() => {
+    const rows: FluxRow[] = [];
+    const today = new Date().toISOString().split('T')[0];
+
+    for (const e of expenses) {
+      const catName =
+        categories.find((c) => c.id === e.expense_category_id)?.name || null;
+      const hasReceipt = Boolean(e.receipt_storage_path);
+      const receiptFilename = e.receipt_storage_path?.split('/').pop() || undefined;
+      const statusKey: FluxStatusKey = hasReceipt ? 'justified' : 'missing';
+      rows.push({
+        key: `exp-${e.id}`,
+        kind: 'expense',
+        date: e.date,
+        deadline: null,
+        label: e.supplier || e.description || '—',
+        sublabel: e.supplier && e.description ? e.description : '',
+        amountHt: Number(e.amount_ht || 0),
+        amountTtc: Number(e.amount || 0),
+        tva: Number(e.tva_amount || 0),
+        statusKey,
+        statusLabel: FLUX_STATUS_LABELS[statusKey].label,
+        statusColor: FLUX_STATUS_LABELS[statusKey].color,
+        sending: null,
+        source: e.source === 'ocr' ? 'Maurice IA' : e.source === 'recurring' ? 'Récurrent' : 'Manuel',
+        categoryName: catName,
+        hasReceipt,
+        expenseId: e.id,
+        receiptFilename,
+      });
+    }
+
+    for (const i of invoices) {
+      const isPaid = i.status === 'paid' || Boolean(i.paid_at);
+      const isDraft = i.status === 'draft' || i.status === 'brouillon';
+      const isLate = !isPaid && !isDraft && i.due_date != null && i.due_date < today;
+      let statusKey: FluxStatusKey;
+      if (isPaid) statusKey = 'paid';
+      else if (isDraft) statusKey = 'draft';
+      else if (isLate) statusKey = 'late';
+      else statusKey = 'upcoming';
+
+      const sending: 'sent' | 'none' =
+        i.status === 'sent' || i.status === 'envoyee' || isPaid ? 'sent' : 'none';
+
+      rows.push({
+        key: `inv-${i.id}`,
+        kind: 'invoice',
+        date: i.issued_at || i.created_at,
+        deadline: i.due_date,
+        label: i.invoice_number,
+        sublabel: `${i.title} — ${getClientName(i.clients)}`,
+        amountHt: Number(i.total_ht || 0),
+        amountTtc: Number(i.total_ttc || 0),
+        tva: Number(i.total_ttc || 0) - Number(i.total_ht || 0),
+        statusKey,
+        statusLabel: FLUX_STATUS_LABELS[statusKey].label,
+        statusColor: FLUX_STATUS_LABELS[statusKey].color,
+        sending,
+        source: 'Émise',
+        categoryName: null,
+        hasReceipt: false,
+        invoiceId: i.id,
+      });
+    }
+
+    return rows;
+  }, [expenses, invoices, categories]);
+
+  const fluxStats = useMemo(() => {
+    const all = flux.length;
+    const draft = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'draft').length;
+    const upcoming = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'upcoming').length;
+    const late = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'late').length;
+    const paid = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'paid').length;
+    const missing = flux.filter((f) => f.kind === 'expense' && f.statusKey === 'missing').length;
+    const expCount = flux.filter((f) => f.kind === 'expense').length;
+    const invCount = flux.filter((f) => f.kind === 'invoice').length;
+    return { all, draft, upcoming, late, paid, missing, expCount, invCount };
+  }, [flux]);
+
+  const filteredFlux = useMemo(() => {
+    const filtered = flux.filter((f) => {
+      if (fluxType !== 'all' && f.kind !== fluxType) return false;
+      if (fluxSearch) {
+        const s = fluxSearch.toLowerCase();
+        if (
+          !f.label.toLowerCase().includes(s) &&
+          !f.sublabel.toLowerCase().includes(s)
+        ) {
+          return false;
+        }
+      }
+      if (fluxSubTab !== 'all') {
+        if (fluxSubTab === 'missing') {
+          if (f.kind !== 'expense' || f.statusKey !== 'missing') return false;
+        } else {
+          if (f.kind !== 'invoice' || f.statusKey !== fluxSubTab) return false;
+        }
+      }
+      if (filterYear !== 'all' && f.date) {
+        if (new Date(f.date).getFullYear() !== Number(filterYear)) return false;
+      }
+      return true;
+    });
+
+    const dir = fluxSortDir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      if (fluxSortKey === 'date') {
+        const av = a.date || '';
+        const bv = b.date || '';
+        return av < bv ? -dir : av > bv ? dir : 0;
+      }
+      if (fluxSortKey === 'amountHt') {
+        return (a.amountHt - b.amountHt) * dir;
+      }
+      return (a.amountTtc - b.amountTtc) * dir;
+    });
+    return filtered;
+  }, [flux, fluxType, fluxSearch, fluxSubTab, filterYear, fluxSortKey, fluxSortDir]);
+
+  const fluxTotalPages = Math.max(1, Math.ceil(filteredFlux.length / fluxPageSize));
+  const pagedFlux = useMemo(
+    () =>
+      filteredFlux.slice(
+        (fluxPage - 1) * fluxPageSize,
+        fluxPage * fluxPageSize,
+      ),
+    [filteredFlux, fluxPage, fluxPageSize],
+  );
+
+  // Reset pagination + selection when filters change
+  useEffect(() => {
+    setFluxPage(1);
+    setFluxSelected(new Set());
+  }, [fluxSubTab, fluxType, fluxSearch, filterYear, fluxPageSize]);
+
+  // Clamp page if data shrinks below current page
+  useEffect(() => {
+    if (fluxPage > fluxTotalPages) setFluxPage(fluxTotalPages);
+  }, [fluxTotalPages, fluxPage]);
+
+  const selectedTotalHt = useMemo(
+    () =>
+      flux
+        .filter((f) => fluxSelected.has(f.key))
+        .reduce((s, f) => s + f.amountHt, 0),
+    [flux, fluxSelected],
+  );
+
+  function toggleFluxSort(key: 'date' | 'amountHt' | 'amountTtc') {
+    if (fluxSortKey === key) {
+      setFluxSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setFluxSortKey(key);
+      setFluxSortDir('desc');
+    }
+  }
+
+  function renderPageNumbers(current: number, total: number): (number | 'dots')[] {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: (number | 'dots')[] = [1];
+    if (current > 3) pages.push('dots');
+    for (
+      let i = Math.max(2, current - 1);
+      i <= Math.min(total - 1, current + 1);
+      i++
+    ) {
+      pages.push(i);
+    }
+    if (current < total - 2) pages.push('dots');
+    pages.push(total);
+    return pages;
+  }
+
+  // ───────────────────────── Render ─────────────────────────
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Comptabilite IA" description="Suivi des depenses, TVA et chat comptable">
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowChat(true)} className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Chat comptable
-          </Button>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Nouvelle depense
-          </Button>
-        </div>
+      <PageHeader
+        title="Comptabilité IA"
+        description="Suivi dépenses, TVA, exports comptables et accès comptable sécurisé"
+      >
+        <Button onClick={openCreate} className="gap-2 bg-[#D35400] hover:bg-[#b8470a]">
+          <Plus className="h-4 w-4" />
+          Nouvelle dépense
+        </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><TrendingDown className="h-4 w-4 text-red-500" /> Total depenses</div>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(totalExpenses)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Receipt className="h-4 w-4 text-blue-500" /> TVA deductible</div>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(totalTva)}</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Upload className="h-4 w-4 text-primary" /> OCR Factures</div>
-          <p className="mt-2 text-sm font-medium text-foreground">Scannez vos factures</p>
-          <Button variant="outline" size="sm" className="mt-2 gap-1"><Upload className="h-3 w-3" /> Importer</Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {categorySums.filter(c => c.total > 0).map(cat => (
-          <div key={cat.key} className="rounded-lg border border-border bg-card p-3">
-            <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', cat.color)}>{cat.label}</span>
-            <p className="mt-2 text-lg font-semibold text-foreground">{formatCurrency(cat.total)}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Rechercher une depense..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
-      </div>
-
-      {loading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Calculator} title="Aucune depense" description="Ajoutez vos premieres depenses ou importez des factures par OCR.">
-          <Button onClick={() => setShowCreate(true)} className="gap-2"><Plus className="h-4 w-4" /> Ajouter une depense</Button>
-        </EmptyState>
-      ) : (
-        <>
-          <div className="hidden sm:block rounded-xl border border-border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Fournisseur</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Categorie</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">TVA</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map(e => {
-                    const cat = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES] || EXPENSE_CATEGORIES.autre;
-                    return (
-                      <tr key={e.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(e.date)}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">{e.description}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{e.supplier || '-'}</td>
-                        <td className="px-4 py-3"><span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', cat.color)}>{cat.label}</span></td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(e.amount)}</td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground text-right">{formatCurrency(e.tva_amount)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {/* Maurice — Comptable IA */}
+      <div className="relative overflow-hidden rounded-2xl border border-[#D35400]/30 bg-gradient-to-br from-orange-50 via-orange-50/60 to-amber-50/40 p-4 sm:p-5">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-[#D35400]/10 blur-2xl sm:-right-4 sm:-top-4" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="relative shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#D35400] to-[#b8470a] text-white shadow-lg shadow-[#D35400]/20 sm:h-16 sm:w-16">
+                <Bot className="h-7 w-7 sm:h-8 sm:w-8" />
+              </div>
+              <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-md">
+                <Sparkles className="h-3 w-3 text-[#D35400]" />
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 sm:hidden">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base font-bold text-foreground">Maurice</h2>
+                <Badge variant="secondary" className="bg-[#D35400]/10 text-[10px] font-medium text-[#D35400] hover:bg-[#D35400]/10">
+                  Comptable IA
+                </Badge>
+              </div>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                Photographiez, Maurice range tout au bon endroit.
+              </p>
             </div>
           </div>
-          <div className="sm:hidden space-y-3">
-            {filtered.map(e => {
-              const cat = EXPENSE_CATEGORIES[e.category as keyof typeof EXPENSE_CATEGORIES] || EXPENSE_CATEGORIES.autre;
-              return (
-                <div key={e.id} className="rounded-xl border border-border bg-card p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium text-foreground">{e.description}</p>
-                    <p className="text-sm font-semibold text-foreground whitespace-nowrap">{formatCurrency(e.amount)}</p>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">{formatDate(e.date)}</span>
-                    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', cat.color)}>{cat.label}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">{e.supplier || '-'}</span>
-                    <span className="text-xs text-muted-foreground">TVA: {formatCurrency(e.tva_amount)}</span>
-                  </div>
+          <div className="hidden min-w-0 flex-1 sm:block">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground">Bonjour, moi c&apos;est Maurice</h2>
+              <Badge variant="secondary" className="bg-[#D35400]/10 text-xs font-medium text-[#D35400] hover:bg-[#D35400]/10">
+                Comptable IA
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">
+              Prenez vos factures en photo ou renseignez-les manuellement —{' '}
+              <span className="font-medium text-foreground">je m&apos;occupe du reste</span>{' '}
+              : extraction TVA, classement par catégorie, affectation au bon chantier.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
+            <Button
+              onClick={() => {
+                setTab('expenses');
+                setTimeout(() => {
+                  document.getElementById('expense-ocr-zone')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+              }}
+              className="gap-1.5 bg-[#D35400] text-white shadow-sm hover:bg-[#b8470a]"
+              size="sm"
+            >
+              <Camera className="h-4 w-4" />
+              Photographier
+            </Button>
+            <Button
+              onClick={openCreate}
+              variant="outline"
+              className="gap-1.5 border-[#D35400]/30 bg-white/60 text-foreground hover:bg-white"
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+              Saisie manuelle
+            </Button>
+          </div>
+        </div>
+        <div className="relative mt-3 flex items-center gap-1.5 rounded-lg bg-white/70 px-3 py-2 text-[11px] text-muted-foreground sm:mt-4">
+          <Sparkles className="h-3 w-3 shrink-0 text-[#D35400]" />
+          <span>
+            <strong className="font-medium text-foreground">Rappel&nbsp;:</strong> chaque dépense doit obligatoirement avoir un justificatif (photo ou PDF). C&apos;est la loi — et Maurice y veille.
+          </span>
+        </div>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+          <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
+            Tableau
+          </TabsTrigger>
+          <TabsTrigger value="expenses" className="text-xs sm:text-sm">
+            Dépenses
+          </TabsTrigger>
+          <TabsTrigger value="flux" className="text-xs sm:text-sm">
+            <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
+            Flux
+          </TabsTrigger>
+          <TabsTrigger value="revenue" className="text-xs sm:text-sm">
+            Recettes
+          </TabsTrigger>
+          <TabsTrigger value="tva" className="text-xs sm:text-sm">
+            TVA
+          </TabsTrigger>
+          <TabsTrigger value="accountant" className="text-xs sm:text-sm">
+            Comptable
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ─────── TABLEAU DE BORD ─────── */}
+        <TabsContent value="dashboard" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Année fiscale</p>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="mt-1 w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <TrendingDown className="h-4 w-4 text-red-500" /> Dépenses HT
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                {fmtEur(yearTotalHt)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">TTC : {fmtEur(yearTotalTtc)}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Receipt className="h-4 w-4 text-blue-500" /> TVA déductible
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                {fmtEur(yearTvaDeductible)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">Année {filterYear}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="h-4 w-4 text-emerald-500" /> Mois en cours
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                {fmtEur(monthExpenses)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">HT</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <BarChart3 className="h-4 w-4 text-[#D35400]" /> Top catégorie
+              </div>
+              <p className="mt-2 text-base font-bold sm:text-lg line-clamp-1">{topCategoryName}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {categoryData[0] ? fmtEur(categoryData[0].value) : '—'}
+              </p>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold">Dépenses par mois (12 derniers)</h3>
+              {monthlyData.some((m) => m.total > 0) ? (
+                <div className="mt-3 h-56 w-full">
+                  <BarChart width={500} height={220} data={monthlyData} className="!w-full">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                    <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={11} tickLine={false} axisLine={false} width={50} />
+                    <RechartsTooltip
+                      formatter={(v: number) => fmtEur(v)}
+                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="total" fill="#D35400" radius={[6, 6, 0, 0]} />
+                  </BarChart>
                 </div>
+              ) : (
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  Pas encore de dépenses ce mois-ci
+                </p>
+              )}
+            </Card>
+
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold">Répartition par catégorie ({filterYear})</h3>
+              {categoryData.length > 0 ? (
+                <div className="mt-3 flex flex-col items-center gap-3 sm:flex-row">
+                  <PieChart width={180} height={180}>
+                    <Pie data={categoryData} dataKey="value" outerRadius={70} innerRadius={40}>
+                      {categoryData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      formatter={(v: number) => fmtEur(v)}
+                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                    />
+                  </PieChart>
+                  <ul className="flex-1 space-y-1 text-xs">
+                    {categoryData.slice(0, 6).map((c, i) => (
+                      <li key={c.name} className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+                          />
+                          <span className="line-clamp-1">{c.name}</span>
+                        </span>
+                        <span className="tabular-nums font-medium">{fmtEur(c.value)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  Aucune dépense sur {filterYear}
+                </p>
+              )}
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ─────── DÉPENSES ─────── */}
+        <TabsContent value="expenses" className="mt-4 space-y-4">
+          <div id="expense-ocr-zone" className="scroll-mt-20">
+            <ExpenseOcrDropzone onFileSelected={handleOcrFile} busy={ocrBusy} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <div className="relative sm:col-span-2">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher fournisseur ou description…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les catégories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterSource} onValueChange={setFilterSource}>
+              <SelectTrigger>
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes sources</SelectItem>
+                <SelectItem value="manual">Manuel</SelectItem>
+                <SelectItem value="ocr">OCR IA</SelectItem>
+                <SelectItem value="recurring">Récurrent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />
+              ))}
+            </div>
+          ) : filteredExpenses.length === 0 ? (
+            <EmptyState
+              icon={Calculator}
+              title="Aucune dépense"
+              description="Photographiez une facture pour la saisir en quelques secondes, ou ajoutez-la manuellement."
+            >
+              <Button onClick={openCreate} className="gap-2 bg-[#D35400] hover:bg-[#b8470a]">
+                <Plus className="h-4 w-4" /> Nouvelle dépense
+              </Button>
+            </EmptyState>
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <div className="space-y-2 sm:hidden">
+                {filteredExpenses.map((e) => {
+                  const cat = categories.find((c) => c.id === e.expense_category_id);
+                  return (
+                    <Card
+                      key={e.id}
+                      className="cursor-pointer p-3 hover:bg-muted/30"
+                      onClick={() => openEdit(e)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{e.supplier || '—'}</p>
+                          <p className="truncate text-xs text-muted-foreground">{e.description}</p>
+                        </div>
+                        <p className="whitespace-nowrap text-sm font-bold tabular-nums">
+                          {fmtEur(e.amount)}
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">{fmtDate(e.date)}</span>
+                          {cat && (
+                            <Badge variant="secondary" className="text-[9px]">
+                              {cat.name}
+                            </Badge>
+                          )}
+                          {e.source === 'ocr' && (
+                            <Badge className="bg-[#D35400]/10 text-[9px] text-[#D35400]">
+                              <Sparkles className="mr-0.5 h-2.5 w-2.5" />
+                              OCR
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          TVA {fmtEur(e.tva_amount)}
+                        </span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <Card className="hidden overflow-hidden sm:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-left font-medium">Fournisseur</th>
+                        <th className="px-3 py-2 text-left font-medium">Catégorie</th>
+                        <th className="px-3 py-2 text-right font-medium">HT</th>
+                        <th className="px-3 py-2 text-right font-medium">TVA</th>
+                        <th className="px-3 py-2 text-right font-medium">TTC</th>
+                        <th className="px-3 py-2 text-center font-medium">Source</th>
+                        <th className="px-3 py-2 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExpenses.map((e) => {
+                        const cat = categories.find((c) => c.id === e.expense_category_id);
+                        return (
+                          <tr
+                            key={e.id}
+                            className="cursor-pointer border-t border-border/60 hover:bg-muted/20"
+                            onClick={() => openEdit(e)}
+                          >
+                            <td className="px-3 py-2 whitespace-nowrap">{fmtDate(e.date)}</td>
+                            <td className="px-3 py-2">
+                              <div className="font-medium">{e.supplier || '—'}</div>
+                              {e.description && (
+                                <div className="line-clamp-1 text-[11px] text-muted-foreground">
+                                  {e.description}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {cat ? (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {cat.name}
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">—</span>
+                              )}
+                              {e.is_autoliquidation && (
+                                <Badge variant="outline" className="ml-1 text-[10px]">
+                                  Autoliq.
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums">{fmtEur(e.amount_ht)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {fmtEur(e.tva_amount)}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                              {fmtEur(e.amount)}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {e.source === 'ocr' ? (
+                                <Badge className="bg-[#D35400]/10 text-[10px] text-[#D35400]">
+                                  <Sparkles className="mr-0.5 h-3 w-3" />
+                                  IA
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {SOURCE_LABELS[e.source || 'manual']}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <div
+                                className="inline-flex gap-1"
+                                onClick={(ev) => ev.stopPropagation()}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => openEdit(e)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-600"
+                                  onClick={() => setDeleteId(e.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* ─────── FLUX ─────── */}
+        <TabsContent value="flux" className="mt-4 space-y-4">
+          {/* KPI row */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <ArrowLeftRight className="h-3.5 w-3.5" /> Total flux
+              </div>
+              <p className="mt-1 text-xl font-bold tabular-nums">{fluxStats.all}</p>
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Receipt className="h-3.5 w-3.5 text-[#D35400]" /> Dépenses
+              </div>
+              <p className="mt-1 text-xl font-bold tabular-nums">{fluxStats.expCount}</p>
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <FileCheck2 className="h-3.5 w-3.5 text-blue-500" /> Factures émises
+              </div>
+              <p className="mt-1 text-xl font-bold tabular-nums">{fluxStats.invCount}</p>
+            </Card>
+            <Card className={cn('p-3', fluxStats.missing > 0 && 'border-red-200 bg-red-50/40')}>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <FileX2 className={cn('h-3.5 w-3.5', fluxStats.missing > 0 ? 'text-red-500' : 'text-muted-foreground')} />
+                Justificatifs manquants
+              </div>
+              <p className={cn('mt-1 text-xl font-bold tabular-nums', fluxStats.missing > 0 && 'text-red-600')}>
+                {fluxStats.missing}
+              </p>
+            </Card>
+          </div>
+
+          {/* Sub-tabs with counts */}
+          <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-border px-1 pb-0">
+            {([
+              { key: 'all', label: 'Tous', count: fluxStats.all, tone: 'neutral' },
+              { key: 'draft', label: 'Brouillons', count: fluxStats.draft, tone: 'neutral' },
+              { key: 'upcoming', label: 'À venir', count: fluxStats.upcoming, tone: 'neutral' },
+              { key: 'late', label: 'En retard', count: fluxStats.late, tone: 'red' },
+              { key: 'paid', label: 'Payées', count: fluxStats.paid, tone: 'green' },
+              { key: 'missing', label: 'Justificatifs manquants', count: fluxStats.missing, tone: 'red' },
+            ] as const).map((t) => {
+              const active = fluxSubTab === t.key;
+              const badgeTone =
+                active
+                  ? 'bg-[#D35400]/10 text-[#D35400]'
+                  : t.tone === 'red' && t.count > 0
+                  ? 'bg-red-100 text-red-700'
+                  : t.tone === 'green' && t.count > 0
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-muted text-muted-foreground';
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setFluxSubTab(t.key)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium transition-colors',
+                    active
+                      ? 'border-[#D35400] text-[#D35400]'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {t.label}
+                  <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] tabular-nums', badgeTone)}>
+                    {t.count}
+                  </span>
+                </button>
               );
             })}
           </div>
-        </>
-      )}
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nouvelle depense</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div><label className="text-sm font-medium">Description</label><Input className="mt-1" placeholder="Ex: Achat carrelage" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="text-sm font-medium">Montant TTC</label><Input className="mt-1" type="number" placeholder="0" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} /></div>
-              <div><label className="text-sm font-medium">TVA</label><Input className="mt-1" type="number" placeholder="0" value={form.tvaAmount || ''} onChange={e => setForm({ ...form, tvaAmount: Number(e.target.value) })} /></div>
+          {/* Filter bar */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <div className="relative sm:col-span-2">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={fluxSearch}
+                onChange={(e) => setFluxSearch(e.target.value)}
+                placeholder="Rechercher un flux, un fournisseur, un client…"
+                className="pl-9"
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Categorie</label>
-                <Select value={form.category} onValueChange={v => setForm({ ...form, category: v })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(EXPENSE_CATEGORIES).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            <Select value={fluxType} onValueChange={(v) => setFluxType(v as typeof fluxType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="expense">Dépenses</SelectItem>
+                <SelectItem value="invoice">Factures émises</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les années</SelectItem>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Selection toolbar */}
+          {fluxSelected.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#D35400]/30 bg-orange-50/60 px-4 py-2">
+              <Check className="h-4 w-4 text-[#D35400]" />
+              <span className="text-sm font-medium text-[#D35400]">
+                {fluxSelected.size} sélectionné{fluxSelected.size > 1 ? 's' : ''}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Total HT : <span className="font-semibold tabular-nums text-foreground">{fmtEur(selectedTotalHt)}</span>
+              </span>
+              <div className="ml-auto">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setFluxSelected(new Set())}
+                  className="h-7 text-xs"
+                >
+                  Tout désélectionner
+                </Button>
               </div>
-              <div><label className="text-sm font-medium">Date</label><Input className="mt-1" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
             </div>
-            <div><label className="text-sm font-medium">Fournisseur</label><Input className="mt-1" placeholder="Nom du fournisseur" value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} /></div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button onClick={createExpense} disabled={!form.description.trim()}>Ajouter</Button>
+          )}
+
+          {/* Desktop table */}
+          <Card className="hidden overflow-hidden sm:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <th className="w-10 px-3 py-2">
+                      <Checkbox
+                        checked={
+                          pagedFlux.length > 0 &&
+                          pagedFlux.every((f) => fluxSelected.has(f.key))
+                        }
+                        onCheckedChange={(checked) => {
+                          const next = new Set(fluxSelected);
+                          if (checked) pagedFlux.forEach((f) => next.add(f.key));
+                          else pagedFlux.forEach((f) => next.delete(f.key));
+                          setFluxSelected(next);
+                        }}
+                        aria-label="Tout sélectionner"
+                      />
+                    </th>
+                    <th className="px-3 py-2 font-medium">Statut</th>
+                    <th className="px-3 py-2 font-medium">Envoi</th>
+                    <th
+                      className="cursor-pointer select-none px-3 py-2 font-medium hover:text-foreground"
+                      onClick={() => toggleFluxSort('date')}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Date
+                        {fluxSortKey === 'date' ? (
+                          fluxSortDir === 'desc' ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronUp className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 font-medium">Échéance</th>
+                    <th className="px-3 py-2 font-medium">Document</th>
+                    <th className="px-3 py-2 font-medium">Catégorie</th>
+                    <th
+                      className="cursor-pointer select-none px-3 py-2 text-right font-medium hover:text-foreground"
+                      onClick={() => toggleFluxSort('amountHt')}
+                    >
+                      <span className="inline-flex items-center justify-end gap-1">
+                        HT
+                        {fluxSortKey === 'amountHt' ? (
+                          fluxSortDir === 'desc' ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronUp className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">TVA</th>
+                    <th
+                      className="cursor-pointer select-none px-3 py-2 text-right font-medium hover:text-foreground"
+                      onClick={() => toggleFluxSort('amountTtc')}
+                    >
+                      <span className="inline-flex items-center justify-end gap-1">
+                        TTC
+                        {fluxSortKey === 'amountTtc' ? (
+                          fluxSortDir === 'desc' ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronUp className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </span>
+                    </th>
+                    <th className="px-3 py-2 font-medium">Source</th>
+                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {pagedFlux.map((f) => {
+                    const isSelected = fluxSelected.has(f.key);
+                    const isOverdueDeadline =
+                      f.deadline && f.deadline < new Date().toISOString().split('T')[0] && f.statusKey !== 'paid';
+                    return (
+                      <tr
+                        key={f.key}
+                        className={cn('hover:bg-muted/10', isSelected && 'bg-[#D35400]/5')}
+                      >
+                        <td className="px-3 py-2.5">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(fluxSelected);
+                              if (checked) next.add(f.key);
+                              else next.delete(f.key);
+                              setFluxSelected(next);
+                            }}
+                            aria-label={`Sélectionner ${f.label}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span
+                            className={cn(
+                              'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                              f.statusColor,
+                            )}
+                          >
+                            {f.statusLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {f.kind === 'invoice' ? (
+                            f.sending === 'sent' ? (
+                              <span title="Envoyée par email">
+                                <MailCheck className="h-4 w-4 text-emerald-600" />
+                              </span>
+                            ) : (
+                              <span title="Non envoyée">
+                                <MailX className="h-4 w-4 text-muted-foreground/60" />
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
+                          {fmtDate(f.date)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5">
+                          {f.deadline ? (
+                            <span className={cn('text-xs', isOverdueDeadline && 'font-semibold text-red-600')}>
+                              {fmtDate(f.deadline)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            {f.kind === 'expense' ? (
+                              <Receipt className="h-3.5 w-3.5 shrink-0 text-[#D35400]" />
+                            ) : (
+                              <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="line-clamp-1 font-medium text-foreground">{f.label}</p>
+                              {f.sublabel && (
+                                <p className="line-clamp-1 text-[11px] text-muted-foreground">{f.sublabel}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {f.categoryName ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {f.categoryName}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+                          {fmtEur(f.amountHt)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                          {fmtEur(f.tva)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">
+                          {fmtEur(f.amountTtc)}
+                        </td>
+                        <td className="px-3 py-2.5 text-[11px] text-muted-foreground">{f.source}</td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center justify-end gap-1">
+                            {f.kind === 'expense' ? (
+                              <>
+                                {f.hasReceipt ? (
+                                  <>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => handleViewReceipt(f.expenseId!)}
+                                      disabled={loadingReceiptId === f.expenseId}
+                                      title="Voir le justificatif"
+                                      className="h-7 w-7"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        handleDownloadReceipt(
+                                          f.expenseId!,
+                                          f.receiptFilename || `justificatif-${f.expenseId}.pdf`,
+                                        )
+                                      }
+                                      disabled={loadingReceiptId === f.expenseId}
+                                      title="Télécharger"
+                                      className="h-7 w-7"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const exp = expenses.find((x) => x.id === f.expenseId);
+                                      if (exp) openEdit(exp);
+                                    }}
+                                    className="h-7 gap-1 border-red-200 text-red-700 hover:bg-red-50"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Ajouter
+                                  </Button>
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const exp = expenses.find((x) => x.id === f.expenseId);
+                                    if (exp) openEdit(exp);
+                                  }}
+                                  title="Éditer"
+                                  className="h-7 w-7"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(`/factures?open=${f.invoiceId}`, '_self')}
+                                className="h-7 gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Ouvrir
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {pagedFlux.length === 0 && (
+                    <tr>
+                      <td colSpan={12} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                        Aucun flux ne correspond aux filtres
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Mobile cards */}
+          <div className="space-y-2 sm:hidden">
+            {pagedFlux.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-muted-foreground">Aucun flux</Card>
+            ) : (
+              pagedFlux.map((f) => (
+                <Card key={f.key} className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {f.kind === 'expense' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-medium text-[#D35400]">
+                            <Receipt className="h-2.5 w-2.5" /> Dépense
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
+                            <FileText className="h-2.5 w-2.5" /> Facture
+                          </span>
+                        )}
+                        <span
+                          className={cn(
+                            'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium',
+                            f.statusColor,
+                          )}
+                        >
+                          {f.statusLabel}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-sm font-semibold text-foreground">{f.label}</p>
+                      {f.sublabel && (
+                        <p className="truncate text-[11px] text-muted-foreground">{f.sublabel}</p>
+                      )}
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>{fmtDate(f.date)}</span>
+                        {f.deadline && (
+                          <span>
+                            · Échéance{' '}
+                            <span
+                              className={cn(
+                                f.deadline < new Date().toISOString().split('T')[0] &&
+                                  f.statusKey !== 'paid' &&
+                                  'font-semibold text-red-600',
+                              )}
+                            >
+                              {fmtDate(f.deadline)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold tabular-nums">{fmtEur(f.amountTtc)}</p>
+                      <p className="text-[10px] text-muted-foreground tabular-nums">HT {fmtEur(f.amountHt)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2">
+                    {f.kind === 'expense' ? (
+                      <>
+                        {f.hasReceipt ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewReceipt(f.expenseId!)}
+                              disabled={loadingReceiptId === f.expenseId}
+                              className="h-7 flex-1 gap-1 text-[11px]"
+                            >
+                              <Eye className="h-3 w-3" /> Voir
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleDownloadReceipt(
+                                  f.expenseId!,
+                                  f.receiptFilename || `justificatif-${f.expenseId}.pdf`,
+                                )
+                              }
+                              disabled={loadingReceiptId === f.expenseId}
+                              className="h-7 flex-1 gap-1 text-[11px]"
+                            >
+                              <Download className="h-3 w-3" /> PDF
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const exp = expenses.find((x) => x.id === f.expenseId);
+                              if (exp) openEdit(exp);
+                            }}
+                            className="h-7 flex-1 gap-1 border-red-200 text-[11px] text-red-700"
+                          >
+                            <Plus className="h-3 w-3" /> Ajouter un justificatif
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`/factures?open=${f.invoiceId}`, '_self')}
+                        className="h-7 flex-1 gap-1 text-[11px]"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Ouvrir la facture
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {/* Pagination footer */}
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-3 sm:flex-row">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Par page :</span>
+              <div className="flex items-center gap-1">
+                {([25, 50, 100] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setFluxPageSize(n)}
+                    className={cn(
+                      'rounded border border-border px-2 py-0.5 tabular-nums transition-colors',
+                      fluxPageSize === n
+                        ? 'border-[#D35400] bg-[#D35400]/5 text-[#D35400]'
+                        : 'hover:bg-muted',
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <span className="ml-2 tabular-nums">
+                {filteredFlux.length === 0
+                  ? '0'
+                  : `${(fluxPage - 1) * fluxPageSize + 1}–${Math.min(
+                      fluxPage * fluxPageSize,
+                      filteredFlux.length,
+                    )}`}{' '}
+                sur {filteredFlux.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={fluxPage === 1}
+                onClick={() => setFluxPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {renderPageNumbers(fluxPage, fluxTotalPages).map((p, i) =>
+                p === 'dots' ? (
+                  <span key={`dots-${i}`} className="px-1 text-xs text-muted-foreground">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setFluxPage(p)}
+                    className={cn(
+                      'h-7 min-w-7 rounded border px-2 text-xs tabular-nums transition-colors',
+                      fluxPage === p
+                        ? 'border-[#D35400] bg-[#D35400]/5 text-[#D35400]'
+                        : 'border-border hover:bg-muted',
+                    )}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={fluxPage === fluxTotalPages}
+                onClick={() => setFluxPage((p) => Math.min(fluxTotalPages, p + 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={showChat} onOpenChange={setShowChat}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Chat comptable IA</DialogTitle></DialogHeader>
-          <div className="mt-4 min-h-[300px] rounded-lg bg-muted/30 p-4 flex flex-col">
-            <div className="flex-1 space-y-3">
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[80%]">
-                  <p>Bonjour ! Je suis votre assistant comptable. Posez-moi vos questions sur la TVA, les depenses, les declarations...</p>
-                </div>
+          <p className="text-[11px] text-muted-foreground">
+            Ce flux centralise toutes les factures émises et les dépenses enregistrées. Plus tard, les
+            transactions bancaires (via Powens/Bridge) viendront s&apos;y ajouter automatiquement. Votre
+            comptable y accède en lecture seule via l&apos;onglet &laquo;&nbsp;Comptable&nbsp;&raquo;.
+          </p>
+        </TabsContent>
+
+        {/* ─────── RECETTES ─────── */}
+        <TabsContent value="revenue" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes années</SelectItem>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <TrendingUp className="h-4 w-4 text-emerald-500" /> Chiffre d&apos;affaires HT
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">{fmtEur(revenueHt)}</p>
+              <p className="text-[11px] text-muted-foreground">{revenueRows.length} factures payées</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Receipt className="h-4 w-4 text-blue-500" /> CA TTC
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                {fmtEur(revenueTtc)}
+              </p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Receipt className="h-4 w-4 text-[#D35400]" /> TVA collectée
+              </div>
+              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                {fmtEur(revenueTva)}
+              </p>
+            </Card>
+          </div>
+
+          <Card className="overflow-hidden">
+            <div className="border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">
+              Factures payées ({revenueRows.length})
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground">
+                    <th className="px-3 py-2 text-left font-medium">Numéro</th>
+                    <th className="px-3 py-2 text-left font-medium">Client</th>
+                    <th className="px-3 py-2 text-left font-medium">Payée le</th>
+                    <th className="px-3 py-2 text-right font-medium">HT</th>
+                    <th className="px-3 py-2 text-right font-medium">TTC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {revenueRows.map((inv) => (
+                    <tr key={inv.id} className="border-b border-border/60">
+                      <td className="px-3 py-2 font-medium">{inv.invoice_number}</td>
+                      <td className="px-3 py-2">{getClientName(inv.clients)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.paid_at)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtEur(inv.total_ht)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                        {fmtEur(inv.total_ttc)}
+                      </td>
+                    </tr>
+                  ))}
+                  {revenueRows.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                        Aucune facture payée sur la période
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+          <p className="text-[11px] text-muted-foreground">
+            Les recettes sont alimentées automatiquement par vos factures Hellobat dès qu&apos;elles sont
+            marquées comme payées.
+          </p>
+        </TabsContent>
+
+        {/* ─────── TVA ─────── */}
+        <TabsContent value="tva" className="mt-4">
+          <TvaPanel
+            expenses={expenses.map((e) => ({
+              date: e.date,
+              amount_ht: e.amount_ht,
+              tva_amount: e.tva_amount,
+              tva_rate: e.tva_rate,
+              is_autoliquidation: e.is_autoliquidation,
+            }))}
+            invoices={invoices.map((i) => ({
+              paid_at: i.paid_at,
+              issued_at: i.issued_at,
+              created_at: i.created_at,
+              total_ht: i.total_ht,
+              total_ttc: i.total_ttc,
+              tva_rate: i.tva_rate,
+            }))}
+            tvaMethod={tvaMethod}
+            vatRegime={vatRegime}
+          />
+        </TabsContent>
+
+        {/* ─────── COMPTABLE ─────── */}
+        <TabsContent value="accountant" className="mt-4 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Accès comptable</h2>
+              <p className="text-xs text-muted-foreground">
+                Donnez à votre expert-comptable un accès lecture seule pour télécharger le FEC, les
+                dépenses et les factures.
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowInvite(true)}
+              className="gap-2 bg-[#D35400] hover:bg-[#b8470a]"
+            >
+              <Mail className="h-4 w-4" />
+              Inviter mon comptable
+            </Button>
+          </div>
+
+          {accesses.length === 0 ? (
+            <EmptyState
+              icon={Mail}
+              title="Aucun accès actif"
+              description="Invitez votre comptable pour qu'il puisse consulter et exporter votre comptabilité en lecture seule."
+            />
+          ) : (
+            <div className="space-y-3">
+              {accesses.map((a) => {
+                const isRevoked = !!a.revoked_at;
+                const isExpired = !isRevoked && new Date(a.expires_at).getTime() < Date.now();
+                const isActive = !isRevoked && !isExpired;
+                let scopeLabel = 'Toutes les données';
+                if (a.scope === 'fiscal_year' && a.scope_year) scopeLabel = `Année ${a.scope_year}`;
+                if (a.scope === 'period' && a.scope_start && a.scope_end) {
+                  scopeLabel = `${fmtDate(a.scope_start)} → ${fmtDate(a.scope_end)}`;
+                }
+                return (
+                  <Card key={a.id} className="p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <p className="font-medium">{a.accountant_email}</p>
+                          {isRevoked && (
+                            <Badge variant="outline" className="text-[10px] text-red-600">
+                              Révoqué
+                            </Badge>
+                          )}
+                          {isExpired && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600">
+                              Expiré
+                            </Badge>
+                          )}
+                          {isActive && (
+                            <Badge className="bg-emerald-100 text-[10px] text-emerald-700">
+                              Actif
+                            </Badge>
+                          )}
+                        </div>
+                        {a.accountant_name && (
+                          <p className="text-xs text-muted-foreground">{a.accountant_name}</p>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Expire le {fmtDate(a.expires_at)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            {a.view_count} vue{a.view_count > 1 ? 's' : ''}
+                          </span>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {scopeLabel}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {isActive && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyAccessLink(a.token)}
+                              className="gap-1.5"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                              Copier
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              className="gap-1.5"
+                            >
+                              <a
+                                href={`/comptable/${a.token}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Ouvrir
+                              </a>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setRevokeId(a.id)}
+                              className="gap-1.5 text-red-600 hover:text-red-700"
+                            >
+                              <ShieldOff className="h-3.5 w-3.5" />
+                              Révoquer
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          <Card className="border-dashed bg-muted/20 p-4">
+            <div className="flex items-start gap-3">
+              <LinkIcon className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Comment ça marche ?</p>
+                <p className="mt-1">
+                  Votre comptable reçoit un lien sécurisé personnel. Il peut consulter vos dépenses,
+                  factures, et télécharger le FEC au format légal pour le bilan annuel — sans jamais
+                  pouvoir modifier vos données. Vous pouvez révoquer l&apos;accès à tout moment.
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-4">
-              <Input placeholder="Ex: Quel est mon taux de TVA a declarer ?" className="flex-1" />
-              <Button size="icon"><Sparkles className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
+      <ExpenseFormDialog
+        open={showExpenseForm}
+        onOpenChange={setShowExpenseForm}
+        initialValues={expenseInitial}
+        categories={categories}
+        projects={projects}
+        onSubmit={handleExpenseSubmit}
+      />
+
+      <AccountantInviteDialog
+        open={showInvite}
+        onOpenChange={setShowInvite}
+        onSubmit={handleInviteSubmit}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette dépense ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La dépense ne pourra pas être restaurée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!revokeId} onOpenChange={(o) => !o && setRevokeId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Révoquer l&apos;accès ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le lien deviendra inutilisable immédiatement. Vous pourrez toujours en créer un
+              nouveau si besoin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevoke} className="bg-red-600 hover:bg-red-700">
+              Révoquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
