@@ -171,8 +171,8 @@ export const featureCards: FeatureCard[] = [
   },
   {
     icon: Calculator,
-    title: 'Comptabilité IA',
-    desc: 'Suivi des revenus, dépenses et marges avec catégorisation automatique.',
+    title: 'Maurice — Comptable IA',
+    desc: 'Scan de tickets, rapprochement bancaire, TVA et export comptable. Maurice gère, vous travaillez.',
     special: 'ai',
     sectionId: 'compta',
     slug: 'comptabilite-ia',

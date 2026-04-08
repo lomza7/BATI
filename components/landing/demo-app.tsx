@@ -33,6 +33,16 @@ import {
   CheckCircle2,
   BarChart3,
   PenLine,
+  ScanLine,
+  Landmark,
+  Sparkles,
+  ArrowDownRight,
+  ArrowUpRight,
+  Download,
+  FileSpreadsheet,
+  Check,
+  Camera,
+  Wand2,
 } from 'lucide-react';
 
 const views = [
@@ -1179,46 +1189,250 @@ function AgentsView() {
 function ComptaView() {
   return (
     <div>
-      <ViewHeader title="Comptabilité" />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className="p-3 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
-          <div className="text-[10px] text-[var(--landing-muted)] font-medium">CA annuel</div>
-          <div className="text-lg font-bold text-[var(--landing-text)]">148 200 EUR</div>
-          <div className="text-[10px] text-emerald-600">+18% vs N-1</div>
+      {/* Header avec Maurice */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-full bg-[var(--landing-accent)] flex items-center justify-center shadow-sm shrink-0">
+            <Bot className="w-6 h-6 text-white" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-base sm:text-lg font-semibold text-[var(--landing-text)]">Maurice</h3>
+              <span className="text-[9px] font-medium text-[#D97706] bg-[#D97706]/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">Claude Sonnet</span>
+            </div>
+            <p className="text-[11px] text-[var(--landing-muted)]">Comptable IA · 3 tickets scannés ce matin · 12 lignes rapprochées</p>
+          </div>
         </div>
-        <div className="p-3 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
-          <div className="text-[10px] text-[var(--landing-muted)] font-medium">Dépenses</div>
-          <div className="text-lg font-bold text-[var(--landing-text)]">52 400 EUR</div>
-          <div className="text-[10px] text-red-500">+5% vs N-1</div>
-        </div>
-        <div className="p-3 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
-          <div className="text-[10px] text-[var(--landing-muted)] font-medium">Marge nette</div>
-          <div className="text-lg font-bold text-[var(--landing-text)]">64.6%</div>
-          <div className="text-[10px] text-emerald-600">+3.2 pts</div>
-        </div>
-        <div className="p-3 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
-          <div className="text-[10px] text-[var(--landing-muted)] font-medium">Trésorerie</div>
-          <div className="text-lg font-bold text-[var(--landing-text)]">28 600 EUR</div>
-          <div className="text-[10px] text-emerald-600">Sain</div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--landing-border)] bg-white text-[11px] font-medium text-[var(--landing-text)] hover:bg-[var(--landing-stone)]">
+            <Download className="w-3 h-3" />
+            Export FEC
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--landing-accent)] text-white text-[11px] font-medium">
+            <Plus className="w-3 h-3" />
+            Dépense
+          </button>
         </div>
       </div>
-      <div className="flex items-end gap-1 h-32 p-4 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
-        {[35, 45, 60, 50, 75, 65, 80, 70, 90, 85, 70, 95].map((h, i) => (
-          <div key={i} className="flex-1 flex flex-col items-stretch gap-0.5">
-            <div className="bg-[var(--landing-accent)] rounded-t-sm" style={{ height: `${h * 0.6}%` }} />
-            <div className="bg-[var(--landing-accent)]/30 rounded-b-sm" style={{ height: `${h * 0.4}%` }} />
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+          <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+            <ArrowDownRight className="w-3 h-3" /> Encaissé
+          </div>
+          <div className="text-base sm:text-lg font-bold text-emerald-800 mt-0.5">124 800 €</div>
+          <div className="text-[9px] text-emerald-600 mt-0.5">+18% vs N-1</div>
+        </div>
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200">
+          <div className="flex items-center gap-1 text-[10px] text-red-700 font-medium">
+            <ArrowUpRight className="w-3 h-3" /> Dépenses
+          </div>
+          <div className="text-base sm:text-lg font-bold text-red-800 mt-0.5">43 200 €</div>
+          <div className="text-[9px] text-red-600 mt-0.5">+5% vs N-1</div>
+        </div>
+        <div className="p-3 rounded-xl bg-[var(--landing-accent-light)] border border-[var(--landing-accent)]/30">
+          <div className="flex items-center gap-1 text-[10px] text-[var(--landing-accent)] font-medium">
+            <TrendingUp className="w-3 h-3" /> Marge nette
+          </div>
+          <div className="text-base sm:text-lg font-bold text-[var(--landing-accent)] mt-0.5">+34,8 %</div>
+          <div className="text-[9px] text-[var(--landing-accent)] mt-0.5">+3,2 pts</div>
+        </div>
+        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+          <div className="flex items-center gap-1 text-[10px] text-blue-700 font-medium">
+            <Landmark className="w-3 h-3" /> Trésorerie
+          </div>
+          <div className="text-base sm:text-lg font-bold text-blue-800 mt-0.5">28 600 €</div>
+          <div className="text-[9px] text-blue-600 mt-0.5">Sain</div>
+        </div>
+      </div>
+
+      {/* Maurice OCR + Bank reconciliation */}
+      <div className="grid gap-3 lg:grid-cols-2 mb-4">
+        {/* Maurice OCR */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
+              <ScanLine className="h-3.5 w-3.5" />
+              Maurice scanne un ticket
+            </div>
+            <span className="text-[9px] text-[var(--landing-muted)] flex items-center gap-1">
+              <Camera className="w-2.5 h-2.5" /> Photo
+            </span>
+          </div>
+          <div className="rounded-lg bg-white border border-[var(--landing-border)] p-2.5 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <div className="w-12 h-14 rounded-md bg-gradient-to-b from-[var(--landing-stone)] to-[var(--landing-border)] shrink-0 flex items-center justify-center relative overflow-hidden">
+                <Receipt className="w-5 h-5 text-[var(--landing-muted)]" />
+                <div className="absolute inset-x-0 top-1/2 h-0.5 bg-[var(--landing-accent)]/70" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="text-[11px] font-semibold text-[var(--landing-text)] truncate">Leroy Merlin Rivoli</div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--landing-stone)] text-[var(--landing-muted)] font-medium">Matériaux</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">Chantier Petit</span>
+                </div>
+                <div className="text-[9px] text-[var(--landing-muted)]">07/04/2026 · TVA 20%</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[9px] text-[var(--landing-muted)]">TTC</div>
+                <div className="text-sm font-bold text-[var(--landing-text)]">187,42 €</div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+              <div className="rounded bg-[var(--landing-off)] p-1">
+                <div className="text-[8px] text-[var(--landing-muted)]">HT</div>
+                <div className="text-[10px] font-semibold text-[var(--landing-text)]">156,18 €</div>
+              </div>
+              <div className="rounded bg-[var(--landing-off)] p-1">
+                <div className="text-[8px] text-[var(--landing-muted)]">TVA</div>
+                <div className="text-[10px] font-semibold text-[var(--landing-text)]">31,24 €</div>
+              </div>
+              <div className="rounded bg-emerald-50 p-1">
+                <div className="text-[8px] text-emerald-700">Statut</div>
+                <div className="text-[10px] font-semibold text-emerald-800">Rangé</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
+            <Sparkles className="w-3 h-3 shrink-0" />
+            <span className="font-medium">Maurice a tout extrait et archivé · justificatif conforme 10 ans</span>
+          </div>
+        </div>
+
+        {/* Bank reconciliation */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
+              <Landmark className="h-3.5 w-3.5" />
+              Rapprochement bancaire
+            </div>
+            <span className="text-[9px] font-medium text-[var(--landing-muted)] bg-[var(--landing-stone)] px-1.5 py-0.5 rounded-full">CSV · OFX</span>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { label: 'VIR Dupont F-2026-089', amt: '+3 200,00', kind: 'Facture payée', state: 'auto' },
+              { label: 'CB Leroy Merlin', amt: '−187,42', kind: 'Dépense', state: 'auto' },
+              { label: 'PRLV URSSAF', amt: '−842,00', kind: 'Charge sociale', state: 'auto' },
+              { label: 'VIR LM RIVOLI', amt: '−54,90', kind: 'Suggéré IA · 89%', state: 'ai' },
+              { label: 'FRAIS BANCAIRES', amt: '−4,20', kind: 'À ignorer ?', state: 'pending' },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-2 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)] px-2 py-1.5">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                  row.state === 'auto' ? 'bg-emerald-100' :
+                  row.state === 'ai' ? 'bg-amber-100' : 'bg-[var(--landing-stone)]'
+                }`}>
+                  {row.state === 'auto' && <Check className="w-3 h-3 text-emerald-700" />}
+                  {row.state === 'ai' && <Sparkles className="w-3 h-3 text-amber-700" />}
+                  {row.state === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-[var(--landing-muted)]" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-medium text-[var(--landing-text)] truncate">{row.label}</div>
+                  <div className="text-[9px] text-[var(--landing-muted)] truncate">{row.kind}</div>
+                </div>
+                <span className={`text-[10px] font-bold tabular-nums shrink-0 ${row.amt.startsWith('+') ? 'text-emerald-700' : 'text-[var(--landing-text)]'}`}>{row.amt} €</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[10px] pt-2 border-t border-[var(--landing-border)]">
+            <span className="text-[var(--landing-muted)]">12 / 13 lignes rapprochées</span>
+            <span className="font-semibold text-emerald-700">92 %</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Cash flow chart + marges chantier */}
+      <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+        {/* Cash flow chart */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-xs font-semibold text-[var(--landing-text)]">Flux de trésorerie</p>
+              <p className="text-[10px] text-[var(--landing-muted)]">12 derniers mois · solde projeté +81 600 €</p>
+            </div>
+            <BarChart3 className="w-4 h-4 text-[var(--landing-muted)]" />
+          </div>
+          <div className="flex items-end gap-1 h-[80px]">
+            {[
+              { rev: 60, dep: 30 }, { rev: 70, dep: 40 }, { rev: 50, dep: 35 },
+              { rev: 80, dep: 50 }, { rev: 75, dep: 40 }, { rev: 90, dep: 55 },
+              { rev: 65, dep: 40 }, { rev: 85, dep: 50 }, { rev: 78, dep: 45 },
+              { rev: 95, dep: 60 }, { rev: 72, dep: 42 }, { rev: 92, dep: 55 },
+            ].map((m, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end">
+                <div className="w-full bg-[var(--landing-accent)] rounded-t-sm" style={{ height: `${m.rev}%` }} />
+                <div className="w-full bg-[var(--landing-accent)]/25 rounded-b-sm" style={{ height: `${m.dep}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-1.5">
+            {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((m, i) => (
+              <span key={i} className="text-[8px] text-[var(--landing-muted)] flex-1 text-center">{m}</span>
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-[var(--landing-border)]">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-[var(--landing-accent)]" />
+              <span className="text-[9px] text-[var(--landing-muted)]">Encaissements</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm bg-[var(--landing-accent)]/25" />
+              <span className="text-[9px] text-[var(--landing-muted)]">Dépenses</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Marges par chantier */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-xs font-semibold text-[var(--landing-text)]">Marges par chantier</p>
+              <p className="text-[10px] text-[var(--landing-muted)]">Top 3 ce trimestre</p>
+            </div>
+            <TrendingUp className="w-4 h-4 text-[var(--landing-muted)]" />
+          </div>
+          <div className="space-y-2">
+            {[
+              { name: 'SDB Petit', marge: 42, color: 'bg-emerald-500' },
+              { name: 'Toiture Bernard', marge: 36, color: 'bg-emerald-500' },
+              { name: 'Cuisine Martin', marge: 18, color: 'bg-amber-500' },
+            ].map((c) => (
+              <div key={c.name}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-medium text-[var(--landing-text)] truncate">{c.name}</span>
+                  <span className={`text-[10px] font-bold tabular-nums ${c.marge >= 30 ? 'text-emerald-700' : 'text-amber-700'}`}>+{c.marge} %</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-[var(--landing-stone)] overflow-hidden">
+                  <div className={`h-full ${c.color} rounded-full`} style={{ width: `${c.marge * 2}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 pt-2 border-t border-[var(--landing-border)] flex items-center gap-1.5 text-[9px] text-[var(--landing-accent)]">
+            <Wand2 className="w-3 h-3" />
+            <span className="font-medium">Marge moyenne · 34,8 %</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer compta tools */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+        {[
+          { icon: ScanLine, label: 'Scan ticket', sub: 'OCR Maurice' },
+          { icon: Landmark, label: 'Rapprochement', sub: 'CSV / OFX' },
+          { icon: FileSpreadsheet, label: 'TVA', sub: 'Mensuelle / trim.' },
+          { icon: Download, label: 'Export FEC', sub: 'Pour comptable' },
+        ].map((t) => (
+          <div key={t.label} className="flex items-center gap-2 p-2 rounded-lg border border-[var(--landing-border)] bg-[var(--landing-off)]">
+            <div className="w-7 h-7 rounded-md bg-[var(--landing-accent-light)] flex items-center justify-center shrink-0">
+              <t.icon className="w-3.5 h-3.5 text-[var(--landing-accent)]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold text-[var(--landing-text)] truncate">{t.label}</div>
+              <div className="text-[9px] text-[var(--landing-muted)] truncate">{t.sub}</div>
+            </div>
           </div>
         ))}
-      </div>
-      <div className="flex items-center justify-center gap-6 mt-3">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-sm bg-[var(--landing-accent)]" />
-          <span className="text-[10px] text-[var(--landing-muted)]">Revenus</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-sm bg-[var(--landing-accent)]/30" />
-          <span className="text-[10px] text-[var(--landing-muted)]">Dépenses</span>
-        </div>
       </div>
     </div>
   );

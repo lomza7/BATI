@@ -24,6 +24,13 @@ import {
   ShieldCheck,
   FileCheck2,
   Archive,
+  ScanLine,
+  Receipt,
+  Landmark,
+  Sparkles,
+  TrendingUp,
+  ArrowDownRight,
+  ArrowUpRight,
 } from 'lucide-react';
 import { LandingMap } from './landing-map';
 
@@ -360,36 +367,141 @@ export function ComptaSection() {
     <FeatureSection
       id="compta"
       slug="comptabilite-ia"
-      badge="Comptabilité"
-      title="Comptabilité simplifiée,"
-      titleAccent="en un clin d'œil"
-      description="Suivez vos revenus, dépenses et marges en temps réel. Exportez vos données pour votre comptable en un clic."
+      badge="Comptabilité IA · Maurice"
+      title="Maurice, votre comptable IA"
+      titleAccent="qui ne dort jamais"
+      description="Photographiez vos tickets, importez votre relevé bancaire — Maurice scanne, classe, rapproche, calcule votre TVA et prépare l'export pour votre comptable. Vous gardez l'œil sur vos marges, lui s'occupe de la paperasse."
       bulletPoints={[
-        'Tableau de bord financier en temps réel',
-        'Suivi des dépenses par catégorie',
-        'Rapprochement bancaire automatique',
-        'Export comptable (PDF, CSV)',
+        'Maurice scanne vos tickets et factures (OCR Claude Sonnet)',
+        'Rapprochement bancaire automatique — import CSV/OFX toutes banques',
+        'Flux de trésorerie en temps réel : entrées, sorties, marges par chantier',
+        'Justificatifs archivés au bon endroit, conformes à la loi (10 ans)',
+        'TVA assistée + export comptable en un clic (FEC, CSV, PDF)',
       ]}
       reversed
       visual={
-        <MockBrowser>
+        <MockBrowser url="hellobat.app/comptabilite">
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                <div className="text-[10px] text-emerald-600 font-medium">Revenus</div>
-                <div className="text-lg font-bold text-emerald-700">124 800 EUR</div>
+            {/* Maurice header */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[var(--landing-accent-light)] to-white border border-[var(--landing-border)]">
+              <div className="w-11 h-11 rounded-full bg-[var(--landing-accent)] flex items-center justify-center shrink-0 shadow-sm">
+                <Bot className="w-6 h-6 text-white" />
               </div>
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-                <div className="text-[10px] text-red-600 font-medium">Dépenses</div>
-                <div className="text-lg font-bold text-red-700">43 200 EUR</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-[var(--landing-text)]">Maurice</span>
+                  <span className="text-[9px] font-medium text-[#D97706] bg-[#D97706]/10 px-1.5 py-0.5 rounded-full">Claude Sonnet</span>
+                </div>
+                <p className="text-[11px] text-[var(--landing-muted)] truncate">3 tickets scannés · 12 lignes rapprochées ce matin</p>
+              </div>
+              <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full shrink-0">Actif</span>
+            </div>
+
+            {/* KPI row */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div className="flex items-center gap-1 text-[9px] text-emerald-700 font-medium">
+                  <ArrowDownRight className="w-3 h-3" /> Encaissé
+                </div>
+                <div className="text-sm font-bold text-emerald-800 mt-0.5">124 800 €</div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-red-50 border border-red-200">
+                <div className="flex items-center gap-1 text-[9px] text-red-700 font-medium">
+                  <ArrowUpRight className="w-3 h-3" /> Dépenses
+                </div>
+                <div className="text-sm font-bold text-red-800 mt-0.5">43 200 €</div>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--landing-accent-light)] border border-[var(--landing-accent)]/30">
+                <div className="flex items-center gap-1 text-[9px] text-[var(--landing-accent)] font-medium">
+                  <TrendingUp className="w-3 h-3" /> Marge
+                </div>
+                <div className="text-sm font-bold text-[var(--landing-accent)] mt-0.5">+34,8 %</div>
               </div>
             </div>
-            <div className="flex items-end gap-1 h-20">
-              {[40, 65, 50, 80, 70, 90, 60, 85, 75, 95, 70, 88].map((h, i) => (
-                <div key={i} className="flex-1 bg-[var(--landing-accent)]/20 rounded-sm" style={{ height: `${h}%` }}>
-                  <div className="w-full bg-[var(--landing-accent)] rounded-sm" style={{ height: '60%' }} />
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {/* Maurice OCR card */}
+              <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-3">
+                <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Ticket scanné par Maurice
                 </div>
-              ))}
+                <div className="mt-2 rounded-lg bg-white border border-[var(--landing-border)] p-2.5 shadow-sm">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-10 h-12 rounded-md bg-gradient-to-b from-[var(--landing-stone)] to-[var(--landing-border)] shrink-0 flex items-center justify-center">
+                      <Receipt className="w-4 h-4 text-[var(--landing-muted)]" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-[11px] font-semibold text-[var(--landing-text)] truncate">Leroy Merlin Rivoli</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--landing-stone)] text-[var(--landing-muted)] font-medium">Matériaux</span>
+                        <span className="text-[9px] text-[var(--landing-muted)]">07/04/2026</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-0.5">
+                        <span className="text-[10px] text-[var(--landing-muted)]">TVA 20%</span>
+                        <span className="text-xs font-bold text-[var(--landing-text)]">187,42 €</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1 text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-1">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    <span className="font-medium">Maurice a tout rangé · justificatif archivé</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank reconciliation card */}
+              <div className="rounded-xl border border-[var(--landing-border)] bg-white p-3">
+                <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
+                  <Landmark className="h-3.5 w-3.5" />
+                  Rapprochement bancaire
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {[
+                    { label: 'VIR Dupont F-2026-089', amt: '+3 200 €', ok: true, kind: 'Facture payée' },
+                    { label: 'CB Leroy Merlin', amt: '−187,42 €', ok: true, kind: 'Dépense' },
+                    { label: 'PRLV URSSAF', amt: '−842 €', ok: true, kind: 'Charge' },
+                    { label: 'VIR LM Rivoli', amt: '−54,90 €', ok: false, kind: 'Suggéré IA' },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center gap-2 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)] px-2 py-1.5">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${row.ok ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                        {row.ok ? (
+                          <Check className="w-2.5 h-2.5 text-emerald-700" />
+                        ) : (
+                          <Sparkles className="w-2.5 h-2.5 text-amber-700" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-medium text-[var(--landing-text)] truncate">{row.label}</div>
+                        <div className="text-[9px] text-[var(--landing-muted)] truncate">{row.kind}</div>
+                      </div>
+                      <span className={`text-[10px] font-bold shrink-0 ${row.amt.startsWith('+') ? 'text-emerald-700' : 'text-[var(--landing-text)]'}`}>{row.amt}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[9px]">
+                  <span className="text-[var(--landing-muted)]">12 / 13 rapprochées</span>
+                  <span className="font-medium text-emerald-700">92 %</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Cash flow chart */}
+            <div className="rounded-xl border border-[var(--landing-border)] bg-white p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-text)]">
+                  <ArrowRight className="h-3 w-3 text-[var(--landing-accent)]" />
+                  Flux de trésorerie · 12 mois
+                </div>
+                <span className="text-[9px] text-[var(--landing-muted)]">Solde +81 600 €</span>
+              </div>
+              <div className="flex items-end gap-1 h-14">
+                {[40, 65, 50, 80, 70, 90, 60, 85, 75, 95, 70, 88].map((h, i) => (
+                  <div key={i} className="flex-1 bg-[var(--landing-stone)] rounded-sm relative overflow-hidden" style={{ height: '100%' }}>
+                    <div className="absolute inset-x-0 bottom-0 bg-[var(--landing-accent)]" style={{ height: `${h}%` }} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </MockBrowser>

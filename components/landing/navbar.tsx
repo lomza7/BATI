@@ -14,6 +14,7 @@ import {
   FileImage,
   CreditCard,
   Bot,
+  Calculator,
   Menu,
   X,
   ChevronDown,
@@ -31,6 +32,7 @@ const features = [
   { icon: Star, label: 'Avis Google', href: '/fonctionnalites/avis-google' },
   { icon: FileImage, label: 'Rendus IA', href: '/fonctionnalites/rendus-ia' },
   { icon: CreditCard, label: 'Paiements Stripe', href: '/fonctionnalites/paiements-stripe' },
+  { icon: Calculator, label: 'Maurice — Comptable IA', href: '/fonctionnalites/comptabilite-ia' },
   { icon: Bot, label: 'Agents IA', href: '/fonctionnalites/agents-ia' },
 ];
 

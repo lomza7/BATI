@@ -40,7 +40,7 @@ const items = [
   { icon: FileImage, label: 'Rendus IA' },
   { icon: CreditCard, label: 'Paiements Stripe' },
   { icon: RefreshCw, label: 'Contrats récurrents' },
-  { icon: Calculator, label: 'Comptabilité IA' },
+  { icon: Calculator, label: 'Maurice — Comptable IA' },
   { icon: Bot, label: 'Agents IA' },
 ];
 
