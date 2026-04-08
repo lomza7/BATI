@@ -33,13 +33,11 @@ jobs:
         run: npm run lint
 
       - name: Type check
-        run: npm run typecheck
+        run: npm run type-check
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    # Only run if vitest is configured (skip until HEL-120 tests are merged into main)
-    if: hashFiles('vitest.config.ts') != ''
     steps:
       - uses: actions/checkout@v4
 
