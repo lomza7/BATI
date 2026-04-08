@@ -479,6 +479,87 @@ export function buildReferralInviteEmail(data: ReferralInviteData): string {
 </html>`.trim();
 }
 
+interface VerificationCodeEmailData {
+  code: string;
+  expiresInMinutes: number;
+}
+
+export function buildVerificationCodeEmail(data: VerificationCodeEmailData): string {
+  const accent = '#d35400';
+  const digits = data.code.split('');
+
+  const codeCells = digits
+    .map(
+      (d) =>
+        `<td align="center" style="width:44px;padding:0 4px"><div style="background-color:#faf8f5;border:2px solid #ece8e0;border-radius:10px;font-size:28px;font-weight:700;color:#1a1a1a;padding:14px 0;letter-spacing:0;font-family:'SF Mono',Menlo,Consolas,monospace">${d}</div></td>`
+    )
+    .join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Votre code de verification Hellobat</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+
+          <tr>
+            <td style="background-color:${accent};padding:32px 32px 28px;text-align:center">
+              <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#ffffff;opacity:0.85;text-transform:uppercase;letter-spacing:1.2px">
+                Hellobat
+              </p>
+              <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.4px">
+                Verifiez votre adresse email
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:36px 32px 12px">
+              <p style="margin:0 0 14px;font-size:15px;color:#1a1a1a">
+                Bonjour,
+              </p>
+              <p style="margin:0 0 28px;font-size:14px;color:#6b6560;line-height:1.65">
+                Bienvenue sur <strong>Hellobat</strong>. Pour confirmer votre adresse email et acceder a votre espace, saisissez ce code de verification :
+              </p>
+
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto 24px">
+                <tr>
+                  ${codeCells}
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#6b6560;text-align:center">
+                Ce code expire dans <strong>${data.expiresInMinutes} minutes</strong>.
+              </p>
+              <p style="margin:0 0 28px;font-size:12px;color:#9a9590;text-align:center;line-height:1.5">
+                Si vous n'etes pas a l'origine de cette inscription, vous pouvez ignorer ce message.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background-color:#faf8f5;padding:22px 32px">
+              <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+                Hellobat — Le logiciel des artisans du batiment
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 function escHtml(str: string): string {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

@@ -31,7 +31,7 @@ type DemoState =
   | { status: 'banner' };
 
 export function DemoBanner() {
-  const { user, session } = useAuth();
+  const { user, session, showOnboarding } = useAuth();
   const { toast } = useToast();
   const [state, setState] = useState<DemoState>({ status: 'loading' });
   const [closing, setClosing] = useState(false);
@@ -52,9 +52,12 @@ export function DemoBanner() {
     setState({ status: data.demo_intro_seen ? 'banner' : 'intro' });
   }, [user]);
 
+  // Wait for the onboarding flow to finish before loading / showing the demo state.
+  // Without this guard the intro modal would overlap the onboarding modal on first signup.
   useEffect(() => {
+    if (showOnboarding) return;
     loadState();
-  }, [loadState]);
+  }, [loadState, showOnboarding]);
 
   // Bootstrap the welcome PDF once, the first time we show the intro
   useEffect(() => {
@@ -105,7 +108,7 @@ export function DemoBanner() {
     }
   }
 
-  if (state.status === 'loading' || state.status === 'hidden') {
+  if (showOnboarding || state.status === 'loading' || state.status === 'hidden') {
     return null;
   }
 

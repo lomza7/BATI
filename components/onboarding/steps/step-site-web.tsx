@@ -55,13 +55,18 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
           <Globe2 className="h-5 w-5 text-primary" />
         </div>
+        <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
+          <Check className="h-3 w-3" strokeWidth={3} />
+          100% gratuit
+        </span>
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
         Avez-vous deja un site web ?
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        On peut vous en creer un gratuitement, optimise SEO et relie a Hellobat.
+        On vous en cree un <span className="font-semibold text-emerald-700">gratuitement</span>,
+        optimise SEO et relie a Hellobat. Aucun surcout, jamais.
       </p>
 
       <div className="mt-6 space-y-5 flex-1">

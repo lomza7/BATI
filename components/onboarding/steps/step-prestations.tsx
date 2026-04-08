@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,6 +19,20 @@ import {
   Pipette,
   Plug,
   Settings,
+  Search,
+  Wind,
+  Bath,
+  Key,
+  Waves,
+  Sun,
+  Cpu,
+  Axe,
+  ChefHat,
+  Trees,
+  Building,
+  Grid2x2,
+  Square,
+  MoreHorizontal,
 } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
 
@@ -32,15 +46,40 @@ const BTP_CATEGORIES: {
   { value: 'plomberie', label: 'Plomberie', icon: Droplets, nafKeywords: ['plomb', 'sanitaire'] },
   { value: 'electricite', label: 'Electricite', icon: Zap, nafKeywords: ['electri'] },
   { value: 'peinture', label: 'Peinture', icon: Paintbrush, nafKeywords: ['peint', 'revetement'] },
-  { value: 'carrelage', label: 'Carrelage', icon: Layers, nafKeywords: ['carrel', 'sol'] },
-  { value: 'menuiserie', label: 'Menuiserie', icon: Hammer, nafKeywords: ['menuise', 'bois', 'charpent'] },
-  { value: 'toiture', label: 'Toiture', icon: Home, nafKeywords: ['couvert', 'toitur', 'etanche'] },
+  { value: 'carrelage', label: 'Carrelage', icon: Grid2x2, nafKeywords: ['carrel'] },
+  { value: 'menuiserie', label: 'Menuiserie', icon: Hammer, nafKeywords: ['menuise', 'bois'] },
+  { value: 'charpente', label: 'Charpente', icon: TreePine, nafKeywords: ['charpent'] },
+  { value: 'couverture', label: 'Couverture / Zinguerie', icon: Home, nafKeywords: ['couvert', 'zingu'] },
+  { value: 'toiture', label: 'Toiture', icon: Home, nafKeywords: ['toitur'] },
+  { value: 'etancheite', label: 'Etancheite', icon: Droplets, nafKeywords: ['etanche'] },
   { value: 'isolation', label: 'Isolation', icon: Layers, nafKeywords: ['isol', 'thermique'] },
-  { value: 'chauffage', label: 'Chauffage', icon: Thermometer, nafKeywords: ['chauff', 'clim', 'froid'] },
-  { value: 'terrassement', label: 'Terrassement', icon: TreePine, nafKeywords: ['terrass', 'demolit'] },
-  { value: 'facade', label: 'Facade', icon: Pipette, nafKeywords: ['ravalement', 'facade'] },
-  { value: 'placo', label: 'Placoplatre', icon: Settings, nafKeywords: ['platr', 'cloison'] },
+  { value: 'chauffage', label: 'Chauffage', icon: Thermometer, nafKeywords: ['chauff'] },
+  { value: 'climatisation', label: 'Climatisation', icon: Wind, nafKeywords: ['clim', 'froid'] },
+  { value: 'terrassement', label: 'Terrassement', icon: TreePine, nafKeywords: ['terrass'] },
+  { value: 'demolition', label: 'Demolition', icon: Axe, nafKeywords: ['demolit'] },
+  { value: 'vrd', label: 'VRD / Assainissement', icon: Pipette, nafKeywords: ['vrd', 'voirie', 'reseau', 'assainiss'] },
+  { value: 'facade', label: 'Facade / Ravalement', icon: Building, nafKeywords: ['ravalement', 'facade'] },
+  { value: 'platrerie', label: 'Platrerie', icon: Square, nafKeywords: ['platr'] },
+  { value: 'placo', label: 'Placoplatre / Cloisons', icon: Settings, nafKeywords: ['placo', 'cloison'] },
+  { value: 'serrurerie', label: 'Serrurerie / Metallerie', icon: Key, nafKeywords: ['serrur', 'metall', 'metaux'] },
+  { value: 'ferronnerie', label: 'Ferronnerie', icon: Hammer, nafKeywords: ['ferronn'] },
+  { value: 'vitrerie', label: 'Vitrerie / Miroiterie', icon: Square, nafKeywords: ['vitre', 'miroit', 'verre'] },
+  { value: 'parquet', label: 'Parquet / Sols souples', icon: Layers, nafKeywords: ['parquet', 'sol', 'revetement'] },
+  { value: 'cuisiniste', label: 'Cuisiniste', icon: ChefHat, nafKeywords: ['cuisine', 'cuisinist'] },
+  { value: 'salle_de_bain', label: 'Salle de bain', icon: Bath, nafKeywords: ['salle de bain', 'sanitaire'] },
+  { value: 'paysagisme', label: 'Paysagisme', icon: Trees, nafKeywords: ['paysag', 'espaces verts', 'jardin'] },
+  { value: 'piscine', label: 'Piscine', icon: Waves, nafKeywords: ['piscine'] },
+  { value: 'photovoltaique', label: 'Photovoltaique', icon: Sun, nafKeywords: ['photovolta', 'solaire', 'panneau'] },
+  { value: 'domotique', label: 'Domotique', icon: Cpu, nafKeywords: ['domotique', 'smart', 'automat'] },
+  { value: 'autre', label: 'Autre', icon: MoreHorizontal, nafKeywords: [] },
 ];
+
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
 
 function autoDetectCategories(nafLabel: string, activity: string): string[] {
   const haystack = `${nafLabel} ${activity}`.toLowerCase();
@@ -59,6 +98,8 @@ interface Props {
 }
 
 export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Props) {
+  const [search, setSearch] = useState('');
+
   // Pre-check categories matching NAF code the first time we land on this step
   useEffect(() => {
     if (data.serviceCategories.length === 0) {
@@ -77,6 +118,15 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
       : [...current, value];
     onChange({ serviceCategories: updated });
   }
+
+  const filteredCategories = useMemo(() => {
+    const q = normalize(search.trim());
+    if (!q) return BTP_CATEGORIES;
+    return BTP_CATEGORIES.filter((cat) =>
+      normalize(cat.label).includes(q) ||
+      cat.nafKeywords.some((kw) => normalize(kw).includes(q))
+    );
+  }, [search]);
 
   const selectedCount = data.serviceCategories.length;
 
@@ -97,8 +147,19 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
       </p>
 
       <div className="mt-6 flex-1">
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un metier..."
+            className="flex h-10 w-full rounded-xl border border-border bg-white pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+        </div>
+
         <div className="grid grid-cols-3 gap-2">
-          {BTP_CATEGORIES.map((cat) => {
+          {filteredCategories.map((cat) => {
             const selected = data.serviceCategories.includes(cat.value);
             const Icon = cat.icon;
             return (
@@ -137,6 +198,14 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
             );
           })}
         </div>
+
+        {filteredCategories.length === 0 && (
+          <div className="mt-4 rounded-xl border border-border bg-muted/20 px-4 py-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Aucun metier trouve pour &laquo; {search} &raquo;
+            </p>
+          </div>
+        )}
 
         {selectedCount > 0 && (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center gap-2 animate-fade-up">

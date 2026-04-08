@@ -10,6 +10,7 @@ interface Profile {
   company_name: string;
   company_activity: string;
   onboarding_completed: boolean;
+  email_verified: boolean;
 }
 
 interface AuthContextValue {
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, company_name, company_activity, onboarding_completed')
+        .select('id, full_name, company_name, company_activity, onboarding_completed, email_verified')
         .eq('id', userId)
         .maybeSingle();
 

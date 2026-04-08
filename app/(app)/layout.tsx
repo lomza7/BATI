@@ -10,7 +10,7 @@ import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
 import { Hexagon } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, session, loading, showOnboarding, completeOnboarding } = useAuth();
+  const { user, session, profile, loading, showOnboarding, completeOnboarding } = useAuth();
   const { hasPermission, loading: workspaceLoading } = useWorkspace();
   const router = useRouter();
   const pathname = usePathname();
@@ -21,6 +21,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.push('/login');
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (loading || !user || !profile) return;
+    if (profile.email_verified === false) {
+      router.replace('/verify-email');
+    }
+  }, [loading, user, profile, router]);
 
   useEffect(() => {
     if (loading || workspaceLoading || !user || !pathname) return;
@@ -80,6 +87,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
+    return null;
+  }
+
+  if (profile?.email_verified === false) {
     return null;
   }
 

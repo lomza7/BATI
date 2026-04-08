@@ -13,6 +13,7 @@ import {
   Receipt,
   FileText,
   Bell,
+  Info,
 } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
 
@@ -99,9 +100,15 @@ export function StepComptaEquipe({
       <div className="mt-6 space-y-6 flex-1">
         {/* ── Section A : Accounting ── */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">
-            Vous avez deja un logiciel de comptabilite ?
-          </label>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className="text-sm font-medium text-foreground">
+              Vous avez deja un logiciel de comptabilite ?
+            </label>
+            <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
+              <Check className="h-2.5 w-2.5" strokeWidth={3} />
+              Le notre est gratuit
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -145,11 +152,16 @@ export function StepComptaEquipe({
                   <Sparkles className="h-5 w-5 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground">
-                    Decouvrez Maurice, votre comptable IA
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-foreground">
+                      Decouvrez Maurice, votre comptable IA
+                    </p>
+                    <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
+                      Gratuit
+                    </span>
+                  </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Inclus dans Hellobat. Pas besoin de logiciel supplementaire.
+                    Inclus dans Hellobat. Pas de surcout, pas de logiciel supplementaire.
                   </p>
                 </div>
               </div>
@@ -179,6 +191,25 @@ export function StepComptaEquipe({
                   />
                 </button>
               </label>
+            </div>
+          )}
+
+          {/* Small note: our accounting module is free too */}
+          {data.hasAccountingSoftware === true && (
+            <div className="animate-fade-up rounded-xl border border-emerald-200 bg-emerald-50 p-3 mt-2 flex items-start gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-white border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                <Info className="h-3.5 w-3.5 text-emerald-700" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-emerald-900">
+                  Bon a savoir : le notre est inclus gratuitement
+                </p>
+                <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+                  Hellobat integre Maurice, un comptable IA qui scanne vos factures
+                  et fait votre compta automatiquement. Vous pourrez l&apos;activer
+                  quand vous voulez depuis vos parametres.
+                </p>
+              </div>
             </div>
           )}
         </div>
