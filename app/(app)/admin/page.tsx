@@ -8,6 +8,7 @@ import {
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
   Save, Check, AlertCircle, ExternalLink, Loader2, Globe,
   Brain, Ban, ShieldCheck, Wand2, Eye, EyeOff, Gift, Mail, Sparkles,
+  Trash2, AlertTriangle, X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -137,6 +138,12 @@ export default function AdminPage() {
   const [aiLimits, setAiLimits] = useState<AiPlanLimit[]>([]);
   const [aiUsageLoading, setAiUsageLoading] = useState(false);
   const [blockingUser, setBlockingUser] = useState<string | null>(null);
+
+  // Suppression utilisateur
+  const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Stripe / pricing config
   const [configLoading, setConfigLoading] = useState(true);
@@ -451,6 +458,39 @@ export default function AdminPage() {
       // silent
     } finally {
       setBlockingUser(null);
+    }
+  }
+
+  async function handleDeleteUser() {
+    if (!userToDelete) return;
+    setDeletingUser(true);
+    setDeleteError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Session expiree');
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          user_id: userToDelete.id,
+          confirm_email: deleteConfirmEmail.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Erreur lors de la suppression');
+      }
+      // Retirer de la liste locale
+      setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+      setUserToDelete(null);
+      setDeleteConfirmEmail('');
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Erreur inconnue');
+    } finally {
+      setDeletingUser(false);
     }
   }
 
@@ -1304,6 +1344,7 @@ export default function AdminPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Inscription</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Derniere connexion</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Activite</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1351,12 +1392,30 @@ export default function AdminPage() {
                             <span title="Chantiers">{u.project_count} chant.</span>
                           </div>
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          {u.email === ADMIN_EMAIL ? (
+                            <span className="text-[10px] text-muted-foreground italic">admin</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUserToDelete(u);
+                                setDeleteConfirmEmail('');
+                                setDeleteError('');
+                              }}
+                              title="Supprimer definitivement cet utilisateur"
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-border bg-white text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
                   {filteredUsers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
                         Aucun utilisateur trouve
                       </td>
                     </tr>
@@ -1366,6 +1425,126 @@ export default function AdminPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Modal de suppression utilisateur */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between p-5 border-b border-border bg-destructive/5">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Supprimer definitivement</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Cette action est irreversible.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (deletingUser) return;
+                  setUserToDelete(null);
+                  setDeleteConfirmEmail('');
+                  setDeleteError('');
+                }}
+                className="h-7 w-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
+                disabled={deletingUser}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Utilisateur cible</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">
+                  {userToDelete.full_name || userToDelete.company_name || '—'}
+                </p>
+                <p className="text-xs text-muted-foreground">{userToDelete.email}</p>
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                  <span>{userToDelete.quote_count} devis</span>
+                  <span>·</span>
+                  <span>{userToDelete.invoice_count} factures</span>
+                  <span>·</span>
+                  <span>{userToDelete.project_count} chantiers</span>
+                  <span>·</span>
+                  <span>{userToDelete.client_count} contacts</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  Toutes les donnees metier (devis, factures, chantiers, contacts, documents,
+                  fichiers de stockage, abonnement, etc.) seront definitivement supprimees.
+                  L&apos;adresse email sera liberee et pourra etre reutilisee pour un nouveau compte.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">
+                  Pour confirmer, retapez l&apos;email :{' '}
+                  <span className="font-mono text-destructive">{userToDelete.email}</span>
+                </label>
+                <input
+                  type="email"
+                  value={deleteConfirmEmail}
+                  onChange={e => setDeleteConfirmEmail(e.target.value)}
+                  placeholder={userToDelete.email}
+                  className="w-full h-10 px-3 rounded-lg border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-destructive/20 focus:border-destructive"
+                  disabled={deletingUser}
+                />
+              </div>
+
+              {deleteError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 flex items-start gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive">{deleteError}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-border bg-muted/20">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUserToDelete(null);
+                  setDeleteConfirmEmail('');
+                  setDeleteError('');
+                }}
+                disabled={deletingUser}
+              >
+                Annuler
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDeleteUser}
+                disabled={
+                  deletingUser ||
+                  deleteConfirmEmail.trim().toLowerCase() !==
+                    userToDelete.email.toLowerCase()
+                }
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+              >
+                {deletingUser ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Supprimer definitivement
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
