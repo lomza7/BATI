@@ -113,6 +113,29 @@ function totalSize(files: DocumentFile[]) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Storage quotas (in bytes) — must match SQL trigger                 */
+/* ------------------------------------------------------------------ */
+
+const GB = 1024 * 1024 * 1024;
+
+const STORAGE_QUOTAS: Record<string, number> = {
+  starter: 5 * GB,
+  pro: 10 * GB,
+  business: 20 * GB,
+};
+
+function getQuotaForPlan(plan: string | null | undefined) {
+  return STORAGE_QUOTAS[(plan || 'starter').toLowerCase()] ?? STORAGE_QUOTAS.starter;
+}
+
+function getPlanLabel(plan: string | null | undefined) {
+  const key = (plan || 'starter').toLowerCase();
+  if (key === 'business') return 'Business';
+  if (key === 'pro') return 'Pro';
+  return 'Starter';
+}
+
+/* ------------------------------------------------------------------ */
 /*  Visibility badge                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -144,6 +167,7 @@ export default function DocumentsPage() {
 
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [files, setFiles] = useState<DocumentFile[]>([]);
+  const [userPlan, setUserPlan] = useState<string>('starter');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -164,17 +188,20 @@ export default function DocumentsPage() {
   /* ---- Data loading ---- */
 
   const loadDocuments = useCallback(async () => {
+    if (!ownerId) return;
     setLoading(true);
     try {
-      const [foldersRes, filesRes] = await Promise.all([
+      const [foldersRes, filesRes, profileRes] = await Promise.all([
         supabase.from('document_folders').select('*').order('name'),
         supabase.from('document_files').select('*').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('plan').eq('id', ownerId).maybeSingle(),
       ]);
       if (foldersRes.error) throw foldersRes.error;
       if (filesRes.error) throw filesRes.error;
 
       setFolders((foldersRes.data as DocumentFolder[]) || []);
       setFiles((filesRes.data as DocumentFile[]) || []);
+      setUserPlan((profileRes.data?.plan as string) || 'starter');
       setCurrentFolderId((prev) =>
         prev && !(foldersRes.data || []).some((f: DocumentFolder) => f.id === prev) ? null : prev
       );
@@ -185,7 +212,7 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ownerId]);
 
   useEffect(() => {
     if (!user || workspaceLoading) return;
@@ -285,8 +312,23 @@ export default function DocumentsPage() {
     const list = Array.from(fileList);
     if (list.length === 0) return;
 
+    // Client-side quota check (the DB trigger is the source of truth)
+    const quota = getQuotaForPlan(userPlan);
+    const used = files.filter((f) => f.storage_bucket === 'documents').reduce((s, f) => s + f.size_bytes, 0);
+    const incoming = list.reduce((s, f) => s + f.size, 0);
+    if (used + incoming > quota) {
+      const remaining = Math.max(0, quota - used);
+      toast({
+        title: 'Quota de stockage dépassé',
+        description: `Votre plan ${getPlanLabel(userPlan)} permet ${formatFileSize(quota)}. Espace restant : ${formatFileSize(remaining)}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setUploading(true);
     let failedCount = 0;
+    let quotaError = false;
 
     for (const file of list) {
       const safeName = sanitizeDocumentFileName(file.name || 'document');
@@ -311,6 +353,7 @@ export default function DocumentsPage() {
         });
         if (insertError) {
           await supabase.storage.from('documents').remove([filePath]);
+          if (insertError.message?.includes('STORAGE_QUOTA_EXCEEDED')) quotaError = true;
           throw insertError;
         }
       } catch {
@@ -322,7 +365,13 @@ export default function DocumentsPage() {
     if (inputRef.current) inputRef.current.value = '';
     await loadDocuments();
 
-    if (failedCount > 0) {
+    if (quotaError) {
+      toast({
+        title: 'Quota de stockage dépassé',
+        description: `Votre plan ${getPlanLabel(userPlan)} permet ${formatFileSize(getQuotaForPlan(userPlan))}.`,
+        variant: 'destructive',
+      });
+    } else if (failedCount > 0) {
       toast({ title: 'Erreur', description: `${failedCount} fichier(s) n'ont pas pu être importés.`, variant: 'destructive' });
     } else {
       toast({ title: `${list.length} fichier(s) importé(s)` });
@@ -453,26 +502,45 @@ export default function DocumentsPage() {
       <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) void uploadFiles(e.target.files); }} />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        <Card className="rounded-2xl">
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-xs sm:text-sm text-muted-foreground">Dossiers</p>
-            <p className="mt-1 text-xl sm:text-2xl font-semibold">{folders.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl">
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-xs sm:text-sm text-muted-foreground">Fichiers</p>
-            <p className="mt-1 text-xl sm:text-2xl font-semibold">{files.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl">
-          <CardContent className="p-3 sm:p-4">
-            <p className="text-xs sm:text-sm text-muted-foreground">Taille totale</p>
-            <p className="mt-1 text-xl sm:text-2xl font-semibold">{formatFileSize(totalSize(files))}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {(() => {
+        const quota = getQuotaForPlan(userPlan);
+        const used = totalSize(files.filter((f) => f.storage_bucket === 'documents'));
+        const percent = Math.min(100, Math.round((used / quota) * 100));
+        const overWarning = percent >= 90;
+        return (
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3">
+            <Card className="rounded-2xl">
+              <CardContent className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-muted-foreground">Dossiers</p>
+                <p className="mt-1 text-xl sm:text-2xl font-semibold">{folders.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-2xl">
+              <CardContent className="p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-muted-foreground">Fichiers</p>
+                <p className="mt-1 text-xl sm:text-2xl font-semibold">{files.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="rounded-2xl col-span-2 sm:col-span-1">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Stockage</p>
+                  <Badge variant="outline" className="text-[10px] font-normal">{getPlanLabel(userPlan)}</Badge>
+                </div>
+                <p className="mt-1 text-sm sm:text-base font-semibold">
+                  {formatFileSize(used)} <span className="text-xs text-muted-foreground font-normal">/ {formatFileSize(quota)}</span>
+                </p>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn('h-full transition-all', overWarning ? 'bg-destructive' : 'bg-primary')}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Breadcrumbs */}
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-sm text-muted-foreground overflow-x-auto">
