@@ -63,10 +63,16 @@ export async function POST(request: Request) {
   const accessToken = generateAccessToken(36);
   const expiresAt = new Date(Date.now() + durationDays * 24 * 3600 * 1000).toISOString();
 
-  const { data: created, error: insertError } = await supabaseAdmin
+  // IMPORTANT : on insère via userClient (et non supabaseAdmin) car la table
+  // accountant_access a un trigger BEFORE INSERT qui force user_id à
+  // current_workspace_user_id() — fonction basée sur auth.uid(). Avec le
+  // service role il n'y a pas de auth.uid(), donc le trigger écrasait user_id
+  // à NULL et violait la contrainte NOT NULL. Le userClient porte le JWT,
+  // le trigger résout correctement (membre → owner_user_id du workspace,
+  // ou auth.uid() en fallback) et la policy RLS passe.
+  const { data: created, error: insertError } = await userClient
     .from('accountant_access')
     .insert({
-      user_id: ownerUserId,
       accountant_email: accountantEmail,
       accountant_name: accountantName,
       token: accessToken,

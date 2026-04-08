@@ -14,8 +14,10 @@ import {
   Link as LinkIcon,
   ShieldOff,
   Calendar,
+  Clock,
   Eye,
   ExternalLink,
+  RefreshCw,
   Sparkles,
   BarChart3,
   Calculator,
@@ -35,6 +37,11 @@ import {
   Check,
   MailCheck,
   MailX,
+  Landmark,
+  Wallet,
+  AlertTriangle,
+  CheckCircle2,
+  Percent,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -45,6 +52,7 @@ import {
   Cell,
   Pie,
   PieChart,
+  ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
@@ -66,7 +74,10 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -91,6 +102,7 @@ import {
   AccountantInviteDialog,
   type AccountantInviteValues,
 } from '@/components/comptabilite/accountant-invite-dialog';
+import { BankReconciliationTab } from '@/components/comptabilite/bank-reconciliation-tab';
 
 interface ExpenseRow {
   id: string;
@@ -108,6 +120,7 @@ interface ExpenseRow {
   source: string | null;
   ocr_confidence: number | null;
   receipt_storage_path: string | null;
+  bank_transaction_id: string | null;
 }
 
 interface CategoryRow {
@@ -134,6 +147,7 @@ interface InvoiceRow {
   due_date: string | null;
   created_at: string;
   clients: { name: string } | { name: string }[] | null;
+  bank_transaction_id: string | null;
 }
 
 interface AccessRow {
@@ -186,10 +200,152 @@ function fmtDate(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function fmtDateTime(d: string | null | undefined) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function fmtRelative(d: string | null | undefined): string {
+  if (!d) return '';
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffSec = Math.round(diffMs / 1000);
+  if (diffSec < 60) return "à l'instant";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `il y a ${diffMin} min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `il y a ${diffH} h`;
+  const diffD = Math.round(diffH / 24);
+  if (diffD < 7) return `il y a ${diffD} j`;
+  if (diffD < 30) return `il y a ${Math.round(diffD / 7)} sem.`;
+  if (diffD < 365) return `il y a ${Math.round(diffD / 30)} mois`;
+  return `il y a ${Math.round(diffD / 365)} an${diffD >= 730 ? 's' : ''}`;
+}
+
 function getClientName(c: InvoiceRow['clients']): string {
   if (!c) return '—';
   if (Array.isArray(c)) return c[0]?.name || '—';
   return c.name || '—';
+}
+
+// ───────────────── Period helpers (Dashboard) ─────────────────
+
+function ymKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function quarterOfMonth(month0: number): number {
+  return Math.floor(month0 / 3) + 1;
+}
+
+interface PeriodOption {
+  value: string;
+  label: string;
+}
+
+function buildDashboardPeriodOptions(): {
+  current: PeriodOption[];
+  months: PeriodOption[];
+  quarters: PeriodOption[];
+  years: PeriodOption[];
+} {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const currentMonthKey = ymKey(now);
+  const prevMonth = new Date(y, m - 1, 1);
+  const currentQuarter = quarterOfMonth(m);
+  const prevQuarterMonth = new Date(y, (currentQuarter - 1) * 3 - 3, 1);
+  const prevQuarterYear = prevQuarterMonth.getFullYear();
+  const prevQuarter = quarterOfMonth(prevQuarterMonth.getMonth());
+
+  const current: PeriodOption[] = [
+    { value: `month:${currentMonthKey}`, label: 'Mois en cours' },
+    { value: `month:${ymKey(prevMonth)}`, label: 'Mois précédent' },
+    { value: `quarter:${y}:${currentQuarter}`, label: 'Trimestre en cours' },
+    { value: `quarter:${prevQuarterYear}:${prevQuarter}`, label: 'Trimestre précédent' },
+    { value: `year:${y}`, label: 'Année en cours' },
+    { value: `year:${y - 1}`, label: 'Année précédente' },
+  ];
+
+  // Évite les collisions de value entre les groupes — Radix Select rendrait
+  // les deux SelectItem qui partagent la même value côte à côte dans le trigger.
+  const usedValues = new Set(current.map((p) => p.value));
+
+  const months: PeriodOption[] = [];
+  for (let i = 0; i < 12; i += 1) {
+    const d = new Date(y, m - i, 1);
+    const value = `month:${ymKey(d)}`;
+    if (usedValues.has(value)) continue;
+    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    months.push({
+      value,
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+    });
+    usedValues.add(value);
+  }
+
+  const quarters: PeriodOption[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const d = new Date(y, m - i * 3, 1);
+    const qy = d.getFullYear();
+    const q = quarterOfMonth(d.getMonth());
+    const value = `quarter:${qy}:${q}`;
+    if (usedValues.has(value)) continue;
+    quarters.push({ value, label: `T${q} ${qy}` });
+    usedValues.add(value);
+  }
+
+  const years: PeriodOption[] = [];
+  for (let i = 0; i < 4; i += 1) {
+    const value = `year:${y - i}`;
+    if (usedValues.has(value)) continue;
+    years.push({ value, label: `Année ${y - i}` });
+    usedValues.add(value);
+  }
+
+  return { current, months, quarters, years };
+}
+
+function isInPeriod(dateStr: string | null | undefined, period: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return false;
+  if (period.startsWith('year:')) {
+    return d.getFullYear() === Number(period.split(':')[1]);
+  }
+  if (period.startsWith('quarter:')) {
+    const [, y, q] = period.split(':');
+    if (d.getFullYear() !== Number(y)) return false;
+    return quarterOfMonth(d.getMonth()) === Number(q);
+  }
+  if (period.startsWith('month:')) {
+    return ymKey(d) === period.split(':')[1];
+  }
+  return false;
+}
+
+function getPeriodLabel(period: string): string {
+  if (period.startsWith('year:')) return `Année ${period.split(':')[1]}`;
+  if (period.startsWith('quarter:')) {
+    const [, y, q] = period.split(':');
+    return `T${q} ${y}`;
+  }
+  if (period.startsWith('month:')) {
+    const [, ym] = period.split(':');
+    const [yy, mm] = ym.split('-').map(Number);
+    const d = new Date(yy, mm - 1, 1);
+    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  return '';
 }
 
 export default function ComptabilitePage() {
@@ -227,6 +383,9 @@ export default function ComptabilitePage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterSource, setFilterSource] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
+  const [dashboardPeriod, setDashboardPeriod] = useState<string>(
+    () => `month:${ymKey(new Date())}`,
+  );
 
   // Flux tab state
   const [fluxSearch, setFluxSearch] = useState('');
@@ -255,7 +414,7 @@ export default function ComptabilitePage() {
           .select(
             `id, date, description, supplier, amount_ht, tva_rate, tva_amount, amount,
              expense_category_id, payment_method, is_autoliquidation, project_id,
-             source, ocr_confidence, receipt_storage_path`,
+             source, ocr_confidence, receipt_storage_path, bank_transaction_id`,
           )
           .order('date', { ascending: false }),
         supabase.from('expense_categories').select('id, slug, name').order('sort_order'),
@@ -264,7 +423,7 @@ export default function ComptabilitePage() {
           .from('invoices')
           .select(
             `id, invoice_number, title, status, total_ht, total_ttc, tva_rate,
-             paid_at, issued_at, due_date, created_at, clients(name)`,
+             paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id`,
           )
           .order('issued_at', { ascending: false, nullsFirst: false }),
         supabase
@@ -288,6 +447,25 @@ export default function ComptabilitePage() {
       setLoading(false);
     }
   }
+
+  // Recharge uniquement les accès comptables (utilisé pour rafraîchir les
+  // dernières connexions sans recharger toutes les dépenses/factures).
+  async function loadAccesses() {
+    const { data } = await supabase
+      .from('accountant_access')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setAccesses((data as AccessRow[]) || []);
+  }
+
+  // Refresh des accès quand l'utilisateur ouvre l'onglet "Comptable" — permet
+  // de voir en direct quand le comptable s'est connecté sans recharger la page.
+  useEffect(() => {
+    if (tab === 'accountant' && user) {
+      loadAccesses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, user]);
 
   // ───────────────────────── OCR ─────────────────────────
 
@@ -584,37 +762,120 @@ export default function ComptabilitePage() {
     });
   }, [expenses, search, filterCategory, filterSource, filterYear]);
 
-  const yearExpenses = useMemo(
-    () => expenses.filter((e) => e.date && new Date(e.date).getFullYear() === Number(filterYear)),
-    [expenses, filterYear],
+  // ───── Dashboard : données filtrées par dashboardPeriod ─────
+
+  const periodExpenses = useMemo(
+    () => expenses.filter((e) => isInPeriod(e.date, dashboardPeriod)),
+    [expenses, dashboardPeriod],
   );
 
-  const yearTotalHt = yearExpenses.reduce((s, e) => s + Number(e.amount_ht || 0), 0);
-  const yearTotalTtc = yearExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const yearTvaDeductible = yearExpenses.reduce(
-    (s, e) => (e.is_autoliquidation ? s : s + Number(e.tva_amount || 0)),
-    0,
-  );
+  const periodInvoices = useMemo(() => {
+    return invoices.filter((i) => {
+      // Méthode encaissements : on prend la date de paiement
+      // Méthode débits      : on prend la date d'émission
+      const refDate =
+        tvaMethod === 'encaissements' ? i.paid_at : i.issued_at || i.created_at;
+      return isInPeriod(refDate, dashboardPeriod);
+    });
+  }, [invoices, dashboardPeriod, tvaMethod]);
+
+  const dashboardMetrics = useMemo(() => {
+    // Dépenses
+    const expHt = periodExpenses.reduce((s, e) => s + Number(e.amount_ht || 0), 0);
+    const expTtc = periodExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const expCount = periodExpenses.length;
+
+    // TVA déductible (récupérable) — exclut autoliquidation
+    const tvaDeductible = periodExpenses.reduce(
+      (s, e) => (e.is_autoliquidation ? s : s + Number(e.tva_amount || 0)),
+      0,
+    );
+    const deductibleCount = periodExpenses.filter((e) => !e.is_autoliquidation).length;
+
+    // Recettes (factures encaissées dans la période, selon tvaMethod)
+    const paidInvoices = periodInvoices.filter(
+      (i) => i.status === 'paid' || Boolean(i.paid_at),
+    );
+    const revHt = paidInvoices.reduce((s, i) => s + Number(i.total_ht || 0), 0);
+    const revTtc = paidInvoices.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
+    const revCount = paidInvoices.length;
+
+    // TVA collectée = différence TTC - HT sur les factures payées
+    const tvaCollected = Math.max(0, revTtc - revHt);
+
+    // TVA à reverser
+    const tvaToPay = tvaCollected - tvaDeductible;
+
+    // Marge
+    const marginHt = revHt - expHt;
+    const cashNet = revTtc - expTtc;
+
+    // Justificatifs manquants (sur dépenses de la période)
+    const missingCount = periodExpenses.filter((e) => !e.receipt_storage_path).length;
+    const compliance =
+      expCount === 0 ? 100 : Math.round(((expCount - missingCount) / expCount) * 100);
+
+    // Pointage banque (sur dépenses + factures de la période)
+    const totalActive = periodExpenses.length + paidInvoices.length;
+    const pointedExp = periodExpenses.filter((e) => e.bank_transaction_id).length;
+    const pointedInv = paidInvoices.filter((i) => i.bank_transaction_id).length;
+    const pointedCount = pointedExp + pointedInv;
+    const pointedRatio =
+      totalActive === 0 ? 100 : Math.round((pointedCount / totalActive) * 100);
+
+    return {
+      expHt,
+      expTtc,
+      expCount,
+      revHt,
+      revTtc,
+      revCount,
+      tvaCollected,
+      tvaDeductible,
+      deductibleCount,
+      tvaToPay,
+      marginHt,
+      cashNet,
+      missingCount,
+      compliance,
+      pointedCount,
+      totalActive,
+      pointedRatio,
+    };
+  }, [periodExpenses, periodInvoices]);
 
   const monthlyData = useMemo(() => {
-    const months: { month: string; total: number }[] = [];
+    const months: { month: string; depenses: number; recettes: number }[] = [];
     const now = new Date();
     for (let i = 11; i >= 0; i -= 1) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const key = ymKey(d);
       const label = d.toLocaleDateString('fr-FR', { month: 'short' });
-      months.push({ month: label, total: 0 });
-      const sum = expenses
+      const depenses = expenses
         .filter((e) => e.date?.startsWith(key))
         .reduce((s, e) => s + Number(e.amount_ht || 0), 0);
-      months[months.length - 1].total = +sum.toFixed(2);
+      const recettes = invoices
+        .filter((i) => {
+          const ref = tvaMethod === 'encaissements' ? i.paid_at : i.issued_at;
+          if (!ref) return false;
+          if (tvaMethod === 'encaissements' && !(i.status === 'paid' || i.paid_at)) {
+            return false;
+          }
+          return ref.startsWith(key);
+        })
+        .reduce((s, i) => s + Number(i.total_ht || 0), 0);
+      months.push({
+        month: label,
+        depenses: +depenses.toFixed(2),
+        recettes: +recettes.toFixed(2),
+      });
     }
     return months;
-  }, [expenses]);
+  }, [expenses, invoices, tvaMethod]);
 
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const e of yearExpenses) {
+    for (const e of periodExpenses) {
       const slug =
         categories.find((c) => c.id === e.expense_category_id)?.slug || 'autres';
       map[slug] = (map[slug] || 0) + Number(e.amount_ht || 0);
@@ -626,21 +887,12 @@ export default function ComptabilitePage() {
       }))
       .filter((d) => d.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [yearExpenses, categories]);
+  }, [periodExpenses, categories]);
 
   const topCategoryName = categoryData[0]?.name || '—';
-
-  const monthExpenses = useMemo(() => {
-    const now = new Date();
-    return expenses
-      .filter(
-        (e) =>
-          e.date &&
-          new Date(e.date).getFullYear() === now.getFullYear() &&
-          new Date(e.date).getMonth() === now.getMonth(),
-      )
-      .reduce((s, e) => s + Number(e.amount_ht || 0), 0);
-  }, [expenses]);
+  const periodLabel = useMemo(() => getPeriodLabel(dashboardPeriod), [dashboardPeriod]);
+  const isFranchise = vatRegime === 'franchise_en_base';
+  const periodOptionGroups = useMemo(() => buildDashboardPeriodOptions(), []);
 
   // Recettes (paid invoices)
   const revenueRows = useMemo(
@@ -687,6 +939,7 @@ export default function ComptabilitePage() {
     source: string;
     categoryName: string | null;
     hasReceipt: boolean;
+    pointed: boolean;
     expenseId?: string;
     invoiceId?: string;
     receiptFilename?: string;
@@ -719,6 +972,7 @@ export default function ComptabilitePage() {
         source: e.source === 'ocr' ? 'Maurice IA' : e.source === 'recurring' ? 'Récurrent' : 'Manuel',
         categoryName: catName,
         hasReceipt,
+        pointed: Boolean(e.bank_transaction_id),
         expenseId: e.id,
         receiptFilename,
       });
@@ -754,6 +1008,7 @@ export default function ComptabilitePage() {
         source: 'Émise',
         categoryName: null,
         hasReceipt: false,
+        pointed: Boolean(i.bank_transaction_id),
         invoiceId: i.id,
       });
     }
@@ -953,112 +1208,326 @@ export default function ComptabilitePage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-          <TabsTrigger value="dashboard" className="text-xs sm:text-sm">
-            Tableau
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="text-xs sm:text-sm">
-            Dépenses
-          </TabsTrigger>
-          <TabsTrigger value="flux" className="text-xs sm:text-sm">
-            <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
-            Flux
-          </TabsTrigger>
-          <TabsTrigger value="revenue" className="text-xs sm:text-sm">
-            Recettes
-          </TabsTrigger>
-          <TabsTrigger value="tva" className="text-xs sm:text-sm">
-            TVA
-          </TabsTrigger>
-          <TabsTrigger value="accountant" className="text-xs sm:text-sm">
-            Comptable
-          </TabsTrigger>
-        </TabsList>
+        {/* Mobile : scroll horizontal — desktop : grille uniforme */}
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="inline-flex h-auto w-max gap-1 sm:grid sm:w-full sm:grid-cols-7 sm:gap-0">
+            <TabsTrigger value="dashboard" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              Tableau
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              Dépenses
+            </TabsTrigger>
+            <TabsTrigger value="flux" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              <ArrowLeftRight className="mr-1 h-3.5 w-3.5" />
+              Flux
+            </TabsTrigger>
+            <TabsTrigger value="bank" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              <Landmark className="mr-1 h-3.5 w-3.5" />
+              Banque
+            </TabsTrigger>
+            <TabsTrigger value="revenue" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              Recettes
+            </TabsTrigger>
+            <TabsTrigger value="tva" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              TVA
+            </TabsTrigger>
+            <TabsTrigger value="accountant" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm">
+              Comptable
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ─────── TABLEAU DE BORD ─────── */}
         <TabsContent value="dashboard" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Année fiscale</p>
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="mt-1 w-32">
+          {/* Sélecteur de période */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Période</p>
+              <Select value={dashboardPeriod} onValueChange={setDashboardPeriod}>
+                <SelectTrigger className="mt-1 w-full sm:w-72">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-96">
+                  <SelectGroup>
+                    <SelectLabel>Périodes courantes</SelectLabel>
+                    {periodOptionGroups.current.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>12 derniers mois</SelectLabel>
+                    {periodOptionGroups.months.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Trimestres</SelectLabel>
+                    {periodOptionGroups.quarters.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Années</SelectLabel>
+                    {periodOptionGroups.years.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Données affichées pour&nbsp;: <span className="font-medium text-foreground">{periodLabel}</span>
+                {!isFranchise && (
+                  <>
+                    {' · '}
+                    Méthode TVA&nbsp;:{' '}
+                    {tvaMethod === 'encaissements' ? 'encaissements' : 'débits'}
+                  </>
+                )}
+              </p>
             </div>
           </div>
 
+          {/* Row 1 — KPI financiers principaux */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Card className="p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <TrendingDown className="h-4 w-4 text-red-500" /> Dépenses HT
               </div>
               <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
-                {fmtEur(yearTotalHt)}
+                {fmtEur(dashboardMetrics.expHt)}
               </p>
-              <p className="text-[11px] text-muted-foreground">TTC : {fmtEur(yearTotalTtc)}</p>
+              <p className="text-[11px] text-muted-foreground">
+                TTC&nbsp;: {fmtEur(dashboardMetrics.expTtc)} · {dashboardMetrics.expCount} dépense
+                {dashboardMetrics.expCount > 1 ? 's' : ''}
+              </p>
             </Card>
+
             <Card className="p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Receipt className="h-4 w-4 text-blue-500" /> TVA déductible
+                <TrendingUp className="h-4 w-4 text-emerald-500" /> Recettes HT
               </div>
               <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
-                {fmtEur(yearTvaDeductible)}
+                {fmtEur(dashboardMetrics.revHt)}
               </p>
-              <p className="text-[11px] text-muted-foreground">Année {filterYear}</p>
+              <p className="text-[11px] text-muted-foreground">
+                TTC&nbsp;: {fmtEur(dashboardMetrics.revTtc)} · {dashboardMetrics.revCount} facture
+                {dashboardMetrics.revCount > 1 ? 's' : ''}
+              </p>
             </Card>
+
+            {isFranchise ? (
+              <>
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Wallet className="h-4 w-4 text-[#D35400]" /> Marge brute HT
+                  </div>
+                  <p
+                    className={cn(
+                      'mt-2 text-xl font-bold tabular-nums sm:text-2xl',
+                      dashboardMetrics.marginHt >= 0 ? 'text-emerald-700' : 'text-red-600',
+                    )}
+                  >
+                    {fmtEur(dashboardMetrics.marginHt)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Recettes − Dépenses</p>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Wallet className="h-4 w-4 text-blue-500" /> Cash net TTC
+                  </div>
+                  <p
+                    className={cn(
+                      'mt-2 text-xl font-bold tabular-nums sm:text-2xl',
+                      dashboardMetrics.cashNet >= 0 ? 'text-emerald-700' : 'text-red-600',
+                    )}
+                  >
+                    {fmtEur(dashboardMetrics.cashNet)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Franchise en base — pas de TVA</p>
+                </Card>
+              </>
+            ) : (
+              <>
+                <Card
+                  className={cn(
+                    'p-4',
+                    dashboardMetrics.tvaToPay > 0
+                      ? 'border-[#D35400]/30 bg-orange-50/40'
+                      : dashboardMetrics.tvaToPay < 0
+                      ? 'border-emerald-300/40 bg-emerald-50/40'
+                      : '',
+                  )}
+                >
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Percent
+                      className={cn(
+                        'h-4 w-4',
+                        dashboardMetrics.tvaToPay > 0 ? 'text-[#D35400]' : 'text-emerald-600',
+                      )}
+                    />
+                    {dashboardMetrics.tvaToPay >= 0 ? 'TVA à payer' : 'Crédit de TVA'}
+                  </div>
+                  <p
+                    className={cn(
+                      'mt-2 text-xl font-bold tabular-nums sm:text-2xl',
+                      dashboardMetrics.tvaToPay > 0
+                        ? 'text-[#D35400]'
+                        : dashboardMetrics.tvaToPay < 0
+                        ? 'text-emerald-700'
+                        : '',
+                    )}
+                  >
+                    {fmtEur(Math.abs(dashboardMetrics.tvaToPay))}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Collectée {fmtEur(dashboardMetrics.tvaCollected)} −{' '}
+                    {fmtEur(dashboardMetrics.tvaDeductible)}
+                  </p>
+                </Card>
+
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Receipt className="h-4 w-4 text-blue-500" /> TVA récupérable
+                  </div>
+                  <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+                    {fmtEur(dashboardMetrics.tvaDeductible)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {dashboardMetrics.deductibleCount} dépense
+                    {dashboardMetrics.deductibleCount > 1 ? 's' : ''} déductible
+                    {dashboardMetrics.deductibleCount > 1 ? 's' : ''}
+                  </p>
+                </Card>
+              </>
+            )}
+          </div>
+
+          {/* Row 2 — Indicators secondaires */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Justificatifs manquants */}
+            <Card
+              className={cn(
+                'p-4',
+                dashboardMetrics.missingCount > 0
+                  ? 'border-red-200 bg-red-50/40'
+                  : dashboardMetrics.expCount > 0
+                  ? 'border-emerald-200 bg-emerald-50/40'
+                  : '',
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {dashboardMetrics.missingCount > 0 ? (
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  )}
+                  Justificatifs manquants
+                </div>
+              </div>
+              <p
+                className={cn(
+                  'mt-2 text-xl font-bold tabular-nums sm:text-2xl',
+                  dashboardMetrics.missingCount > 0 ? 'text-red-600' : 'text-emerald-700',
+                )}
+              >
+                {dashboardMetrics.missingCount}
+              </p>
+              <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{dashboardMetrics.compliance}% conformes</span>
+                {dashboardMetrics.missingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFluxSubTab('missing');
+                      setTab('flux');
+                    }}
+                    className="font-medium text-red-600 underline-offset-2 hover:underline"
+                  >
+                    Voir →
+                  </button>
+                )}
+              </div>
+            </Card>
+
+            {/* Pointage banque */}
             <Card className="p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="h-4 w-4 text-emerald-500" /> Mois en cours
+                <Landmark className="h-4 w-4 text-blue-500" /> Pointage banque
               </div>
               <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
-                {fmtEur(monthExpenses)}
+                {dashboardMetrics.pointedCount}
+                <span className="text-base text-muted-foreground">
+                  /{dashboardMetrics.totalActive}
+                </span>
               </p>
-              <p className="text-[11px] text-muted-foreground">HT</p>
+              <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{dashboardMetrics.pointedRatio}% rapprochés</span>
+                <button
+                  type="button"
+                  onClick={() => setTab('bank')}
+                  className="font-medium text-blue-600 underline-offset-2 hover:underline"
+                >
+                  Banque →
+                </button>
+              </div>
             </Card>
+
+            {/* Top catégorie */}
             <Card className="p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <BarChart3 className="h-4 w-4 text-[#D35400]" /> Top catégorie
               </div>
               <p className="mt-2 text-base font-bold sm:text-lg line-clamp-1">{topCategoryName}</p>
               <p className="text-[11px] text-muted-foreground">
-                {categoryData[0] ? fmtEur(categoryData[0].value) : '—'}
+                {categoryData[0] ? fmtEur(categoryData[0].value) : '—'} HT
               </p>
             </Card>
           </div>
 
+          {/* Charts */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card className="p-4">
-              <h3 className="text-sm font-semibold">Dépenses par mois (12 derniers)</h3>
-              {monthlyData.some((m) => m.total > 0) ? (
+              <h3 className="text-sm font-semibold">Dépenses vs Recettes (12 derniers mois)</h3>
+              <p className="text-[11px] text-muted-foreground">Montants HT</p>
+              {monthlyData.some((m) => m.depenses > 0 || m.recettes > 0) ? (
                 <div className="mt-3 h-56 w-full">
-                  <BarChart width={500} height={220} data={monthlyData} className="!w-full">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                    <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis fontSize={11} tickLine={false} axisLine={false} width={50} />
-                    <RechartsTooltip
-                      formatter={(v: number) => fmtEur(v)}
-                      contentStyle={{ fontSize: 11, borderRadius: 8 }}
-                    />
-                    <Bar dataKey="total" fill="#D35400" radius={[6, 6, 0, 0]} />
-                  </BarChart>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                      <XAxis dataKey="month" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis fontSize={11} tickLine={false} axisLine={false} width={50} />
+                      <RechartsTooltip
+                        formatter={(v: number) => fmtEur(v)}
+                        contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                        cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                      />
+                      <Bar dataKey="recettes" name="Recettes" fill="#10b981" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="depenses" name="Dépenses" fill="#D35400" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               ) : (
                 <p className="mt-4 text-center text-xs text-muted-foreground">
-                  Pas encore de dépenses ce mois-ci
+                  Pas encore de mouvements sur les 12 derniers mois
                 </p>
               )}
             </Card>
 
             <Card className="p-4">
-              <h3 className="text-sm font-semibold">Répartition par catégorie ({filterYear})</h3>
+              <h3 className="text-sm font-semibold">Répartition par catégorie</h3>
+              <p className="text-[11px] text-muted-foreground">{periodLabel}</p>
               {categoryData.length > 0 ? (
                 <div className="mt-3 flex flex-col items-center gap-3 sm:flex-row">
                   <PieChart width={180} height={180}>
@@ -1089,7 +1558,7 @@ export default function ComptabilitePage() {
                 </div>
               ) : (
                 <p className="mt-4 text-center text-xs text-muted-foreground">
-                  Aucune dépense sur {filterYear}
+                  Aucune dépense sur {periodLabel.toLowerCase()}
                 </p>
               )}
             </Card>
@@ -1160,10 +1629,14 @@ export default function ComptabilitePage() {
               <div className="space-y-2 sm:hidden">
                 {filteredExpenses.map((e) => {
                   const cat = categories.find((c) => c.id === e.expense_category_id);
+                  const hasReceipt = !!e.receipt_storage_path;
                   return (
                     <Card
                       key={e.id}
-                      className="cursor-pointer p-3 hover:bg-muted/30"
+                      className={cn(
+                        'cursor-pointer p-3 hover:bg-muted/30',
+                        !hasReceipt && 'border-l-2 border-l-red-400',
+                      )}
                       onClick={() => openEdit(e)}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1176,7 +1649,7 @@ export default function ComptabilitePage() {
                         </p>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex min-w-0 items-center gap-1.5">
                           <span className="text-[10px] text-muted-foreground">{fmtDate(e.date)}</span>
                           {cat && (
                             <Badge variant="secondary" className="text-[9px]">
@@ -1189,8 +1662,19 @@ export default function ComptabilitePage() {
                               OCR
                             </Badge>
                           )}
+                          {hasReceipt ? (
+                            <Badge className="gap-0.5 bg-emerald-100 text-[9px] text-emerald-700 hover:bg-emerald-100">
+                              <FileCheck2 className="h-2.5 w-2.5" />
+                              Justif
+                            </Badge>
+                          ) : (
+                            <Badge className="gap-0.5 bg-red-100 text-[9px] text-red-700 hover:bg-red-100">
+                              <FileX2 className="h-2.5 w-2.5" />
+                              Sans justif
+                            </Badge>
+                          )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="whitespace-nowrap text-[10px] text-muted-foreground">
                           TVA {fmtEur(e.tva_amount)}
                         </span>
                       </div>
@@ -1211,6 +1695,7 @@ export default function ComptabilitePage() {
                         <th className="px-3 py-2 text-right font-medium">HT</th>
                         <th className="px-3 py-2 text-right font-medium">TVA</th>
                         <th className="px-3 py-2 text-right font-medium">TTC</th>
+                        <th className="px-3 py-2 text-center font-medium">Justif</th>
                         <th className="px-3 py-2 text-center font-medium">Source</th>
                         <th className="px-3 py-2 text-right font-medium">Actions</th>
                       </tr>
@@ -1253,6 +1738,23 @@ export default function ComptabilitePage() {
                             </td>
                             <td className="px-3 py-2 text-right tabular-nums font-semibold">
                               {fmtEur(e.amount)}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {e.receipt_storage_path ? (
+                                <span
+                                  className="inline-flex items-center justify-center text-emerald-600"
+                                  title="Justificatif présent"
+                                >
+                                  <FileCheck2 className="h-4 w-4" />
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center justify-center text-red-500"
+                                  title="Justificatif manquant"
+                                >
+                                  <FileX2 className="h-4 w-4" />
+                                </span>
+                              )}
                             </td>
                             <td className="px-3 py-2 text-center">
                               {e.source === 'ocr' ? (
@@ -1536,14 +2038,25 @@ export default function ComptabilitePage() {
                           />
                         </td>
                         <td className="px-3 py-2.5">
-                          <span
-                            className={cn(
-                              'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                              f.statusColor,
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className={cn(
+                                'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                                f.statusColor,
+                              )}
+                            >
+                              {f.statusLabel}
+                            </span>
+                            {f.pointed && (
+                              <span
+                                className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700"
+                                title="Pointée avec une transaction bancaire"
+                              >
+                                <Check className="h-2.5 w-2.5" />
+                                Pointée
+                              </span>
                             )}
-                          >
-                            {f.statusLabel}
-                          </span>
+                          </div>
                         </td>
                         <td className="px-3 py-2.5">
                           {f.kind === 'invoice' ? (
@@ -1720,6 +2233,15 @@ export default function ComptabilitePage() {
                         >
                           {f.statusLabel}
                         </span>
+                        {f.pointed && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700"
+                            title="Pointée avec une transaction bancaire"
+                          >
+                            <Check className="h-2.5 w-2.5" />
+                            Pointée
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 truncate text-sm font-semibold text-foreground">{f.label}</p>
                       {f.sublabel && (
@@ -1880,10 +2402,16 @@ export default function ComptabilitePage() {
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            Ce flux centralise toutes les factures émises et les dépenses enregistrées. Plus tard, les
-            transactions bancaires (via Powens/Bridge) viendront s&apos;y ajouter automatiquement. Votre
-            comptable y accède en lecture seule via l&apos;onglet &laquo;&nbsp;Comptable&nbsp;&raquo;.
+            Ce flux centralise toutes les factures émises et les dépenses enregistrées. Importez un
+            relevé bancaire depuis l&apos;onglet &laquo;&nbsp;Banque&nbsp;&raquo; pour pointer les
+            écritures réellement passées en banque. Votre comptable y accède en lecture seule via
+            l&apos;onglet &laquo;&nbsp;Comptable&nbsp;&raquo;.
           </p>
+        </TabsContent>
+
+        {/* ─────── BANQUE ─────── */}
+        <TabsContent value="bank" className="mt-4 space-y-4">
+          <BankReconciliationTab />
         </TabsContent>
 
         {/* ─────── RECETTES ─────── */}
@@ -2007,13 +2535,24 @@ export default function ComptabilitePage() {
                 dépenses et les factures.
               </p>
             </div>
-            <Button
-              onClick={() => setShowInvite(true)}
-              className="gap-2 bg-[#D35400] hover:bg-[#b8470a]"
-            >
-              <Mail className="h-4 w-4" />
-              Inviter mon comptable
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={loadAccesses}
+                title="Rafraîchir"
+                className="flex-shrink-0"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={() => setShowInvite(true)}
+                className="gap-2 bg-[#D35400] hover:bg-[#b8470a]"
+              >
+                <Mail className="h-4 w-4" />
+                Inviter mon comptable
+              </Button>
+            </div>
           </div>
 
           {accesses.length === 0 ? (
@@ -2059,6 +2598,38 @@ export default function ComptabilitePage() {
                         {a.accountant_name && (
                           <p className="text-xs text-muted-foreground">{a.accountant_name}</p>
                         )}
+
+                        {/* Statut de connexion — visible immédiatement */}
+                        {isActive && (
+                          <div
+                            className={cn(
+                              'mt-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs',
+                              a.last_viewed_at
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                : 'border-amber-200 bg-amber-50 text-amber-800',
+                            )}
+                          >
+                            {a.last_viewed_at ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>
+                                  Dernière connexion&nbsp;
+                                  <span className="font-semibold">{fmtRelative(a.last_viewed_at)}</span>
+                                  <span className="hidden sm:inline">
+                                    {' · '}
+                                    {fmtDateTime(a.last_viewed_at)}
+                                  </span>
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>Pas encore consulté par votre comptable</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+
                         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
