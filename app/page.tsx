@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Navbar } from '@/components/landing/navbar';
 import { Hero } from '@/components/landing/hero';
 import { Marquee } from '@/components/landing/marquee';
@@ -26,6 +27,25 @@ import { Testimonials } from '@/components/landing/testimonials';
 import { FAQ } from '@/components/landing/faq';
 import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
+
+export const metadata: Metadata = {
+  title: 'Logiciel du bâtiment tout-en-un pour artisans — Hellobat',
+  description:
+    'Hellobat réunit devis IA vocal, facture électronique 2026, gestion chantiers, planning et CRM. Plus de 2 400 artisans nous font confiance, noté 4.9/5. Essai gratuit 30 jours.',
+  alternates: {
+    canonical: 'https://hellobat.app/',
+  },
+  openGraph: {
+    type: 'website',
+    url: 'https://hellobat.app/',
+    siteName: 'Hellobat',
+    title: 'Logiciel du bâtiment tout-en-un pour artisans — Hellobat',
+    description:
+      'Hellobat réunit devis IA vocal, facture électronique 2026, gestion chantiers, planning et CRM. Plus de 2 400 artisans nous font confiance, noté 4.9/5. Essai gratuit 30 jours.',
+    locale: 'fr_FR',
+    // OG image inherited from app/opengraph-image.tsx
+  },
+};
 
 export default function LandingPage() {
   return (

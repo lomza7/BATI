@@ -10,16 +10,18 @@ export function Hero() {
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-sm font-medium mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--landing-accent)] animate-pulse" />
-            Boostez votre entreprise avec l'intelligence artificielle
+            Boostez votre boîte avec l'intelligence artificielle
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif leading-[1.1] mb-6 text-[var(--landing-text)]">
-            Gérez votre activité BTP,{' '}
-            <em className="font-serif italic text-[var(--landing-accent)]">simplement</em>
+            <span className="block mb-2">Fini la paperasse.</span>
+            Le logiciel du bâtiment{' '}
+            <em className="font-serif italic text-[var(--landing-accent)]">tout-en-un</em>
+            , boosté par l&apos;IA.
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Devis IA vocal, signature électronique, factures, paiements Stripe, contrats récurrents, chantiers, planning, CRM, Gmail, Google Calendar
+            Gérez votre activité BTP <em className="italic">simplement</em> : devis IA vocal, signature électronique, factures, paiements Stripe, contrats récurrents, chantiers, planning, CRM, Gmail, Google Calendar
             &mdash; tout est réuni dans une seule plateforme pensée pour les artisans.
           </p>
 

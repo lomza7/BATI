@@ -18,7 +18,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  Hexagon,
 } from 'lucide-react';
 
 const features = [
@@ -51,11 +50,16 @@ export function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--landing-white)]/80 backdrop-blur-md border-b border-[var(--landing-border)]">
       <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2" onClick={handleLogoClick}>
-          <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
-            <Hexagon className={`h-4 w-4 text-white ${logoClicked ? 'animate-nut-click' : ''}`} />
-          </div>
-          <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
+        <Link href="/" className="flex items-center gap-2.5" onClick={handleLogoClick}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon.svg"
+            alt="Hellobat"
+            width={36}
+            height={36}
+            className={logoClicked ? 'animate-nut-click' : ''}
+          />
+          <span className="font-serif font-medium text-[var(--landing-text)] text-xl">Hellobat</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
