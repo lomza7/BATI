@@ -67,11 +67,8 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
-  // TODO: Replace PLACEHOLDER_GOOGLE_SITE_VERIFICATION with the real token once
-  // Google Search Console verification is completed.
-  verification: {
-    google: 'PLACEHOLDER_GOOGLE_SITE_VERIFICATION',
-  },
+  // Google Search Console verification is handled at the domain level via
+  // Google Workspace (DNS ownership), so no meta tag is required here.
   category: 'technology',
 };
 
