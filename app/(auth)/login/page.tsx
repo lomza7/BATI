@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Hexagon, Eye, EyeOff, ArrowRight, ArrowLeft, Zap, RefreshCw, Check } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ArrowRight, ArrowLeft, Zap, RefreshCw, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Turnstile } from '@/components/shared/turnstile';
 
@@ -116,11 +116,10 @@ function LoginContent() {
           <div className="absolute inset-0 bg-gradient-to-t from-[#1a1510] via-[#1a1510]/60 to-transparent" />
         </div>
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/10">
-              <Hexagon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-semibold text-white">Hellobat</span>
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="Hellobat" width={40} height={40} />
+            <span className="font-serif font-medium text-white text-xl">Hellobat</span>
           </div>
           <div className="space-y-6">
             <blockquote className="text-2xl font-serif italic text-white/90 leading-relaxed">
@@ -147,10 +146,9 @@ function LoginContent() {
         </Link>
         <div className="w-full max-w-[420px]">
           <div className="lg:hidden flex items-center gap-2.5 mb-12">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Hexagon className="h-4.5 w-4.5 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-semibold text-foreground">Hellobat</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="Hellobat" width={36} height={36} />
+            <span className="font-serif font-medium text-foreground text-lg">Hellobat</span>
           </div>
 
           <div className="space-y-2 mb-8">
@@ -232,7 +230,7 @@ function LoginContent() {
               className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-medium text-sm flex items-center justify-center gap-2 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
-                <Hexagon className="h-4 w-4 animate-nut-ratchet" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
                   Se connecter

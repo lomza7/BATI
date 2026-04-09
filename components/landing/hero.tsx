@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, TrendingUp, FileText, CreditCard, Calendar, Mail, CheckCircle2, ShieldCheck, Mic, Sparkles, Clock, MapPin, Globe } from 'lucide-react';
 
@@ -22,9 +23,20 @@ export function Hero() {
 
           <AiProvidersRow />
 
-          <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
-            <strong className="text-[var(--landing-text)] font-semibold">Votre site web est offert</strong>, une IA <strong className="text-[var(--landing-text)] font-semibold">dicte vos devis à la voix</strong>, votre <strong className="text-[var(--landing-text)] font-semibold">compta se classe toute seule</strong> (facture électronique 2026 incluse). Gmail et agenda Google connectés, CRM clients, carte de vos chantiers, paiement et signature en ligne &mdash; bref, tout ce qui vous prend vos soirées, réglé dans une seule app.
+          <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-5 sm:mb-6 max-w-2xl mx-auto leading-relaxed">
+            L&apos;IA <Highlight delay={0.2}>rédige vos devis à la voix</Highlight>,{' '}
+            <Highlight delay={0.7}>répond à vos mails</Highlight> en connaissant chaque client,{' '}
+            <Highlight delay={1.2}>classe votre compta</Highlight> et{' '}
+            <Highlight delay={1.7}>met à jour votre site web</Highlight> à chaque fin de chantier.
+            Avec <Highlight delay={2.3}>signature électronique</Highlight>,{' '}
+            <Highlight delay={2.7}>paiement en ligne</Highlight> et{' '}
+            <Highlight delay={3.1}>suivi des chantiers &amp; de l&apos;équipe</Highlight> — tout dans une seule app.
           </p>
+
+          <TypewriterTagline
+            text="Passer moins de temps devant un écran, plus de temps chez vos clients."
+            startDelay={4000}
+          />
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
@@ -379,5 +391,76 @@ function AiBrand({ name, children }: { name: string; children: React.ReactNode }
       {children}
       <span className="text-[11px] font-medium tracking-wide">{name}</span>
     </div>
+  );
+}
+
+/**
+ * Inline highlighter-pen effect: a pastel accent background sweeps from
+ * left to right under the word after `delay` seconds. Combined with a
+ * staggered delay per feature this draws the eye through the hero
+ * description without being noisy.
+ */
+function Highlight({ delay, children }: { delay: number; children: React.ReactNode }) {
+  return (
+    <strong
+      className="highlight-sweep font-semibold text-[var(--landing-text)]"
+      style={{ animationDelay: `${delay}s` }}
+    >
+      {children}
+    </strong>
+  );
+}
+
+/**
+ * Typewriter tagline — characters appear one by one with a blinking
+ * caret (as if someone was typing on a keyboard). Once the full line
+ * is written, the caret blinks a couple of times and then an "Enter"
+ * press is simulated: a brief glow + bounce on the whole line, and
+ * the caret disappears.
+ *
+ * startDelay (ms) lets us chain it after the highlight cascade above.
+ */
+function TypewriterTagline({ text, startDelay }: { text: string; startDelay: number }) {
+  const [phase, setPhase] = useState<'waiting' | 'typing' | 'done' | 'submitted'>('waiting');
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPhase('typing'), startDelay);
+    return () => clearTimeout(t);
+  }, [startDelay]);
+
+  useEffect(() => {
+    if (phase !== 'typing') return;
+    if (count >= text.length) {
+      setPhase('done');
+      return;
+    }
+    // Slightly slower after punctuation to feel human.
+    const prev = text[count - 1];
+    const delay = prev === ',' ? 220 : prev === '.' ? 320 : 38 + Math.random() * 35;
+    const t = setTimeout(() => setCount(count + 1), delay);
+    return () => clearTimeout(t);
+  }, [phase, count, text]);
+
+  useEffect(() => {
+    if (phase !== 'done') return;
+    // Pause on the finished sentence, then "press Enter".
+    const t = setTimeout(() => setPhase('submitted'), 700);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  const typed = text.slice(0, count);
+  const showCaret = phase === 'typing' || phase === 'done';
+
+  return (
+    <p
+      className="text-base sm:text-lg font-serif italic text-[var(--landing-text)]/90 max-w-xl mx-auto mb-8 sm:mb-10 leading-relaxed min-h-[1.75em]"
+      aria-label={text}
+    >
+      <span className={phase === 'submitted' ? 'tagline-submit inline-block' : 'inline-block'}>
+        <span aria-hidden>{typed}</span>
+        {showCaret && <span className="typewriter-caret" aria-hidden />}
+      </span>
+    </p>
   );
 }
