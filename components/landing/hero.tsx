@@ -20,9 +20,10 @@ export function Hero() {
             , boosté par l&apos;IA.
           </h1>
 
+          <AiProvidersRow />
+
           <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Gérez votre activité BTP <em className="italic">simplement</em> : devis IA vocal, signature électronique, factures, paiements Stripe, contrats récurrents, chantiers, planning, CRM, Gmail, Google Calendar
-            &mdash; tout est réuni dans une seule plateforme pensée pour les artisans.
+            Un <strong className="text-[var(--landing-text)] font-semibold">site web offert</strong> pour votre entreprise, une <strong className="text-[var(--landing-text)] font-semibold">IA qui rédige vos devis à la voix</strong>, une <strong className="text-[var(--landing-text)] font-semibold">compta qui se classe toute seule</strong> (prête pour la facture électronique 2026), le <strong className="text-[var(--landing-text)] font-semibold">paiement en ligne</strong> des factures et la <strong className="text-[var(--landing-text)] font-semibold">signature à distance</strong> des devis &mdash; bref, tout ce qui vous prend vos soirées, réglé dans une seule app.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -237,6 +238,56 @@ function RappelItem({
       <Icon className={`w-3 h-3 ${color} shrink-0`} />
       <span className="text-[10px] text-[var(--landing-text)] truncate flex-1">{label}</span>
       <span className="text-[9px] text-[var(--landing-muted)] shrink-0">{badge}</span>
+    </div>
+  );
+}
+
+/**
+ * Discreet row showing the three AI engines that power Hellobat.
+ * Rendered between the H1 and the description to build trust in the
+ * first seconds of the page visit. Logos are intentionally tiny and
+ * muted — they are a signal, not a decoration.
+ */
+function AiProvidersRow() {
+  return (
+    <div className="flex flex-col items-center gap-2 mb-6 sm:mb-7">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--landing-muted)] font-medium">
+        Les intelligences artificielles qui travaillent pour vous
+      </span>
+      <div className="flex items-center gap-3 sm:gap-5 text-[var(--landing-muted)]">
+        <AiBrand name="Claude">
+          {/* Anthropic — 8-ray burst */}
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <line x1="12" y1="3" x2="12" y2="21" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="5.64" y1="5.64" x2="18.36" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="5.64" y2="18.36" />
+          </svg>
+        </AiBrand>
+        <span aria-hidden className="text-[var(--landing-muted)] opacity-40 select-none">·</span>
+        <AiBrand name="ChatGPT">
+          {/* OpenAI — knot ring */}
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8zm0 3a5 5 0 100 10 5 5 0 000-10zm0 2a3 3 0 110 6 3 3 0 010-6z" />
+          </svg>
+        </AiBrand>
+        <span aria-hidden className="text-[var(--landing-muted)] opacity-40 select-none">·</span>
+        <AiBrand name="Gemini">
+          {/* Google Gemini — 4-point sparkle */}
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+            <path d="M12 1C11.5 6 7 10.5 2 11C7 11.5 11.5 16 12 21C12.5 16 17 11.5 22 11C17 10.5 12.5 6 12 1Z" />
+          </svg>
+        </AiBrand>
+      </div>
+    </div>
+  );
+}
+
+function AiBrand({ name, children }: { name: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+      {children}
+      <span className="text-[11px] font-medium tracking-wide">{name}</span>
     </div>
   );
 }
