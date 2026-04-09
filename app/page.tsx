@@ -29,9 +29,9 @@ import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
-  title: 'Hellobat — +10h gagnées par semaine grâce à l\'IA | Logiciel bâtiment',
+  title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA | Logiciel bâtiment',
   description:
-    '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+    'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
   alternates: {
     canonical: 'https://hellobat.app/',
   },
@@ -39,17 +39,17 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://hellobat.app/',
     siteName: 'Hellobat',
-    title: 'Hellobat — +10h gagnées par semaine grâce à l\'IA',
+    title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA',
     description:
-      '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
     locale: 'fr_FR',
     // OG image inherited from app/opengraph-image.tsx
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hellobat — +10h gagnées par semaine grâce à l\'IA',
+    title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA',
     description:
-      '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
   },
 };
 
