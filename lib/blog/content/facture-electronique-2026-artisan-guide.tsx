@@ -8,8 +8,17 @@ import Link from 'next/link';
  *            "plateforme agréée PDP", "Factur-X artisan"
  * Intent: high — very concrete compliance problem with deadline.
  *
- * Factual sources cross-checked (April 2026): economie.gouv.fr,
- * impots.gouv.fr, service-public.fr, FFB, compta-online.
+ * Fact-check 2026-04-09 against impots.gouv.fr, economie.gouv.fr and
+ * articles 1737 / 1788 D du CGI. Corrections applied:
+ *  - Sanction pour non-émission au format électronique : 50 € / facture
+ *    (et non 15 €), plafond 15 000 € / année civile — article 1737 CGI.
+ *  - Micro-entrepreneurs en franchise de TVA : totalement concernés
+ *    ("assujettis non redevables"), pas "partiellement".
+ *  - Ajout du droit à l'erreur (première infraction sur 4 ans).
+ *  - Ajout de l'amende de 500 € pour défaut de désignation d'une
+ *    Plateforme Agréée de réception.
+ *  - Date précise de l'abandon du PPF : 15 octobre 2024, par le
+ *    ministère de l'Économie (DGFiP était l'opérateur prévu).
  */
 export function FactureElectronique2026Content() {
   const h2 = 'text-2xl sm:text-3xl font-serif text-[var(--landing-text)] mt-12 mb-4';
@@ -186,16 +195,37 @@ export function FactureElectronique2026Content() {
 
       <h3 className={h3}>Et les micro-entrepreneurs du bâtiment ?</h3>
       <p className={p}>
-        Les micro-entrepreneurs qui bénéficient de la franchise en base de
-        TVA (et qui n&apos;ont donc pas de numéro de TVA intracommunautaire)
-        sont <strong>partiellement</strong> concernés. Ils devront être
-        capables de recevoir des factures électroniques dès septembre 2026,
-        et ils devront émettre des factures électroniques pour leurs
-        échanges B2B. Même sans collecter de TVA, ils font partie du champ de
-        la réforme dès lors qu&apos;ils facturent des entreprises. Seules les
-        factures adressées à des particuliers (B2C) échappent au dispositif
-        — mais restent concernées par l&apos;e-reporting que nous verrons
-        plus bas.
+        Les micro-entrepreneurs en franchise en base de TVA sont{' '}
+        <strong>totalement concernés</strong> par la réforme. La DGFiP est
+        très claire sur ce point : même s&apos;ils ne collectent pas la TVA,
+        ils restent <em>assujettis à la TVA non redevables</em>, et à ce
+        titre ils entrent dans le champ d&apos;application au même titre que
+        n&apos;importe quelle autre entreprise française. Concrètement, un
+        maçon ou un peintre en micro-entreprise devra :
+      </p>
+      <ul className={ul}>
+        <li>
+          <strong>Recevoir</strong> les factures électroniques de ses
+          fournisseurs dès le 1ᵉʳ septembre 2026 (même calendrier que les
+          grandes entreprises pour la réception).
+        </li>
+        <li>
+          <strong>Émettre</strong> ses propres factures au format
+          électronique pour ses clients professionnels (B2B) à partir du
+          1ᵉʳ septembre 2027, comme toutes les PME et TPE.
+        </li>
+        <li>
+          <strong>Transmettre les données</strong> de ses factures à
+          destination de particuliers (B2C) via l&apos;e-reporting, que nous
+          détaillons plus bas.
+        </li>
+      </ul>
+      <p className={p}>
+        Autrement dit, il n&apos;existe aucune dérogation basée sur le
+        statut de micro-entrepreneur ou la franchise en base. Seule la
+        date d&apos;entrée en vigueur de l&apos;obligation d&apos;émission
+        change (septembre 2027 au lieu de septembre 2026), alignée sur le
+        calendrier des PME.
       </p>
 
       {/* H2 3 */}
@@ -225,15 +255,16 @@ export function FactureElectronique2026Content() {
       <h3 className={h3}>Le PPF (Portail Public de Facturation)</h3>
       <p className={p}>
         Le PPF était initialement pensé comme une alternative publique et
-        gratuite aux plateformes privées. Ce rôle a été officiellement
-        abandonné en octobre 2024 par la Direction générale des Finances
-        publiques (DGFiP). Le PPF n&apos;assurera plus l&apos;émission ni la
-        réception directe de factures. Il conserve en revanche deux
-        fonctions essentielles : celle d&apos;<strong>annuaire central</strong>{' '}
-        (qui indique quelle Plateforme Agréée utilise chaque entreprise
-        destinataire) et celle de <strong>concentrateur de données</strong>{' '}
-        fiscales, pour transmettre les informations nécessaires à
-        l&apos;administration.
+        gratuite aux plateformes privées, opérée par la DGFiP. Ce rôle a
+        été officiellement abandonné le <strong>15 octobre 2024</strong>,
+        lorsque le ministère de l&apos;Économie a annoncé le recentrage
+        stratégique du projet. Le PPF n&apos;assurera plus l&apos;émission
+        ni la réception directe de factures. Il conserve en revanche deux
+        fonctions essentielles : celle d&apos;
+        <strong>annuaire central</strong> (qui indique quelle Plateforme
+        Agréée utilise chaque entreprise destinataire) et celle de{' '}
+        <strong>concentrateur de données</strong> fiscales, pour transmettre
+        les informations nécessaires à l&apos;administration.
       </p>
       <p className={p}>
         Conclusion pratique : aucun artisan n&apos;utilisera le PPF pour
@@ -351,29 +382,55 @@ export function FactureElectronique2026Content() {
         Sanctions : combien coûte une non-conformité ?
       </h2>
       <p className={p}>
-        Le législateur a prévu un régime de sanctions pour inciter les
-        entreprises à se mettre en conformité. Les montants sont les
-        suivants :
+        Le législateur a prévu un régime de sanctions, codifié aux{' '}
+        <strong>articles 1737 et 1788 D du Code général des impôts</strong>,
+        pour inciter les entreprises à se mettre en conformité. Les montants
+        sont les suivants :
       </p>
       <ul className={ul}>
         <li>
-          <strong>15 € par facture non conforme</strong> (format incorrect
-          ou absence d&apos;émission au bon format), plafonnée à{' '}
-          <strong>15 000 € par année civile</strong>.
+          <strong>50 € par facture</strong> non émise au format électronique
+          alors que l&apos;obligation s&apos;applique, plafonnée à{' '}
+          <strong>15 000 € par année civile</strong>. Ce montant a été porté
+          de 15 € à 50 € lors des dernières évolutions du texte, pour
+          renforcer l&apos;effet dissuasif.
         </li>
         <li>
           <strong>250 € par défaut de transmission</strong> dans le cadre de
-          l&apos;e-reporting, également plafonnés à{' '}
+          l&apos;e-reporting (données de transactions ou de paiement non
+          envoyées à l&apos;administration), également plafonnés à{' '}
           <strong>15 000 € par année civile</strong>.
         </li>
+        <li>
+          <strong>500 € d&apos;amende</strong> en cas de défaut de
+          désignation d&apos;une Plateforme Agréée pour la réception de vos
+          factures, après une mise en demeure de l&apos;administration
+          restée sans suite pendant trois mois. Ce montant peut être
+          renouvelé en cas de persistance.
+        </li>
       </ul>
+
+      <h3 className={h3}>Un droit à l&apos;erreur est prévu</h3>
+      <p className={p}>
+        Bonne nouvelle : le texte prévoit explicitement un{' '}
+        <strong>droit à l&apos;erreur</strong>. Les amendes ci-dessus{' '}
+        <em>ne s&apos;appliquent pas</em> en cas de première infraction
+        commise au cours de l&apos;année civile en cours et des trois années
+        précédentes, dès lors que l&apos;entreprise corrige spontanément
+        l&apos;irrégularité — ou qu&apos;elle le fait dans les trente jours
+        suivant une première demande de l&apos;administration. Concrètement,
+        un artisan de bonne foi qui oublierait une facture ou se tromperait
+        de format n&apos;est pas sanctionné immédiatement : il reçoit
+        d&apos;abord un avertissement avec un délai pour rectifier.
+      </p>
+
       <p className={p}>
         Ces montants peuvent paraître modestes au regard d&apos;un gros
         chantier, mais le vrai coût de la non-conformité est ailleurs : un
         client professionnel qui reçoit une facture non conforme peut
         refuser de la traiter, ce qui retarde d&apos;autant votre
-        paiement. Dans le BTP, où les délais de règlement sont déjà
-        souvent tendus, cela devient un vrai problème de trésorerie.
+        paiement. Dans le BTP, où les délais de règlement sont déjà souvent
+        tendus, cela devient un vrai problème de trésorerie.
       </p>
 
       {/* H2 7 */}
@@ -483,12 +540,15 @@ export function FactureElectronique2026Content() {
 
       <h3 className={h3}>Je suis micro-entrepreneur en franchise de TVA. Suis-je concerné ?</h3>
       <p className={p}>
-        Oui, partiellement. Vous devez être capable de recevoir des
-        factures électroniques dès septembre 2026 et d&apos;en émettre
-        pour vos clients professionnels à partir de septembre 2027, même
-        si vous ne collectez pas de TVA. Les factures adressées à des
-        particuliers ne passent pas par le circuit électronique mais
-        doivent faire l&apos;objet d&apos;un e-reporting.
+        Oui, totalement. La DGFiP est explicite : les franchisés en base de
+        TVA sont des <em>assujettis non redevables</em> et entrent dans le
+        champ complet de la réforme. Vous devez être capable de recevoir
+        des factures électroniques dès le 1ᵉʳ septembre 2026 et d&apos;en
+        émettre pour vos clients professionnels à partir du 1ᵉʳ septembre
+        2027 (même calendrier que les PME), même si vous ne collectez pas
+        de TVA. Les factures adressées à des particuliers ne passent pas
+        par le circuit électronique mais doivent faire l&apos;objet
+        d&apos;un e-reporting.
       </p>
 
       <h3 className={h3}>Dois-je choisir moi-même ma Plateforme Agréée ?</h3>
@@ -501,9 +561,14 @@ export function FactureElectronique2026Content() {
 
       <h3 className={h3}>Que se passe-t-il si je ne suis pas prêt au 1ᵉʳ septembre 2027 ?</h3>
       <p className={p}>
-        Vous vous exposez aux sanctions évoquées plus haut (15 € par
+        Vous vous exposez aux sanctions évoquées plus haut (50 € par
         facture non conforme, 250 € par défaut d&apos;e-reporting, dans
-        la limite de 15 000 € par an chacun). Surtout, vous risquez des
+        la limite de 15 000 € par an chacun, plus une amende de 500 € en
+        cas de défaut de désignation d&apos;une Plateforme Agréée après
+        mise en demeure). Un droit à l&apos;erreur est prévu pour une
+        première infraction corrigée spontanément ou dans les trente
+        jours suivant une notification, mais il ne joue qu&apos;une seule
+        fois sur une période de quatre ans. Surtout, vous risquez des
         refus de paiement de la part de vos clients professionnels, ce qui
         peut rapidement déséquilibrer votre trésorerie. Le mieux est de
         démarrer la migration dès 2026, sans attendre l&apos;échéance.
