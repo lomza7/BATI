@@ -173,6 +173,7 @@ export default function AdminPage() {
     openai_image_model: 'gpt-image-1',
     gemini_api_key: '',
     gemini_image_model: 'gemini-2.5-flash-image',
+    groq_api_key: '',
   });
   const [imageSecretsLoading, setImageSecretsLoading] = useState(true);
   const [imageSecretsSaving, setImageSecretsSaving] = useState(false);
@@ -180,6 +181,7 @@ export default function AdminPage() {
   const [imageSecretsError, setImageSecretsError] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [showGroqKey, setShowGroqKey] = useState(false);
 
   // Referrals
   const [referralStats, setReferralStats] = useState<{
@@ -350,6 +352,7 @@ export default function AdminPage() {
           openai_image_model: s.openai_image_model?.value || 'gpt-image-1',
           gemini_api_key: s.gemini_api_key?.value || '',
           gemini_image_model: s.gemini_image_model?.value || 'gemini-2.5-flash-image',
+          groq_api_key: s.groq_api_key?.value || '',
         });
       }
     } catch {
@@ -877,15 +880,15 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Generation d'images IA */}
+          {/* Services IA externes */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Wand2 className="h-4 w-4 text-primary" /> Generation d'images IA
+                  <Wand2 className="h-4 w-4 text-primary" /> Services IA externes
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Cles API utilisees pour la generation Avant/Apres IA. Choisis le provider actif et renseigne sa cle.
+                  Cles API pour la generation Avant/Apres (OpenAI/Gemini) et la dictee vocale de devis (Groq).
                 </p>
               </div>
               <Button
@@ -1032,6 +1035,47 @@ export default function AdminPage() {
                     onChange={(e) => setImageSecrets((prev) => ({ ...prev, gemini_image_model: e.target.value }))}
                     placeholder="gemini-2.5-flash-image"
                   />
+                </div>
+              </div>
+
+              {/* Groq config (transcription vocale) */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Groq Whisper (dictee vocale)</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Utilise pour transcrire la voix des artisans dans l'assistant devis IA.
+                    </p>
+                  </div>
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline shrink-0"
+                  >
+                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Cle API (gsk_...)</label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type={showGroqKey ? 'text' : 'password'}
+                      placeholder="gsk_..."
+                      className="text-xs font-mono"
+                      value={imageSecrets.groq_api_key}
+                      onChange={(e) => setImageSecrets((prev) => ({ ...prev, groq_api_key: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowGroqKey((v) => !v)}
+                      className="shrink-0"
+                    >
+                      {showGroqKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
                 </div>
               </div>
 

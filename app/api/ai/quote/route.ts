@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { aiQuoteAnalysisSchema, AI_QUOTE_UNITS } from '@/lib/ai/quote-schema';
+import {
+  aiQuoteResponseSchema,
+  quoteTurnSchema,
+  AI_QUOTE_UNITS,
+  type QuoteTurn,
+} from '@/lib/ai/quote-schema';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
@@ -215,11 +220,38 @@ export async function POST(request: Request) {
     const businessContextRaw = String(formData.get('business_context') || '').trim();
     const recentLinesRaw = String(formData.get('recent_quote_lines') || '').trim();
     const clientHistoryRaw = String(formData.get('client_history') || '').trim();
+    const previousTurnsRaw = String(formData.get('previous_turns') || '').trim();
     const photoEntries = formData.getAll('photos').filter((value): value is File => value instanceof File);
 
     if (!transcript) {
       return NextResponse.json({ error: 'La transcription vocale est vide.' }, { status: 400 });
     }
+
+    // Parse the clarification history. The client owns all conversation
+    // state and re-sends the whole array on every call — server stays
+    // stateless. A malformed payload is non-fatal: we just start fresh.
+    let previousTurns: QuoteTurn[] = [];
+    if (previousTurnsRaw) {
+      try {
+        const parsedRaw = JSON.parse(previousTurnsRaw);
+        if (Array.isArray(parsedRaw)) {
+          previousTurns = parsedRaw
+            .map((t) => quoteTurnSchema.safeParse(t))
+            .filter((r) => r.success)
+            .map((r) => (r as { success: true; data: QuoteTurn }).data);
+        }
+      } catch {
+        previousTurns = [];
+      }
+    }
+
+    // Count how many times the craftsman has already answered questions.
+    // After 2 answer rounds, the next call MUST return a ready draft — the
+    // server enforces this in the prompt to prevent infinite clarification.
+    const answerTurnsCount = previousTurns.filter(
+      (t) => t.role === 'user' && t.kind === 'answers',
+    ).length;
+    const mustFinalize = answerTurnsCount >= 2;
 
     // Parse contextual JSON payloads safely
     let servicesCatalog: ServiceCatalogItem[] = [];
@@ -260,42 +292,110 @@ export async function POST(request: Request) {
       })
     );
 
+    // Render the clarification history as plain text so GPT-4o can reason
+    // about what was already asked and answered. We intentionally keep this
+    // very compact — each turn is at most a few lines.
+    const historyLines: string[] = [];
+    for (const turn of previousTurns) {
+      if (turn.role === 'user' && turn.kind === 'transcript') {
+        historyLines.push(`Artisan (description initiale): ${turn.text}`);
+      } else if (turn.role === 'assistant' && turn.kind === 'questions') {
+        historyLines.push(
+          `Toi (questions posées): ${turn.questions
+            .map((q, i) => `${i + 1}) ${q.text}`)
+            .join(' | ')}`,
+        );
+      } else if (turn.role === 'user' && turn.kind === 'answers') {
+        historyLines.push(
+          `Artisan (réponses): ${turn.answers
+            .map((a) => `${a.question_text} → ${a.text}`)
+            .join(' | ')}`,
+        );
+      }
+    }
+
     const prompt = [
       'Tu aides un artisan francais du BTP a preparer un brouillon de devis.',
-      'Analyse la transcription vocale et, le cas echeant, les photos du chantier.',
-      'Retourne uniquement un JSON valide, sans markdown, sans commentaire, sans texte avant ou apres.',
-      'Le JSON doit respecter exactement cette forme:',
+      'Analyse la transcription vocale, les photos eventuelles et l historique de clarification (s il existe).',
+      '',
+      'Tu dois renvoyer UNIQUEMENT un JSON valide (pas de markdown, pas de commentaires).',
+      'Ton JSON peut prendre DEUX formes :',
+      '',
+      '== FORME 1 : tu as besoin de precisions ==',
       JSON.stringify(
         {
-          title: 'string',
-          clientName: 'string',
-          description: 'string',
-          confidence: 85,
-          summary: 'string',
-          assumptions: ['string'],
-          lines: [
+          status: 'clarify',
+          questions: [
             {
-              description: 'string',
-              quantity: 1,
-              unit: 'forfait',
-              unit_price: 0,
-              service_id: 'uuid-optionnel-si-issu-du-catalogue',
+              id: 'q1',
+              text: 'Question courte, parlable a voix haute, en une phrase',
+              reason: 'Pourquoi cette question change le chiffrage',
             },
           ],
         },
         null,
-        2
+        2,
       ),
-      'Consignes:',
+      'Utilise cette forme si la demande est trop vague pour etablir un devis precis.',
+      'Regles pour les questions :',
+      '- Entre 1 et 3 questions maximum (privilegie 2).',
+      '- Chaque question cible un element chiffrable concret (surface, quantite, gamme, etat existant, contraintes d acces, delai).',
+      '- Chaque question tient en une seule phrase courte (max 20 mots).',
+      '- Chaque question a un `reason` concret qui explique l impact sur le devis (ex: "Pour chiffrer la quantite de carrelage").',
+      '- N ajoute PAS de question cosmetique ou evidente.',
+      '- Les id sont des chaines courtes et uniques (q1, q2, q3).',
+      '',
+      '== FORME 2 : tu as assez d infos, tu rediges le brouillon ==',
+      JSON.stringify(
+        {
+          status: 'ready',
+          analysis: {
+            title: 'string',
+            clientName: 'string',
+            description: 'string',
+            confidence: 85,
+            summary: 'string',
+            assumptions: ['string'],
+            lines: [
+              {
+                description: 'string',
+                quantity: 1,
+                unit: 'forfait',
+                unit_price: 0,
+                service_id: 'uuid-optionnel-si-issu-du-catalogue',
+              },
+            ],
+          },
+        },
+        null,
+        2,
+      ),
+      'Regles pour l analyse :',
       '- Reponds en francais.',
       '- Le titre doit etre court et exploitable pour un devis.',
       '- clientName peut etre vide si aucun nom n est identifiable.',
       "- description doit resumer le besoin et indiquer qu'il s'agit d'un brouillon IA a valider.",
       '- confidence doit etre un entier de 0 a 100.',
-      '- assumptions doit contenir seulement des hypotheses utiles.',
+      '- assumptions doit contenir seulement des hypotheses utiles (liste les elements incertains).',
       '- lines doit contenir des lignes concretes de devis avec quantites et prix unitaires plausibles.',
       '- Si un prix est incertain, propose une estimation raisonnable pour un brouillon.',
       `- unit doit etre STRICTEMENT l une de ces valeurs: ${AI_QUOTE_UNITS.join(', ')}. N en invente pas d autres.`,
+      ...(mustFinalize
+        ? [
+            '',
+            '!! CONTRAINTE IMPORTANTE !!',
+            'L artisan a deja repondu a DEUX series de questions. Tu DOIS renvoyer status: "ready" maintenant.',
+            'N envoie PAS de nouvelles questions. Liste les elements incertains dans `assumptions` a la place.',
+          ]
+        : []),
+      ...(historyLines.length > 0
+        ? [
+            '',
+            'HISTORIQUE DE LA CONVERSATION (chronologique):',
+            ...historyLines,
+            'Prends en compte ces echanges pour affiner ton brouillon (ou pour poser des questions differentes si tu en reposes).',
+          ]
+        : []),
       ...(businessContext && (businessContext.company_activity || businessContext.naf_label || businessContext.company_city)
         ? [
             '',
@@ -398,11 +498,55 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "La reponse d'OpenAI est vide." }, { status: 502 });
     }
 
+    // The model returns either a clarify payload or a ready payload. If the
+    // `status` discriminator is missing we assume the legacy shape (bare
+    // analysis object) and wrap it ourselves.
     const rawParsed = JSON.parse(extractJsonFromText(textContent));
-    const normalized = normalizeAnalysisRaw(rawParsed);
-    const parsed = aiQuoteAnalysisSchema.parse(normalized);
+    const rawObj =
+      rawParsed && typeof rawParsed === 'object' ? (rawParsed as Record<string, unknown>) : null;
 
-    return NextResponse.json({ analysis: parsed });
+    const candidate: Record<string, unknown> =
+      rawObj && rawObj.status
+        ? rawObj
+        : { status: 'ready', analysis: rawObj };
+
+    // Normalize units inside the analysis before zod-parsing — the model
+    // sometimes returns "m²" where we expect "m2", etc.
+    if (candidate.status === 'ready') {
+      candidate.analysis = normalizeAnalysisRaw(candidate.analysis);
+    }
+
+    const responseParsed = aiQuoteResponseSchema.safeParse(candidate);
+    if (!responseParsed.success) {
+      return apiError('AI_PARSE', {
+        cause: responseParsed.error,
+        context: { route: 'ai/quote', user_id: userId, turns: previousTurns.length },
+      });
+    }
+
+    // Server-side safety net: if we asked the model to finalize, refuse any
+    // clarify answer and return a parse error the client can surface.
+    if (responseParsed.data.status === 'clarify' && mustFinalize) {
+      return apiError('AI_PARSE', {
+        message: "L'IA n'a pas pu finaliser le devis après 3 tours. Rédige-le manuellement.",
+        context: { route: 'ai/quote', user_id: userId, turns: previousTurns.length },
+      });
+    }
+
+    if (responseParsed.data.status === 'clarify') {
+      return NextResponse.json({
+        status: 'clarify',
+        questions: responseParsed.data.questions,
+      });
+    }
+
+    // The ready branch already carried `analysis` through aiQuoteAnalysisSchema
+    // inside the union, so TypeScript narrows it here and the post-conditions
+    // (non-empty lines etc.) are already enforced.
+    return NextResponse.json({
+      status: 'ready',
+      analysis: responseParsed.data.analysis,
+    });
   } catch (error) {
     return apiError('INTERNAL', {
       message: "L'analyse IA a echoue.",

@@ -10,6 +10,7 @@ const ALLOWED_KEYS = new Set([
   'openai_image_model',
   'gemini_api_key',
   'gemini_image_model',
+  'groq_api_key',
 ]);
 
 async function verifyAdmin(request: Request) {
