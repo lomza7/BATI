@@ -560,6 +560,121 @@ export function buildVerificationCodeEmail(data: VerificationCodeEmailData): str
 </html>`.trim();
 }
 
+interface RenduCampaignEmailData {
+  artisanName: string;
+  clientName: string;
+  campaignUrl: string;
+  projectType?: string;
+  accentColor?: string;
+}
+
+export function buildRenduCampaignEmail(data: RenduCampaignEmailData): string {
+  const accent = data.accentColor || '#d35400';
+  const greeting = data.clientName ? `Bonjour ${escHtml(data.clientName)}` : 'Bonjour';
+  const projectLine = data.projectType
+    ? `<p style="margin:0 0 18px;font-size:14px;color:#1a1a1a;line-height:1.6;font-style:italic;border-left:3px solid ${accent};padding-left:14px">Projet : ${escHtml(data.projectType)}</p>`
+    : '';
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visualisez vos travaux avant signature</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+
+          <tr>
+            <td style="background-color:${accent};padding:32px 32px 28px;text-align:center">
+              <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#ffffff;opacity:0.85;text-transform:uppercase;letter-spacing:1.2px">
+                ${escHtml(data.artisanName)}
+              </p>
+              <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.4px">
+                Visualisez vos travaux avant de signer
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:32px 32px 8px">
+              <p style="margin:0 0 14px;font-size:15px;color:#1a1a1a">
+                ${greeting},
+              </p>
+              <p style="margin:0 0 18px;font-size:14px;color:#6b6560;line-height:1.65">
+                <strong>${escHtml(data.artisanName)}</strong> vous offre un outil exclusif :
+                envoyez une simple photo de votre piece ou facade, et notre IA vous montre
+                <strong>en quelques secondes a quoi ressembleront vos travaux apres rénovation</strong>.
+              </p>
+
+              ${projectLine}
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf8f5;border-radius:12px;border:1px solid #ece8e0;margin:6px 0 22px">
+                <tr>
+                  <td style="padding:18px 22px">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:${accent}">
+                      Comment ca marche
+                    </p>
+                    <p style="margin:0 0 6px;font-size:13px;color:#1a1a1a;line-height:1.55">
+                      <strong>1.</strong> Cliquez sur le bouton ci-dessous
+                    </p>
+                    <p style="margin:0 0 6px;font-size:13px;color:#1a1a1a;line-height:1.55">
+                      <strong>2.</strong> Uploadez la photo de votre piece
+                    </p>
+                    <p style="margin:0 0 6px;font-size:13px;color:#1a1a1a;line-height:1.55">
+                      <strong>3.</strong> Choisissez un style et generez plusieurs avant/apres
+                    </p>
+                    <p style="margin:0;font-size:13px;color:#1a1a1a;line-height:1.55">
+                      <strong>4.</strong> Marquez vos preferes — vous les recevrez par email
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:0 32px 32px">
+              <a href="${data.campaignUrl}" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:12px;letter-spacing:-0.2px">
+                Visualiser mon projet
+              </a>
+              <p style="margin:14px 0 0;font-size:11px;color:#9a9590;line-height:1.5">
+                Lien personnel et confidentiel — ne le partagez pas.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background-color:#faf8f5;padding:20px 32px">
+              <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+                Envoye via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du batiment
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin-top:16px">
+          <tr>
+            <td align="center">
+              <p style="margin:0;font-size:11px;color:#999">
+                Si le bouton ne fonctionne pas, copiez ce lien :<br/>
+                <a href="${data.campaignUrl}" style="color:${accent};word-break:break-all">${data.campaignUrl}</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 function escHtml(str: string): string {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
