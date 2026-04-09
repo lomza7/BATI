@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
 import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
-import { Hexagon } from 'lucide-react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, session, profile, loading, showOnboarding, completeOnboarding } = useAuth();
@@ -77,9 +76,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <Hexagon className="h-5 w-5 text-white animate-nut-ratchet" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="Hellobat" width={40} height={40} className="animate-nut-ratchet" />
           <p className="text-sm text-muted-foreground">Chargement...</p>
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Hexagon, Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift } from 'lucide-react';
+import { Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -11,10 +11,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Hexagon className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <span className="text-base font-semibold tracking-tight text-foreground">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
+        <span className="font-serif font-medium tracking-tight text-foreground text-lg">
           Hellobat
         </span>
       </div>
@@ -86,10 +85,9 @@ export function Sidebar() {
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-            <Hexagon className="h-3.5 w-3.5 text-primary-foreground" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-foreground">Hellobat</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="Hellobat" width={28} height={28} />
+          <span className="font-serif font-medium tracking-tight text-foreground text-base">Hellobat</span>
         </div>
       </div>
     </>
