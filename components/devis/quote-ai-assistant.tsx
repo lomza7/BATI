@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Loader2, Mic, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -74,11 +67,6 @@ type AssistantPhase = 'input' | 'analyzing' | 'clarifying' | 'ready';
 
 const BAR_COUNT = 30;
 const MAX_DURATION_SEC = 120;
-// Ignore presses shorter than this — a tap is almost always accidental for
-// hold-to-record gestures. The user gets a short "keep holding" hint.
-const MIN_HOLD_MS = 350;
-// Swipe-left distance (px) needed to cancel an in-progress recording.
-const CANCEL_SWIPE_PX = 80;
 
 const EXAMPLE_REQUEST =
   "Renovation d'une salle de bain de 6 m2 avec depose, plomberie douche, carrelage mural, meuble vasque et peinture plafond.";
@@ -441,13 +429,6 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     activeMicRef.current = activeMic;
   }, [activeMic]);
 
-  // Hold gesture state — per-press, for the main mic only (answer mics are
-  // auto-mode: press to start, release to stop without cancel thresholds).
-  const pressStartRef = useRef<number>(0);
-  const pressStartXRef = useRef<number>(0);
-  const shouldCancelRef = useRef<boolean>(false);
-  const [showCancelHint, setShowCancelHint] = useState(false);
-
   const recorder = useVoiceRecorder({
     onTranscript: (text) => {
       const target = activeMicRef.current;
@@ -538,7 +519,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     setAnalysisError('');
   }
 
-  // ---------- Mic gesture (hold-to-record on main + answer mics) -------
+  // ---------- Mic toggle (tap to start, tap to stop) -------------------
 
   async function startMic(target: string) {
     if (recorder.phase === 'recording' || recorder.phase === 'uploading') return;
@@ -548,69 +529,16 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     await recorder.start();
   }
 
-  function handleMainPointerDown(e: ReactPointerEvent<HTMLButtonElement>) {
-    e.preventDefault();
-    pressStartRef.current = performance.now();
-    pressStartXRef.current = e.clientX;
-    shouldCancelRef.current = false;
-    setShowCancelHint(false);
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
-    void startMic('main');
-  }
-
-  function handleMainPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (recorder.phase !== 'recording' || activeMicRef.current !== 'main') return;
-    const deltaX = e.clientX - pressStartXRef.current;
-    const wantCancel = deltaX < -CANCEL_SWIPE_PX;
-    if (wantCancel !== shouldCancelRef.current) {
-      shouldCancelRef.current = wantCancel;
-      setShowCancelHint(wantCancel);
+  async function toggleMic(target: string) {
+    // If that exact mic is already recording, the tap stops it and sends.
+    if (recorder.phase === 'recording' && activeMicRef.current === target) {
+      await recorder.stop({ cancel: false });
+      return;
     }
-  }
-
-  async function handleMainPointerUp(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (activeMicRef.current !== 'main') return;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-    const held = performance.now() - pressStartRef.current;
-    const cancel = shouldCancelRef.current || held < MIN_HOLD_MS;
-    setShowCancelHint(false);
-    if (held < MIN_HOLD_MS) {
-      setAnalysisError('Maintiens le micro appuyé pour parler.');
-    }
-    await recorder.stop({ cancel });
-    if (cancel) setActiveMic(null);
-  }
-
-  function handleMainPointerCancel() {
-    if (activeMicRef.current !== 'main') return;
-    setShowCancelHint(false);
-    void recorder.stop({ cancel: true });
-    setActiveMic(null);
-  }
-
-  // ---------- Answer mini-mic handlers ---------------------------------
-
-  function handleAnswerPointerDown(e: ReactPointerEvent<HTMLButtonElement>, qId: string) {
-    e.preventDefault();
-    pressStartRef.current = performance.now();
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
-    void startMic(`answer:${qId}`);
-  }
-
-  async function handleAnswerPointerUp(e: ReactPointerEvent<HTMLButtonElement>, qId: string) {
-    if (activeMicRef.current !== `answer:${qId}`) return;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-    const held = performance.now() - pressStartRef.current;
-    const cancel = held < MIN_HOLD_MS;
-    if (cancel) setAnalysisError('Maintiens le micro pour répondre.');
-    await recorder.stop({ cancel });
-    if (cancel) setActiveMic(null);
-  }
-
-  function handleAnswerPointerCancel(qId: string) {
-    if (activeMicRef.current !== `answer:${qId}`) return;
-    void recorder.stop({ cancel: true });
-    setActiveMic(null);
+    // If a different mic is busy (recording or uploading), ignore the tap —
+    // we never want two recordings racing or a click during upload.
+    if (recorder.phase === 'recording' || recorder.phase === 'uploading') return;
+    await startMic(target);
   }
 
   // ---------- Analyze call (shared between first run and follow-ups) ---
@@ -925,48 +853,35 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
               </div>
             ) : (
               <>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onPointerDown={handleMainPointerDown}
-                    onPointerMove={handleMainPointerMove}
-                    onPointerUp={handleMainPointerUp}
-                    onPointerLeave={handleMainPointerUp}
-                    onPointerCancel={handleMainPointerCancel}
-                    onContextMenu={(e) => e.preventDefault()}
-                    disabled={isUploading || isAnalysing}
-                    aria-label={isRecordingMain ? 'Relâche pour envoyer' : 'Maintiens pour parler'}
-                    aria-pressed={isRecordingMain}
-                    className={cn(
-                      'relative flex h-20 w-20 touch-none select-none items-center justify-center rounded-full shadow-lg transition-all duration-150',
-                      isRecordingMain
-                        ? 'scale-110 bg-[#d35400] text-white ring-8 ring-[#d35400]/20'
-                        : 'bg-white text-[#d35400] ring-2 ring-[#d35400]/20 hover:ring-[#d35400]/35 active:scale-95',
-                      (isUploading || isAnalysing) && 'opacity-50',
-                    )}
-                    style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-9 w-9 animate-spin" />
-                    ) : (
-                      <Mic className="h-9 w-9" />
-                    )}
-                  </button>
-                  {isRecordingMain && showCancelHint && (
-                    <div className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-white shadow-md">
-                      ← Relâche pour annuler
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => { void toggleMic('main'); }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  disabled={isUploading || isAnalysing}
+                  aria-label={isRecordingMain ? 'Appuie pour arrêter' : 'Appuie pour parler'}
+                  aria-pressed={isRecordingMain}
+                  className={cn(
+                    'relative flex h-20 w-20 select-none items-center justify-center rounded-full shadow-lg transition-all duration-150',
+                    isRecordingMain
+                      ? 'scale-110 bg-[#d35400] text-white ring-8 ring-[#d35400]/20'
+                      : 'bg-white text-[#d35400] ring-2 ring-[#d35400]/20 hover:ring-[#d35400]/35 active:scale-95',
+                    (isUploading || isAnalysing) && 'opacity-50',
                   )}
-                </div>
+                  style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+                >
+                  {isUploading ? (
+                    <Loader2 className="h-9 w-9 animate-spin" />
+                  ) : (
+                    <Mic className="h-9 w-9" />
+                  )}
+                </button>
 
                 <p className="text-center text-sm font-medium text-[#a34700]">
                   {isRecordingMain
-                    ? showCancelHint
-                      ? 'Relâche ici pour annuler'
-                      : 'Parle maintenant, relâche quand tu as fini'
+                    ? 'Enregistrement… appuie pour arrêter'
                     : isUploading
                       ? 'Transcription en cours…'
-                      : 'Maintiens pour parler'}
+                      : 'Appuie pour parler'}
                 </p>
 
                 {isRecordingMain && (
@@ -982,7 +897,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
                 )}
                 {isRecordingMain && (
                   <p className="text-xs text-muted-foreground">
-                    Glisse vers la gauche pour annuler · {elapsedLabel} / {Math.floor(MAX_DURATION_SEC / 60)}:{String(MAX_DURATION_SEC % 60).padStart(2, '0')}
+                    {elapsedLabel} / {Math.floor(MAX_DURATION_SEC / 60)}:{String(MAX_DURATION_SEC % 60).padStart(2, '0')}
                   </p>
                 )}
               </>
@@ -1114,18 +1029,15 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
                       {!recorderUnsupported && (
                         <button
                           type="button"
-                          onPointerDown={(e) => handleAnswerPointerDown(e, q.id)}
-                          onPointerUp={(e) => handleAnswerPointerUp(e, q.id)}
-                          onPointerLeave={(e) => handleAnswerPointerUp(e, q.id)}
-                          onPointerCancel={() => handleAnswerPointerCancel(q.id)}
+                          onClick={() => { void toggleMic(`answer:${q.id}`); }}
                           onContextMenu={(e) => e.preventDefault()}
                           disabled={
                             (recorder.phase !== 'idle' && !isAnswerMicActive) || isAnalysing
                           }
-                          aria-label={isAnswerMicActive ? 'Relâche pour envoyer' : 'Maintiens pour répondre'}
+                          aria-label={isAnswerMicActive ? 'Appuie pour arrêter' : 'Appuie pour répondre'}
                           aria-pressed={isAnswerMicActive}
                           className={cn(
-                            'flex h-10 w-10 shrink-0 touch-none select-none items-center justify-center rounded-full shadow-sm transition-all duration-150',
+                            'flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full shadow-sm transition-all duration-150',
                             isAnswerMicActive
                               ? 'scale-110 bg-[#d35400] text-white ring-4 ring-[#d35400]/25'
                               : 'bg-white text-[#d35400] ring-2 ring-[#d35400]/20 hover:ring-[#d35400]/35',
