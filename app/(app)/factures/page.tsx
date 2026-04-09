@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -238,8 +239,7 @@ export default function FacturesPage() {
         clientId = newC?.id || null;
       }
     }
-    const now = new Date();
-    const invNumber = `F-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+    const invNumber = await getNextInvoiceNumber(supabase, user.id);
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
 
@@ -289,8 +289,7 @@ export default function FacturesPage() {
     setCreatingFromQuoteId(quote.id);
 
     try {
-      const now = new Date();
-      const invNumber = `F-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+      const invNumber = await getNextInvoiceNumber(supabase, user.id);
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 30);
 

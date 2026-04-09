@@ -30,6 +30,7 @@ import {
   YAxis,
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
+import { getNextInvoiceNumber, getNextQuoteNumber } from '@/lib/document-numbers';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate, INVOICE_STATUSES, QUOTE_STATUSES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
@@ -279,21 +280,7 @@ export default function ContratsPage() {
     setBillingContractId(contract.id);
 
     try {
-      // Generate invoice number
-      const { data: lastInv } = await supabase
-        .from('invoices')
-        .select('invoice_number')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const year = new Date().getFullYear();
-      let nextNum = 1;
-      if (lastInv?.invoice_number) {
-        const match = lastInv.invoice_number.match(/F-\d{4}-(\d+)/);
-        if (match) nextNum = parseInt(match[1]) + 1;
-      }
-      const invoiceNumber = `F-${year}-${String(nextNum).padStart(3, '0')}`;
+      const invoiceNumber = await getNextInvoiceNumber(supabase, user.id);
 
       const totalHt = contract.amount;
       const tvaRate = contract.tva_rate ?? 20;
@@ -371,21 +358,7 @@ export default function ContratsPage() {
   async function generateQuote(contract: Contract) {
     if (!user) return;
 
-    // Generate quote number
-    const { data: lastQ } = await supabase
-      .from('quotes')
-      .select('quote_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const year = new Date().getFullYear();
-    let nextNum = 1;
-    if (lastQ?.quote_number) {
-      const match = lastQ.quote_number.match(/D-\d{4}-(\d+)/);
-      if (match) nextNum = parseInt(match[1]) + 1;
-    }
-    const quoteNumber = `D-${year}-${String(nextNum).padStart(3, '0')}`;
+    const quoteNumber = await getNextQuoteNumber(supabase, user.id);
 
     const totalHt = contract.amount;
     const tvaRate = contract.tva_rate ?? 20;

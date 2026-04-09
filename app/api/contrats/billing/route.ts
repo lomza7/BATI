@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildInvoicePaymentEmail } from '@/lib/email-templates';
+import { getNextInvoiceNumber } from '@/lib/document-numbers';
 
 export const runtime = 'nodejs';
 
@@ -52,22 +53,8 @@ export async function POST(request: Request) {
 
   for (const contract of contracts as unknown as ContractRow[]) {
     try {
-      // Generate sequential invoice number for this user
-      const { data: lastInvoice } = await supabaseAdmin
-        .from('invoices')
-        .select('invoice_number')
-        .eq('user_id', contract.user_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const year = new Date().getFullYear();
-      let nextNum = 1;
-      if (lastInvoice?.invoice_number) {
-        const match = lastInvoice.invoice_number.match(/F-\d{4}-(\d+)/);
-        if (match) nextNum = parseInt(match[1]) + 1;
-      }
-      const invoiceNumber = `F-${year}-${String(nextNum).padStart(3, '0')}`;
+      // Generate sequential invoice number per user+year.
+      const invoiceNumber = await getNextInvoiceNumber(supabaseAdmin, contract.user_id);
 
       const totalHt = contract.amount;
       const tvaRate = contract.tva_rate ?? 20;

@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { QUOTE_STATUSES, QUOTE_UNITS, formatCurrency, formatDate } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
-import { type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
+import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { ServicePicker } from '@/components/devis/service-picker';
 import { PageHeader } from '@/components/shared/page-header';
@@ -78,7 +78,6 @@ interface QuoteLine {
 
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
-  const AI_PENDING_DRAFT_KEY = 'hellobat_ai_quote_pending_draft';
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
@@ -104,6 +103,10 @@ export default function DevisPage() {
   const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null);
+  // Set when returning from /devis/ai after a successful creation — drives
+  // the confirmation banner at the top of the list. Cleared automatically
+  // after 5s.
+  const [aiCreatedNumber, setAiCreatedNumber] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -112,6 +115,7 @@ export default function DevisPage() {
     const params = new URLSearchParams(window.location.search);
     const paramClientId = params.get('client_id');
     const paramProjectId = params.get('project_id');
+    const aiCreated = params.get('ai_created');
 
     if (paramClientId || paramProjectId) {
       if (paramProjectId) prefillProjectId.current = paramProjectId;
@@ -120,20 +124,12 @@ export default function DevisPage() {
       router.replace('/devis', { scroll: false });
     }
 
-    // Pick up a draft produced by /devis/ai before this page mounted. When
-    // the AI assistant finishes on its dedicated page, it stashes the draft
-    // in sessionStorage and navigates here — we consume it once and open the
-    // create dialog pre-filled.
-    try {
-      const stored = window.sessionStorage.getItem(AI_PENDING_DRAFT_KEY);
-      if (stored) {
-        window.sessionStorage.removeItem(AI_PENDING_DRAFT_KEY);
-        const draft = JSON.parse(stored) as AiQuoteDraft;
-        applyAiDraft(draft);
-      }
-    } catch {
-      // Corrupted JSON or storage quota issues — ignore silently, user will
-      // just see the devis list as usual.
+    // When the AI assistant redirects back with ?ai_created=<number>, show
+    // a confirmation banner and strip the query param.
+    if (aiCreated) {
+      setAiCreatedNumber(aiCreated);
+      router.replace('/devis', { scroll: false });
+      window.setTimeout(() => setAiCreatedNumber(null), 5000);
     }
   }, []);
 
@@ -199,8 +195,7 @@ export default function DevisPage() {
   async function autosaveDraft(clientId: string) {
     if (!user || draftId.current) return;
 
-    const now = new Date();
-    const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+    const quoteNumber = await getNextQuoteNumber(supabase, user.id);
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 30);
 
@@ -289,11 +284,17 @@ export default function DevisPage() {
         .maybeSingle();
 
       if (!existingLead) {
-        const now = new Date();
-        const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+        // Reuse the real quote_number from the existing draft so the lead
+        // label stays consistent with what the user sees in the list.
+        const { data: draftRow } = await supabase
+          .from('quotes')
+          .select('quote_number')
+          .eq('id', draftId.current)
+          .single();
+        const draftQuoteNumber = draftRow?.quote_number || '';
         await supabase.from('leads').insert({
           user_id: user.id,
-          name: newQuote.title || `Devis ${quoteNumber}`,
+          name: newQuote.title || `Devis ${draftQuoteNumber}`,
           client_id: selectedClientId || null,
           quote_id: draftId.current,
           stage: 'devis_envoye',
@@ -304,8 +305,7 @@ export default function DevisPage() {
       }
     } else {
       // No draft yet — create everything from scratch
-      const now = new Date();
-      const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+      const quoteNumber = await getNextQuoteNumber(supabase, user.id);
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
 
@@ -561,35 +561,6 @@ export default function DevisPage() {
     router.push('/devis/ai');
   }
 
-  async function applyAiDraft(draft: AiQuoteDraft) {
-    setNewQuote({
-      title: draft.title,
-      description: draft.description,
-    });
-    setLines(draft.lines.map((line) => ({
-      ...line,
-      tva_rate: (line as { tva_rate?: number }).tva_rate ?? 20,
-    })));
-    setShowCreate(true);
-
-    // If the assistant already has a client selected, use it directly
-    if (draft.clientId) {
-      setSelectedClientId(draft.clientId);
-      return;
-    }
-
-    // Otherwise fall back to matching by name
-    if (draft.clientName?.trim()) {
-      const { data } = await supabase
-        .from('clients')
-        .select('id')
-        .ilike('name', draft.clientName.trim())
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (data) setSelectedClientId(data.id);
-    }
-  }
-
   const linesTotals = computeTvaBreakdown(lines.filter(l => l.description.trim()));
 
   return (
@@ -600,6 +571,24 @@ export default function DevisPage() {
           Nouveau devis
         </Button>
       </PageHeader>
+
+      {aiCreatedNumber && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+          <div className="flex-1">
+            <p className="font-medium">Devis {aiCreatedNumber} créé par l&apos;IA</p>
+            <p className="text-xs text-emerald-800/80">Tu peux le retrouver dans la liste ci-dessous et l&apos;envoyer dès que tu es prêt.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAiCreatedNumber(null)}
+            className="text-emerald-700 hover:text-emerald-900"
+            aria-label="Fermer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -906,11 +895,11 @@ export default function DevisPage() {
               <div className="mt-4 flex items-center gap-2">
                 <p className="text-base font-semibold text-foreground">Devis avec IA</p>
                 <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-[#a34700]">
-                  Voix + photos
+                  Vocal
                 </span>
               </div>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Decrivez la demande, ajoutez des photos du chantier et laissez l&apos;assistant proposer une base de devis.
+                Décris ta demande à voix haute et laisse l&apos;assistant rédiger un brouillon prêt à envoyer.
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#a34700]">
                 <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
@@ -938,9 +927,9 @@ export default function DevisPage() {
             <div className="rounded-2xl border border-[#d35400]/15 bg-[#fff7f0] p-4">
               <p className="text-sm font-medium text-foreground">Allez droit au but</p>
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <p>1. Commencez a parler.</p>
-                <p>2. Ajoutez des photos si besoin.</p>
-                <p>3. Lancez la magie pour generer le brouillon.</p>
+                <p>1. Appuie sur le micro et décris ton chantier.</p>
+                <p>2. Réponds aux questions éventuelles de l&apos;IA.</p>
+                <p>3. Vérifie le brouillon et crée le devis.</p>
               </div>
             </div>
 

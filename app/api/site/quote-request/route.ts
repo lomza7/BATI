@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyTurnstile } from '@/lib/turnstile';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { getNextQuoteNumber } from '@/lib/document-numbers';
 
 export const runtime = 'nodejs';
 
@@ -167,8 +168,7 @@ export async function POST(request: Request) {
   }
 
   // 3. Create a draft quote
-  const now = new Date();
-  const quoteNumber = `D-${now.getFullYear()}-${String(Math.floor(Math.random() * 999) + 1).padStart(3, '0')}`;
+  const quoteNumber = await getNextQuoteNumber(supabaseAdmin, artisanUserId);
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + 30);
 

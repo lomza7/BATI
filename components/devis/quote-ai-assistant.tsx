@@ -52,7 +52,9 @@ export interface AiQuoteDraft {
 }
 
 interface QuoteAiAssistantProps {
-  onUseDraft: (draft: AiQuoteDraft) => void;
+  onUseDraft: (draft: AiQuoteDraft) => void | Promise<void>;
+  /** When true, the submit button shows a spinner and is disabled. */
+  saving?: boolean;
   presetRequest?: {
     id: number;
     mode: 'empty' | 'example';
@@ -426,7 +428,7 @@ function useVoiceRecorder({ onTranscript, onError }: UseVoiceRecorderOptions) {
 
 // ---------- Main component ----------------------------------------------
 
-export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAssistantProps) {
+export function QuoteAiAssistant({ onUseDraft, saving = false, presetRequest = null }: QuoteAiAssistantProps) {
   const { user } = useAuth();
 
   const [clientId, setClientId] = useState<string | null>(null);
@@ -832,9 +834,9 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     setSavedLines((prev) => ({ ...prev, [index]: 'saved' }));
   }
 
-  function useInQuote() {
-    if (!analysis || editedLines.length === 0) return;
-    onUseDraft({
+  async function useInQuote() {
+    if (!analysis || editedLines.length === 0 || saving) return;
+    await onUseDraft({
       title: editedTitle.trim() || analysis.title || 'Devis à compléter',
       clientName: clientName.trim() || analysis.clientName || '',
       clientId,
@@ -1257,10 +1259,17 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
               </div>
               <Button
                 onClick={useInQuote}
-                disabled={editedLines.length === 0}
+                disabled={editedLines.length === 0 || saving}
                 className="bg-[#d35400] text-white hover:bg-[#b94800]"
               >
-                Pré-remplir le devis
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Création en cours…
+                  </>
+                ) : (
+                  'Créer le devis'
+                )}
               </Button>
             </div>
           </div>

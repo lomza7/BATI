@@ -22,6 +22,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
+import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { SPECIALTIES, formatCurrency, formatDate } from '@/lib/constants';
 import {
   DEFAULT_LEAD_SOURCES,
@@ -356,9 +357,8 @@ export default function ProspectionPage() {
 
     try {
       const clientId = await ensureClientForLead(lead);
-      const now = new Date();
-      const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-      const validUntil = new Date(now);
+      const quoteNumber = await getNextQuoteNumber(supabase, user.id);
+      const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
 
       const totalHt = Number(lead.value || 0);
@@ -485,9 +485,8 @@ export default function ProspectionPage() {
 
     try {
       const clientId = await ensureClientForLead(lead);
-      const now = new Date();
-      const quoteNumber = `D-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-      const validUntil = new Date(now);
+      const quoteNumber = await getNextQuoteNumber(supabase, user.id);
+      const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
 
       const totalHt = Number(lead.value || 0);
