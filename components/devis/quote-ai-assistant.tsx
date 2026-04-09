@@ -1,7 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Loader2, Mic, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import {
+  Calculator,
+  Camera,
+  Check,
+  FileText,
+  History,
+  Loader2,
+  Mic,
+  Plus,
+  ScrollText,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+  Wand2,
+  X,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, QUOTE_UNITS } from '@/lib/constants';
@@ -12,6 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ClientPicker } from '@/components/shared/client-picker';
 import type { ClarifyQuestion, QuoteTurn } from '@/lib/ai/quote-schema';
 
@@ -67,6 +84,23 @@ type AssistantPhase = 'input' | 'analyzing' | 'clarifying' | 'ready';
 
 const BAR_COUNT = 30;
 const MAX_DURATION_SEC = 120;
+
+// Cosmetic "deep analysis" steps shown in a modal while the /api/ai/quote
+// call is in flight. The real work is just one HTTP round-trip (~3-5s), but
+// rolling through these steps reassures the artisan that we're actually
+// weighing photos, prices, history, etc. Interval below is tuned so the
+// full sequence lasts ~4.4s — the typical API latency.
+const ANALYSIS_STEPS: ReadonlyArray<{ label: string; icon: typeof FileText }> = [
+  { label: 'Lecture attentive de ta demande', icon: FileText },
+  { label: 'Analyse des photos et visuels du chantier', icon: Camera },
+  { label: 'Identification des prestations BTP', icon: Sparkles },
+  { label: 'Estimation des surfaces et quantités', icon: Calculator },
+  { label: 'Consultation des prix du marché français', icon: TrendingUp },
+  { label: 'Prise en compte de ton historique tarifaire', icon: History },
+  { label: 'Rédaction des lignes de devis', icon: ScrollText },
+  { label: 'Vérification finale et cohérence', icon: ShieldCheck },
+];
+const ANALYSIS_STEP_MS = 550;
 
 const EXAMPLE_REQUEST =
   "Renovation d'une salle de bain de 6 m2 avec depose, plomberie douche, carrelage mural, meuble vasque et peinture plafond.";
@@ -420,6 +454,9 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
   const [currentQuestions, setCurrentQuestions] = useState<ClarifyQuestion[]>([]);
   const [pendingAnswers, setPendingAnswers] = useState<Record<string, string>>({});
 
+  // Cosmetic step index shown in the analyzing overlay — see ANALYSIS_STEPS.
+  const [analyzingStep, setAnalyzingStep] = useState(0);
+
   // Tracks which button triggered the active recording so we can route the
   // returned transcript: 'main' writes to the top transcript; 'answer:<id>'
   // writes into pendingAnswers for that question id.
@@ -485,6 +522,31 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     setClientName('');
     setTranscript('');
   }, [presetRequest]);
+
+  // Drive the cosmetic analysis step counter while the API call is in
+  // flight. Resets to 0 on entry and ticks through ANALYSIS_STEPS until the
+  // last one, then stops. When the phase leaves 'analyzing' the overlay
+  // unmounts anyway.
+  useEffect(() => {
+    if (phase !== 'analyzing') {
+      setAnalyzingStep(0);
+      return;
+    }
+    setAnalyzingStep(0);
+    let current = 0;
+    const id = window.setInterval(() => {
+      current += 1;
+      if (current >= ANALYSIS_STEPS.length - 1) {
+        // Stay on the last step (not past it) so the final spinner keeps
+        // pulsing if the API is slower than our animation.
+        setAnalyzingStep(ANALYSIS_STEPS.length - 1);
+        window.clearInterval(id);
+        return;
+      }
+      setAnalyzingStep(current);
+    }, ANALYSIS_STEP_MS);
+    return () => window.clearInterval(id);
+  }, [phase]);
 
   // ---------- Photos ----------------------------------------------------
 
@@ -722,6 +784,15 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
 
   async function launchMagic() {
     if (!transcript.trim()) return;
+    if (!clientId) {
+      setAnalysisError('Sélectionne ou crée un client avant de lancer l\'analyse.');
+      // Scroll the client picker into view so the artisan sees where to act.
+      if (typeof window !== 'undefined') {
+        const picker = document.getElementById('ai-quote-client-picker');
+        picker?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
     const initialTurn: QuoteTurn = {
       role: 'user',
       kind: 'transcript',
@@ -805,6 +876,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
   // ---------- Render ---------------------------------------------------
 
   return (
+    <>
     <Card className="border-border bg-card">
       <CardHeader className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -815,7 +887,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
             </div>
             <CardTitle className="mt-3 text-xl">Décris ton chantier à voix haute</CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
-              Maintiens le micro pour parler. L&apos;IA te pose des questions si besoin, puis prépare un brouillon de devis basé sur ton catalogue et ton historique.
+              Appuie sur le micro pour parler. L&apos;IA te pose des questions si besoin, puis prépare un brouillon de devis basé sur ton catalogue et ton historique.
             </CardDescription>
           </div>
           {isRecordingMain && (
@@ -826,8 +898,20 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
           )}
         </div>
 
-        <div className="rounded-2xl border border-border bg-muted/20 p-3">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Client (optionnel)</p>
+        <div
+          id="ai-quote-client-picker"
+          className={cn(
+            'rounded-2xl border p-3 transition-colors',
+            clientId
+              ? 'border-border bg-muted/20'
+              : 'border-[#d35400]/40 bg-[#fff7f0]',
+          )}
+        >
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Client
+            <span className="text-[#d35400]" aria-hidden="true">*</span>
+            <span className="normal-case tracking-normal text-[11px] text-muted-foreground/70">(requis)</span>
+          </p>
           <ClientPicker
             value={clientId}
             onChange={(id, client) => {
@@ -835,10 +919,11 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
               if (client?.name) setClientName(client.name);
               setAnalysis(null);
               setEditedLines([]);
+              if (id) setAnalysisError('');
             }}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Sélectionne un client pour que l&apos;IA tienne compte de son historique tarifaire.
+            Sélectionne ou crée le client du chantier — l&apos;IA s&apos;appuie sur son historique pour ajuster les prix.
           </p>
         </div>
       </CardHeader>
@@ -989,11 +1074,15 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
 
             <Button
               onClick={launchMagic}
-              disabled={!hasTranscript || isAnalysing || isRecordingMain || isUploading}
+              disabled={!hasTranscript || !clientId || isAnalysing || isRecordingMain || isUploading}
               className="mt-3 w-full gap-2 bg-[#d35400] text-white hover:bg-[#b94800]"
             >
               <Wand2 className={cn('h-4 w-4', isAnalysing && 'animate-spin')} />
-              {isAnalysing ? 'Analyse en cours…' : 'Lancer la magie'}
+              {isAnalysing
+                ? 'Analyse en cours…'
+                : !clientId
+                  ? 'Sélectionne un client pour continuer'
+                  : 'Lancer la magie'}
             </Button>
           </div>
         )}
@@ -1191,5 +1280,75 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
         )}
       </CardContent>
     </Card>
+
+    {/* ---------- Deep analysis overlay ---------- */}
+    <Dialog open={phase === 'analyzing'}>
+      <DialogContent
+        // [&>button]:hidden removes the built-in X close button — this
+        // overlay must stay up until the API call settles.
+        className="max-w-md border-[#d35400]/20 bg-gradient-to-b from-[#fff7f0] to-white sm:max-w-md [&>button]:hidden"
+        // Force-block closing while the API is working — the user shouldn't
+        // be able to dismiss with Escape or outside click either.
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#d35400]/10 ring-4 ring-[#d35400]/10">
+            <Wand2 className="h-7 w-7 animate-pulse text-[#d35400]" />
+          </div>
+          <DialogTitle className="text-center text-lg">Analyse approfondie en cours</DialogTitle>
+          <DialogDescription className="text-center">
+            L&apos;IA croise ta demande, tes photos, ton catalogue et ton historique tarifaire pour rédiger le meilleur devis possible.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="mt-3 space-y-2.5">
+          {ANALYSIS_STEPS.map((step, idx) => {
+            const isDone = idx < analyzingStep;
+            const isCurrent = idx === analyzingStep;
+            const Icon = step.icon;
+            return (
+              <li
+                key={step.label}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl border px-3 py-2 transition-all duration-300',
+                  isDone && 'border-[#d35400]/25 bg-white/70 opacity-80',
+                  isCurrent && 'border-[#d35400]/40 bg-white shadow-sm',
+                  !isDone && !isCurrent && 'border-border bg-white/40 opacity-40',
+                )}
+              >
+                <div
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors',
+                    isDone && 'bg-[#d35400] text-white',
+                    isCurrent && 'bg-[#d35400]/10 text-[#d35400]',
+                    !isDone && !isCurrent && 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {isDone ? (
+                    <Check className="h-4 w-4" />
+                  ) : isCurrent ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    'text-sm',
+                    isCurrent && 'font-medium text-foreground',
+                    isDone && 'text-muted-foreground line-through decoration-[#d35400]/40',
+                    !isDone && !isCurrent && 'text-muted-foreground',
+                  )}
+                >
+                  {step.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
