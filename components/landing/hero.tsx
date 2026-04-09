@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, TrendingUp, FileText, HardHat, CreditCard, RefreshCw, Calendar, Mail, BarChart3, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, TrendingUp, FileText, CreditCard, Calendar, Mail, CheckCircle2, ShieldCheck, Mic, Sparkles, Clock, MapPin, Globe } from 'lucide-react';
 
 export function Hero() {
   return (
@@ -70,8 +70,15 @@ export function Hero() {
             </div>
 
             <div className="p-4 sm:p-6">
-              {/* KPI row */}
+              {/* KPI row — leading with the time saving claim */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <KpiCard
+                  highlight
+                  label="Temps gagné"
+                  value="9h42"
+                  change="cette semaine · grâce à l'IA"
+                  icon={Clock}
+                />
                 <KpiCard
                   label="CA encaissé"
                   value="38 400 €"
@@ -80,17 +87,11 @@ export function Hero() {
                   positive
                 />
                 <KpiCard
-                  label="MRR Contrats"
-                  value="4 200 €"
-                  change="12 contrats actifs"
-                  icon={RefreshCw}
-                  positive
-                />
-                <KpiCard
-                  label="Devis en cours"
-                  value="9"
-                  change="5 envoyés · 4 brouillons"
+                  label="Devis signés"
+                  value="9 / 12"
+                  change="75% conversion"
                   icon={FileText}
+                  positive
                 />
                 <KpiCard
                   label="Paiements Stripe"
@@ -101,70 +102,86 @@ export function Hero() {
                 />
               </div>
 
-              {/* Dashboard content grid */}
+              {/* Dashboard content grid — left: Devis IA vocal (hero feature), right: integrations + map */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-                {/* Mini chart */}
-                <div className="md:col-span-2 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)] p-3 sm:p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-semibold text-[var(--landing-text)]">Dynamique business</p>
-                      <p className="text-[10px] text-[var(--landing-muted)]">Devis, factures et encaissements — cette année</p>
-                    </div>
-                    <BarChart3 className="w-4 h-4 text-[var(--landing-muted)]" />
-                  </div>
-                  <div className="flex items-end gap-[3px] h-[60px] sm:h-[80px]">
-                    {[28, 35, 42, 38, 55, 48, 62, 58, 72, 68, 85, 92].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col gap-[2px] items-stretch justify-end h-full">
-                        <div className="rounded-sm bg-[var(--landing-accent)]/20" style={{ height: `${h * 0.4}%` }} />
-                        <div className="rounded-sm bg-[var(--landing-accent)]/50" style={{ height: `${h * 0.3}%` }} />
-                        <div className="rounded-sm bg-[var(--landing-accent)]" style={{ height: `${h}%` }} />
+                {/* Devis IA vocal — the "wow" feature */}
+                <div className="md:col-span-2 rounded-xl bg-white border border-[var(--landing-border)] p-3 sm:p-4 relative overflow-hidden">
+                  {/* Subtle gradient accent */}
+                  <div aria-hidden className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-[var(--landing-accent)]/5 blur-2xl" />
+
+                  <div className="relative flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-[var(--landing-accent)]/10 flex items-center justify-center">
+                        <Mic className="w-3.5 h-3.5 text-[var(--landing-accent)]" />
                       </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--landing-text)]">Nouveau devis · IA vocale</p>
+                        <p className="text-[10px] text-[var(--landing-muted)]">D-2026-043 · Mme Leroy · Rénovation salle de bain</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[var(--landing-accent)] bg-[var(--landing-accent)]/10 px-1.5 py-0.5 rounded-full">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Claude
+                    </span>
+                  </div>
+
+                  {/* Voice waveform */}
+                  <div className="relative flex items-end justify-center gap-[2px] h-6 sm:h-7 mb-2">
+                    {[25, 55, 40, 80, 65, 90, 45, 70, 85, 55, 35, 75, 60, 95, 50, 80, 40, 65, 55, 30, 70, 45, 85, 60, 25].map((h, i) => (
+                      <div
+                        key={i}
+                        className="w-[2px] rounded-full bg-[var(--landing-accent)]/70"
+                        style={{ height: `${h}%` }}
+                      />
                     ))}
                   </div>
-                  <div className="flex justify-between mt-2">
-                    {['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'].map(m => (
-                      <span key={m} className="text-[8px] text-[var(--landing-muted)] flex-1 text-center">{m}</span>
-                    ))}
+
+                  {/* Transcript */}
+                  <p className="text-[10px] sm:text-[11px] italic text-[var(--landing-muted)] mb-2.5 text-center leading-snug">
+                    « Dépose des sanitaires, carrelage 8 m² grès cérame, douche italienne complète, peinture murs et plafond… »
+                  </p>
+
+                  {/* Generated lines */}
+                  <div className="space-y-1 mb-2">
+                    <DevisLine label="Dépose sanitaires + évacuation" qty="forfait" total="280 €" />
+                    <DevisLine label="Carrelage grès cérame posé" qty="8 m² × 75 €" total="600 €" />
+                    <DevisLine label="Douche italienne complète" qty="1 × 1 250 €" total="1 250 €" />
+                    <DevisLine label="Peinture murs + plafond" qty="24 m² × 28 €" total="672 €" />
+                    <p className="text-[9px] text-[var(--landing-muted)] text-center italic pt-0.5">+ 3 autres lignes générées</p>
+                  </div>
+
+                  {/* Total */}
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--landing-border)]">
+                    <div>
+                      <p className="text-[9px] text-[var(--landing-muted)] uppercase tracking-wide">Total TTC · TVA 10%</p>
+                      <p className="text-sm sm:text-base font-semibold text-[var(--landing-text)]">3 843 €</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] text-[var(--landing-muted)]">Généré en</p>
+                      <p className="text-xs font-semibold text-emerald-600">8 secondes</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Right column: Integrations + Activity */}
+                {/* Right column: Google + Carte chantiers */}
                 <div className="space-y-3 sm:space-y-4">
                   {/* Google integrations */}
-                  <div className="rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)] p-3 sm:p-4">
+                  <div className="rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)] p-3">
                     <p className="text-xs font-semibold text-[var(--landing-text)] mb-2">Connecté à Google</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center">
-                          <Calendar className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-[var(--landing-text)]">Google Calendar</p>
-                          <p className="text-[9px] text-[var(--landing-muted)]">3 RDV aujourd&apos;hui</p>
-                        </div>
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-red-50 flex items-center justify-center">
-                          <Mail className="w-3 h-3 text-red-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-[var(--landing-text)]">Gmail</p>
-                          <p className="text-[9px] text-[var(--landing-muted)]">2 non lus</p>
-                        </div>
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                      </div>
+                    <div className="space-y-1.5">
+                      <IntegrationRow icon={Calendar} iconBg="bg-blue-50" iconColor="text-blue-600" label="Agenda" sub="3 RDV aujourd'hui" />
+                      <IntegrationRow icon={Mail} iconBg="bg-red-50" iconColor="text-red-600" label="Gmail" sub="2 messages non lus" />
+                      <IntegrationRow icon={Globe} iconBg="bg-emerald-50" iconColor="text-emerald-600" label="Site web publié" sub="hellobat.app/leroy-plomberie" />
                     </div>
                   </div>
 
-                  {/* Rappels */}
-                  <div className="rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)] p-3 sm:p-4">
-                    <p className="text-xs font-semibold text-[var(--landing-text)] mb-2">Rappels</p>
-                    <div className="space-y-1.5">
-                      <RappelItem icon={RefreshCw} label="Contrat Dupont — facturation" badge="Demain" color="text-amber-600" />
-                      <RappelItem icon={FileText} label="Devis D-2026-042 à relancer" badge="3 jours" color="text-blue-600" />
-                      <RappelItem icon={HardHat} label="Chantier Moreau — démarrage" badge="Lundi" color="text-emerald-600" />
+                  {/* Mini map of chantiers */}
+                  <div className="rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)] p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-[var(--landing-text)]">Chantiers</p>
+                      <span className="text-[9px] font-medium text-[var(--landing-muted)]">4 actifs</span>
                     </div>
+                    <MiniMap />
                   </div>
                 </div>
               </div>
@@ -201,43 +218,109 @@ function KpiCard({
   change,
   icon: Icon,
   positive,
+  highlight,
 }: {
   label: string;
   value: string;
   change: string;
   icon: React.ElementType;
   positive?: boolean;
+  highlight?: boolean;
 }) {
   return (
-    <div className="p-3 sm:p-4 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]">
+    <div
+      className={
+        highlight
+          ? 'p-3 sm:p-4 rounded-xl bg-gradient-to-br from-[var(--landing-accent)]/10 to-[var(--landing-accent)]/5 border border-[var(--landing-accent)]/30 relative overflow-hidden'
+          : 'p-3 sm:p-4 rounded-xl bg-[var(--landing-off)] border border-[var(--landing-border)]'
+      }
+    >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] sm:text-xs font-medium text-[var(--landing-muted)] uppercase tracking-wide">{label}</span>
-        <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--landing-muted)]" />
+        <span className={`text-[10px] sm:text-xs font-medium uppercase tracking-wide ${highlight ? 'text-[var(--landing-accent)]' : 'text-[var(--landing-muted)]'}`}>{label}</span>
+        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${highlight ? 'text-[var(--landing-accent)]' : 'text-[var(--landing-muted)]'}`} />
       </div>
-      <div className="text-lg sm:text-2xl font-semibold text-[var(--landing-text)] mb-0.5">{value}</div>
-      <div className={`text-[10px] sm:text-xs font-medium ${positive ? 'text-emerald-600' : 'text-[var(--landing-muted)]'}`}>
+      <div className={`text-lg sm:text-2xl font-semibold mb-0.5 ${highlight ? 'text-[var(--landing-accent)]' : 'text-[var(--landing-text)]'}`}>{value}</div>
+      <div className={`text-[10px] sm:text-xs font-medium ${highlight ? 'text-[var(--landing-accent)]/80' : positive ? 'text-emerald-600' : 'text-[var(--landing-muted)]'}`}>
         {change}
       </div>
     </div>
   );
 }
 
-function RappelItem({
+function DevisLine({ label, qty, total }: { label: string; qty: string; total: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[10px] sm:text-[11px]">
+      <span className="w-1 h-1 rounded-full bg-[var(--landing-accent)] shrink-0" />
+      <span className="flex-1 text-[var(--landing-text)] truncate">{label}</span>
+      <span className="text-[var(--landing-muted)] shrink-0 tabular-nums">{qty}</span>
+      <span className="font-semibold text-[var(--landing-text)] shrink-0 tabular-nums w-14 text-right">{total}</span>
+    </div>
+  );
+}
+
+function IntegrationRow({
   icon: Icon,
+  iconBg,
+  iconColor,
   label,
-  badge,
-  color,
+  sub,
 }: {
   icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
   label: string;
-  badge: string;
-  color: string;
+  sub: string;
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon className={`w-3 h-3 ${color} shrink-0`} />
-      <span className="text-[10px] text-[var(--landing-text)] truncate flex-1">{label}</span>
-      <span className="text-[9px] text-[var(--landing-muted)] shrink-0">{badge}</span>
+      <div className={`w-6 h-6 rounded-md ${iconBg} flex items-center justify-center shrink-0`}>
+        <Icon className={`w-3 h-3 ${iconColor}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-medium text-[var(--landing-text)] truncate">{label}</p>
+        <p className="text-[9px] text-[var(--landing-muted)] truncate">{sub}</p>
+      </div>
+      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+    </div>
+  );
+}
+
+/**
+ * Minimap showing 4 jobsites as colored pins over a schematic street
+ * layout. Pure SVG + absolute-positioned dots — no Leaflet in the hero.
+ */
+function MiniMap() {
+  return (
+    <div className="relative h-[92px] sm:h-[104px] rounded-lg overflow-hidden bg-gradient-to-br from-emerald-50 via-sky-50 to-amber-50">
+      {/* Schematic streets */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 120" preserveAspectRatio="none" aria-hidden>
+        <path d="M-10,55 Q40,35 90,60 T210,45" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round" />
+        <path d="M-10,55 Q40,35 90,60 T210,45" stroke="rgba(148,163,184,0.4)" strokeWidth="1" fill="none" strokeDasharray="2 3" />
+        <path d="M50,-10 Q65,40 80,80 T95,130" stroke="white" strokeWidth="4" fill="none" strokeLinecap="round" />
+        <path d="M110,120 Q140,85 175,95" stroke="white" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      </svg>
+      {/* Pins */}
+      <MapPin2 top="22%" left="22%" color="bg-emerald-500" />
+      <MapPin2 top="52%" left="48%" color="bg-[var(--landing-accent)]" />
+      <MapPin2 top="68%" left="28%" color="bg-blue-500" />
+      <MapPin2 top="38%" left="78%" color="bg-emerald-500" />
+      {/* Legend */}
+      <div className="absolute bottom-1 right-1 bg-white/90 backdrop-blur-sm rounded px-1.5 py-0.5 flex items-center gap-1 shadow-sm">
+        <MapPin className="w-2.5 h-2.5 text-[var(--landing-accent)]" />
+        <span className="text-[8px] font-semibold text-[var(--landing-text)]">Île-de-France</span>
+      </div>
+    </div>
+  );
+}
+
+function MapPin2({ top, left, color }: { top: string; left: string; color: string }) {
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2"
+      style={{ top, left }}
+    >
+      <span className={`block w-2.5 h-2.5 rounded-full ${color} ring-2 ring-white shadow-md`} />
+      <span className={`absolute inset-0 w-2.5 h-2.5 rounded-full ${color} animate-ping opacity-60`} />
     </div>
   );
 }
