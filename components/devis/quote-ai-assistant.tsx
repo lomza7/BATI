@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Camera, CheckCircle2, Mic, Square, Wand2 } from 'lucide-react';
+import { Camera, CheckCircle2, Mic, Plus, Sparkles, Square, Trash2, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/constants';
+import { useAuth } from '@/lib/auth-context';
+import { formatCurrency, QUOTE_UNITS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ClientPicker } from '@/components/shared/client-picker';
 
 interface PhotoPreview {
   id: string;
@@ -17,21 +21,25 @@ interface PhotoPreview {
   file: File;
 }
 
+export interface AiQuoteDraftLine {
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  tva_rate?: number;
+  service_id?: string;
+}
+
 export interface AiQuoteDraft {
   title: string;
   clientName: string;
+  clientId: string | null;
   description: string;
-  lines: Array<{
-    description: string;
-    quantity: number;
-    unit: string;
-    unit_price: number;
-  }>;
+  lines: AiQuoteDraftLine[];
 }
 
 interface QuoteAiAssistantProps {
   onUseDraft: (draft: AiQuoteDraft) => void;
-  highlighted?: boolean;
   presetRequest?: {
     id: number;
     mode: 'empty' | 'example';
@@ -45,7 +53,7 @@ interface AiAnalysis {
   confidence: number;
   summary: string;
   assumptions: string[];
-  lines: AiQuoteDraft['lines'];
+  lines: AiQuoteDraftLine[];
 }
 
 interface SpeechRecognitionAlternativeLike {
@@ -89,32 +97,21 @@ declare global {
 const EXAMPLE_REQUEST =
   "Renovation d'une salle de bain de 6 m2 avec depose, plomberie douche, carrelage mural, meuble vasque et peinture plafond.";
 
-function inferTitle(transcript: string) {
-  const normalized = transcript.toLowerCase();
-  if (normalized.includes('salle de bain')) return 'Renovation salle de bain';
-  if (normalized.includes('fuite') || normalized.includes('plomberie')) return 'Intervention plomberie';
-  if (normalized.includes('peinture') || normalized.includes('facade')) return 'Travaux peinture';
-  return 'Travaux a chiffrer';
-}
-
-function inferClientName(transcript: string) {
-  const normalized = transcript.toLowerCase();
-  if (normalized.includes('mme petit')) return 'Mme Petit';
-  if (normalized.includes('m bernard') || normalized.includes('mr bernard')) return 'M. Bernard';
-  return '';
-}
-
-export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetRequest = null }: QuoteAiAssistantProps) {
+export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAssistantProps) {
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const photosRef = useRef<PhotoPreview[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
   const [transcript, setTranscript] = useState('');
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  const [editedLines, setEditedLines] = useState<AiQuoteDraftLine[]>([]);
+  const [editedTitle, setEditedTitle] = useState('');
   const [analysisError, setAnalysisError] = useState('');
   const [forceManualInput, setForceManualInput] = useState(false);
 
@@ -145,11 +142,14 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     photosRef.current.forEach((photo) => window.URL.revokeObjectURL(photo.url));
     setPhotos([]);
     setAnalysis(null);
+    setEditedLines([]);
+    setEditedTitle('');
     setAnalysisError('');
     setIsRecording(false);
     recognitionRef.current?.abort();
     setRecordSeconds(0);
     setForceManualInput(false);
+    setClientId(null);
 
     if (presetRequest.mode === 'example') {
       setClientName('Mme Petit');
@@ -177,6 +177,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     }));
 
     setAnalysis(null);
+    setEditedLines([]);
     setAnalysisError('');
     setPhotos((current) => [...current, ...next].slice(0, 4));
     event.target.value = '';
@@ -191,6 +192,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       return current.filter((item) => item.id !== id);
     });
     setAnalysis(null);
+    setEditedLines([]);
     setAnalysisError('');
   }
 
@@ -267,8 +269,8 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     };
 
     setAnalysis(null);
+    setEditedLines([]);
     setAnalysisError('');
-    setClientName('');
     setRecordSeconds(0);
     setTranscript('');
     setForceManualInput(false);
@@ -284,28 +286,134 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       setIsAnalysing(true);
       setAnalysisError('');
       setAnalysis(null);
+      setEditedLines([]);
 
-      // Load user's service catalog for AI context
-      const { data: userServices } = await supabase
+      // Load contextual data in parallel: services catalog, business profile, recent history, client history
+      const servicesPromise = supabase
         .from('services')
-        .select('name, description, unit, unit_price, category')
+        .select('id, name, description, unit, unit_price, category')
         .eq('is_active', true)
         .is('deleted_at', null)
         .order('category')
         .order('name');
 
+      const profilePromise = user
+        ? supabase
+            .from('profiles')
+            .select('company_activity, company_city, naf_label')
+            .eq('id', user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null });
+
+      const recentLinesPromise = user
+        ? supabase
+            .from('quote_lines')
+            .select('description, quantity, unit, unit_price, quotes!inner(status, user_id, created_at)')
+            .eq('quotes.user_id', user.id)
+            .eq('quotes.status', 'accepte')
+            .order('created_at', { foreignTable: 'quotes', ascending: false })
+            .limit(40)
+        : Promise.resolve({ data: [] as Array<{ description: string; quantity: number; unit: string; unit_price: number }> });
+
+      const clientHistoryPromise = clientId && user
+        ? supabase
+            .from('quote_lines')
+            .select('description, quantity, unit, unit_price, quotes!inner(client_id, user_id, created_at)')
+            .eq('quotes.user_id', user.id)
+            .eq('quotes.client_id', clientId)
+            .order('created_at', { foreignTable: 'quotes', ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as Array<{ description: string; quantity: number; unit: string; unit_price: number }> });
+
+      const [servicesResult, profileResult, recentResult, clientResult] = await Promise.all([
+        servicesPromise,
+        profilePromise,
+        recentLinesPromise,
+        clientHistoryPromise,
+      ]);
+
+      const userServices = servicesResult.data ?? [];
+      const profile = (profileResult.data ?? null) as
+        | { company_activity?: string; company_city?: string; naf_label?: string }
+        | null;
+
+      // Aggregate recent lines by description+unit → average price, most frequent first
+      const recentRaw = (recentResult.data ?? []) as Array<{
+        description: string;
+        quantity: number;
+        unit: string;
+        unit_price: number;
+      }>;
+      const aggregated = new Map<
+        string,
+        { description: string; quantity: number; unit: string; unit_price: number; count: number }
+      >();
+      for (const line of recentRaw) {
+        const key = `${line.description.toLowerCase().trim()}|${line.unit}`;
+        const existing = aggregated.get(key);
+        if (existing) {
+          existing.unit_price = (existing.unit_price * existing.count + line.unit_price) / (existing.count + 1);
+          existing.count += 1;
+        } else {
+          aggregated.set(key, { ...line, count: 1 });
+        }
+      }
+      const recentLines = Array.from(aggregated.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20)
+        .map(({ description, quantity, unit, unit_price }) => ({
+          description,
+          quantity,
+          unit,
+          unit_price: Math.round(unit_price),
+        }));
+
+      const clientHistoryRaw = (clientResult.data ?? []) as Array<{
+        description: string;
+        quantity: number;
+        unit: string;
+        unit_price: number;
+      }>;
+      const clientHistory = clientHistoryRaw.slice(0, 15).map(({ description, quantity, unit, unit_price }) => ({
+        description,
+        quantity,
+        unit,
+        unit_price,
+      }));
+
       const formData = new FormData();
       formData.append('transcript', transcript.trim());
-      if (userServices && userServices.length > 0) {
+      if (userServices.length > 0) {
         formData.append('services_catalog', JSON.stringify(userServices));
+      }
+      if (profile && (profile.company_activity || profile.company_city || profile.naf_label)) {
+        formData.append(
+          'business_context',
+          JSON.stringify({
+            company_activity: profile.company_activity || '',
+            company_city: profile.company_city || '',
+            naf_label: profile.naf_label || '',
+          })
+        );
+      }
+      if (recentLines.length > 0) {
+        formData.append('recent_quote_lines', JSON.stringify(recentLines));
+      }
+      if (clientHistory.length > 0) {
+        formData.append('client_history', JSON.stringify(clientHistory));
       }
       photos.forEach((photo) => {
         formData.append('photos', photo.file);
       });
 
+      // Attach auth token so the API route can enforce plan limits per user
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
       const response = await fetch('/api/ai/quote', {
         method: 'POST',
         body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
 
       const payload = (await response.json()) as { analysis?: AiAnalysis; error?: string };
@@ -315,7 +423,11 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
       }
 
       setAnalysis(payload.analysis);
-      setClientName(payload.analysis.clientName || '');
+      setEditedLines(payload.analysis.lines.map((line) => ({ ...line })));
+      setEditedTitle(payload.analysis.title || '');
+      if (payload.analysis.clientName && !clientName) {
+        setClientName(payload.analysis.clientName);
+      }
     } catch (error) {
       setAnalysisError(error instanceof Error ? error.message : "L'analyse IA a echoue.");
     } finally {
@@ -323,26 +435,51 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
     }
   }
 
+  function updateLine(index: number, patch: Partial<AiQuoteDraftLine>) {
+    setEditedLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  }
+
+  function removeLine(index: number) {
+    setEditedLines((current) => current.filter((_, i) => i !== index));
+  }
+
+  function addEmptyLine() {
+    setEditedLines((current) => [
+      ...current,
+      { description: '', quantity: 1, unit: 'u', unit_price: 0 },
+    ]);
+  }
+
   function useInQuote() {
-    if (!analysis) return;
+    if (!analysis || editedLines.length === 0) return;
 
     onUseDraft({
-      title: analysis.title || inferTitle(transcript),
-      clientName: analysis.clientName || clientName.trim() || inferClientName(transcript),
-      description: analysis.description || `Brouillon prepare avec l assistant IA a partir d'une demande vocale/photo. ${analysis.summary}`,
-      lines: analysis.lines,
+      title: editedTitle.trim() || analysis.title || 'Devis a completer',
+      clientName: clientName.trim() || analysis.clientName || '',
+      clientId,
+      description:
+        analysis.description ||
+        `Brouillon prepare avec l assistant IA a partir d'une demande vocale/photo. ${analysis.summary}`,
+      lines: editedLines.map((line) => ({ ...line })),
     });
   }
 
   const hasTranscript = transcript.trim().length > 0;
   const hasPhotos = photos.length > 0;
-  const totalHt = analysis?.lines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0) ?? 0;
+  const totalHt = editedLines.reduce(
+    (sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unit_price) || 0),
+    0
+  );
 
   function getStepState(step: 1 | 2 | 3) {
     if (step === 1) return hasTranscript ? 'done' : 'active';
-    if (step === 2) return hasTranscript ? (hasPhotos ? 'done' : 'active') : 'todo';
+    if (step === 2) {
+      if (hasPhotos) return 'done';
+      if (hasTranscript) return 'active';
+      return 'todo';
+    }
     if (analysis) return 'done';
-    return hasTranscript && hasPhotos ? 'active' : 'todo';
+    return hasTranscript ? 'active' : 'todo';
   }
 
   function getStepClasses(step: 1 | 2 | 3) {
@@ -360,27 +497,38 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
   }
 
   return (
-    <Card
-      className={cn(
-        'border-border bg-card transition-all duration-300',
-        highlighted && 'border-[#d35400]/35 ring-2 ring-[#d35400]/15 shadow-lg shadow-[#d35400]/10'
-      )}
-    >
+    <Card className="border-border bg-card transition-all duration-300">
       <CardHeader className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-[#d35400] text-white hover:bg-[#d35400]">Assistant devis IA</Badge>
-              <Badge variant="outline">Voix + photos</Badge>
+              <Badge variant="outline">Voix + photos (optionnelles)</Badge>
             </div>
-            <CardTitle className="mt-3 text-xl">Parlez, ajoutez des photos, lancez la magie</CardTitle>
+            <CardTitle className="mt-3 text-xl">Parlez, ajoutez des photos si besoin, lancez la magie</CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
-              L&apos;IA prepare ensuite une base de devis a partir de ce qu&apos;elle a compris.
+              L&apos;IA utilise votre catalogue de prestations, votre historique et votre profil pour proposer un devis sur-mesure.
             </CardDescription>
           </div>
           <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
             {isRecording ? `Ecoute en cours ${recordSeconds}s` : 'Pret a ecouter'}
           </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-muted/20 p-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Client (optionnel)</p>
+          <ClientPicker
+            value={clientId}
+            onChange={(id, client) => {
+              setClientId(id);
+              if (client?.name) setClientName(client.name);
+              setAnalysis(null);
+              setEditedLines([]);
+            }}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Selectionnez un client pour que l&apos;IA tienne compte de son historique tarifaire.
+          </p>
         </div>
       </CardHeader>
 
@@ -391,7 +539,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#a34700]">1</p>
                 {getStepState(1) === 'done' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700 animate-pulse">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Termine
                   </span>
@@ -408,8 +556,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
                   'mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
                   isRecording
                     ? 'bg-[#d35400] text-white hover:bg-[#b94800]'
-                    : 'bg-white text-[#a34700] border border-[#d35400]/20 hover:border-[#d35400]/35',
-                  getStepState(1) === 'todo' && 'pointer-events-none opacity-60'
+                    : 'bg-white text-[#a34700] border border-[#d35400]/20 hover:border-[#d35400]/35'
                 )}
               >
                 {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -431,46 +578,23 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
             <div className={cn('rounded-2xl border p-4 transition-all duration-300', getStepClasses(2))}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#a34700]">2</p>
-                {getStepState(2) === 'done' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700 animate-pulse">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Termine
-                  </span>
-                )}
-                {getStepState(2) === 'active' && (
-                  <span className="inline-flex rounded-full bg-[#d35400]/10 px-2 py-1 text-[11px] font-medium text-[#a34700]">
-                    En cours
-                  </span>
-                )}
+                <span className="text-[10px] font-medium text-muted-foreground">Optionnel</span>
               </div>
-              <p className="mt-2 text-sm font-medium text-foreground">Ajoutez quelques photos</p>
+              <p className="mt-2 text-sm font-medium text-foreground">Ajoutez des photos</p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Une ou deux vues du chantier suffisent pour mieux guider l&apos;analyse.
+                Elles aident l&apos;IA a mieux cerner le chantier mais ne sont pas obligatoires.
               </p>
               <button
                 type="button"
                 onClick={triggerPhotoPicker}
-                disabled={!hasTranscript}
-                className={cn(
-                  'mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-dashed px-4 py-3 text-left transition-all',
-                  hasTranscript
-                    ? 'border-[#d35400]/30 bg-white hover:border-[#d35400]/45 hover:bg-[#fff7f0]'
-                    : 'cursor-not-allowed border-border bg-muted/30 text-muted-foreground'
-                )}
+                className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d35400]/30 bg-white px-4 py-3 text-left transition-all hover:border-[#d35400]/45 hover:bg-[#fff7f0]"
               >
-                <span
-                  className={cn(
-                    'flex h-10 w-10 items-center justify-center rounded-xl',
-                    hasTranscript ? 'bg-[#fff1e8] text-[#d35400]' : 'bg-muted text-muted-foreground'
-                  )}
-                >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff1e8] text-[#d35400]">
                   <Camera className="h-4 w-4" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm font-medium text-foreground">Ajouter quelques photos</span>
-                  <span className="text-xs text-muted-foreground">
-                    {hasTranscript ? 'Facade, chantier, degats ou zone a traiter' : "Disponible juste apres l'etape vocale"}
-                  </span>
+                  <span className="text-sm font-medium text-foreground">Ajouter des photos</span>
+                  <span className="text-xs text-muted-foreground">Facade, chantier, degats, zone a traiter (4 max)</span>
                 </span>
               </button>
             </div>
@@ -478,7 +602,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#a34700]">3</p>
                 {getStepState(3) === 'done' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700 animate-pulse">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-700">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Termine
                   </span>
@@ -495,7 +619,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
               </p>
               <Button
                 onClick={analyseRequest}
-                disabled={!hasTranscript || !hasPhotos || isRecording || isAnalysing}
+                disabled={!hasTranscript || isRecording || isAnalysing}
                 className="mt-4 w-full gap-2"
               >
                 <Wand2 className={cn('h-4 w-4', isAnalysing && 'animate-spin')} />
@@ -515,12 +639,10 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
 
           <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-xs text-muted-foreground">
             {!hasTranscript
-              ? "Parlez d'abord. Les details seront structures juste apres."
-              : !hasPhotos
-                ? "Parfait. Ajoutez maintenant une photo pour aider l'IA."
-                : isAnalysing
-                  ? "L'IA est en train d'analyser votre demande."
-                  : 'C est bon, vous pouvez lancer la magie.'}
+              ? "Parlez d'abord, ou cliquez sur 'Saisir a la main'. Les photos restent optionnelles."
+              : isAnalysing
+                ? "L'IA est en train d'analyser votre demande."
+                : 'C est bon, vous pouvez lancer la magie.'}
           </div>
 
           {analysisError && (
@@ -565,6 +687,7 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
                 onChange={(event) => {
                   setTranscript(event.target.value);
                   setAnalysis(null);
+                  setEditedLines([]);
                   setAnalysisError('');
                 }}
               />
@@ -579,56 +702,115 @@ export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetReques
               <p className="text-sm font-medium text-foreground">Le brouillon apparaitra ici</p>
               <div className="rounded-2xl border border-dashed border-border bg-background/80 p-4 text-sm text-muted-foreground">
                 {!hasTranscript
-                  ? 'Etape 1: commencez a parler.'
-                  : !hasPhotos
-                    ? 'Etape 2: ajoutez une ou deux photos pour aider l IA.'
-                    : isAnalysing
-                      ? 'Generation du brouillon en cours...'
-                      : 'Etape 3: lancez la magie pour generer le brouillon.'}
+                  ? 'Etape 1: commencez a parler ou saisissez a la main.'
+                  : isAnalysing
+                    ? 'Generation du brouillon en cours...'
+                    : 'Etape 3: lancez la magie pour generer le brouillon.'}
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">Analyse preliminaire</p>
                   <p className="mt-1 text-sm text-muted-foreground">{analysis.summary}</p>
                 </div>
                 <Badge variant="outline">{analysis.confidence}%</Badge>
               </div>
 
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Titre du devis</label>
+                <Input
+                  className="mt-1 bg-white"
+                  value={editedTitle}
+                  onChange={(event) => setEditedTitle(event.target.value)}
+                  placeholder="Titre du devis"
+                />
+              </div>
+
               <div className="space-y-2">
-                {analysis.lines.map((line) => (
-                  <div key={line.description} className="rounded-xl border border-border bg-card p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{line.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {line.quantity} {line.unit} x {formatCurrency(line.unit_price)}
-                        </p>
+                {editedLines.map((line, index) => (
+                  <div key={index} className="rounded-xl border border-border bg-card p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-2">
+                        <Textarea
+                          className="min-h-[48px] bg-white text-sm"
+                          value={line.description}
+                          onChange={(event) => updateLine(index, { description: event.target.value })}
+                          placeholder="Description"
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-8 w-20 bg-white text-sm"
+                            value={line.quantity}
+                            onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })}
+                          />
+                          <Select value={line.unit} onValueChange={(value) => updateLine(index, { unit: value })}>
+                            <SelectTrigger className="h-8 w-28 bg-white text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {QUOTE_UNITS.map((u) => (
+                                <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-8 w-24 bg-white text-sm"
+                            value={line.unit_price}
+                            onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })}
+                          />
+                          <span className="text-xs text-muted-foreground">=</span>
+                          <span className="text-sm font-semibold text-foreground">
+                            {formatCurrency((Number(line.quantity) || 0) * (Number(line.unit_price) || 0))}
+                          </span>
+                          {line.service_id && (
+                            <Badge variant="outline" className="gap-1 text-[10px]">
+                              <Sparkles className="h-2.5 w-2.5" /> catalogue
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatCurrency(line.quantity * line.unit_price)}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeLine(index)}
+                        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                        title="Supprimer la ligne"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="space-y-2">
-                {analysis.assumptions.map((item) => (
-                  <p key={item} className="text-xs text-muted-foreground">
-                    • {item}
-                  </p>
-                ))}
-              </div>
+              <Button variant="outline" size="sm" onClick={addEmptyLine} className="gap-1">
+                <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
+              </Button>
+
+              {analysis.assumptions.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hypotheses</p>
+                  {analysis.assumptions.map((item) => (
+                    <p key={item} className="text-xs text-muted-foreground">
+                      • {item}
+                    </p>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Total estime HT</p>
                   <p className="text-xl font-semibold text-foreground">{formatCurrency(totalHt)}</p>
                 </div>
-                <Button onClick={useInQuote}>Pre-remplir le devis</Button>
+                <Button onClick={useInQuote} disabled={editedLines.length === 0}>Pre-remplir le devis</Button>
               </div>
             </div>
           )}
