@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail } from 'lucide-react';
+import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail, TriangleAlert as AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+
+type EmailStatus = 'sent' | 'skipped' | 'failed' | null;
 
 interface Props {
   quote: {
@@ -31,7 +33,8 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
   const [magicLink, setMagicLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [sendError, setSendError] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>(null);
+  const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
 
   async function handleSend() {
     if (!user || !clientName.trim()) return;
@@ -70,7 +73,8 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       }
 
       setMagicLink(data.magic_link);
-      setEmailSent(!!clientEmail.trim());
+      setEmailStatus((data.email_status as EmailStatus) || null);
+      setEmailErrorMsg(data.email_error || null);
       onSent?.();
     } catch {
       setSendError('Erreur reseau, veuillez reessayer');
@@ -105,15 +109,44 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
         <div className="px-6 py-5 space-y-4">
           {magicLink ? (
             <div className="space-y-4 animate-fade-up">
-              {emailSent && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+              {emailStatus === 'sent' && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                   <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                     <Mail className="h-4 w-4 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-emerald-800">Devis envoye par email</p>
+                    <p className="text-sm font-medium text-emerald-800">Devis envoyé par email</p>
                     <p className="text-xs text-emerald-600 mt-0.5">
-                      Un email de signature a ete envoye a <strong>{clientEmail}</strong>
+                      Un email de signature a été envoyé à <strong>{clientEmail}</strong>.
+                      S&apos;il ne le reçoit pas, demandez-lui de vérifier ses spams ou envoyez-lui le lien de secours ci-dessous.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {emailStatus === 'failed' && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100">
+                  <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-red-800">L&apos;email n&apos;a pas pu être envoyé</p>
+                    <p className="text-xs text-red-600 mt-0.5">
+                      {emailErrorMsg || 'Erreur inconnue.'} Le devis est enregistré — utilisez le lien de secours ci-dessous pour le transmettre par SMS, WhatsApp ou copier-coller.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {emailStatus === 'skipped' && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                  <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Email non envoyé</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      {emailErrorMsg || 'Aucune adresse email fournie.'} Utilisez le lien de secours ci-dessous.
                     </p>
                   </div>
                 </div>
@@ -121,7 +154,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Lien de secours (si le client ne recoit pas l&apos;email)
+                  {emailStatus === 'sent' ? 'Lien de secours (si le client ne reçoit pas l\u2019email)' : 'Lien de signature du devis'}
                 </label>
                 <div className="flex gap-2">
                   <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">

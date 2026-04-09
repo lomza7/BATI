@@ -188,7 +188,19 @@ export async function POST(request: Request) {
     // Envoyer l'email au client via Resend
     const resendKey = process.env.RESEND_API_KEY;
     const recipientEmail = client_email?.trim() || client.email;
-    if (resendKey && recipientEmail) {
+
+    // Statut d'envoi email — retourne au frontend pour affichage honnête
+    let emailStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
+    let emailError: string | null = null;
+    let emailId: string | null = null;
+
+    if (!resendKey) {
+      emailStatus = 'skipped';
+      emailError = 'Service email non configuré (RESEND_API_KEY manquante)';
+    } else if (!recipientEmail) {
+      emailStatus = 'skipped';
+      emailError = 'Aucune adresse email fournie pour le client';
+    } else {
       const resend = new Resend(resendKey);
       const dc = ((artisan.document_config as Record<string, string>) || {});
       const companyName = (artisan.company_name as string) || (artisan.full_name as string) || 'Artisan';
@@ -214,18 +226,44 @@ export async function POST(request: Request) {
 
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
 
-      await resend.emails.send({
-        from: fromEmail,
-        to: recipientEmail,
-        subject: `Devis ${quote.quote_number} — ${companyName}`,
-        html: emailHtml,
-      }).catch((emailErr) => {
-        // Log mais ne bloque pas le flow
-        console.error('Resend email error:', emailErr);
-      });
+      // Resend SDK v6+ retourne { data, error } au lieu de throw —
+      // on vérifie explicitement l'erreur pour ne plus avaler silencieusement
+      // les échecs de délivrabilité (domaine non vérifié, adresse invalide, etc.)
+      try {
+        const result = await resend.emails.send({
+          from: fromEmail,
+          to: recipientEmail,
+          subject: `Devis ${quote.quote_number} — ${companyName}`,
+          html: emailHtml,
+        });
+
+        if (result.error) {
+          emailStatus = 'failed';
+          emailError = result.error.message || 'Erreur inconnue lors de l\'envoi';
+          console.error('[create-submission] Resend API error:', result.error);
+        } else if (result.data?.id) {
+          emailStatus = 'sent';
+          emailId = result.data.id;
+        } else {
+          emailStatus = 'failed';
+          emailError = 'Réponse Resend inattendue (pas d\'ID de message)';
+          console.error('[create-submission] Resend unexpected response:', result);
+        }
+      } catch (sendErr) {
+        emailStatus = 'failed';
+        emailError = sendErr instanceof Error ? sendErr.message : 'Erreur réseau lors de l\'envoi';
+        console.error('[create-submission] Resend send exception:', sendErr);
+      }
     }
 
-    return NextResponse.json({ magic_link: magicLink, token });
+    return NextResponse.json({
+      magic_link: magicLink,
+      token,
+      email_status: emailStatus,
+      email_error: emailError,
+      email_provider_id: emailId,
+      recipient_email: recipientEmail || null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erreur interne';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -6,6 +6,32 @@ export const QUOTE_STATUSES = {
   expire: { label: 'Expire', color: 'bg-amber-50 text-amber-700' },
 } as const;
 
+export const QUOTE_UNITS = [
+  { value: 'u', label: 'Unité' },
+  { value: 'forfait', label: 'Forfait' },
+  { value: 'm2', label: 'm² (mètre carré)' },
+  { value: 'ml', label: 'ml (mètre linéaire)' },
+  { value: 'm3', label: 'm³ (mètre cube)' },
+  { value: 'h', label: 'Heure' },
+  { value: 'jour', label: 'Jour' },
+  { value: 'kg', label: 'kg' },
+  { value: 'l', label: 'Litre' },
+  { value: 't', label: 'Tonne' },
+] as const;
+
+export const QUOTE_UNIT_LABELS: Record<string, string> = {
+  u: 'Unité',
+  forfait: 'Forfait',
+  m2: 'm²',
+  ml: 'ml',
+  m3: 'm³',
+  h: 'h',
+  jour: 'jour',
+  kg: 'kg',
+  l: 'L',
+  t: 't',
+};
+
 export const INVOICE_STATUSES = {
   brouillon: { label: 'Brouillon', color: 'bg-slate-100 text-slate-700' },
   creee: { label: 'Créée', color: 'bg-violet-50 text-violet-700' },

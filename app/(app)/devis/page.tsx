@@ -6,7 +6,7 @@ import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send,
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
-import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { QUOTE_STATUSES, QUOTE_UNITS, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { ServicePicker } from '@/components/devis/service-picker';
@@ -30,6 +30,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { QuotePreviewDialog } from '@/components/devis/quote-preview-dialog';
 
 interface QuoteSend {
   id: string;
@@ -91,6 +99,7 @@ export default function DevisPage() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [resendingQuoteId, setResendingQuoteId] = useState<string | null>(null);
   const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     loadQuotes();
@@ -967,14 +976,14 @@ export default function DevisPage() {
               <div className="space-y-2">
                 {lines.map((line, i) => (
                   <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                    <div className="col-span-12 sm:col-span-5">
+                    <div className="col-span-12 sm:col-span-4">
                       <Input
                         placeholder="Description"
                         value={line.description}
                         onChange={e => updateLine(i, 'description', e.target.value)}
                       />
                     </div>
-                    <div className="col-span-4 sm:col-span-2">
+                    <div className="col-span-3 sm:col-span-2">
                       <Input
                         type="number"
                         placeholder="Qte"
@@ -982,12 +991,22 @@ export default function DevisPage() {
                         onChange={e => updateLine(i, 'quantity', Number(e.target.value))}
                       />
                     </div>
-                    <div className="col-span-3 sm:col-span-1">
-                      <Input
-                        placeholder="u"
-                        value={line.unit}
-                        onChange={e => updateLine(i, 'unit', e.target.value)}
-                      />
+                    <div className="col-span-4 sm:col-span-2">
+                      <Select
+                        value={line.unit || 'u'}
+                        onValueChange={(val) => updateLine(i, 'unit', val)}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Unité" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {QUOTE_UNITS.map((u) => (
+                            <SelectItem key={u.value} value={u.value}>
+                              {u.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="col-span-4 sm:col-span-3">
                       <Input
@@ -1018,8 +1037,17 @@ export default function DevisPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowPreview(true)}
+                disabled={!newQuote.title.trim() && lines.every(l => !l.description.trim())}
+                className="gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                Apercu
+              </Button>
               <Button onClick={saveQuote} disabled={!newQuote.title.trim()}>
                 {draftId.current ? 'Enregistrer le devis' : 'Creer le devis'}
               </Button>
@@ -1027,6 +1055,15 @@ export default function DevisPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <QuotePreviewDialog
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        title={newQuote.title}
+        description={newQuote.description}
+        lines={lines}
+        clientId={selectedClientId}
+      />
 
       {sendQuote && (
         <SendQuoteDialog

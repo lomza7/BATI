@@ -100,14 +100,24 @@ export async function POST(request: Request) {
     const resend = new Resend(resendKey);
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
 
-    await resend.emails.send({
+    // Resend SDK v6+ retourne { data, error } — vérifier explicitement pour ne
+    // pas avaler silencieusement les échecs de délivrabilité.
+    const result = await resend.emails.send({
       from: fromEmail,
       to: recipientEmail,
       subject: `Rappel : Devis ${quote.quote_number} — ${companyName}`,
       html: emailHtml,
     });
 
-    return NextResponse.json({ success: true });
+    if (result.error) {
+      console.error('[resend-email] Resend API error:', result.error);
+      return NextResponse.json(
+        { error: result.error.message || 'Échec de l\'envoi email' },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({ success: true, email_provider_id: result.data?.id || null });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erreur interne';
     return NextResponse.json({ error: message }, { status: 500 });
