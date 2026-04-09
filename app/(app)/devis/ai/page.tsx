@@ -38,7 +38,7 @@ export default function DevisAiPage() {
           Devis avec IA
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Parlez, ajoutez des photos, puis lancez la magie.
+          Décris ton chantier à voix haute, l&apos;IA rédige ton devis.
         </p>
       </div>
       <QuoteAiAssistant onUseDraft={handleUseDraft} />

@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BookmarkPlus,
   Calculator,
-  Camera,
   Check,
   FileText,
   History,
   Loader2,
   Mic,
   Plus,
+  RefreshCw,
   ScrollText,
   ShieldCheck,
   Sparkles,
   Trash2,
   TrendingUp,
   Wand2,
-  X,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -61,13 +61,6 @@ interface QuoteAiAssistantProps {
 
 // ---------- Internal types ----------------------------------------------
 
-interface PhotoPreview {
-  id: string;
-  name: string;
-  url: string;
-  file: File;
-}
-
 interface AiAnalysis {
   title: string;
   clientName: string;
@@ -88,11 +81,10 @@ const MAX_DURATION_SEC = 120;
 // Cosmetic "deep analysis" steps shown in a modal while the /api/ai/quote
 // call is in flight. The real work is just one HTTP round-trip (~3-5s), but
 // rolling through these steps reassures the artisan that we're actually
-// weighing photos, prices, history, etc. Interval below is tuned so the
-// full sequence lasts ~4.4s — the typical API latency.
+// weighing prices, history, etc. Interval below is tuned so the full sequence
+// lasts ~4s — the typical API latency.
 const ANALYSIS_STEPS: ReadonlyArray<{ label: string; icon: typeof FileText }> = [
   { label: 'Lecture attentive de ta demande', icon: FileText },
-  { label: 'Analyse des photos et visuels du chantier', icon: Camera },
   { label: 'Identification des prestations BTP', icon: Sparkles },
   { label: 'Estimation des surfaces et quantités', icon: Calculator },
   { label: 'Consultation des prix du marché français', icon: TrendingUp },
@@ -100,7 +92,7 @@ const ANALYSIS_STEPS: ReadonlyArray<{ label: string; icon: typeof FileText }> = 
   { label: 'Rédaction des lignes de devis', icon: ScrollText },
   { label: 'Vérification finale et cohérence', icon: ShieldCheck },
 ];
-const ANALYSIS_STEP_MS = 550;
+const ANALYSIS_STEP_MS = 600;
 
 const EXAMPLE_REQUEST =
   "Renovation d'une salle de bain de 6 m2 avec depose, plomberie douche, carrelage mural, meuble vasque et peinture plafond.";
@@ -436,18 +428,17 @@ function useVoiceRecorder({ onTranscript, onError }: UseVoiceRecorderOptions) {
 
 export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAssistantProps) {
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const photosRef = useRef<PhotoPreview[]>([]);
 
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
   const [transcript, setTranscript] = useState('');
-  const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [editedLines, setEditedLines] = useState<AiQuoteDraftLine[]>([]);
   const [editedTitle, setEditedTitle] = useState('');
   const [analysisError, setAnalysisError] = useState('');
-  const [forceManualInput, setForceManualInput] = useState(false);
+  // Tracks which lines the artisan has saved into their services catalog
+  // during this session — keyed by the ready-state line index.
+  const [savedLines, setSavedLines] = useState<Record<number, 'saving' | 'saved'>>({});
 
   const [phase, setPhase] = useState<AssistantPhase>('input');
   const [turns, setTurns] = useState<QuoteTurn[]>([]);
@@ -487,30 +478,18 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
     },
   });
 
-  useEffect(() => {
-    photosRef.current = photos;
-  }, [photos]);
-
-  useEffect(() => {
-    return () => {
-      photosRef.current.forEach((photo) => window.URL.revokeObjectURL(photo.url));
-    };
-  }, []);
-
   // Apply presets from the parent (e.g. "empty draft" or "example").
   useEffect(() => {
     if (!presetRequest) return;
-    photosRef.current.forEach((photo) => window.URL.revokeObjectURL(photo.url));
-    setPhotos([]);
     setAnalysis(null);
     setEditedLines([]);
     setEditedTitle('');
     setAnalysisError('');
-    setForceManualInput(false);
     setClientId(null);
     setTurns([]);
     setCurrentQuestions([]);
     setPendingAnswers({});
+    setSavedLines({});
     setPhase('input');
 
     if (presetRequest.mode === 'example') {
@@ -549,37 +528,6 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
   }, [phase]);
 
   // ---------- Photos ----------------------------------------------------
-
-  function triggerPhotoPicker() {
-    fileInputRef.current?.click();
-  }
-
-  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0) return;
-    const next = files.map((file) => ({
-      id: `${file.name}-${file.lastModified}-${Math.random()}`,
-      name: file.name,
-      url: window.URL.createObjectURL(file),
-      file,
-    }));
-    setAnalysis(null);
-    setEditedLines([]);
-    setAnalysisError('');
-    setPhotos((current) => [...current, ...next].slice(0, 4));
-    event.target.value = '';
-  }
-
-  function removePhoto(id: string) {
-    setPhotos((current) => {
-      const photo = current.find((item) => item.id === id);
-      if (photo) window.URL.revokeObjectURL(photo.url);
-      return current.filter((item) => item.id !== id);
-    });
-    setAnalysis(null);
-    setEditedLines([]);
-    setAnalysisError('');
-  }
 
   // ---------- Mic toggle (tap to start, tap to stop) -------------------
 
@@ -728,9 +676,6 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
       if (clientHistory.length > 0) {
         formData.append('client_history', JSON.stringify(clientHistory));
       }
-      photos.forEach((photo) => {
-        formData.append('photos', photo.file);
-      });
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
@@ -829,6 +774,16 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
 
   function removeLine(index: number) {
     setEditedLines((current) => current.filter((_, i) => i !== index));
+    // Shift the savedLines map so entries stay aligned with the new indices.
+    setSavedLines((current) => {
+      const next: Record<number, 'saving' | 'saved'> = {};
+      for (const [key, state] of Object.entries(current)) {
+        const k = Number(key);
+        if (k === index) continue;
+        next[k > index ? k - 1 : k] = state;
+      }
+      return next;
+    });
   }
 
   function addEmptyLine() {
@@ -836,6 +791,45 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
       ...current,
       { description: '', quantity: 1, unit: 'u', unit_price: 0 },
     ]);
+  }
+
+  // Persist a line that the IA flagged as a new proposition (no service_id)
+  // into the artisan's services catalog so it shows up on future quotes.
+  // Matches the shape used by app/(app)/devis/page.tsx:saveLineAsPrestation.
+  async function saveLineAsPrestation(index: number) {
+    if (!user) return;
+    const line = editedLines[index];
+    if (!line) return;
+    const description = line.description.trim();
+    if (!description || line.unit_price <= 0) return;
+    if (savedLines[index]) return;
+
+    setSavedLines((prev) => ({ ...prev, [index]: 'saving' }));
+    const name = description.length > 80 ? description.slice(0, 80) : description;
+    const longDescription = description.length > 80 ? description : '';
+
+    const { error } = await supabase.from('services').insert({
+      user_id: user.id,
+      name,
+      description: longDescription,
+      unit: line.unit || 'u',
+      unit_price: line.unit_price,
+      category: '',
+      tva_rate: line.tva_rate ?? 20,
+      is_recurring: false,
+      is_active: true,
+    });
+
+    if (error) {
+      setSavedLines((prev) => {
+        const { [index]: _removed, ...rest } = prev;
+        return rest;
+      });
+      setAnalysisError("Impossible d'enregistrer la prestation. Réessaye.");
+      return;
+    }
+
+    setSavedLines((prev) => ({ ...prev, [index]: 'saved' }));
   }
 
   function useInQuote() {
@@ -846,7 +840,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
       clientId,
       description:
         analysis.description ||
-        `Brouillon préparé avec l'assistant IA à partir d'une demande vocale/photo. ${analysis.summary}`,
+        `Brouillon préparé avec l'assistant IA à partir d'une demande vocale. ${analysis.summary}`,
       lines: editedLines.map((line) => ({ ...line })),
     });
   }
@@ -883,7 +877,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-[#d35400] text-white hover:bg-[#d35400]">Assistant devis IA</Badge>
-              <Badge variant="outline">Voix + photos</Badge>
+              <Badge variant="outline">Dictée vocale</Badge>
             </div>
             <CardTitle className="mt-3 text-xl">Décris ton chantier à voix haute</CardTitle>
             <CardDescription className="mt-1 max-w-2xl">
@@ -929,7 +923,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        {/* ---------- Mic + photos + manual input ---------- */}
+        {/* ---------- Mic (voice-only) ---------- */}
         <div className="rounded-2xl border border-[#d35400]/20 bg-gradient-to-b from-[#fff7f0] to-white p-5">
           <div className="flex flex-col items-center gap-3">
             {recorderUnsupported ? (
@@ -987,39 +981,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
                 )}
               </>
             )}
-
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={triggerPhotoPicker}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-[#d35400]/40 hover:text-[#a34700]"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                Photos {photos.length > 0 ? `(${photos.length}/4)` : '(optionnel)'}
-              </button>
-              {!recorderUnsupported && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForceManualInput(true);
-                    setAnalysisError('');
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-[#d35400]/40 hover:text-[#a34700]"
-                >
-                  Saisir à la main
-                </button>
-              )}
-            </div>
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handlePhotoChange}
-          />
         </div>
 
         {analysisError && (
@@ -1028,27 +990,8 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
           </div>
         )}
 
-        {photos.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {photos.map((photo) => (
-              <div key={photo.id} className="relative overflow-hidden rounded-xl border border-border bg-card">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.url} alt={photo.name} className="h-20 w-24 object-cover" />
-                <button
-                  type="button"
-                  onClick={() => removePhoto(photo.id)}
-                  className="absolute right-1 top-1 rounded-full bg-black/65 p-1 text-white"
-                  aria-label={`Retirer ${photo.name}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ---------- Transcript editor ---------- */}
-        {(hasTranscript || forceManualInput || recorderUnsupported) && (
+        {(hasTranscript || recorderUnsupported) && (
           <div className="rounded-2xl border border-border bg-muted/20 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -1187,65 +1130,109 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
             </div>
 
             <div className="mt-3 space-y-2">
-              {editedLines.map((line, index) => (
-                <div key={index} className="rounded-xl border border-border bg-card p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 space-y-2">
-                      <Textarea
-                        className="min-h-[48px] bg-white text-sm"
-                        value={line.description}
-                        onChange={(event) => updateLine(index, { description: event.target.value })}
-                        placeholder="Description"
-                      />
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className="h-8 w-20 bg-white text-sm"
-                          value={line.quantity}
-                          onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })}
+              {editedLines.map((line, index) => {
+                const isFromCatalog = Boolean(line.service_id);
+                const saveState = savedLines[index];
+                const canSave =
+                  !isFromCatalog &&
+                  line.description.trim().length > 0 &&
+                  line.unit_price > 0;
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      'rounded-xl border bg-card p-3',
+                      isFromCatalog ? 'border-[#d35400]/25' : 'border-border',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {isFromCatalog ? (
+                            <Badge variant="outline" className="gap-1 border-[#d35400]/40 text-[10px] text-[#a34700]">
+                              <Sparkles className="h-2.5 w-2.5" /> De ton catalogue
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+                              <Plus className="h-2.5 w-2.5" /> Nouvelle prestation
+                            </Badge>
+                          )}
+                        </div>
+                        <Textarea
+                          className="min-h-[48px] bg-white text-sm"
+                          value={line.description}
+                          onChange={(event) => updateLine(index, { description: event.target.value })}
+                          placeholder="Description"
                         />
-                        <Select value={line.unit} onValueChange={(value) => updateLine(index, { unit: value })}>
-                          <SelectTrigger className="h-8 w-28 bg-white text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {QUOTE_UNITS.map((u) => (
-                              <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className="h-8 w-24 bg-white text-sm"
-                          value={line.unit_price}
-                          onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })}
-                        />
-                        <span className="text-xs text-muted-foreground">=</span>
-                        <span className="text-sm font-semibold text-foreground">
-                          {formatCurrency((Number(line.quantity) || 0) * (Number(line.unit_price) || 0))}
-                        </span>
-                        {line.service_id && (
-                          <Badge variant="outline" className="gap-1 text-[10px]">
-                            <Sparkles className="h-2.5 w-2.5" /> catalogue
-                          </Badge>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-8 w-20 bg-white text-sm"
+                            value={line.quantity}
+                            onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })}
+                          />
+                          <Select value={line.unit} onValueChange={(value) => updateLine(index, { unit: value })}>
+                            <SelectTrigger className="h-8 w-28 bg-white text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {QUOTE_UNITS.map((u) => (
+                                <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="h-8 w-24 bg-white text-sm"
+                            value={line.unit_price}
+                            onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })}
+                          />
+                          <span className="text-xs text-muted-foreground">=</span>
+                          <span className="text-sm font-semibold text-foreground">
+                            {formatCurrency((Number(line.quantity) || 0) * (Number(line.unit_price) || 0))}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {saveState === 'saved' ? (
+                          <span
+                            title="Enregistrée dans tes prestations"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-600"
+                          >
+                            <Check className="h-4 w-4" />
+                          </span>
+                        ) : canSave ? (
+                          <button
+                            type="button"
+                            onClick={() => { void saveLineAsPrestation(index); }}
+                            disabled={saveState === 'saving'}
+                            title="Enregistrer dans mes prestations"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-[#d35400] disabled:opacity-50"
+                          >
+                            {saveState === 'saving' ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <BookmarkPlus className="h-4 w-4" />
+                            )}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => removeLine(index)}
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                          title="Supprimer la ligne"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeLine(index)}
-                      className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
-                      title="Supprimer la ligne"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button variant="outline" size="sm" onClick={addEmptyLine} className="mt-2 gap-1">
@@ -1299,7 +1286,7 @@ export function QuoteAiAssistant({ onUseDraft, presetRequest = null }: QuoteAiAs
           </div>
           <DialogTitle className="text-center text-lg">Analyse approfondie en cours</DialogTitle>
           <DialogDescription className="text-center">
-            L&apos;IA croise ta demande, tes photos, ton catalogue et ton historique tarifaire pour rédiger le meilleur devis possible.
+            L&apos;IA croise ta demande, ton catalogue de prestations et ton historique tarifaire pour rédiger le meilleur devis possible.
           </DialogDescription>
         </DialogHeader>
         <ol className="mt-3 space-y-2.5">

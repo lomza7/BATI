@@ -109,14 +109,23 @@ function normalizeUnit(raw: unknown): (typeof AI_QUOTE_UNITS)[number] {
   return UNIT_ALIASES[cleaned] ?? 'u';
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function normalizeAnalysisRaw(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return raw;
   const obj = raw as Record<string, unknown>;
   if (Array.isArray(obj.lines)) {
     obj.lines = obj.lines.map((line) => {
       if (!line || typeof line !== 'object') return line;
-      const l = line as Record<string, unknown>;
-      return { ...l, unit: normalizeUnit(l.unit) };
+      const l = { ...(line as Record<string, unknown>) };
+      l.unit = normalizeUnit(l.unit);
+      // Strip any non-UUID service_id (null, "", "none", hallucinated names)
+      // so the optional Zod validator stays happy and the client can treat
+      // the line as a new proposition rather than a catalog match.
+      if (typeof l.service_id !== 'string' || !UUID_RE.test(l.service_id)) {
+        delete l.service_id;
+      }
+      return l;
     });
   }
   return obj;
@@ -316,7 +325,7 @@ export async function POST(request: Request) {
 
     const prompt = [
       'Tu aides un artisan francais du BTP a preparer un brouillon de devis.',
-      'Analyse la transcription vocale, les photos eventuelles et l historique de clarification (s il existe).',
+      'Analyse la transcription vocale et l historique de clarification (s il existe).',
       '',
       'Tu dois renvoyer UNIQUEMENT un JSON valide (pas de markdown, pas de commentaires).',
       'Ton JSON peut prendre DEUX formes :',
@@ -411,13 +420,21 @@ export async function POST(request: Request) {
         ? [
             '',
             'IMPORTANT: L\'artisan a une bibliotheque de prestations avec ses propres prix et descriptions.',
-            'Utilise EN PRIORITE ces prestations pour les lignes du devis.',
+            'Utilise EN PRIORITE ces prestations pour les lignes du devis quand une correspondance existe.',
             'Reprends exactement les noms, descriptions, unites et prix unitaires du catalogue.',
-            'Quand tu utilises une prestation du catalogue, renvoie son id dans le champ service_id de la ligne.',
-            'Ne modifie les prix que si la transcription mentionne explicitement un tarif different.',
+            '',
+            'REGLE ABSOLUE pour le champ `service_id` de chaque ligne :',
+            '- Si la ligne correspond a une prestation du catalogue ci-dessous, tu DOIS renvoyer `service_id` avec l id exact de cette prestation (UUID).',
+            '- Si la ligne est une prestation NOUVELLE (pas dans le catalogue), tu DOIS OMETTRE COMPLETEMENT le champ `service_id` (ne mets ni null, ni "", ni une valeur inventee).',
+            '- N invente JAMAIS un service_id. N inclus jamais un service_id qui n existe pas dans le catalogue fourni.',
+            'Cette distinction est critique : l artisan verra les lignes sans service_id comme des nouvelles propositions qu il pourra ajouter a son catalogue.',
+            'Ne modifie les prix du catalogue que si la transcription mentionne explicitement un tarif different.',
             `Catalogue de prestations: ${JSON.stringify(filteredCatalog)}`,
           ]
-        : []),
+        : [
+            '',
+            'L artisan n a pas encore de catalogue de prestations. Pour chaque ligne du devis, OMETS le champ `service_id` (ne le mets pas dans le JSON).',
+          ]),
       ...(recentLines.length > 0
         ? [
             '',
@@ -436,7 +453,6 @@ export async function POST(request: Request) {
         : []),
       '',
       `Transcription: ${transcript}`,
-      `Nombre de photos: ${photoEntries.length}`,
     ].filter(Boolean).join('\n');
 
     const model = process.env.OPENAI_VISION_MODEL || DEFAULT_MODEL;
