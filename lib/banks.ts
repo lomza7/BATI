@@ -5,38 +5,56 @@ export interface BankOption {
   slug: string;
   name: string;
   category: 'traditionnelle' | 'en_ligne' | 'mutualiste' | 'pro';
+  /** Domaine du site officiel — sert a recuperer le favicon comme logo. */
+  domain: string;
 }
 
 // Triee par nom d'affichage pour un rendu naturel dans la combobox.
 // On couvre les 20+ banques qu'on voit le plus souvent chez les artisans.
 export const FRENCH_BANKS: BankOption[] = [
-  { slug: 'axa-banque', name: 'AXA Banque', category: 'traditionnelle' },
-  { slug: 'banque-populaire', name: 'Banque Populaire', category: 'mutualiste' },
-  { slug: 'blank', name: 'Blank', category: 'pro' },
-  { slug: 'bnp-paribas', name: 'BNP Paribas', category: 'traditionnelle' },
-  { slug: 'boursorama', name: 'Boursorama Banque', category: 'en_ligne' },
-  { slug: 'bred', name: 'BRED Banque Populaire', category: 'mutualiste' },
-  { slug: 'caisse-epargne', name: "Caisse d'Epargne", category: 'mutualiste' },
-  { slug: 'cic', name: 'CIC', category: 'traditionnelle' },
-  { slug: 'credit-agricole', name: 'Credit Agricole', category: 'mutualiste' },
-  { slug: 'credit-cooperatif', name: 'Credit Cooperatif', category: 'mutualiste' },
-  { slug: 'credit-du-nord', name: 'Credit du Nord', category: 'traditionnelle' },
-  { slug: 'credit-mutuel', name: 'Credit Mutuel', category: 'mutualiste' },
-  { slug: 'fortuneo', name: 'Fortuneo', category: 'en_ligne' },
-  { slug: 'hello-bank', name: 'Hello bank!', category: 'en_ligne' },
-  { slug: 'hsbc', name: 'HSBC France', category: 'traditionnelle' },
-  { slug: 'la-banque-postale', name: 'La Banque Postale', category: 'traditionnelle' },
-  { slug: 'lcl', name: 'LCL', category: 'traditionnelle' },
-  { slug: 'ma-french-bank', name: 'Ma French Bank', category: 'en_ligne' },
-  { slug: 'monabanq', name: 'Monabanq', category: 'en_ligne' },
-  { slug: 'n26', name: 'N26', category: 'en_ligne' },
-  { slug: 'nickel', name: 'Nickel', category: 'en_ligne' },
-  { slug: 'orange-bank', name: 'Orange Bank', category: 'en_ligne' },
-  { slug: 'qonto', name: 'Qonto', category: 'pro' },
-  { slug: 'revolut', name: 'Revolut', category: 'en_ligne' },
-  { slug: 'shine', name: 'Shine', category: 'pro' },
-  { slug: 'societe-generale', name: 'Societe Generale', category: 'traditionnelle' },
+  { slug: 'axa-banque', name: 'AXA Banque', category: 'traditionnelle', domain: 'axabanque.fr' },
+  { slug: 'banque-populaire', name: 'Banque Populaire', category: 'mutualiste', domain: 'banquepopulaire.fr' },
+  { slug: 'blank', name: 'Blank', category: 'pro', domain: 'blank.app' },
+  { slug: 'bnp-paribas', name: 'BNP Paribas', category: 'traditionnelle', domain: 'mabanque.bnpparibas' },
+  { slug: 'boursorama', name: 'Boursorama Banque', category: 'en_ligne', domain: 'boursorama.com' },
+  { slug: 'bred', name: 'BRED Banque Populaire', category: 'mutualiste', domain: 'bred.fr' },
+  { slug: 'caisse-epargne', name: "Caisse d'Epargne", category: 'mutualiste', domain: 'caisse-epargne.fr' },
+  { slug: 'cic', name: 'CIC', category: 'traditionnelle', domain: 'cic.fr' },
+  { slug: 'credit-agricole', name: 'Credit Agricole', category: 'mutualiste', domain: 'credit-agricole.fr' },
+  { slug: 'credit-cooperatif', name: 'Credit Cooperatif', category: 'mutualiste', domain: 'credit-cooperatif.coop' },
+  { slug: 'credit-du-nord', name: 'Credit du Nord', category: 'traditionnelle', domain: 'credit-du-nord.fr' },
+  { slug: 'credit-mutuel', name: 'Credit Mutuel', category: 'mutualiste', domain: 'creditmutuel.fr' },
+  { slug: 'fortuneo', name: 'Fortuneo', category: 'en_ligne', domain: 'fortuneo.fr' },
+  { slug: 'hello-bank', name: 'Hello bank!', category: 'en_ligne', domain: 'hellobank.fr' },
+  { slug: 'hsbc', name: 'HSBC France', category: 'traditionnelle', domain: 'hsbc.fr' },
+  { slug: 'la-banque-postale', name: 'La Banque Postale', category: 'traditionnelle', domain: 'labanquepostale.fr' },
+  { slug: 'lcl', name: 'LCL', category: 'traditionnelle', domain: 'lcl.fr' },
+  { slug: 'ma-french-bank', name: 'Ma French Bank', category: 'en_ligne', domain: 'mafrenchbank.fr' },
+  { slug: 'monabanq', name: 'Monabanq', category: 'en_ligne', domain: 'monabanq.com' },
+  { slug: 'n26', name: 'N26', category: 'en_ligne', domain: 'n26.com' },
+  { slug: 'nickel', name: 'Nickel', category: 'en_ligne', domain: 'nickel.eu' },
+  { slug: 'orange-bank', name: 'Orange Bank', category: 'en_ligne', domain: 'orangebank.fr' },
+  { slug: 'qonto', name: 'Qonto', category: 'pro', domain: 'qonto.com' },
+  { slug: 'revolut', name: 'Revolut', category: 'en_ligne', domain: 'revolut.com' },
+  { slug: 'shine', name: 'Shine', category: 'pro', domain: 'shine.fr' },
+  { slug: 'societe-generale', name: 'Societe Generale', category: 'traditionnelle', domain: 'societegenerale.fr' },
 ];
+
+/**
+ * URL du favicon officiel d'une banque (via le service Google S2), utilise
+ * comme logo dans la combobox des RIB. Pas de cle API, pas de rate-limit a
+ * gerer — et un fallback coherent (Landmark) est cable cote composant au cas
+ * ou l'image ne chargerait pas.
+ */
+export function bankLogoUrl(domain: string, size: 64 | 128 = 64): string {
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+}
+
+/** Retrouve une banque connue par son slug. Retourne null si absente. */
+export function findBankBySlug(slug: string | null | undefined): BankOption | null {
+  if (!slug) return null;
+  return FRENCH_BANKS.find((b) => b.slug === slug) ?? null;
+}
 
 export const BANK_CATEGORY_LABELS: Record<BankOption['category'], string> = {
   traditionnelle: 'Banque traditionnelle',

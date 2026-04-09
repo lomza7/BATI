@@ -21,7 +21,6 @@ import {
   Settings2,
   Shield,
   Sparkles,
-  Upload,
   Users,
   Zap,
   Crown,
@@ -41,6 +40,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
 import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
 import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
+import { ImportShowcase, type SourceId } from '@/components/parametres/import-showcase';
 import { ImportModal } from '@/components/onboarding/import-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,7 +89,7 @@ import {
   type WorkspaceRole,
 } from '@/lib/workspace';
 
-type SettingsTab = 'parametres' | 'documents' | 'banque' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'import' | 'documents' | 'banque' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -361,6 +361,7 @@ export default function ParametresPage() {
   const [creatingSource, setCreatingSource] = useState(false);
   const [creatingStage, setCreatingStage] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [importSoftware, setImportSoftware] = useState<'constructeur' | 'excel' | 'other' | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
@@ -1219,8 +1220,17 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 rounded-xl bg-muted/60 p-1">
+        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 rounded-xl bg-muted/60 p-1">
           <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
+          <TabsTrigger value="import" className="rounded-lg py-2.5 text-xs sm:text-sm relative">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-primary" />
+              Import
+            </span>
+            <span className="absolute -top-1 -right-1 inline-flex h-4 px-1.5 items-center rounded-full bg-primary text-[8px] font-bold uppercase tracking-wide text-primary-foreground">
+              Nouveau
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
           <TabsTrigger value="banque" className="rounded-lg py-2.5 text-xs sm:text-sm">Banque</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
@@ -2239,41 +2249,24 @@ export default function ParametresPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Upload className="h-5 w-5 text-primary" />
-                Importer mes données
-              </CardTitle>
-              <CardDescription>
-                Migrez vos clients, devis et factures depuis Constructeur ou tout autre logiciel qui exporte en CSV ou Excel.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="h-10 w-10 rounded-xl bg-white border border-primary/20 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      Compatible Constructeur, Excel, Obat, EBP, Sage, Henrri…
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Hellobat reconnaît automatiquement les colonnes de vos exports CSV.
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setImportOpen(true)}
-                  className="flex-shrink-0"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Lancer l&apos;import
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-6">
+          <ImportShowcase
+            onLaunch={(sourceId: SourceId) => {
+              // Map any of the 12 showcase tiles onto the 3 modal flows:
+              // Constructeur has its own tailored instructions, Excel/CSV is
+              // its own bucket, everything else falls into "other".
+              const mapped =
+                sourceId === 'constructeur'
+                  ? 'constructeur'
+                  : sourceId === 'excel'
+                    ? 'excel'
+                    : 'other';
+              setImportSoftware(mapped);
+              setImportOpen(true);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
@@ -2960,7 +2953,14 @@ export default function ParametresPage() {
         </TabsContent>
       </Tabs>
 
-      <ImportModal open={importOpen} onOpenChange={setImportOpen} />
+      <ImportModal
+        open={importOpen}
+        onOpenChange={(o) => {
+          setImportOpen(o);
+          if (!o) setImportSoftware(null);
+        }}
+        initialSoftware={importSoftware}
+      />
     </div>
   );
 }

@@ -39,24 +39,65 @@ export async function GET(_request: Request, { params }: { params: { token: stri
   // Aggregates: invoices
   let invoicesQuery = supabaseAdmin
     .from('invoices')
-    .select('total_ht, total_ttc, total_tva, status, paid_at, issued_at, created_at', { count: 'exact' })
+    .select(
+      'total_ht, total_ttc, total_tva, status, paid_at, issued_at, created_at, invoice_type, quote_id',
+      { count: 'exact' },
+    )
     .eq('user_id', access.user_id);
   if (scope.start) invoicesQuery = invoicesQuery.gte('created_at', scope.start);
   if (scope.end) invoicesQuery = invoicesQuery.lte('created_at', scope.end + 'T23:59:59');
   const { data: invoicesAgg, count: invoicesCount } = await invoicesQuery;
+
+  // Pour éviter le double-comptage du CA, on charge tous les acomptes liés aux
+  // factures de solde présentes dans la période (sans filtre de date : un
+  // acompte peut avoir été émis avant la période). Le net = solde brut −
+  // acomptes liés.
+  const soldeQuoteIds = Array.from(
+    new Set(
+      (invoicesAgg || [])
+        .filter((inv: Record<string, unknown>) => inv.invoice_type === 'solde' && inv.quote_id)
+        .map((inv: Record<string, unknown>) => String(inv.quote_id)),
+    ),
+  );
+  const depositsByQuote = new Map<string, { ht: number; ttc: number; tva: number }>();
+  if (soldeQuoteIds.length > 0) {
+    const { data: linkedDeposits } = await supabaseAdmin
+      .from('invoices')
+      .select('quote_id, total_ht, total_ttc, total_tva')
+      .eq('user_id', access.user_id)
+      .eq('invoice_type', 'acompte')
+      .neq('status', 'annulee')
+      .in('quote_id', soldeQuoteIds);
+    for (const d of linkedDeposits || []) {
+      const qid = String((d as Record<string, unknown>).quote_id);
+      const prev = depositsByQuote.get(qid) || { ht: 0, ttc: 0, tva: 0 };
+      depositsByQuote.set(qid, {
+        ht: prev.ht + Number((d as Record<string, unknown>).total_ht || 0),
+        ttc: prev.ttc + Number((d as Record<string, unknown>).total_ttc || 0),
+        tva: prev.tva + Number((d as Record<string, unknown>).total_tva || 0),
+      });
+    }
+  }
 
   let totalRevenueHt = 0;
   let totalRevenueTtc = 0;
   let totalTvaCollectee = 0;
   let paidCount = 0;
   for (const inv of invoicesAgg || []) {
-    const ht = Number(inv.total_ht || 0);
-    const ttc = Number(inv.total_ttc || 0);
+    let ht = Number(inv.total_ht || 0);
+    let ttc = Number(inv.total_ttc || 0);
+    let tva = inv.total_tva != null ? Number(inv.total_tva) : Math.max(0, ttc - ht);
+    if (inv.invoice_type === 'solde' && inv.quote_id) {
+      const d = depositsByQuote.get(String(inv.quote_id));
+      if (d) {
+        ht = Math.max(0, ht - d.ht);
+        ttc = Math.max(0, ttc - d.ttc);
+        tva = Math.max(0, tva - d.tva);
+      }
+    }
     totalRevenueHt += ht;
     totalRevenueTtc += ttc;
-    // Prefer stored total_tva (per-rate aware) when available, fallback to ttc - ht
-    totalTvaCollectee +=
-      inv.total_tva != null ? Number(inv.total_tva) : Math.max(0, ttc - ht);
+    totalTvaCollectee += tva;
     if (inv.status === 'paid' || inv.paid_at) paidCount += 1;
   }
 

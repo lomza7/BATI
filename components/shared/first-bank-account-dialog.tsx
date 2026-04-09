@@ -42,7 +42,7 @@ export function FirstBankAccountDialog({
           </div>
           <DialogTitle className="text-center">Ajoute ton RIB pour commencer</DialogTitle>
           <DialogDescription className="text-center">
-            Avant de creer ton premier {docLabel}, renseigne tes coordonnees bancaires.
+            Avant de créer ton premier {docLabel}, renseigne tes coordonnées bancaires.
             Elles s&apos;afficheront automatiquement sur tes {docLabel}s pour que tes
             clients puissent te payer par virement.
           </DialogDescription>

@@ -18,6 +18,7 @@ import {
   mapContactsCSV,
   mapQuotesCSV,
   mapInvoicesCSV,
+  mapServicesCSV,
 } from '@/lib/import/constructeur';
 
 export const runtime = 'nodejs';
@@ -58,12 +59,14 @@ export async function POST(request: Request) {
   const clientsFile = formData.get('clients');
   const quotesFile = formData.get('quotes');
   const invoicesFile = formData.get('invoices');
+  const servicesFile = formData.get('services');
 
   const result: {
     clients: ReturnType<typeof mapContactsCSV> | null;
     quotes: ReturnType<typeof mapQuotesCSV> | null;
     invoices: ReturnType<typeof mapInvoicesCSV> | null;
-  } = { clients: null, quotes: null, invoices: null };
+    services: ReturnType<typeof mapServicesCSV> | null;
+  } = { clients: null, quotes: null, invoices: null, services: null };
 
   async function processField<T>(
     field: FormDataEntryValue | null,
@@ -83,12 +86,13 @@ export async function POST(request: Request) {
     result.clients = await processField(clientsFile, mapContactsCSV);
     result.quotes = await processField(quotesFile, mapQuotesCSV);
     result.invoices = await processField(invoicesFile, mapInvoicesCSV);
+    result.services = await processField(servicesFile, mapServicesCSV);
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur inattendue';
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  if (!result.clients && !result.quotes && !result.invoices) {
+  if (!result.clients && !result.quotes && !result.invoices && !result.services) {
     return NextResponse.json(
       { error: 'Aucun fichier reçu. Joignez au moins un export CSV.' },
       { status: 400 },
@@ -100,13 +104,16 @@ export async function POST(request: Request) {
       clients: result.clients?.rows.length || 0,
       quotes: result.quotes?.rows.length || 0,
       invoices: result.invoices?.rows.length || 0,
+      services: result.services?.rows.length || 0,
       errors:
         (result.clients?.errors.length || 0) +
         (result.quotes?.errors.length || 0) +
-        (result.invoices?.errors.length || 0),
+        (result.invoices?.errors.length || 0) +
+        (result.services?.errors.length || 0),
     },
     clients: result.clients,
     quotes: result.quotes,
     invoices: result.invoices,
+    services: result.services,
   });
 }

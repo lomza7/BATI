@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Archive,
@@ -27,6 +28,7 @@ import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,8 @@ import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
+import { QuoteBillingCard } from '@/components/devis/quote-billing-card';
+import type { DepositInvoice } from '@/lib/invoices/deposits';
 import {
   Select,
   SelectContent,
@@ -70,6 +74,8 @@ interface Invoice {
   is_archived: boolean;
   created_at: string;
   payment_method: string;
+  invoice_type: 'standard' | 'acompte' | 'solde';
+  deposit_percentage: number | null;
   clients: { name: string; email?: string | null } | null;
 }
 
@@ -91,13 +97,15 @@ interface QuoteCandidate {
   status: keyof typeof QUOTE_STATUSES;
   total_ht: number;
   total_ttc: number;
+  tva_rate: number;
   created_at: string;
   valid_until: string | null;
   bank_account_id: string | null;
+  client_id: string | null;
+  project_id: string | null;
   clients: { name: string } | null;
-  invoice_id: string | null;
-  invoice_number: string | null;
-  invoice_status: keyof typeof INVOICE_STATUSES | null;
+  /** Indique s'il existe au moins une facture liée (tous types confondus) */
+  has_linked_invoice: boolean;
   quote_lines: QuoteLine[];
 }
 
@@ -119,12 +127,15 @@ export default function FacturesPage() {
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
+  // Utilisé quand on arrive sur /factures?billing=<quote_id> depuis une autre
+  // page (devis, chantiers, etc.) : on ouvre la carte de facturation une fois
+  // les devis chargés.
+  const pendingBillingQuoteId = useRef<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotes, setQuotes] = useState<QuoteCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [creatingFromQuoteId, setCreatingFromQuoteId] = useState<string | null>(null);
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
   const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
@@ -136,16 +147,28 @@ export default function FacturesPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
+  // Devis pour lequel on affiche le dialog "Facturation" (carte de facturation)
+  const [billingQuote, setBillingQuote] = useState<QuoteCandidate | null>(null);
+  // Loaded from profiles.document_config — controls the inline warning shown
+  // in the create-invoice dialog when payment terms are disabled.
+  const [paymentTermsOnInvoices, setPaymentTermsOnInvoices] = useState<boolean>(true);
 
   useEffect(() => {
     loadData();
 
-    // Pré-remplissage depuis l'URL (venant d'un chantier ou d'une fiche client)
+    // Pré-remplissage depuis l'URL (venant d'un chantier, d'une fiche client ou du devis)
     const params = new URLSearchParams(window.location.search);
     const paramClientId = params.get('client_id');
     const paramProjectId = params.get('project_id');
+    // ?billing=<quote_id> → ouvre directement le dialog de facturation pour ce devis
+    const paramBilling = params.get('billing');
 
-    if (paramClientId || paramProjectId) {
+    if (paramBilling) {
+      // On charge le devis dans le state "pending" pour qu'il soit ouvert une
+      // fois que loadData() a fini (géré dans un effet séparé ci-dessous).
+      pendingBillingQuoteId.current = paramBilling;
+      router.replace('/factures', { scroll: false });
+    } else if (paramClientId || paramProjectId) {
       if (paramProjectId) prefillProjectId.current = paramProjectId;
       if (paramClientId) {
         supabase.from('clients').select('name').eq('id', paramClientId).is('deleted_at', null).single().then(({ data }) => {
@@ -157,13 +180,28 @@ export default function FacturesPage() {
     }
   }, []);
 
+  // Une fois les devis chargés, si on arrive avec ?billing=<quote_id>, ouvre la facturation
+  useEffect(() => {
+    if (!pendingBillingQuoteId.current || quotes.length === 0) return;
+    const quote = quotes.find((q) => q.id === pendingBillingQuoteId.current);
+    pendingBillingQuoteId.current = null;
+    if (!quote) return;
+
+    if (quote.bank_account_id || hasBankAccount) {
+      setBillingQuote(quote);
+    } else {
+      setPendingQuoteForInvoice(quote);
+      setShowFirstRibDialog(true);
+    }
+  }, [quotes, hasBankAccount]);
+
   async function loadData() {
     setLoading(true);
 
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, clients(name, email, deleted_at)')
+        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, invoice_type, deposit_percentage, clients(name, email, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -174,12 +212,15 @@ export default function FacturesPage() {
           status,
           total_ht,
           total_ttc,
+          tva_rate,
           created_at,
           valid_until,
           bank_account_id,
+          client_id,
+          project_id,
           clients(name, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position),
-          invoices(id, invoice_number, status)
+          invoices(id)
         `)
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
@@ -189,6 +230,11 @@ export default function FacturesPage() {
       const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
       return {
         ...invoice,
+        invoice_type: (invoice.invoice_type as Invoice['invoice_type']) || 'standard',
+        deposit_percentage:
+          invoice.deposit_percentage === null || invoice.deposit_percentage === undefined
+            ? null
+            : Number(invoice.deposit_percentage),
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? {
               name: String((clientValue as { name?: string }).name || ''),
@@ -200,7 +246,6 @@ export default function FacturesPage() {
 
     const nextQuotes = (((quoteRes.data as unknown as Array<Record<string, unknown>>) || []).map((quote) => {
       const linkedInvoices = Array.isArray(quote.invoices) ? (quote.invoices as Array<Record<string, unknown>>) : [];
-      const latestInvoice = linkedInvoices[0] || null;
       const clientValue = Array.isArray(quote.clients) ? quote.clients[0] : quote.clients;
 
       return {
@@ -210,15 +255,16 @@ export default function FacturesPage() {
         status: (quote.status as QuoteCandidate['status']) || 'brouillon',
         total_ht: Number(quote.total_ht || 0),
         total_ttc: Number(quote.total_ttc || 0),
+        tva_rate: Number(quote.tva_rate ?? 20),
         created_at: String(quote.created_at || ''),
         valid_until: quote.valid_until ? String(quote.valid_until) : null,
         bank_account_id: quote.bank_account_id ? String(quote.bank_account_id) : null,
+        client_id: quote.client_id ? String(quote.client_id) : null,
+        project_id: quote.project_id ? String(quote.project_id) : null,
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
-        invoice_id: latestInvoice?.id ? String(latestInvoice.id) : null,
-        invoice_number: latestInvoice?.invoice_number ? String(latestInvoice.invoice_number) : null,
-        invoice_status: (latestInvoice?.status as QuoteCandidate['invoice_status']) || null,
+        has_linked_invoice: linkedInvoices.length > 0,
         quote_lines: Array.isArray(quote.quote_lines)
           ? (quote.quote_lines as QuoteLine[]).map((line) => ({
               ...line,
@@ -242,6 +288,17 @@ export default function FacturesPage() {
       .is('deleted_at', null)
       .limit(1);
     setHasBankAccount((bankRows?.length || 0) > 0);
+
+    // Charge le flag "conditions de paiement sur les factures" depuis le profil
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('document_config')
+        .eq('id', user.id)
+        .maybeSingle();
+      const config = (profile?.document_config || {}) as { payment_terms_on_invoices?: boolean };
+      setPaymentTermsOnInvoices(config.payment_terms_on_invoices !== false);
+    }
   }
 
   function handleOpenCreate() {
@@ -253,12 +310,12 @@ export default function FacturesPage() {
   }
 
   function handleConvertQuote(quote: QuoteCandidate) {
-    // Si le devis a deja son propre RIB, on peut convertir directement
+    // Si le devis a deja son propre RIB, on ouvre directement la carte de facturation
     if (quote.bank_account_id || hasBankAccount) {
-      createInvoiceFromQuote(quote);
+      setBillingQuote(quote);
       return;
     }
-    // Sinon, on force l'ajout d'un RIB avant la conversion
+    // Sinon, on force l'ajout d'un RIB avant la facturation
     setPendingQuoteForInvoice(quote);
     setShowFirstRibDialog(true);
   }
@@ -321,100 +378,6 @@ export default function FacturesPage() {
     loadData();
   }
 
-  async function createInvoiceFromQuote(quote: QuoteCandidate) {
-    if (quote.invoice_id) return;
-    if (!user) return;
-
-    setCreatingFromQuoteId(quote.id);
-
-    try {
-      const invNumber = await getNextInvoiceNumber(supabase, user.id);
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-
-      const { data: client } = quote.clients?.name
-        ? await supabase.from('clients').select('id').eq('name', quote.clients.name).is('deleted_at', null).maybeSingle()
-        : { data: null };
-
-      // Recompute totals from lines to guarantee consistent tva_breakdown
-      const tva = computeTvaBreakdown(
-        quote.quote_lines.map(l => ({
-          quantity: l.quantity,
-          unit_price: l.unit_price,
-          tva_rate: l.tva_rate ?? 20,
-        }))
-      );
-
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          user_id: user.id,
-          invoice_number: invNumber,
-          quote_id: quote.id,
-          client_id: client?.id || null,
-          bank_account_id: quote.bank_account_id,
-          title: quote.title || `Facture ${quote.quote_number}`,
-          total_ht: tva.total_ht || quote.total_ht,
-          total_tva: tva.total_tva,
-          total_ttc: tva.total_ttc || quote.total_ttc,
-          tva_rate: tva.primary_rate,
-          tva_breakdown: tva.tva_breakdown,
-          due_date: dueDate.toISOString().split('T')[0],
-        })
-        .select('id')
-        .single();
-
-      if (invoiceError || !invoice) {
-        throw invoiceError || new Error('Impossible de creer la facture.');
-      }
-
-      if (quote.quote_lines.length > 0) {
-        const { error: linesError } = await supabase.from('invoice_lines').insert(
-          quote.quote_lines.map((line, index) => ({
-            user_id: user.id,
-            invoice_id: invoice.id,
-            description: line.description,
-            quantity: line.quantity,
-            unit: line.unit,
-            unit_price: line.unit_price,
-            tva_rate: line.tva_rate ?? 20,
-            total: line.total || line.quantity * line.unit_price,
-            position: typeof line.position === 'number' ? line.position : index,
-          }))
-        );
-
-        if (linesError) {
-          throw linesError;
-        }
-      }
-
-      // Passer le devis en "Accepté" automatiquement
-      await supabase
-        .from('quotes')
-        .update({ status: 'accepte', updated_at: new Date().toISOString() })
-        .eq('id', quote.id);
-
-      // Créer le chantier associé automatiquement
-      const { data: newProject } = await supabase.from('projects').insert({
-        user_id: user.id,
-        quote_id: quote.id,
-        client_id: client?.id || null,
-        name: quote.title,
-        budget: quote.total_ht,
-        status: 'a_planifier',
-      }).select('id').single();
-
-      // Lier le devis au chantier
-      if (newProject?.id) {
-        await supabase.from('quotes').update({ project_id: newProject.id }).eq('id', quote.id);
-      }
-
-      await loadData();
-    } finally {
-      setCreatingFromQuoteId(null);
-    }
-  }
-
   async function updateStatus(id: string, status: string) {
     const updates: Record<string, string> = { status, updated_at: new Date().toISOString() };
     if (status === 'payee') updates.paid_at = new Date().toISOString();
@@ -472,8 +435,8 @@ export default function FacturesPage() {
           quote.clients?.name?.toLowerCase().includes(quoteSearchTerm);
 
         if (!matchesSearch) return false;
-        if (quoteFilter === 'to_invoice') return !quote.invoice_id;
-        return Boolean(quote.invoice_id);
+        if (quoteFilter === 'to_invoice') return !quote.has_linked_invoice;
+        return quote.has_linked_invoice;
       })
       .sort((a, b) => {
         switch (quoteSort) {
@@ -497,18 +460,32 @@ export default function FacturesPage() {
   const totalUnpaid = activeInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
   const totalPaid = activeInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
   const totalLate = activeInvoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
-  const quotesToInvoice = quotes.filter((quote) => !quote.invoice_id);
+  const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice);
 
   function renderInvoiceRow(inv: Invoice, archived = false) {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
     return (
       <tr key={inv.id} className={`transition-colors hover:bg-muted/20 ${archived ? 'opacity-60' : ''}`}>
-        <td className="px-4 py-3 text-sm font-medium text-foreground">{inv.invoice_number}</td>
+        <td className="px-4 py-3 text-sm font-medium text-foreground">
+          <div className="flex items-center gap-1.5">
+            {inv.invoice_number}
+            {inv.invoice_type === 'acompte' && (
+              <Badge className="bg-[#fff7f0] text-[#d35400] hover:bg-[#fff7f0] font-normal">
+                Acompte{inv.deposit_percentage ? ` ${Number.isInteger(inv.deposit_percentage) ? inv.deposit_percentage : inv.deposit_percentage.toFixed(2).replace('.', ',')}%` : ''}
+              </Badge>
+            )}
+            {inv.invoice_type === 'solde' && (
+              <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 font-normal">
+                Solde
+              </Badge>
+            )}
+          </div>
+        </td>
         <td className="px-4 py-3 text-sm text-muted-foreground">{inv.clients?.name || '-'}</td>
         <td className="px-4 py-3 text-sm text-foreground">{inv.title}</td>
         <td className="px-4 py-3 text-sm text-muted-foreground">
           {inv.recurring_contract_id ? (
-            <span className="inline-flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Contrat recurrent</span>
+            <span className="inline-flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Contrat récurrent</span>
           ) : inv.quote_id ? 'Depuis un devis' : 'Facture manuelle'}
         </td>
         <td className="px-4 py-3">
@@ -622,6 +599,16 @@ export default function FacturesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{inv.invoice_number}</span>
+          {inv.invoice_type === 'acompte' && (
+            <Badge className="bg-[#fff7f0] text-[#d35400] hover:bg-[#fff7f0] font-normal">
+              Acompte{inv.deposit_percentage ? ` ${Number.isInteger(inv.deposit_percentage) ? inv.deposit_percentage : inv.deposit_percentage.toFixed(2).replace('.', ',')}%` : ''}
+            </Badge>
+          )}
+          {inv.invoice_type === 'solde' && (
+            <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 font-normal">
+              Solde
+            </Badge>
+          )}
           <StatusBadge label={st.label} color={st.color} />
           {inv.status === 'brouillon' && !archived && (
             <Button
@@ -660,6 +647,7 @@ export default function FacturesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
+        <ImportCsvButton type="invoices" onImported={loadData} />
         <Button onClick={handleOpenCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>
@@ -667,7 +655,7 @@ export default function FacturesPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle className="h-4 w-4 text-emerald-500" /> Encaisse</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle className="h-4 w-4 text-emerald-500" /> Encaissé</div>
           <p className="mt-1 text-xl font-semibold text-foreground">{formatCurrency(totalPaid)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
@@ -679,7 +667,7 @@ export default function FacturesPage() {
           <p className="mt-1 text-xl font-semibold text-foreground">{formatCurrency(totalLate)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowRightLeft className="h-4 w-4 text-[#d35400]" /> Devis a facturer</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowRightLeft className="h-4 w-4 text-[#d35400]" /> Devis à facturer</div>
           <p className="mt-1 text-xl font-semibold text-foreground">{quotesToInvoice.length}</p>
         </div>
       </div>
@@ -695,10 +683,10 @@ export default function FacturesPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant={quoteFilter === 'to_invoice' ? 'default' : 'outline'} size="sm" onClick={() => setQuoteFilter('to_invoice')}>
-                A facturer
+                À facturer
               </Button>
               <Button variant={quoteFilter === 'already_invoiced' ? 'default' : 'outline'} size="sm" onClick={() => setQuoteFilter('already_invoiced')}>
-                Deja factures
+                Déjà facturés
               </Button>
             </div>
           </div>
@@ -713,9 +701,9 @@ export default function FacturesPage() {
               onChange={(e) => setQuoteSort(e.target.value as QuoteSortKey)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
-              <option value="recent">Plus recents</option>
+              <option value="recent">Plus récents</option>
               <option value="oldest">Plus anciens</option>
-              <option value="amount_desc">Montant decroissant</option>
+              <option value="amount_desc">Montant décroissant</option>
               <option value="amount_asc">Montant croissant</option>
               <option value="client">Client A-Z</option>
             </select>
@@ -726,13 +714,12 @@ export default function FacturesPage() {
               [1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />)
             ) : visibleQuotes.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                Aucun devis ne correspond a ce filtre.
+                Aucun devis ne correspond à ce filtre.
               </div>
             ) : (
               visibleQuotes.map((quote) => {
                 const quoteStatus = QUOTE_STATUSES[quote.status] || QUOTE_STATUSES.brouillon;
-                const invoiceStatus = quote.invoice_status ? INVOICE_STATUSES[quote.invoice_status] : null;
-                const canCreateInvoice = !quote.invoice_id;
+                const alreadyHasInvoices = quote.has_linked_invoice;
 
                 return (
                   <div key={quote.id} className="rounded-xl border border-border bg-background p-4 transition-colors hover:bg-muted/10">
@@ -742,35 +729,29 @@ export default function FacturesPage() {
                           <p className="text-sm font-semibold text-foreground">{quote.title}</p>
                           <Badge variant="outline">{quote.quote_number}</Badge>
                           <StatusBadge label={quoteStatus.label} color={quoteStatus.color} />
-                          {invoiceStatus ? (
-                            <StatusBadge label={`Facture ${invoiceStatus.label.toLowerCase()}`} color={invoiceStatus.color} />
+                          {alreadyHasInvoices ? (
+                            <Badge className="bg-[#fff7f0] text-[#d35400] hover:bg-[#fff7f0]">En facturation</Badge>
                           ) : (
                             <Badge className="bg-[#fff1e8] text-[#a34700] hover:bg-[#fff1e8]">A facturer</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {quote.clients?.name || 'Sans client'} • {formatCurrency(quote.total_ttc)} • Cree le {formatDate(quote.created_at)}
+                          {quote.clients?.name || 'Sans client'} • {formatCurrency(quote.total_ttc)} • Créé le {formatDate(quote.created_at)}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {quote.invoice_number ? `Lie a ${quote.invoice_number}` : 'Pret a etre transforme en facture en reprenant les lignes du devis.'}
+                          {alreadyHasInvoices
+                            ? 'Ouvrez la facturation pour émettre un nouvel acompte ou la facture de solde.'
+                            : 'Prêt à être facturé : acompte, facture de solde ou facture totale.'}
                         </p>
                       </div>
 
                       <div className="flex flex-col items-stretch gap-2 sm:min-w-[180px]">
-                        <Button
-                          onClick={() => handleConvertQuote(quote)}
-                          disabled={!canCreateInvoice || creatingFromQuoteId === quote.id}
-                          className="gap-2"
-                        >
-                          <ArrowRightLeft className="h-4 w-4" />
-                          {quote.invoice_id
-                            ? 'Deja facture'
-                            : creatingFromQuoteId === quote.id
-                              ? 'Conversion...'
-                              : 'Transformer en facture'}
+                        <Button onClick={() => handleConvertQuote(quote)} className="gap-2">
+                          <Receipt className="h-4 w-4" />
+                          {alreadyHasInvoices ? 'Ouvrir la facturation' : 'Facturer'}
                         </Button>
                         {quote.valid_until && (
-                          <p className="text-center text-xs text-muted-foreground">Validite jusqu&apos;au {formatDate(quote.valid_until)}</p>
+                          <p className="text-center text-xs text-muted-foreground">Validité jusqu&apos;au {formatDate(quote.valid_until)}</p>
                         )}
                       </div>
                     </div>
@@ -784,7 +765,7 @@ export default function FacturesPage() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-foreground">Factures emises</p>
+              <p className="text-sm font-semibold text-foreground">Factures émises</p>
               <p className="text-sm text-muted-foreground">Suivez les paiements et reprenez le fil de vos devis convertis.</p>
             </div>
           </div>
@@ -792,8 +773,8 @@ export default function FacturesPage() {
           {loading ? (
             <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>
           ) : filteredInvoices.length === 0 ? (
-            <EmptyState icon={Receipt} title="Aucune facture" description="Creez votre premiere facture ou convertissez un devis.">
-              <Button onClick={handleOpenCreate} className="gap-2"><Plus className="h-4 w-4" /> Creer une facture</Button>
+            <EmptyState icon={Receipt} title="Aucune facture" description="Créez votre première facture ou convertissez un devis.">
+              <Button onClick={handleOpenCreate} className="gap-2"><Plus className="h-4 w-4" /> Créer une facture</Button>
             </EmptyState>
           ) : (
             <>
@@ -802,14 +783,14 @@ export default function FacturesPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numero</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numéro</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Client</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Titre</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origine</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
                         <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
                         <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Dates</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Echeance</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Échéance</th>
                         <th className="px-4 py-3 w-10"></th>
                       </tr>
                     </thead>
@@ -853,14 +834,14 @@ export default function FacturesPage() {
                           <table className="w-full">
                             <thead>
                               <tr className="border-b border-border bg-muted/30">
-                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numero</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numéro</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Client</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Titre</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origine</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
                                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
                                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Dates</th>
-                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Echeance</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Échéance</th>
                                 <th className="px-4 py-3 w-10"></th>
                               </tr>
                             </thead>
@@ -882,6 +863,44 @@ export default function FacturesPage() {
           )}
         </section>
       </div>
+
+      {/* Dialog "Facturation" : carte de facturation (acompte / solde / total) */}
+      <Dialog
+        open={billingQuote !== null}
+        onOpenChange={(open) => {
+          if (!open) setBillingQuote(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Facturation</DialogTitle>
+          </DialogHeader>
+          {billingQuote && (
+            <QuoteBillingCard
+              quote={billingQuote}
+              onBillingChanged={loadData}
+              onSendInvoice={(inv: DepositInvoice) => {
+                // Reconstruit un objet compatible avec SendInvoiceDialog
+                setSendingInvoice({
+                  id: inv.id,
+                  invoice_number: inv.invoice_number,
+                  title: billingQuote.title,
+                  total_ttc: Number(inv.total_ttc),
+                  status: inv.status,
+                  clients: billingQuote.clients
+                    ? { name: billingQuote.clients.name, email: null }
+                    : null,
+                } as Invoice);
+                setBillingQuote(null);
+              }}
+              onPreviewInvoice={(inv: DepositInvoice) => {
+                setPreviewInvoiceId(inv.id);
+                setBillingQuote(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {sendingInvoice && (
         <SendInvoiceDialog
@@ -908,11 +927,12 @@ export default function FacturesPage() {
         onSaved={(account) => {
           setHasBankAccount(true);
           setShowFirstRibDialog(false);
-          // Si on etait en train de convertir un devis, on reprend le flow
+          // Si on etait en train de facturer un devis, on ouvre directement la carte
+          // de facturation avec ce RIB fraichement cree.
           if (pendingQuoteForInvoice) {
             const quoteWithBank = { ...pendingQuoteForInvoice, bank_account_id: account.id };
             setPendingQuoteForInvoice(null);
-            createInvoiceFromQuote(quoteWithBank);
+            setBillingQuote(quoteWithBank);
             return;
           }
           // Sinon on ouvre le formulaire de facture manuelle avec ce RIB selectionne
@@ -925,6 +945,26 @@ export default function FacturesPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Nouvelle facture</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
+            {!paymentTermsOnInvoices && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 text-red-700 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-red-900">
+                    Vos conditions de paiement sont désactivées
+                  </p>
+                  <p className="text-[11px] text-red-800 mt-0.5 leading-relaxed">
+                    Elles sont obligatoires sur une facture en France. Activez-les
+                    avant d&apos;émettre cette facture pour rester conforme.
+                  </p>
+                  <Link
+                    href="/parametres?tab=documents"
+                    className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-semibold text-red-900 underline hover:text-red-700"
+                  >
+                    Activer dans les paramètres
+                  </Link>
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium">Titre</label>
               <Input className="mt-1" placeholder="Ex: Travaux salle de bain" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
@@ -971,7 +1011,7 @@ export default function FacturesPage() {
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button onClick={createInvoice} disabled={!form.title.trim()}>Creer</Button>
+              <Button onClick={createInvoice} disabled={!form.title.trim()}>Créer</Button>
             </div>
           </div>
         </DialogContent>

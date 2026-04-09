@@ -33,7 +33,7 @@ export function BankAccountPicker({
   value,
   onChange,
   className,
-  label = 'Coordonnees bancaires',
+  label = 'Coordonnées bancaires',
   disabled = false,
 }: BankAccountPickerProps) {
   const { user } = useAuth();
@@ -107,11 +107,11 @@ export function BankAccountPicker({
                 </>
               ) : accounts.length === 0 && !loading ? (
                 <>
-                  <span className="block font-medium text-foreground">Aucun RIB enregistre</span>
-                  <span className="block text-[11px] text-muted-foreground">Ajoutes-en un pour l'afficher sur le document.</span>
+                  <span className="block font-medium text-foreground">Aucun RIB enregistré</span>
+                  <span className="block text-[11px] text-muted-foreground">Ajoutes-en un pour l&apos;afficher sur le document.</span>
                 </>
               ) : (
-                <span className="text-muted-foreground">Selectionne un compte…</span>
+                <span className="text-muted-foreground">Sélectionne un compte…</span>
               )}
             </span>
           </span>
@@ -123,7 +123,7 @@ export function BankAccountPicker({
             <div className="max-h-[260px] overflow-y-auto py-1">
               {accounts.length === 0 ? (
                 <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                  Tu n'as encore aucun RIB. Ajoute ton premier compte pour l'afficher sur tes documents.
+                  Tu n&apos;as encore aucun RIB. Ajoute ton premier compte pour l&apos;afficher sur tes documents.
                 </div>
               ) : (
                 <>
@@ -193,7 +193,7 @@ export function BankAccountPicker({
           <DialogHeader>
             <DialogTitle>Ajouter un RIB</DialogTitle>
             <DialogDescription>
-              Ce compte s'affichera sur tes devis et factures pour permettre a tes clients de payer par virement.
+              Ce compte s&apos;affichera sur tes devis et factures pour permettre à tes clients de payer par virement.
             </DialogDescription>
           </DialogHeader>
           <BankAccountForm

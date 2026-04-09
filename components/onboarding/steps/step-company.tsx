@@ -38,14 +38,14 @@ interface PappersCompanyData {
 
 const activities = [
   'Plomberie',
-  'Electricite',
+  'Électricité',
   'Peinture',
   'Carrelage',
-  'Maconnerie',
+  'Maçonnerie',
   'Menuiserie',
   'Couverture',
   'Chauffage / Clim',
-  'Renovation generale',
+  'Rénovation générale',
   'Autre',
 ];
 
@@ -97,7 +97,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
         return;
       }
 
-      throw new Error('La recherche Pappers a renvoye une reponse inattendue.');
+      throw new Error('La recherche Pappers a renvoyé une réponse inattendue.');
     } catch (error) {
       setResults([]);
       setShowDropdown(false);
@@ -204,7 +204,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
         Parlez-nous de votre entreprise
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        Tapez le nom de votre entreprise pour pre-remplir automatiquement vos informations.
+        Tapez le nom de votre entreprise pour pré-remplir automatiquement vos informations.
       </p>
 
       <div className="mt-6 space-y-4 flex-1">
@@ -259,14 +259,14 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
           {!searching && searchError && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               {searchError.includes('PAPPERS_API_KEY manquante')
-                ? 'La recherche d entreprise n est pas encore configuree sur cet environnement. Vous pouvez continuer manuellement ou ajouter PAPPERS_API_KEY.'
+                ? 'La recherche d\u2019entreprise n\u2019est pas encore configurée sur cet environnement. Vous pouvez continuer manuellement ou ajouter PAPPERS_API_KEY.'
                 : searchError}
             </p>
           )}
 
           {!searching && !searchError && hasSearched && query.trim().length >= 2 && results.length === 0 && (
             <p className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-lg px-3 py-2">
-              Aucune entreprise trouvee pour cette recherche. Vous pouvez continuer manuellement juste en dessous.
+              Aucune entreprise trouvée pour cette recherche. Vous pouvez continuer manuellement juste en dessous.
             </p>
           )}
         </div>
@@ -283,7 +283,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-2">
             <div className="flex items-center gap-2 mb-2">
               <Check className="h-4 w-4 text-emerald-600" />
-              <p className="text-sm font-medium text-emerald-800">Informations pre-remplies</p>
+              <p className="text-sm font-medium text-emerald-800">Informations pré-remplies</p>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
               <InfoRow label="Entreprise" value={data.companyName} />
@@ -291,14 +291,14 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
               <InfoRow label="SIRET" value={data.siret} />
               <InfoRow label="Forme juridique" value={data.legalForm} />
               <InfoRow label="Adresse" value={[data.companyAddress, data.companyPostalCode, data.companyCity].filter(Boolean).join(', ')} />
-              {data.nafLabel && <InfoRow label="Activite NAF" value={data.nafLabel} />}
+              {data.nafLabel && <InfoRow label="Activité NAF" value={data.nafLabel} />}
               {data.tvaNumber && <InfoRow label="TVA" value={data.tvaNumber} />}
-              {data.companyPhone && <InfoRow label="Telephone" value={data.companyPhone} />}
+              {data.companyPhone && <InfoRow label="Téléphone" value={data.companyPhone} />}
               {data.companyWebsite && <InfoRow label="Site web" value={data.companyWebsite} />}
               {data.capital && <InfoRow label="Capital" value={`${data.capital.toLocaleString('fr-FR')} EUR`} />}
             </div>
             <p className="text-[10px] text-emerald-600 mt-2">
-              Vous pourrez modifier ces informations a tout moment dans les parametres.
+              Vous pourrez modifier ces informations à tout moment dans les paramètres.
             </p>
           </div>
         )}
@@ -321,7 +321,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Activite principale</label>
+              <label className="text-sm font-medium text-foreground">Activité principale</label>
               <div className="grid grid-cols-2 gap-2">
                 {activities.map((activity) => (
                   <button
@@ -356,7 +356,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
               </div>
               <div className="space-y-2">
                 <label htmlFor="companyPhone" className="text-sm font-medium text-foreground">
-                  Telephone
+                  Téléphone
                 </label>
                 <input
                   id="companyPhone"
@@ -374,7 +374,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
         {/* If Pappers loaded but activity wasn't auto-matched, let user pick */}
         {companyLoaded && !data.companyActivity && (
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Selectionnez votre activite principale</label>
+            <label className="text-sm font-medium text-foreground">Sélectionnez votre activité principale</label>
             <div className="grid grid-cols-2 gap-2">
               {activities.map((activity) => (
                 <button
@@ -439,13 +439,13 @@ function matchActivity(nafLabel: string): string {
   if (!nafLabel) return '';
   const lower = nafLabel.toLowerCase();
   if (lower.includes('plomb') || lower.includes('sanitaire')) return 'Plomberie';
-  if (lower.includes('electri')) return 'Electricite';
+  if (lower.includes('electri')) return 'Électricité';
   if (lower.includes('peint') || lower.includes('revetement')) return 'Peinture';
   if (lower.includes('carrel') || lower.includes('sol')) return 'Carrelage';
-  if (lower.includes('macon') || lower.includes('gros oeuvre') || lower.includes('beton')) return 'Maconnerie';
+  if (lower.includes('macon') || lower.includes('gros oeuvre') || lower.includes('beton')) return 'Maçonnerie';
   if (lower.includes('menuise') || lower.includes('bois') || lower.includes('charpent')) return 'Menuiserie';
   if (lower.includes('couvert') || lower.includes('toitur') || lower.includes('etanche')) return 'Couverture';
   if (lower.includes('chauff') || lower.includes('clim') || lower.includes('thermique') || lower.includes('froid')) return 'Chauffage / Clim';
-  if (lower.includes('renov') || lower.includes('construction') || lower.includes('batiment') || lower.includes('travaux')) return 'Renovation generale';
+  if (lower.includes('renov') || lower.includes('construction') || lower.includes('batiment') || lower.includes('travaux')) return 'Rénovation générale';
   return '';
 }

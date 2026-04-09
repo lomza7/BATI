@@ -17,6 +17,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
     .select(
       `id, invoice_number, title, status, issued_at, due_date, paid_at, created_at,
        total_ht, total_ttc, tva_rate, total_tva, tva_breakdown, client_id,
+       invoice_type, deposit_percentage, quote_id,
        clients(name)`,
     )
     .eq('user_id', access.user_id)

@@ -196,7 +196,7 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
       show_watermark: false,
       footer_text: '',
       mentions_legales:
-        'Devis valable 30 jours. En cas de litige, le tribunal competent sera celui du siege social du prestataire.',
+        'Devis valable 30 jours. En cas de litige, le tribunal compétent sera celui du siège social du prestataire.',
     };
 
     const profileUpdate = supabase
@@ -356,7 +356,7 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              Etape {displayStep} sur {CONFIG_STEPS}
+              Étape {displayStep} sur {CONFIG_STEPS}
             </p>
           </div>
         )}

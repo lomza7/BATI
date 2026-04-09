@@ -757,7 +757,7 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, created_at, updated_at, clients(name, deleted_at)')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, invoice_type, created_at, updated_at, clients(name, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('projects')
@@ -826,17 +826,43 @@ export default function DashboardPage() {
         project_id: (quote.project_id as string | null) || null,
       } as QuoteRow;
     }));
-    setInvoices((((invoicesRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
+    // Factures : on calcule un total_ttc "effectif" qui déduit les acomptes
+    // versés pour les factures de solde. Sans ça, le CA dashboard compterait
+    // chaque chantier deux fois (acomptes + facture de solde au total brut).
+    // Voir lib/invoices/deposits.ts pour le helper metier équivalent.
+    const rawInvoices = ((invoicesRes.data as unknown as Array<Record<string, unknown>>) || []);
+    const depositsByQuote = new Map<string, number>();
+    for (const inv of rawInvoices) {
+      const type = inv.invoice_type as string | undefined;
+      const status = inv.status as string | undefined;
+      const quoteId = inv.quote_id as string | null | undefined;
+      if (type === 'acompte' && quoteId && status !== 'annulee') {
+        const prev = depositsByQuote.get(quoteId) || 0;
+        depositsByQuote.set(
+          quoteId,
+          prev + toNumber(inv.total_ttc as string | number | null | undefined),
+        );
+      }
+    }
+    setInvoices(rawInvoices.map((invoice) => {
       const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
+      const rawTotalTtc = toNumber(invoice.total_ttc as string | number | null | undefined);
+      const invoiceType = (invoice.invoice_type as string | undefined) || 'standard';
+      const quoteId = (invoice.quote_id as string | null) || null;
+      // Pour un solde : total effectif = brut - somme des acomptes (non annulés)
+      const effectiveTotalTtc =
+        invoiceType === 'solde' && quoteId
+          ? Math.max(0, rawTotalTtc - (depositsByQuote.get(quoteId) || 0))
+          : rawTotalTtc;
       return {
         ...invoice,
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
         total_ht: toNumber(invoice.total_ht as string | number | null | undefined),
-        total_ttc: toNumber(invoice.total_ttc as string | number | null | undefined),
+        total_ttc: effectiveTotalTtc,
         project_id: (invoice.project_id as string | null) || null,
-        quote_id: (invoice.quote_id as string | null) || null,
+        quote_id: quoteId,
       } as InvoiceRow;
     }));
     const loadedProjects = (((projectsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((project) => {

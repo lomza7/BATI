@@ -35,6 +35,18 @@ interface PreviewClient {
   postal_code?: string | null;
 }
 
+interface LinkedDeposit {
+  id: string;
+  invoice_number: string;
+  total_ttc: number;
+  issued_at: string | null;
+  created_at: string;
+  status: string;
+  deposit_percentage: number | null;
+}
+
+type PreviewInvoiceType = 'standard' | 'acompte' | 'solde';
+
 interface ArtisanProfile {
   company_name: string | null;
   full_name: string | null;
@@ -127,6 +139,12 @@ export function DocumentPreviewDialog({
   const [resolvedCreatedAt, setResolvedCreatedAt] = useState<Date>(new Date());
   const [bankAccount, setBankAccount] = useState<PreviewBankAccount | null>(null);
 
+  // Facturation d'acompte — spécifiques aux invoices de type 'acompte' ou 'solde'
+  const [invoiceType, setInvoiceType] = useState<PreviewInvoiceType>('standard');
+  const [depositPercentage, setDepositPercentage] = useState<number | null>(null);
+  const [linkedQuoteNumber, setLinkedQuoteNumber] = useState<string | null>(null);
+  const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
+
   // Keep in-memory props in sync when the dialog is used without documentId.
   useEffect(() => {
     if (documentId) return;
@@ -137,6 +155,10 @@ export function DocumentPreviewDialog({
     setResolvedValidUntil(validUntilProp);
     setResolvedDueDate(dueDateProp);
     setResolvedCreatedAt(new Date());
+    setInvoiceType('standard');
+    setDepositPercentage(null);
+    setLinkedQuoteNumber(null);
+    setLinkedDeposits([]);
   }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp]);
 
   useEffect(() => {
@@ -198,7 +220,7 @@ export function DocumentPreviewDialog({
         } else {
           const { data: invoice } = await supabase
             .from('invoices')
-            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -210,6 +232,12 @@ export function DocumentPreviewDialog({
             setResolvedDueDate(invoice.due_date);
             setResolvedCreatedAt(new Date(invoice.issued_at || invoice.created_at));
             resolvedBankAccountId = invoice.bank_account_id || null;
+
+            const invType = (invoice.invoice_type || 'standard') as PreviewInvoiceType;
+            setInvoiceType(invType);
+            setDepositPercentage(
+              typeof invoice.deposit_percentage === 'number' ? invoice.deposit_percentage : null,
+            );
 
             const { data: linesData } = await supabase
               .from('invoice_lines')
@@ -229,6 +257,42 @@ export function DocumentPreviewDialog({
               if (!cancelled && clientData) setClient(clientData as PreviewClient);
             } else if (!cancelled) {
               setClient(null);
+            }
+
+            // Pour les factures d'acompte : on affiche le numéro de devis source
+            if (invType === 'acompte' && invoice.quote_id) {
+              const { data: srcQuote } = await supabase
+                .from('quotes')
+                .select('quote_number')
+                .eq('id', invoice.quote_id)
+                .maybeSingle();
+              if (!cancelled) setLinkedQuoteNumber(srcQuote?.quote_number || null);
+            } else if (!cancelled) {
+              setLinkedQuoteNumber(null);
+            }
+
+            // Pour les factures de solde : on charge les acomptes déjà émis pour
+            // les déduire au rendu (non stockés en DB, calcul à la lecture).
+            if (invType === 'solde' && invoice.quote_id) {
+              const { data: depositRows } = await supabase
+                .from('invoices')
+                .select('id, invoice_number, total_ttc, issued_at, created_at, status, deposit_percentage')
+                .eq('quote_id', invoice.quote_id)
+                .eq('invoice_type', 'acompte')
+                .neq('status', 'annulee')
+                .order('issued_at', { ascending: true, nullsFirst: false })
+                .order('created_at', { ascending: true });
+              if (!cancelled) setLinkedDeposits((depositRows || []) as LinkedDeposit[]);
+
+              // On récupère aussi le numéro du devis pour le header/mentions
+              const { data: srcQuote } = await supabase
+                .from('quotes')
+                .select('quote_number')
+                .eq('id', invoice.quote_id)
+                .maybeSingle();
+              if (!cancelled) setLinkedQuoteNumber(srcQuote?.quote_number || null);
+            } else if (invType !== 'acompte' && !cancelled) {
+              setLinkedDeposits([]);
             }
           }
         }
@@ -293,10 +357,23 @@ export function DocumentPreviewDialog({
   const fontClass = dc.font === 'serif' ? 'font-serif' : 'font-sans';
 
   const isInvoice = mode === 'invoice';
-  const documentLabel = isInvoice ? 'FACTURE' : 'DEVIS';
+  const isDepositInvoice = isInvoice && invoiceType === 'acompte';
+  const isFinalInvoice = isInvoice && invoiceType === 'solde';
+  const documentLabel = isInvoice
+    ? isDepositInvoice
+      ? "FACTURE D'ACOMPTE"
+      : isFinalInvoice
+        ? 'FACTURE DE SOLDE'
+        : 'FACTURE'
+    : 'DEVIS';
   const fallbackNumber = isInvoice ? 'F-AAAA-XXX' : 'D-AAAA-XXX';
   const titlePlaceholder = isInvoice ? 'Titre de la facture' : 'Titre du devis';
   const displayNumber = resolvedNumber || fallbackNumber;
+
+  // Montant total des acomptes à déduire (calcul au rendu pour rester cohérent
+  // si un acompte est annulé après émission du solde).
+  const deductedTtc = linkedDeposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0);
+  const finalRemainingTtc = Math.max(0, totalTtc - deductedTtc);
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -346,6 +423,13 @@ export function DocumentPreviewDialog({
                   <div className="sm:text-right">
                     <p className="text-2xl sm:text-3xl font-bold text-white">{documentLabel}</p>
                     <p className="text-sm font-medium text-white/80 mt-1">{displayNumber}</p>
+                    {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
+                      <p className="text-xs text-white/70 mt-1">
+                        {isDepositInvoice
+                          ? `Acompte${depositPercentage ? ` ${Number.isInteger(depositPercentage) ? depositPercentage : depositPercentage.toFixed(2).replace('.', ',')}%` : ''} sur devis ${linkedQuoteNumber}`
+                          : `Solde du devis ${linkedQuoteNumber}`}
+                      </p>
+                    )}
                     <p className="text-xs text-white/60 mt-1">Date : {formatDate(resolvedCreatedAt)}</p>
                   </div>
                 </div>
@@ -360,9 +444,16 @@ export function DocumentPreviewDialog({
                   <span className="text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
                   {artisan?.siret && <span className="text-xs text-[#6b6560]">SIRET {artisan.siret}</span>}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-lg font-bold" style={{ color: accent }}>{documentLabel}</span>
                   <span className="text-sm font-medium" style={{ color: textColor }}>{displayNumber}</span>
+                  {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
+                    <span className="text-xs text-[#6b6560]">
+                      {isDepositInvoice
+                        ? `Acompte${depositPercentage ? ` ${Number.isInteger(depositPercentage) ? depositPercentage : depositPercentage.toFixed(2).replace('.', ',')}%` : ''} / ${linkedQuoteNumber}`
+                        : `Solde / ${linkedQuoteNumber}`}
+                    </span>
+                  )}
                   <span className="text-xs text-[#6b6560]">{formatDate(resolvedCreatedAt)}</span>
                 </div>
               </div>
@@ -400,6 +491,13 @@ export function DocumentPreviewDialog({
                   <div className="sm:text-right flex-shrink-0">
                     <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>{documentLabel}</p>
                     <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{displayNumber}</p>
+                    {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
+                      <p className="text-xs mt-1" style={{ color: accent }}>
+                        {isDepositInvoice
+                          ? `Acompte${depositPercentage ? ` ${Number.isInteger(depositPercentage) ? depositPercentage : depositPercentage.toFixed(2).replace('.', ',')}%` : ''} sur devis ${linkedQuoteNumber}`
+                          : `Solde du devis ${linkedQuoteNumber}`}
+                      </p>
+                    )}
                     <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
                       <p>Date : {formatDate(resolvedCreatedAt)}</p>
                       {isInvoice ? (
@@ -558,7 +656,54 @@ export function DocumentPreviewDialog({
               </div>
             </div>
 
-            {/* Coordonnees bancaires */}
+            {/* Acomptes déduits — pour les factures de solde uniquement */}
+            {isFinalInvoice && linkedDeposits.length > 0 && (
+              <div className="border-t-2 border-dashed px-5 sm:px-8 py-5" style={{ borderColor: accent + '4d' }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: accent }}>
+                  Acomptes déjà versés
+                </p>
+                <div className="flex flex-col items-end gap-1.5">
+                  {linkedDeposits.map((d) => {
+                    const dateStr = d.issued_at || d.created_at;
+                    const isPaid = d.status === 'payee';
+                    return (
+                      <div key={d.id} className="flex items-center justify-between w-full sm:w-[22rem] text-sm">
+                        <span className="text-[#6b6560] truncate mr-2">
+                          {d.invoice_number}
+                          {dateStr && (
+                            <span className="text-[11px] ml-1">({formatDate(dateStr)})</span>
+                          )}
+                          {!isPaid && (
+                            <span className="ml-1.5 text-[10px] text-amber-700 uppercase tracking-wide">
+                              non payé
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium tabular-nums" style={{ color: textColor }}>
+                          − {formatCurrency(Number(d.total_ttc))}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t border-dashed border-[#e5e1da] mt-1">
+                    <span className="text-sm text-[#6b6560]">Total déduit</span>
+                    <span className="text-sm font-medium tabular-nums" style={{ color: textColor }}>
+                      − {formatCurrency(deductedTtc)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t-2 mt-1" style={{ borderColor: accent }}>
+                    <span className="text-base font-semibold" style={{ color: textColor }}>
+                      Reste à payer
+                    </span>
+                    <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>
+                      {formatCurrency(finalRemainingTtc)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Coordonnées bancaires */}
             {bankAccount && (
               <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -613,7 +758,7 @@ export function DocumentPreviewDialog({
                   {mentionsLegales || (
                     isInvoice ? (
                       <>
-                        Facture émise le {formatDate(resolvedCreatedAt)}
+                        {isDepositInvoice ? 'Facture d\u2019acompte' : isFinalInvoice ? 'Facture de solde' : 'Facture'} émise le {formatDate(resolvedCreatedAt)}
                         {resolvedDueDate ? `, à régler avant le ${formatDate(resolvedDueDate)}` : ''}.
                         {tvaBreakdown.length <= 1
                           ? ` TVA applicable au taux de ${formatTvaRate(singleRate ?? 20)}.`
@@ -633,6 +778,11 @@ export function DocumentPreviewDialog({
                   )}
                 </p>
               </div>
+              {isDepositInvoice && (
+                <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5 italic">
+                  TVA exigible à l&apos;encaissement conformément à l&apos;article 269-2 du CGI.
+                </p>
+              )}
               <InsuranceFooter insurance={artisan} />
               {footerText && (
                 <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>

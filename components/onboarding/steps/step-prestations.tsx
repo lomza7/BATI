@@ -42,26 +42,26 @@ const BTP_CATEGORIES: {
   icon: typeof Hammer;
   nafKeywords: string[];
 }[] = [
-  { value: 'maconnerie', label: 'Maconnerie', icon: HardHat, nafKeywords: ['macon', 'gros oeuvre', 'beton'] },
+  { value: 'maconnerie', label: 'Maçonnerie', icon: HardHat, nafKeywords: ['macon', 'gros oeuvre', 'beton'] },
   { value: 'plomberie', label: 'Plomberie', icon: Droplets, nafKeywords: ['plomb', 'sanitaire'] },
-  { value: 'electricite', label: 'Electricite', icon: Zap, nafKeywords: ['electri'] },
+  { value: 'electricite', label: 'Électricité', icon: Zap, nafKeywords: ['electri'] },
   { value: 'peinture', label: 'Peinture', icon: Paintbrush, nafKeywords: ['peint', 'revetement'] },
   { value: 'carrelage', label: 'Carrelage', icon: Grid2x2, nafKeywords: ['carrel'] },
   { value: 'menuiserie', label: 'Menuiserie', icon: Hammer, nafKeywords: ['menuise', 'bois'] },
   { value: 'charpente', label: 'Charpente', icon: TreePine, nafKeywords: ['charpent'] },
   { value: 'couverture', label: 'Couverture / Zinguerie', icon: Home, nafKeywords: ['couvert', 'zingu'] },
   { value: 'toiture', label: 'Toiture', icon: Home, nafKeywords: ['toitur'] },
-  { value: 'etancheite', label: 'Etancheite', icon: Droplets, nafKeywords: ['etanche'] },
+  { value: 'etancheite', label: 'Étanchéité', icon: Droplets, nafKeywords: ['etanche'] },
   { value: 'isolation', label: 'Isolation', icon: Layers, nafKeywords: ['isol', 'thermique'] },
   { value: 'chauffage', label: 'Chauffage', icon: Thermometer, nafKeywords: ['chauff'] },
   { value: 'climatisation', label: 'Climatisation', icon: Wind, nafKeywords: ['clim', 'froid'] },
   { value: 'terrassement', label: 'Terrassement', icon: TreePine, nafKeywords: ['terrass'] },
-  { value: 'demolition', label: 'Demolition', icon: Axe, nafKeywords: ['demolit'] },
+  { value: 'demolition', label: 'Démolition', icon: Axe, nafKeywords: ['demolit'] },
   { value: 'vrd', label: 'VRD / Assainissement', icon: Pipette, nafKeywords: ['vrd', 'voirie', 'reseau', 'assainiss'] },
-  { value: 'facade', label: 'Facade / Ravalement', icon: Building, nafKeywords: ['ravalement', 'facade'] },
-  { value: 'platrerie', label: 'Platrerie', icon: Square, nafKeywords: ['platr'] },
-  { value: 'placo', label: 'Placoplatre / Cloisons', icon: Settings, nafKeywords: ['placo', 'cloison'] },
-  { value: 'serrurerie', label: 'Serrurerie / Metallerie', icon: Key, nafKeywords: ['serrur', 'metall', 'metaux'] },
+  { value: 'facade', label: 'Façade / Ravalement', icon: Building, nafKeywords: ['ravalement', 'facade'] },
+  { value: 'platrerie', label: 'Plâtrerie', icon: Square, nafKeywords: ['platr'] },
+  { value: 'placo', label: 'Placoplâtre / Cloisons', icon: Settings, nafKeywords: ['placo', 'cloison'] },
+  { value: 'serrurerie', label: 'Serrurerie / Métallerie', icon: Key, nafKeywords: ['serrur', 'metall', 'metaux'] },
   { value: 'ferronnerie', label: 'Ferronnerie', icon: Hammer, nafKeywords: ['ferronn'] },
   { value: 'vitrerie', label: 'Vitrerie / Miroiterie', icon: Square, nafKeywords: ['vitre', 'miroit', 'verre'] },
   { value: 'parquet', label: 'Parquet / Sols souples', icon: Layers, nafKeywords: ['parquet', 'sol', 'revetement'] },
@@ -69,7 +69,7 @@ const BTP_CATEGORIES: {
   { value: 'salle_de_bain', label: 'Salle de bain', icon: Bath, nafKeywords: ['salle de bain', 'sanitaire'] },
   { value: 'paysagisme', label: 'Paysagisme', icon: Trees, nafKeywords: ['paysag', 'espaces verts', 'jardin'] },
   { value: 'piscine', label: 'Piscine', icon: Waves, nafKeywords: ['piscine'] },
-  { value: 'photovoltaique', label: 'Photovoltaique', icon: Sun, nafKeywords: ['photovolta', 'solaire', 'panneau'] },
+  { value: 'photovoltaique', label: 'Photovoltaïque', icon: Sun, nafKeywords: ['photovolta', 'solaire', 'panneau'] },
   { value: 'domotique', label: 'Domotique', icon: Cpu, nafKeywords: ['domotique', 'smart', 'automat'] },
   { value: 'autre', label: 'Autre', icon: MoreHorizontal, nafKeywords: [] },
 ];
@@ -142,8 +142,8 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
         Vos prestations
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        Selectionnez vos specialites. On creera les categories dans votre
-        bibliotheque de prestations.
+        Sélectionnez vos spécialités. On créera les catégories dans votre
+        bibliothèque de prestations.
       </p>
 
       <div className="mt-6 flex-1">
@@ -153,7 +153,7 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un metier..."
+            placeholder="Rechercher un métier..."
             className="flex h-10 w-full rounded-xl border border-border bg-white pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
         </div>
@@ -202,7 +202,7 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
         {filteredCategories.length === 0 && (
           <div className="mt-4 rounded-xl border border-border bg-muted/20 px-4 py-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Aucun metier trouve pour &laquo; {search} &raquo;
+              Aucun métier trouvé pour &laquo; {search} &raquo;
             </p>
           </div>
         )}
@@ -211,7 +211,7 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center gap-2 animate-fade-up">
             <Plug className="h-4 w-4 text-emerald-700" />
             <p className="text-xs text-emerald-800">
-              {selectedCount} categorie{selectedCount > 1 ? 's' : ''} selectionnee
+              {selectedCount} catégorie{selectedCount > 1 ? 's' : ''} sélectionnée
               {selectedCount > 1 ? 's' : ''}. Vous pourrez ajouter vos propres
               prestations ensuite.
             </p>

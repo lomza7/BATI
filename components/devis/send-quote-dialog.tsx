@@ -76,7 +76,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       // Recuperer le token d'auth pour l'API route
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setSendError('Session expiree, veuillez vous reconnecter');
+        setSendError('Session expirée, veuillez vous reconnecter');
         setSending(false);
         return;
       }
@@ -99,7 +99,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        setSendError(data.error || 'Erreur lors de la creation du lien');
+        setSendError(data.error || 'Erreur lors de la création du lien');
         setSending(false);
         return;
       }
@@ -109,7 +109,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       setEmailErrorMsg(data.email_error || null);
       onSent?.();
     } catch {
-      setSendError('Erreur reseau, veuillez reessayer');
+      setSendError('Erreur réseau, veuillez réessayer');
     }
 
     setSending(false);
@@ -202,11 +202,11 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                     }`}
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? 'Copie !' : 'Copier'}
+                    {copied ? 'Copié !' : 'Copier'}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                  Vous pouvez aussi envoyer ce lien par SMS ou WhatsApp a <strong>{clientName}</strong>.
+                  Vous pouvez aussi envoyer ce lien par SMS ou WhatsApp à <strong>{clientName}</strong>.
                 </p>
               </div>
             </div>
@@ -242,7 +242,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                       <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                      Pieces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
+                      Pièces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
                     </label>
                   </div>
                   <ul className="rounded-xl border border-border divide-y">
@@ -272,7 +272,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                     })}
                   </ul>
                   <p className="text-[11px] text-muted-foreground">
-                    Vos attestations sont jointes par defaut a tous les devis. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
+                    Vos attestations sont jointes par défaut à tous les devis. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
                   </p>
                 </div>
               )}

@@ -8,6 +8,7 @@ import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { formatCurrency } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -37,20 +38,20 @@ interface Service {
 }
 
 const UNITS = [
-  { value: 'u', label: 'Unite (u)' },
+  { value: 'u', label: 'Unité (u)' },
   { value: 'h', label: 'Heure (h)' },
-  { value: 'm2', label: 'M carre (m2)' },
-  { value: 'ml', label: 'Metre lineaire (ml)' },
-  { value: 'm3', label: 'M cube (m3)' },
+  { value: 'm2', label: 'Mètre carré (m²)' },
+  { value: 'ml', label: 'Mètre linéaire (ml)' },
+  { value: 'm3', label: 'Mètre cube (m³)' },
   { value: 'kg', label: 'Kilo (kg)' },
   { value: 'forfait', label: 'Forfait' },
   { value: 'jour', label: 'Jour' },
 ];
 
 const DEFAULT_CATEGORIES = [
-  'Plomberie', 'Electricite', 'Maconnerie', 'Peinture', 'Carrelage',
-  'Menuiserie', 'Isolation', 'Toiture', 'Demolition', 'Nettoyage',
-  'Main d\'oeuvre', 'Fourniture', 'Deplacement', 'Autre',
+  'Plomberie', 'Électricité', 'Maçonnerie', 'Peinture', 'Carrelage',
+  'Menuiserie', 'Isolation', 'Toiture', 'Démolition', 'Nettoyage',
+  'Main d\'œuvre', 'Fourniture', 'Déplacement', 'Autre',
 ];
 
 const FREQ_LABELS: Record<string, string> = {
@@ -175,7 +176,7 @@ export default function PrestationsPage() {
   const grouped = useMemo(() => {
     const map = new Map<string, Service[]>();
     for (const s of filtered) {
-      const cat = s.category || 'Sans categorie';
+      const cat = s.category || 'Sans catégorie';
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(s);
     }
@@ -184,7 +185,8 @@ export default function PrestationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mes prestations" description="Bibliotheque de vos produits et services — reutilisables dans vos devis">
+      <PageHeader title="Mes prestations" description="Bibliothèque de vos produits et services — réutilisables dans vos devis">
+        <ImportCsvButton type="services" onImported={loadServices} />
         <Button onClick={openCreate} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouvelle prestation
@@ -205,10 +207,10 @@ export default function PrestationsPage() {
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Categorie" />
+            <SelectValue placeholder="Catégorie" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Toutes les categories</SelectItem>
+            <SelectItem value="all">Toutes les catégories</SelectItem>
             {categories.map(cat => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
@@ -223,7 +225,7 @@ export default function PrestationsPage() {
           <p className="text-xl font-semibold">{services.length}</p>
         </div>
         <div className="rounded-lg border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Categories</p>
+          <p className="text-xs text-muted-foreground">Catégories</p>
           <p className="text-xl font-semibold">{categories.length}</p>
         </div>
         <div className="rounded-lg border bg-card p-3">
@@ -233,7 +235,7 @@ export default function PrestationsPage() {
           </p>
         </div>
         <div className="rounded-lg border bg-card p-3">
-          <p className="text-xs text-muted-foreground">Recurrentes</p>
+          <p className="text-xs text-muted-foreground">Récurrentes</p>
           <p className="text-xl font-semibold">{services.filter(s => s.is_recurring).length}</p>
         </div>
       </div>
@@ -247,14 +249,14 @@ export default function PrestationsPage() {
         <EmptyState
           icon={Package}
           title="Aucune prestation"
-          description="Creez vos prestations une fois, reutilisez-les dans tous vos devis."
+          description="Créez vos prestations une fois, réutilisez-les dans tous vos devis."
         >
           <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" /> Creer ma premiere prestation
+            <Plus className="h-4 w-4" /> Créer ma première prestation
           </Button>
         </EmptyState>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 text-sm text-muted-foreground">Aucun resultat pour cette recherche.</div>
+        <div className="text-center py-12 text-sm text-muted-foreground">Aucun résultat pour cette recherche.</div>
       ) : (
         <div className="space-y-6">
           {grouped.map(([category, items]) => (
@@ -309,7 +311,7 @@ export default function PrestationsPage() {
                           <Pencil className="h-4 w-4 mr-2" /> Modifier
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => toggleActive(s)}>
-                          {s.is_active ? 'Desactiver' : 'Reactiver'}
+                          {s.is_active ? 'Désactiver' : 'Réactiver'}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => deleteService(s.id)}>
                           <Trash2 className="h-4 w-4 mr-2" /> Supprimer
@@ -345,7 +347,7 @@ export default function PrestationsPage() {
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                 rows={2}
-                placeholder="Details, references, marque..."
+                placeholder="Détails, références, marque..."
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
               />
@@ -363,7 +365,7 @@ export default function PrestationsPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Unite</label>
+                <label className="text-sm font-medium">Unité</label>
                 <Select value={form.unit} onValueChange={v => setForm({ ...form, unit: v })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
@@ -378,13 +380,13 @@ export default function PrestationsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium">Categorie</label>
+                <label className="text-sm font-medium">Catégorie</label>
                 <Select value={form.category || 'none'} onValueChange={v => setForm({ ...form, category: v === 'none' ? '' : v })}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Categorie..." />
+                    <SelectValue placeholder="Catégorie..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sans categorie</SelectItem>
+                    <SelectItem value="none">Sans catégorie</SelectItem>
                     {DEFAULT_CATEGORIES.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
@@ -418,11 +420,11 @@ export default function PrestationsPage() {
                   onChange={e => setForm({ ...form, is_recurring: e.target.checked })}
                   className="rounded border-input"
                 />
-                <span className="text-sm font-medium">Prestation recurrente</span>
+                <span className="text-sm font-medium">Prestation récurrente</span>
               </label>
               {form.is_recurring && (
                 <div>
-                  <label className="text-sm font-medium">Frequence</label>
+                  <label className="text-sm font-medium">Fréquence</label>
                   <Select value={form.frequency} onValueChange={v => setForm({ ...form, frequency: v })}>
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -434,7 +436,7 @@ export default function PrestationsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Un contrat recurrent sera automatiquement cree quand cette prestation est ajoutee a un devis.
+                    Un contrat récurrent sera automatiquement créé quand cette prestation est ajoutée à un devis.
                   </p>
                 </div>
               )}
@@ -442,7 +444,7 @@ export default function PrestationsPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowForm(false)}>Annuler</Button>
               <Button onClick={saveService} disabled={!form.name.trim() || submitting}>
-                {editingId ? 'Enregistrer' : 'Creer'}
+                {editingId ? 'Enregistrer' : 'Créer'}
               </Button>
             </div>
           </div>

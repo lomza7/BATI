@@ -93,7 +93,7 @@ export function BankAccountsCard() {
         <div>
           <CardTitle className="text-xl">Mes RIB</CardTitle>
           <CardDescription>
-            Les coordonnees bancaires que tu peux joindre a tes devis et factures pour que tes clients te payent par virement.
+            Les coordonnées bancaires que tu peux joindre à tes devis et factures pour que tes clients te payent par virement.
           </CardDescription>
         </div>
         <Button
@@ -113,9 +113,9 @@ export function BankAccountsCard() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#d35400]/10 text-[#d35400]">
               <Landmark className="h-5 w-5" />
             </div>
-            <p className="mt-3 text-sm font-medium">Aucun RIB enregistre</p>
+            <p className="mt-3 text-sm font-medium">Aucun RIB enregistré</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Ajoute ton premier compte pour qu'il apparaisse automatiquement sur tes documents.
+              Ajoute ton premier compte pour qu&apos;il apparaisse automatiquement sur tes documents.
             </p>
             <Button
               size="sm"
@@ -145,7 +145,7 @@ export function BankAccountsCard() {
                         <p className="truncate text-sm font-semibold">{account.label}</p>
                         {account.is_default && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#d35400] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-                            <Star className="h-2.5 w-2.5 fill-current" /> Par defaut
+                            <Star className="h-2.5 w-2.5 fill-current" /> Par défaut
                           </span>
                         )}
                       </div>
@@ -169,7 +169,7 @@ export function BankAccountsCard() {
                         onClick={() => setDefault(account)}
                         disabled={busyId === account.id}
                       >
-                        <Star className="h-3.5 w-3.5" /> Defaut
+                        <Star className="h-3.5 w-3.5" /> Défaut
                       </Button>
                     )}
                     <Button
@@ -203,7 +203,7 @@ export function BankAccountsCard() {
           <DialogHeader>
             <DialogTitle>{editing ? 'Modifier le RIB' : 'Ajouter un RIB'}</DialogTitle>
             <DialogDescription>
-              Ces coordonnees s'afficheront sur tes devis et factures pour que le client puisse te payer par virement.
+              Ces coordonnées s&apos;afficheront sur tes devis et factures pour que le client puisse te payer par virement.
             </DialogDescription>
           </DialogHeader>
           <BankAccountForm
@@ -224,7 +224,7 @@ export function BankAccountsCard() {
             <DialogDescription>
               {deleting?.label} — {deleting && maskIban(deleting.iban)}
               <br />
-              Les devis et factures qui utilisent deja ce compte continueront a l'afficher, mais tu ne pourras plus le selectionner sur de nouveaux documents.
+              Les devis et factures qui utilisent déjà ce compte continueront à l&apos;afficher, mais tu ne pourras plus le sélectionner sur de nouveaux documents.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-2">

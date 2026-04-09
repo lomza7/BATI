@@ -155,7 +155,7 @@ export function SiteJsonLd({
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
-          name: 'Nos realisations',
+          name: 'Nos réalisations',
           itemListElement: projects.slice(0, 30).map((p, index) => ({
             '@type': 'ListItem',
             position: index + 1,

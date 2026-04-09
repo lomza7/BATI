@@ -90,6 +90,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
       .from('invoices')
       .select(
         `invoice_number, title, status, issued_at, due_date, paid_at, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc,
+         invoice_type, deposit_percentage,
          clients(name)`,
       )
       .eq('user_id', access.user_id)
@@ -101,6 +102,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
     const headers = [
       'Numéro',
       'Titre',
+      'Type',
       'Client',
       'Statut',
       'Émise le',
@@ -127,9 +129,20 @@ export async function GET(request: Request, { params }: { params: { token: strin
               )
               .join(' + ')
           : '';
+      const invoiceType = (inv.invoice_type as string | null) || 'standard';
+      const pct = inv.deposit_percentage as number | null;
+      const typeLabel =
+        invoiceType === 'acompte'
+          ? pct
+            ? `Acompte ${pct}%`
+            : 'Acompte'
+          : invoiceType === 'solde'
+            ? 'Solde'
+            : 'Standard';
       return [
         inv.invoice_number,
         inv.title,
+        typeLabel,
         Array.isArray(inv.clients)
           ? ((inv.clients[0] as Record<string, unknown>)?.name as string | null) || ''
           : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',

@@ -135,6 +135,12 @@ interface InvoiceEmailData {
   magicLink: string;
   hasOnlinePayment: boolean;
   accentColor?: string;
+  /** Type de facture — change le libellé et la narration de l'email */
+  invoiceType?: 'standard' | 'acompte' | 'solde';
+  /** Pourcentage pour une facture d'acompte (ex: 30) */
+  depositPercentage?: number | null;
+  /** Numéro du devis source (pour acompte/solde) */
+  relatedQuoteNumber?: string | null;
 }
 
 export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
@@ -144,11 +150,52 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
     ? `<p style="margin:0;font-size:13px;color:#6b6560">Echeance : ${data.dueDate}</p>`
     : '';
 
+  const invoiceType = data.invoiceType || 'standard';
+  const isDeposit = invoiceType === 'acompte';
+  const isFinal = invoiceType === 'solde';
+
+  const depositLabel = data.depositPercentage
+    ? `${Number.isInteger(data.depositPercentage) ? data.depositPercentage : data.depositPercentage.toFixed(2).replace('.', ',')}%`
+    : '';
+
+  // Libellé du bloc récapitulatif — remplace « Facture »
+  const headerBlockLabel = isDeposit
+    ? `Facture d'acompte${depositLabel ? ` ${depositLabel}` : ''}`
+    : isFinal
+      ? 'Facture de solde'
+      : 'Facture';
+
+  // Sujet visuel du titre de l'email (balise <title>) + narration
+  const documentNoun = isDeposit
+    ? `une facture d'acompte${depositLabel ? ` de ${depositLabel}` : ''}${data.relatedQuoteNumber ? ` sur le devis ${escHtml(data.relatedQuoteNumber)}` : ''}`
+    : isFinal
+      ? `la facture de solde${data.relatedQuoteNumber ? ` du devis ${escHtml(data.relatedQuoteNumber)}` : ''}`
+      : 'une facture';
+
+  const introNote = isDeposit
+    ? `Afin de démarrer les travaux, ${escHtml(data.artisanName)} vous adresse ${documentNoun}.`
+    : isFinal
+      ? `${escHtml(data.artisanName)} vous adresse ${documentNoun}. Les acomptes déjà versés sont automatiquement déduits du montant à régler.`
+      : `${escHtml(data.artisanName)} vous a envoye une facture.`;
+
   const paymentNote = data.hasOnlinePayment
-    ? 'Vous pouvez consulter le detail de la facture et la payer en ligne en un clic.'
+    ? isDeposit
+      ? "Vous pouvez régler cet acompte en ligne en un clic."
+      : 'Vous pouvez consulter le detail de la facture et la payer en ligne en un clic.'
     : 'Vous pouvez consulter le detail de la facture en cliquant sur le bouton ci-dessous.';
 
-  const ctaLabel = data.hasOnlinePayment ? 'Voir et payer ma facture' : 'Consulter ma facture';
+  const ctaLabel = data.hasOnlinePayment
+    ? isDeposit
+      ? "Payer l'acompte"
+      : 'Voir et payer ma facture'
+    : 'Consulter ma facture';
+
+  // Titre de l'onglet
+  const titleTag = isDeposit
+    ? `Facture d'acompte ${data.invoiceNumber}`
+    : isFinal
+      ? `Facture de solde ${data.invoiceNumber}`
+      : `Facture ${data.invoiceNumber}`;
 
   return `
 <!DOCTYPE html>
@@ -156,7 +203,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Facture ${data.invoiceNumber}</title>
+  <title>${titleTag}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
@@ -180,7 +227,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
                 Bonjour <strong>${escHtml(data.clientName)}</strong>,
               </p>
               <p style="margin:0 0 24px;font-size:14px;color:#6b6560;line-height:1.6">
-                ${escHtml(data.artisanName)} vous a envoye une facture. ${paymentNote}
+                ${introNote} ${paymentNote}
               </p>
 
               <!-- Bloc facture -->
@@ -190,7 +237,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td>
-                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Facture</p>
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">${escHtml(headerBlockLabel)}</p>
                           <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.invoiceTitle || data.invoiceNumber)}</p>
                           <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.invoiceNumber)}</p>
                           ${dueDateLine}

@@ -26,23 +26,23 @@ interface Props {
 const ADVANTAGES = [
   {
     icon: Search,
-    title: 'Referencement Google local',
-    description: 'Votre site optimise pour apparaitre sur "plombier Lyon" et similaires.',
+    title: 'Référencement Google local',
+    description: 'Votre site optimisé pour apparaître sur "plombier Lyon" et similaires.',
   },
   {
     icon: Star,
-    title: 'Avis Google integres',
+    title: 'Avis Google intégrés',
     description: 'Vos avis clients s\'affichent automatiquement et rassurent vos prospects.',
   },
   {
     icon: Sparkles,
     title: 'Publication chantiers',
-    description: 'Chaque chantier publie devient une page SEO avec photos et description.',
+    description: 'Chaque chantier publié devient une page SEO avec photos et description.',
   },
   {
     icon: Rocket,
     title: 'Inclus gratuitement',
-    description: 'Pas de frais d\'hebergement ou de developpeur. Tout est inclus.',
+    description: 'Pas de frais d\'hébergement ou de développeur. Tout est inclus.',
   },
 ];
 
@@ -62,11 +62,11 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
-        Avez-vous deja un site web ?
+        Avez-vous déjà un site web ?
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        On vous en cree un <span className="font-semibold text-emerald-700">gratuitement</span>,
-        optimise SEO et relie a Hellobat. Aucun surcout, jamais.
+        On vous en crée un <span className="font-semibold text-emerald-700">gratuitement</span>,
+        optimisé SEO et relié à Hellobat. Aucun surcoût, jamais.
       </p>
 
       <div className="mt-6 space-y-5 flex-1">
@@ -99,7 +99,7 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
                   : 'text-foreground'
               }`}
             >
-              Oui, j&apos;ai deja un site
+              Oui, j&apos;ai déjà un site
             </span>
           </button>
           <button
@@ -146,10 +146,10 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
                   Un seul site, c&apos;est mieux pour le SEO
                 </p>
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  Avoir deux sites web dilue votre referencement Google. On vous
+                  Avoir deux sites web dilue votre référencement Google. On vous
                   recommande de garder votre site actuel comme vitrine
                   principale. Vous pourrez toujours activer un site Hellobat plus
-                  tard si besoin depuis vos parametres.
+                  tard si besoin depuis vos paramètres.
                 </p>
               </div>
             </div>
@@ -235,10 +235,10 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
                 <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">
-                    Generer mon site Hellobat
+                    Générer mon site Hellobat
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    On le prepare pendant que vous decouvrez l&apos;app.
+                    On le prépare pendant que vous découvrez l&apos;app.
                   </p>
                 </div>
               </div>
@@ -248,7 +248,7 @@ export function StepSiteWeb({ data, onChange, onNext, onBack, onSkip }: Props) {
                 className={`relative h-6 w-11 rounded-full transition-colors flex-shrink-0 ${
                   data.wantsHellobatSite ? 'bg-primary' : 'bg-muted-foreground/30'
                 }`}
-                aria-label="Activer la generation du site"
+                aria-label="Activer la génération du site"
               >
                 <span
                   className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${

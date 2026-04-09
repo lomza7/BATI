@@ -14,22 +14,22 @@ const VAT_REGIMES = [
   {
     value: 'franchise',
     label: 'Franchise en base',
-    description: 'Pas de TVA a facturer (CA < 36 800 EUR services)',
+    description: 'Pas de TVA à facturer (CA < 36 800 € services)',
   },
   {
     value: 'simplifie',
-    label: 'Reel simplifie',
-    description: 'Declaration annuelle avec 2 acomptes',
+    label: 'Réel simplifié',
+    description: 'Déclaration annuelle avec 2 acomptes',
   },
   {
     value: 'normal',
-    label: 'Reel normal',
-    description: 'Declaration mensuelle ou trimestrielle',
+    label: 'Réel normal',
+    description: 'Déclaration mensuelle ou trimestrielle',
   },
   {
     value: 'auto',
     label: 'Auto-entrepreneur',
-    description: 'Regime micro-entreprise',
+    description: 'Régime micro-entreprise',
   },
 ];
 
@@ -41,17 +41,17 @@ const VAT_FREQUENCIES = [
 
 const MONTHS = [
   { value: 1, label: 'Janvier' },
-  { value: 2, label: 'Fevrier' },
+  { value: 2, label: 'Février' },
   { value: 3, label: 'Mars' },
   { value: 4, label: 'Avril' },
   { value: 5, label: 'Mai' },
   { value: 6, label: 'Juin' },
   { value: 7, label: 'Juillet' },
-  { value: 8, label: 'Aout' },
+  { value: 8, label: 'Août' },
   { value: 9, label: 'Septembre' },
   { value: 10, label: 'Octobre' },
   { value: 11, label: 'Novembre' },
-  { value: 12, label: 'Decembre' },
+  { value: 12, label: 'Décembre' },
 ];
 
 interface Props {
@@ -74,17 +74,17 @@ export function StepFiscalite({ data, onChange, onNext, onBack, onSkip }: Props)
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
-        Fiscalite & TVA
+        Fiscalité & TVA
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        On va configurer vos rappels TVA et echeances fiscales automatiquement.
+        On va configurer vos rappels TVA et échéances fiscales automatiquement.
       </p>
 
       <div className="mt-6 space-y-5 flex-1">
         {/* VAT regime */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">
-            Votre regime de TVA
+            Votre régime de TVA
           </label>
           <div className="grid grid-cols-2 gap-2">
             {VAT_REGIMES.map((r) => (
@@ -117,7 +117,7 @@ export function StepFiscalite({ data, onChange, onNext, onBack, onSkip }: Props)
         {!isFranchise && data.vatRegime && (
           <div className="space-y-2 animate-fade-up">
             <label className="text-sm font-medium text-foreground">
-              Frequence de declaration TVA
+              Fréquence de déclaration TVA
             </label>
             <div className="grid grid-cols-3 gap-2">
               {VAT_FREQUENCIES.map((f) => (
@@ -143,7 +143,7 @@ export function StepFiscalite({ data, onChange, onNext, onBack, onSkip }: Props)
           <div className="space-y-2 animate-fade-up">
             <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              Rappel avant echeance (jour du mois)
+              Rappel avant échéance (jour du mois)
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -159,8 +159,8 @@ export function StepFiscalite({ data, onChange, onNext, onBack, onSkip }: Props)
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              On vous rappellera le {data.vatReminderDay} de chaque mois pour preparer votre
-              declaration.
+              On vous rappellera le {data.vatReminderDay} de chaque mois pour préparer votre
+              déclaration.
             </p>
           </div>
         )}
@@ -196,7 +196,7 @@ export function StepFiscalite({ data, onChange, onNext, onBack, onSkip }: Props)
           </div>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-            Par defaut : 31 decembre (annee civile).
+            Par défaut : 31 décembre (année civile).
           </p>
         </div>
       </div>

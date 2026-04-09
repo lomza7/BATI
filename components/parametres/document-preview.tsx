@@ -71,7 +71,7 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
                 ) : null}
                 <span className="font-semibold text-[11px]" style={{ color: config.secondary_color }}>{companyName}</span>
               </div>
-              <p className="text-[8px] mt-1 text-gray-400">12 Rue du Batiment, 75001 Paris</p>
+              <p className="text-[8px] mt-1 text-gray-400">12 Rue du Bâtiment, 75001 Paris</p>
               <p className="text-[8px] text-gray-400">SIRET: 123 456 789 00012</p>
             </div>
             <div className="text-right">
@@ -92,7 +92,7 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
       <div className="px-4 py-2" style={{ backgroundColor: isMinimal ? '#ffffff' : '#fafaf9' }}>
         <p className="text-[8px] uppercase tracking-wider text-gray-400 mb-0.5">Client</p>
         <p className="font-medium text-[10px]" style={{ color: config.secondary_color }}>Jean Dupont</p>
-        <p className="text-[8px] text-gray-400">15 Avenue de la Republique, 69001 Lyon</p>
+        <p className="text-[8px] text-gray-400">15 Avenue de la République, 69001 Lyon</p>
       </div>
 
       {/* Lines */}
@@ -101,7 +101,7 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
           <thead>
             <tr style={{ borderBottom: `1px solid ${config.primary_color}20` }}>
               <th className="text-left py-1 font-medium" style={{ color: config.primary_color }}>Description</th>
-              <th className="text-right py-1 font-medium w-10" style={{ color: config.primary_color }}>Qte</th>
+              <th className="text-right py-1 font-medium w-10" style={{ color: config.primary_color }}>Qté</th>
               <th className="text-right py-1 font-medium w-14" style={{ color: config.primary_color }}>Prix HT</th>
               <th className="text-right py-1 font-medium w-14" style={{ color: config.primary_color }}>Total</th>
             </tr>
@@ -114,13 +114,13 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
               <td className="text-right py-1 font-medium">1 125,00 €</td>
             </tr>
             <tr className="border-b border-gray-100">
-              <td className="py-1">Fourniture carrelage gres cerame</td>
+              <td className="py-1">Fourniture carrelage grès cérame</td>
               <td className="text-right py-1">27 m²</td>
               <td className="text-right py-1">32,00 €</td>
               <td className="text-right py-1 font-medium">864,00 €</td>
             </tr>
             <tr>
-              <td className="py-1">Depose ancien sol + evacuation</td>
+              <td className="py-1">Dépose ancien sol + évacuation</td>
               <td className="text-right py-1">1 forf.</td>
               <td className="text-right py-1">350,00 €</td>
               <td className="text-right py-1 font-medium">350,00 €</td>
@@ -150,6 +150,26 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
         </div>
       </div>
 
+      {/* Payment terms — only on the relevant document type */}
+      {((type === 'devis' && config.payment_terms_on_quotes) ||
+        (type === 'facture' && config.payment_terms_on_invoices)) &&
+        config.payment_terms && (
+          <div
+            className="px-4 py-2 border-t"
+            style={{ borderColor: '#e5e5e5' }}
+          >
+            <p
+              className="text-[7px] uppercase tracking-wider font-semibold mb-0.5"
+              style={{ color: config.primary_color }}
+            >
+              Conditions de paiement
+            </p>
+            <p className="text-[7px] text-gray-500 leading-snug whitespace-pre-line">
+              {config.payment_terms}
+            </p>
+          </div>
+        )}
+
       {/* Footer */}
       <div className="px-4 py-2 border-t" style={{ borderColor: '#e5e5e5', backgroundColor: isMinimal ? '#ffffff' : '#fafaf9' }}>
         <p className="text-[7px] text-gray-400 text-center">
@@ -157,7 +177,7 @@ export function DocumentPreview({ config, logoUrl, companyName = 'Mon Entreprise
         </p>
         {config.show_watermark && (
           <p className="text-[7px] text-center mt-0.5" style={{ color: config.primary_color + '60' }}>
-            Cree avec Hellobat
+            Créé avec Hellobat
           </p>
         )}
       </div>

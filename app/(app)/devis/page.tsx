@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download, BookmarkPlus } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download, BookmarkPlus, Receipt } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
@@ -14,6 +14,7 @@ import { ServicePicker } from '@/components/devis/service-picker';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
@@ -504,10 +505,10 @@ export default function DevisPage() {
   function getTrackingBadge(q: Quote) {
     const send = quoteSends[q.id];
     if (!send) return null;
-    if (send.signed_at) return { label: 'Signe', color: 'bg-emerald-50 text-emerald-700', icon: Check };
+    if (send.signed_at) return { label: 'Signé', color: 'bg-emerald-50 text-emerald-700', icon: Check };
     if (send.view_count > 0) return { label: `Vu ${send.view_count}x`, color: 'bg-blue-50 text-blue-700', icon: Eye };
-    if (new Date(send.expires_at) < new Date()) return { label: 'Expire', color: 'bg-amber-50 text-amber-700', icon: null };
-    return { label: 'Envoye', color: 'bg-violet-50 text-violet-700', icon: Send };
+    if (new Date(send.expires_at) < new Date()) return { label: 'Expiré', color: 'bg-amber-50 text-amber-700', icon: null };
+    return { label: 'Envoyé', color: 'bg-violet-50 text-violet-700', icon: Send };
   }
 
   const filteredQuotes = quotes.filter(q =>
@@ -599,7 +600,8 @@ export default function DevisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Devis" description="Creez, gerez et envoyez vos devis">
+      <PageHeader title="Devis" description="Créez, gérez et envoyez vos devis">
+        <ImportCsvButton type="quotes" onImported={loadQuotes} />
         <Button onClick={openCreateOptions} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis
@@ -649,11 +651,11 @@ export default function DevisPage() {
         <EmptyState
           icon={FileText}
           title="Aucun devis"
-          description="Creez votre premier devis pour commencer a facturer vos clients."
+          description="Créez votre premier devis pour commencer à facturer vos clients."
         >
           <Button onClick={openCreateOptions} className="gap-2">
             <Plus className="h-4 w-4" />
-            Creer un devis
+            Créer un devis
           </Button>
         </EmptyState>
       ) : (
@@ -663,7 +665,7 @@ export default function DevisPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numero</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numéro</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Client</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Titre</th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
@@ -732,6 +734,11 @@ export default function DevisPage() {
                               <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                                 <Eye className="mr-2 h-4 w-4" /> Visualiser
                               </DropdownMenuItem>
+                              {q.status === 'accepte' && (
+                                <DropdownMenuItem onClick={() => router.push(`/factures?billing=${q.id}`)}>
+                                  <Receipt className="mr-2 h-4 w-4" /> Facturation
+                                </DropdownMenuItem>
+                              )}
                               {(q.status === 'brouillon' || q.status === 'envoye') && (
                                 <DropdownMenuItem onClick={() => setSendQuote(q)}>
                                   <PenLine className="mr-2 h-4 w-4" /> {send ? 'Renvoyer pour signature' : 'Envoyer pour signature'}
@@ -740,7 +747,7 @@ export default function DevisPage() {
                               {send && (
                                 <DropdownMenuItem onClick={() => resendEmail(q.id)} disabled={resendingQuoteId === q.id}>
                                   {resentQuoteId === q.id ? (
-                                    <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoye !</>
+                                    <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoyé !</>
                                   ) : resendingQuoteId === q.id ? (
                                     <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Envoi en cours...</>
                                   ) : (
@@ -760,11 +767,11 @@ export default function DevisPage() {
                               )}
                               {send?.docuseal_signed_document_url && (
                                 <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
-                                  <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
+                                  <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>
-                                <X className="mr-2 h-4 w-4" /> Marquer refuse
+                                <X className="mr-2 h-4 w-4" /> Marquer refusé
                               </DropdownMenuItem>
                               {q.status === 'brouillon' && (
                                 <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
@@ -803,13 +810,18 @@ export default function DevisPage() {
                         <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                           <Eye className="mr-2 h-4 w-4" /> Visualiser
                         </DropdownMenuItem>
+                        {q.status === 'accepte' && (
+                          <DropdownMenuItem onClick={() => router.push(`/factures?billing=${q.id}`)}>
+                            <Receipt className="mr-2 h-4 w-4" /> Facturation
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => setSendQuote(q)}>
                           <PenLine className="mr-2 h-4 w-4" /> {send ? 'Renvoyer' : 'Envoyer pour signature'}
                         </DropdownMenuItem>
                         {send && (
                           <DropdownMenuItem onClick={() => resendEmail(q.id)} disabled={resendingQuoteId === q.id}>
                             {resentQuoteId === q.id ? (
-                              <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoye !</>
+                              <><Check className="mr-2 h-4 w-4 text-emerald-600" /> Email renvoyé !</>
                             ) : resendingQuoteId === q.id ? (
                               <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
                             ) : (
@@ -829,10 +841,10 @@ export default function DevisPage() {
                         )}
                         {send?.docuseal_signed_document_url && (
                           <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
-                            <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
+                            <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refuse</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refusé</DropdownMenuItem>
                         {q.status === 'brouillon' && (
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Supprimer
@@ -875,7 +887,7 @@ export default function DevisPage() {
                         className="flex-1 h-9 rounded-lg text-xs font-medium border border-border bg-white text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center gap-1.5"
                       >
                         {copiedLink === send.token ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-                        {copiedLink === send.token ? 'Copie !' : 'Copier le lien'}
+                        {copiedLink === send.token ? 'Copié !' : 'Copier le lien'}
                       </button>
                       <button
                         onClick={() => setSendQuote(q)}
@@ -909,9 +921,9 @@ export default function DevisPage() {
       <Dialog open={showCreateOptions} onOpenChange={setShowCreateOptions}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Comment voulez-vous preparer ce devis ?</DialogTitle>
+            <DialogTitle>Comment voulez-vous préparer ce devis ?</DialogTitle>
             <DialogDescription>
-              Choisissez votre point de depart. Vous pourrez toujours reprendre la main avant l&apos;envoi au client.
+              Choisissez votre point de départ. Vous pourrez toujours reprendre la main avant l&apos;envoi au client.
             </DialogDescription>
           </DialogHeader>
 
@@ -926,7 +938,7 @@ export default function DevisPage() {
               </div>
               <p className="mt-4 text-base font-semibold text-foreground">Devis classique</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Ouvrir le formulaire habituel et saisir les lignes vous-meme.
+                Ouvrir le formulaire habituel et saisir les lignes vous-même.
               </p>
             </button>
 
@@ -1022,7 +1034,7 @@ export default function DevisPage() {
                 <label className="text-sm font-medium text-foreground">Titre du devis</label>
                 <Input
                   className="mt-1"
-                  placeholder="Ex: Renovation salle de bain"
+                  placeholder="Ex: Rénovation salle de bain"
                   value={newQuote.title}
                   onChange={e => setNewQuote({ ...newQuote, title: e.target.value })}
                 />
@@ -1059,7 +1071,7 @@ export default function DevisPage() {
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 rows={2}
-                placeholder="Details supplementaires..."
+                placeholder="Détails supplémentaires..."
                 value={newQuote.description}
                 onChange={e => setNewQuote({ ...newQuote, description: e.target.value })}
               />
@@ -1100,7 +1112,7 @@ export default function DevisPage() {
                     <div className="col-span-2 sm:col-span-1">
                       <Input
                         type="number"
-                        placeholder="Qte"
+                        placeholder="Qté"
                         value={line.quantity || ''}
                         onChange={e => updateLine(i, 'quantity', Number(e.target.value))}
                       />
@@ -1215,10 +1227,10 @@ export default function DevisPage() {
                 className="gap-2"
               >
                 <Eye className="h-4 w-4" />
-                Apercu
+                Aperçu
               </Button>
               <Button onClick={saveQuote} disabled={!newQuote.title.trim()}>
-                {draftId.current ? 'Enregistrer le devis' : 'Creer le devis'}
+                {draftId.current ? 'Enregistrer le devis' : 'Créer le devis'}
               </Button>
             </div>
           </div>
@@ -1278,8 +1290,8 @@ export default function DevisPage() {
                         <Send className="h-3 w-3 text-violet-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">Lien envoye</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(send.created_at)} — a {send.client_name}</p>
+                        <p className="text-sm font-medium text-foreground">Lien envoyé</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(send.created_at)} — à {send.client_name}</p>
                       </div>
                     </div>
 
@@ -1314,7 +1326,7 @@ export default function DevisPage() {
                           <Check className="h-3 w-3 text-emerald-600" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-emerald-700">Devis signe</p>
+                          <p className="text-sm font-medium text-emerald-700">Devis signé</p>
                           <p className="text-xs text-muted-foreground">{formatDate(send.signed_at)}</p>
                           {send.docuseal_signed_document_url && (
                             <a
@@ -1324,7 +1336,7 @@ export default function DevisPage() {
                               className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
                             >
                               <Download className="h-3 w-3" />
-                              Telecharger le devis signe
+                              Télécharger le devis signé
                             </a>
                           )}
                         </div>
@@ -1354,7 +1366,7 @@ export default function DevisPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Statut</span>
                       <span className="font-medium text-foreground">
-                        {send.signed_at ? 'Signe' : new Date(send.expires_at) < new Date() ? 'Expire' : 'En attente'}
+                        {send.signed_at ? 'Signé' : new Date(send.expires_at) < new Date() ? 'Expiré' : 'En attente'}
                       </span>
                     </div>
                   </div>

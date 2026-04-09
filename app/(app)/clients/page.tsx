@@ -16,6 +16,7 @@ import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constant
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
+import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -160,6 +161,7 @@ export default function ClientsPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <PageHeader title="Contacts" description="Votre carnet d'adresses">
+        <ImportCsvButton type="clients" onImported={loadClients} />
         <Button onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true); }} className="gap-2">
           <Plus className="h-4 w-4" /> Nouveau contact
         </Button>
@@ -262,7 +264,7 @@ export default function ClientsPage() {
               <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-border bg-card p-8 min-h-[300px]">
                 <div className="text-center text-muted-foreground">
                   <User className="h-10 w-10 mx-auto" />
-                  <p className="mt-3 text-sm">Selectionnez un contact pour voir sa fiche</p>
+                  <p className="mt-3 text-sm">Sélectionnez un contact pour voir sa fiche</p>
                 </div>
               </div>
             ) : (
@@ -332,7 +334,7 @@ export default function ClientsPage() {
                       <p className="text-sm font-semibold mt-0.5">{invoices.length} — {formatCurrency(totalFactures)}</p>
                     </div>
                     <div className="rounded-lg bg-muted/50 p-3">
-                      <p className="text-xs text-muted-foreground">Paye</p>
+                      <p className="text-xs text-muted-foreground">Payé</p>
                       <p className="text-sm font-semibold mt-0.5">{formatCurrency(totalPaye)}</p>
                     </div>
                     <div className="rounded-lg bg-muted/50 p-3">
@@ -371,7 +373,7 @@ export default function ClientsPage() {
                               p.status === 'termine' ? 'bg-emerald-50 text-emerald-700' :
                               'bg-slate-100 text-slate-600'
                             )}>
-                              {p.status === 'en_cours' ? 'En cours' : p.status === 'termine' ? 'Termine' : p.status === 'en_pause' ? 'En pause' : 'A planifier'}
+                              {p.status === 'en_cours' ? 'En cours' : p.status === 'termine' ? 'Terminé' : p.status === 'en_pause' ? 'En pause' : 'À planifier'}
                             </span>
                           </div>
                         ))}
@@ -415,7 +417,7 @@ export default function ClientsPage() {
                                 inv.status === 'en_retard' ? 'text-red-600' :
                                 'text-muted-foreground'
                               )}>
-                                {inv.status === 'payee' ? 'Payee' : inv.status === 'en_retard' ? 'En retard' : inv.status === 'envoyee' ? 'Envoyee' : 'Brouillon'}
+                                {inv.status === 'payee' ? 'Payée' : inv.status === 'en_retard' ? 'En retard' : inv.status === 'envoyee' ? 'Envoyée' : 'Brouillon'}
                               </span>
                             </div>
                           </div>
@@ -516,7 +518,7 @@ export default function ClientsPage() {
                     <SelectValue placeholder="Source..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Non renseigne</SelectItem>
+                    <SelectItem value="none">Non renseigné</SelectItem>
                     {DEFAULT_LEAD_SOURCES.map(s => (
                       <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
                     ))}
@@ -526,7 +528,7 @@ export default function ClientsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Telephone</label>
+                <label className="text-sm font-medium">Téléphone</label>
                 <Input className="mt-1" placeholder="06 12 34 56 78" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div>
@@ -554,7 +556,7 @@ export default function ClientsPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Annuler</Button>
-              <Button onClick={saveClient} disabled={!form.name.trim() || !form.email.trim()}>{editingId ? 'Enregistrer' : 'Creer'}</Button>
+              <Button onClick={saveClient} disabled={!form.name.trim() || !form.email.trim()}>{editingId ? 'Enregistrer' : 'Créer'}</Button>
             </div>
           </div>
         </DialogContent>
@@ -565,7 +567,7 @@ export default function ClientsPage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Supprimer ce contact ?</DialogTitle>
-            <DialogDescription>Les devis, factures et chantiers lies ne seront pas supprimes.</DialogDescription>
+            <DialogDescription>Les devis, factures et chantiers liés ne seront pas supprimés.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setShowDelete(null)}>Annuler</Button>

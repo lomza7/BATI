@@ -18,7 +18,7 @@ import {
 import type { OnboardingData } from '../onboarding-modal';
 
 const ROLES = [
-  { value: 'chef_equipe', label: "Chef d'equipe" },
+  { value: 'chef_equipe', label: "Chef d'équipe" },
   { value: 'commercial', label: 'Commercial' },
   { value: 'assistante', label: 'Assistant(e)' },
   { value: 'conducteur_travaux', label: 'Conducteur de travaux' },
@@ -36,7 +36,7 @@ const MAURICE_ADVANTAGES = [
   },
   {
     icon: Bell,
-    text: 'Rappels fiscaux personnalises',
+    text: 'Rappels fiscaux personnalisés',
   },
 ];
 
@@ -91,10 +91,10 @@ export function StepComptaEquipe({
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
-        Comptabilite & equipe
+        Comptabilité & équipe
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        Deux dernieres questions pour personnaliser vos outils.
+        Deux dernières questions pour personnaliser vos outils.
       </p>
 
       <div className="mt-6 space-y-6 flex-1">
@@ -102,11 +102,11 @@ export function StepComptaEquipe({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <label className="text-sm font-medium text-foreground">
-              Vous avez deja un logiciel de comptabilite ?
+              Vous avez déjà un logiciel de comptabilité ?
             </label>
             <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
               <Check className="h-2.5 w-2.5" strokeWidth={3} />
-              Le notre est gratuit
+              Le nôtre est gratuit
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -154,14 +154,14 @@ export function StepComptaEquipe({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-foreground">
-                      Decouvrez Maurice, votre comptable IA
+                      Découvrez Maurice, votre comptable IA
                     </p>
                     <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-emerald-100 text-[10px] font-semibold text-emerald-800">
                       Gratuit
                     </span>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Inclus dans Hellobat. Pas de surcout, pas de logiciel supplementaire.
+                    Inclus dans Hellobat. Pas de surcoût, pas de logiciel supplémentaire.
                   </p>
                 </div>
               </div>
@@ -202,12 +202,12 @@ export function StepComptaEquipe({
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-emerald-900">
-                  Bon a savoir : le notre est inclus gratuitement
+                  Bon à savoir : le nôtre est inclus gratuitement
                 </p>
                 <p className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
-                  Hellobat integre Maurice, un comptable IA qui scanne vos factures
+                  Hellobat intègre Maurice, un comptable IA qui scanne vos factures
                   et fait votre compta automatiquement. Vous pourrez l&apos;activer
-                  quand vous voulez depuis vos parametres.
+                  quand vous voulez depuis vos paramètres.
                 </p>
               </div>
             </div>
@@ -217,7 +217,7 @@ export function StepComptaEquipe({
         {/* ── Section B : Employees ── */}
         <div className="space-y-2 pt-2 border-t border-border">
           <label className="text-sm font-medium text-foreground pt-3 block">
-            Vous avez des salaries ?
+            Vous avez des salariés ?
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -271,7 +271,7 @@ export function StepComptaEquipe({
                   className="w-full h-14 rounded-xl border-2 border-dashed border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-foreground flex items-center justify-center gap-2 transition-all"
                 >
                   <Plus className="h-4 w-4" />
-                  Inviter un premier salarie
+                  Inviter un premier salarié
                 </button>
               )}
 
@@ -323,7 +323,7 @@ export function StepComptaEquipe({
               {data.invitedEmployees.length > 0 && (
                 <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
                   <Check className="h-3 w-3" />
-                  Les invitations seront envoyees apres votre onboarding.
+                  Les invitations seront envoyées après votre onboarding.
                 </p>
               )}
             </div>

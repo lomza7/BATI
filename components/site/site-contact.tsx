@@ -60,7 +60,7 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
               </div>
               <div>
                 <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--site-text-muted)' }}>
-                  Telephone
+                  Téléphone
                 </p>
                 <p className="font-semibold" style={{ color: 'var(--site-heading)' }}>
                   {displayPhone}
@@ -130,7 +130,7 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
           )}
         </div>
 
-        {/* CTA block — demander un devis + telephone a cote */}
+        {/* CTA block — demander un devis + téléphone à côté */}
         <div className="mt-8 sm:mt-10">
           <SiteContactCta slug={slug} companyName={profile.company_name} phone={displayPhone} />
         </div>

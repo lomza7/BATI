@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Save, Upload, X, FileText, Palette } from 'lucide-react';
+import {
+  Check,
+  Save,
+  Upload,
+  X,
+  FileText,
+  Palette,
+  CreditCard,
+  AlertTriangle,
+  Sparkles,
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -10,6 +20,7 @@ import {
   TEMPLATE_PRESETS,
   COLOR_PRESETS,
   FONT_OPTIONS,
+  PAYMENT_TERMS_PRESETS,
   mergeDocConfig,
 } from '@/lib/document-templates';
 import { DocumentPreview } from './document-preview';
@@ -116,6 +127,16 @@ export function DocumentTemplateSettings() {
     setConfig(prev => ({ ...prev, [key]: value }));
   }
 
+  function applyPaymentPreset(presetValue: string) {
+    const preset = PAYMENT_TERMS_PRESETS.find(p => p.value === presetValue);
+    if (!preset) return;
+    setConfig(prev => ({
+      ...prev,
+      payment_terms_preset: preset.value,
+      payment_terms: preset.body,
+    }));
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
       {/* Settings panel */}
@@ -190,7 +211,7 @@ export function DocumentTemplateSettings() {
                     value={config.primary_color}
                     onChange={e => updateConfig('primary_color', e.target.value)}
                     className="h-8 w-8 rounded-full cursor-pointer border-2 border-dashed border-muted-foreground/30"
-                    title="Couleur personnalisee"
+                    title="Couleur personnalisée"
                   />
                 </div>
               </div>
@@ -198,7 +219,7 @@ export function DocumentTemplateSettings() {
 
             {/* Font */}
             <div>
-              <Label className="text-sm">Police de caracteres</Label>
+              <Label className="text-sm">Police de caractères</Label>
               <Select value={config.font} onValueChange={v => updateConfig('font', v)}>
                 <SelectTrigger className="mt-1.5 w-full sm:w-[280px]">
                   <SelectValue />
@@ -213,14 +234,14 @@ export function DocumentTemplateSettings() {
 
             {/* Header style */}
             <div>
-              <Label className="text-sm">Style d'en-tete</Label>
+              <Label className="text-sm">Style d&apos;en-tête</Label>
               <Select value={config.header_style} onValueChange={v => updateConfig('header_style', v as DocumentConfig['header_style'])}>
                 <SelectTrigger className="mt-1.5 w-full sm:w-[280px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="standard">Standard (logo + infos)</SelectItem>
-                  <SelectItem value="banner">Banniere coloree</SelectItem>
+                  <SelectItem value="banner">Bannière colorée</SelectItem>
                   <SelectItem value="compact">Compact (une ligne)</SelectItem>
                 </SelectContent>
               </Select>
@@ -232,7 +253,7 @@ export function DocumentTemplateSettings() {
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="text-lg">Logo</CardTitle>
-            <CardDescription>Votre logo apparaitra sur vos devis et factures</CardDescription>
+            <CardDescription>Votre logo apparaîtra sur vos devis et factures</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
@@ -281,14 +302,14 @@ export function DocumentTemplateSettings() {
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div>
                 <Label className="text-sm">Afficher le logo</Label>
-                <p className="text-[11px] text-muted-foreground">Sur l'en-tete des documents</p>
+                <p className="text-[11px] text-muted-foreground">Sur l&apos;en-tête des documents</p>
               </div>
               <Switch checked={config.show_logo} onCheckedChange={v => updateConfig('show_logo', v)} />
             </div>
 
             <div className="flex items-center justify-between mt-3">
               <div>
-                <Label className="text-sm">Mention "Cree avec Hellobat"</Label>
+                <Label className="text-sm">Mention &quot;Créé avec Hellobat&quot;</Label>
                 <p className="text-[11px] text-muted-foreground">Petit filigrane en bas du document</p>
               </div>
               <Switch checked={config.show_watermark} onCheckedChange={v => updateConfig('show_watermark', v)} />
@@ -299,7 +320,7 @@ export function DocumentTemplateSettings() {
         {/* Mentions */}
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-lg">Textes personnalises</CardTitle>
+            <CardTitle className="text-lg">Textes personnalisés</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -312,14 +333,142 @@ export function DocumentTemplateSettings() {
               />
             </div>
             <div>
-              <Label className="text-sm">Mentions legales</Label>
+              <Label className="text-sm">Mentions légales</Label>
               <Textarea
                 className="mt-1.5 resize-none"
                 rows={3}
-                placeholder="Conditions generales, validite, tribunal competent..."
+                placeholder="Conditions générales, validité, tribunal compétent..."
                 value={config.mentions_legales}
                 onChange={e => updateConfig('mentions_legales', e.target.value)}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Conditions de paiement */}
+        <Card className="rounded-2xl border-primary/15">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Conditions de paiement
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Affichées en bas de vos devis et factures. Conformes à la loi française.
+                </CardDescription>
+              </div>
+              <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700 whitespace-nowrap">
+                <Sparkles className="h-3 w-3" />
+                Pré-remplies
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Preset cards */}
+            <div>
+              <Label className="text-sm">Modèle</Label>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {PAYMENT_TERMS_PRESETS.map(preset => {
+                  const active = config.payment_terms_preset === preset.value;
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => applyPaymentPreset(preset.value)}
+                      className={cn(
+                        'relative text-left rounded-xl border-2 p-3 transition-all hover:shadow-sm',
+                        active
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-white hover:border-primary/30',
+                      )}
+                    >
+                      {active && (
+                        <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                      <p className="text-sm font-medium text-foreground pr-6">
+                        {preset.label}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {preset.short}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Editable text */}
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Texte affiché sur le document</Label>
+                <span className="text-[10px] text-muted-foreground">
+                  Modifiable
+                </span>
+              </div>
+              <Textarea
+                className="mt-1.5 resize-none text-xs leading-relaxed"
+                rows={6}
+                value={config.payment_terms}
+                onChange={e => {
+                  updateConfig('payment_terms', e.target.value);
+                  // Switching to manual edits → mark as custom
+                  updateConfig('payment_terms_preset', 'custom');
+                }}
+              />
+            </div>
+
+            {/* Toggles */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label className="text-sm">Afficher sur les devis</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Vos clients voient les conditions avant de signer.
+                  </p>
+                </div>
+                <Switch
+                  checked={config.payment_terms_on_quotes}
+                  onCheckedChange={v => updateConfig('payment_terms_on_quotes', v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    Afficher sur les factures
+                    <span className="inline-flex items-center h-4 px-1.5 rounded-full bg-red-50 text-[9px] font-semibold uppercase tracking-wide text-red-700 border border-red-200">
+                      Obligatoire
+                    </span>
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Les pénalités de retard sont exigées par la loi française.
+                  </p>
+                </div>
+                <Switch
+                  checked={config.payment_terms_on_invoices}
+                  onCheckedChange={v => updateConfig('payment_terms_on_invoices', v)}
+                />
+              </div>
+
+              {!config.payment_terms_on_invoices && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 text-red-700 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-red-900">
+                      Légalement obligatoire sur vos factures
+                    </p>
+                    <p className="text-[11px] text-red-800 mt-0.5 leading-relaxed">
+                      L&apos;absence des conditions de paiement (délais et
+                      pénalités de retard) vous expose à une amende administrative
+                      pouvant aller jusqu&apos;à 75 000 €. Nous vous recommandons
+                      vivement de réactiver l&apos;option.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -328,7 +477,7 @@ export function DocumentTemplateSettings() {
         <div className="flex justify-end">
           <Button onClick={saveConfig} disabled={saving} className="gap-2">
             {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saved ? 'Enregistre !' : saving ? 'Enregistrement...' : 'Enregistrer le design'}
+            {saved ? 'Enregistré !' : saving ? 'Enregistrement...' : 'Enregistrer le design'}
           </Button>
         </div>
       </div>
@@ -336,7 +485,7 @@ export function DocumentTemplateSettings() {
       {/* Preview panel — sticky on desktop */}
       <div className="xl:sticky xl:top-4 space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Apercu en direct</p>
+          <p className="text-sm font-medium">Aperçu en direct</p>
           <div className="flex gap-1 rounded-lg border p-0.5">
             <button
               type="button"

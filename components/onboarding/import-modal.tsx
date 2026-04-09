@@ -19,7 +19,7 @@
  * them or trigger a celebratory toast.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -53,9 +53,8 @@ interface ImportFiles {
   clients: File | null;
   quotes: File | null;
   invoices: File | null;
-  // bibliothèque de prix kept as a placeholder slot — disabled for now since
-  // we don't yet have a sample CSV to map against.
-  library: File | null;
+  /** Bibliothèque de prix → mapped to the `services` table. */
+  services: File | null;
 }
 
 interface PreviewResponse {
@@ -63,11 +62,13 @@ interface PreviewResponse {
     clients: number;
     quotes: number;
     invoices: number;
+    services: number;
     errors: number;
   };
   clients: { rows: unknown[]; errors: { line: number; reason: string }[] } | null;
   quotes: { rows: unknown[]; errors: { line: number; reason: string }[] } | null;
   invoices: { rows: unknown[]; errors: { line: number; reason: string }[] } | null;
+  services: { rows: unknown[]; errors: { line: number; reason: string }[] } | null;
 }
 
 interface CommitResponse {
@@ -76,6 +77,7 @@ interface CommitResponse {
     clients: { inserted: number; skipped: number };
     quotes: { inserted: number; skipped: number };
     invoices: { inserted: number; skipped: number };
+    services: { inserted: number; skipped: number };
   };
 }
 
@@ -115,16 +117,27 @@ interface ImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete?: (counts: CommitResponse['counts']) => void;
+  /**
+   * When set, the modal skips the software-picker step and starts directly at
+   * the relevant entry point. `'constructeur'` → instructions screen,
+   * everything else → upload screen.
+   */
+  initialSoftware?: Software | null;
 }
 
-export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps) {
+export function ImportModal({
+  open,
+  onOpenChange,
+  onComplete,
+  initialSoftware = null,
+}: ImportModalProps) {
   const [step, setStep] = useState<Step>('pick');
   const [software, setSoftware] = useState<Software | null>(null);
   const [files, setFiles] = useState<ImportFiles>({
     clients: null,
     quotes: null,
     invoices: null,
-    library: null,
+    services: null,
   });
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [commitResult, setCommitResult] = useState<CommitResponse | null>(null);
@@ -132,14 +145,25 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
   const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setStep('pick');
-    setSoftware(null);
-    setFiles({ clients: null, quotes: null, invoices: null, library: null });
+    setStep(initialSoftware ? (initialSoftware === 'constructeur' ? 'instructions' : 'upload') : 'pick');
+    setSoftware(initialSoftware);
+    setFiles({ clients: null, quotes: null, invoices: null, services: null });
     setPreview(null);
     setCommitResult(null);
     setError(null);
     setLoading(false);
-  }, []);
+  }, [initialSoftware]);
+
+  // When the modal opens with a pre-selected software, jump straight to the
+  // right step instead of forcing the user through the picker.
+  useEffect(() => {
+    if (open && initialSoftware) {
+      setSoftware(initialSoftware);
+      setStep(initialSoftware === 'constructeur' ? 'instructions' : 'upload');
+    } else if (open && !initialSoftware) {
+      setStep('pick');
+    }
+  }, [open, initialSoftware]);
 
   function close() {
     onOpenChange(false);
@@ -167,7 +191,8 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
       if (files.clients) formData.append('clients', files.clients);
       if (files.quotes) formData.append('quotes', files.quotes);
       if (files.invoices) formData.append('invoices', files.invoices);
-      if (!files.clients && !files.quotes && !files.invoices) {
+      if (files.services) formData.append('services', files.services);
+      if (!files.clients && !files.quotes && !files.invoices && !files.services) {
         throw new Error('Veuillez joindre au moins un fichier.');
       }
 
@@ -199,6 +224,7 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
       if (files.clients) formData.append('clients', files.clients);
       if (files.quotes) formData.append('quotes', files.quotes);
       if (files.invoices) formData.append('invoices', files.invoices);
+      if (files.services) formData.append('services', files.services);
 
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
@@ -388,17 +414,16 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
               <DropzoneCard
                 icon={Package}
                 title="Bibliothèque de prix"
-                description="Bientôt disponible — contactez-nous pour un import sur-mesure"
-                file={files.library}
-                onChange={(f) => setFile('library', f)}
-                disabled
+                description="Vos prestations, fournitures et tarifs réutilisables"
+                file={files.services}
+                onChange={(f) => setFile('services', f)}
               />
             </div>
           )}
 
           {step === 'preview' && preview && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <PreviewStat
                   icon={Users}
                   label="Clients"
@@ -413,6 +438,11 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
                   icon={Receipt}
                   label="Factures"
                   value={preview.counts.invoices}
+                />
+                <PreviewStat
+                  icon={Package}
+                  label="Prestations"
+                  value={preview.counts.services}
                 />
               </div>
 
@@ -461,7 +491,7 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
                   Vos données sont disponibles dans Hellobat.
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <PreviewStat
                   icon={Users}
                   label="Clients"
@@ -476,6 +506,11 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
                   icon={Receipt}
                   label="Factures"
                   value={commitResult.counts.invoices.inserted}
+                />
+                <PreviewStat
+                  icon={Package}
+                  label="Prestations"
+                  value={commitResult.counts.services.inserted}
                 />
               </div>
             </div>
@@ -495,9 +530,15 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
             type="button"
             onClick={() => {
               if (step === 'pick' || step === 'done') return close();
-              if (step === 'instructions') return setStep('pick');
+              // If the user landed straight on instructions/upload via the
+              // showcase pre-selection, "Retour" should close the modal — there
+              // is no picker step to go back to.
+              if (step === 'instructions') {
+                return initialSoftware ? close() : setStep('pick');
+              }
               if (step === 'upload') {
-                return setStep(software === 'constructeur' ? 'instructions' : 'pick');
+                if (software === 'constructeur') return setStep('instructions');
+                return initialSoftware ? close() : setStep('pick');
               }
               if (step === 'preview') return setStep('upload');
             }}
@@ -530,7 +571,7 @@ export function ImportModal({ open, onOpenChange, onComplete }: ImportModalProps
               type="button"
               onClick={runPreview}
               disabled={
-                loading || (!files.clients && !files.quotes && !files.invoices)
+                loading || (!files.clients && !files.quotes && !files.invoices && !files.services)
               }
               className="h-10 px-5 rounded-xl bg-primary text-primary-foreground font-medium text-xs flex items-center gap-1.5 hover:bg-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -687,6 +728,7 @@ function PreviewErrors({ preview }: { preview: PreviewResponse }) {
     ...(preview.clients?.errors.map((e) => ({ ...e, source: 'Clients' })) || []),
     ...(preview.quotes?.errors.map((e) => ({ ...e, source: 'Devis' })) || []),
     ...(preview.invoices?.errors.map((e) => ({ ...e, source: 'Factures' })) || []),
+    ...(preview.services?.errors.map((e) => ({ ...e, source: 'Prestations' })) || []),
   ];
   if (allErrors.length === 0) return null;
   return (

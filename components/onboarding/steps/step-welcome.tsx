@@ -26,7 +26,7 @@ export function StepWelcome({ data, onChange, onNext, onSkip }: Props) {
       </h2>
       <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
         Avant de commencer, on a besoin de quelques informations pour
-        personnaliser votre espace. Ca ne prend que 2 minutes.
+        personnaliser votre espace. Ça ne prend que 2 minutes.
       </p>
 
       <div className="mt-8 space-y-4 flex-1">
@@ -39,7 +39,7 @@ export function StepWelcome({ data, onChange, onNext, onSkip }: Props) {
             type="text"
             value={data.fullName}
             onChange={(e) => onChange({ fullName: e.target.value })}
-            placeholder="Prenom et Nom"
+            placeholder="Prénom et Nom"
             autoFocus
             className="flex h-12 w-full rounded-xl border border-border bg-muted/30 px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
             onKeyDown={(e) => {

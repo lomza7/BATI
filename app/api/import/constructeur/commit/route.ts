@@ -24,9 +24,11 @@ import {
   mapContactsCSV,
   mapQuotesCSV,
   mapInvoicesCSV,
+  mapServicesCSV,
   type MappedClient,
   type MappedQuote,
   type MappedInvoice,
+  type MappedService,
 } from '@/lib/import/constructeur';
 import {
   getNextQuoteNumber,
@@ -50,6 +52,7 @@ interface CommitCounts {
   clients: { inserted: number; skipped: number };
   quotes: { inserted: number; skipped: number };
   invoices: { inserted: number; skipped: number };
+  services: { inserted: number; skipped: number };
 }
 
 async function insertClients(
@@ -261,6 +264,60 @@ async function insertInvoices(
   }
 }
 
+async function insertServices(
+  sb: SupabaseClient,
+  userId: string,
+  rows: MappedService[],
+  counts: CommitCounts,
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  // De-duplicate against existing prestations by normalized name.
+  const { data: existing } = await sb
+    .from('services')
+    .select('name')
+    .eq('user_id', userId)
+    .is('deleted_at', null);
+  const existingNames = new Set<string>();
+  for (const s of existing || []) {
+    existingNames.add(normalizeName((s as { name: string }).name));
+  }
+
+  const toInsert: Array<Record<string, unknown>> = [];
+  const seenInBatch = new Set<string>();
+  for (const row of rows) {
+    const key = normalizeName(row.name);
+    if (existingNames.has(key) || seenInBatch.has(key)) {
+      counts.services.skipped++;
+      continue;
+    }
+    seenInBatch.add(key);
+    toInsert.push({
+      name: row.name,
+      description: row.description,
+      unit: row.unit,
+      unit_price: row.unit_price,
+      category: row.category,
+      tva_rate: row.tva_rate,
+      is_recurring: false,
+      frequency: 'mensuel',
+      is_active: true,
+      user_id: userId,
+    });
+  }
+
+  const CHUNK = 200;
+  for (let i = 0; i < toInsert.length; i += CHUNK) {
+    const chunk = toInsert.slice(i, i + CHUNK);
+    const { data, error } = await sb.from('services').insert(chunk).select('id');
+    if (error) {
+      counts.services.skipped += chunk.length;
+      continue;
+    }
+    counts.services.inserted += data?.length || 0;
+  }
+}
+
 export async function POST(request: Request) {
   // Auth
   const authHeader = request.headers.get('authorization');
@@ -293,11 +350,12 @@ export async function POST(request: Request) {
     return parseCSV(await readBytes(field));
   }
 
-  let clientsParsed, quotesParsed, invoicesParsed;
+  let clientsParsed, quotesParsed, invoicesParsed, servicesParsed;
   try {
     clientsParsed = await load(formData.get('clients'));
     quotesParsed = await load(formData.get('quotes'));
     invoicesParsed = await load(formData.get('invoices'));
+    servicesParsed = await load(formData.get('services'));
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Erreur inattendue';
     return NextResponse.json({ error: message }, { status: 400 });
@@ -309,6 +367,7 @@ export async function POST(request: Request) {
     clients: { inserted: 0, skipped: 0 },
     quotes: { inserted: 0, skipped: 0 },
     invoices: { inserted: 0, skipped: 0 },
+    services: { inserted: 0, skipped: 0 },
   };
 
   try {
@@ -345,6 +404,11 @@ export async function POST(request: Request) {
         quoteNumberMap,
         counts,
       );
+    }
+
+    if (servicesParsed) {
+      const mapped = mapServicesCSV(servicesParsed);
+      await insertServices(sb, user.id, mapped.rows, counts);
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erreur lors de l'import";

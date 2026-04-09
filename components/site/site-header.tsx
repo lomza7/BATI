@@ -14,9 +14,9 @@ interface SiteHeaderProps {
   hasProjects: boolean;
   hasReviews: boolean;
   /**
-   * Prefix absolu pour les ancres du menu, ex: "/site/mon-artisan".
-   * Utilise quand le header est monte sur une page interne (detail chantier)
-   * pour que les liens ramenent bien a la home du site et scrollent a la section.
+   * Préfixe absolu pour les ancres du menu, ex: "/site/mon-artisan".
+   * Utilisé quand le header est monté sur une page interne (détail chantier)
+   * pour que les liens ramènent bien à la home du site et scrollent à la section.
    */
   basePath?: string;
 }
@@ -39,9 +39,9 @@ export function SiteHeader({
 
   const links: { label: string; href: string }[] = [];
 
-  links.push({ label: 'A propos', href: prefix('#a-propos') });
+  links.push({ label: 'À propos', href: prefix('#a-propos') });
   if (showServices && hasServices) links.push({ label: 'Services', href: prefix('#services') });
-  if (showProjects && hasProjects) links.push({ label: 'Realisations', href: prefix('#realisations') });
+  if (showProjects && hasProjects) links.push({ label: 'Réalisations', href: prefix('#realisations') });
   if (showReviews && hasReviews) links.push({ label: 'Avis', href: prefix('#avis') });
   if (showContact) links.push({ label: 'Contact', href: prefix('#contact') });
 

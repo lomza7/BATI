@@ -75,7 +75,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setSendError('Session expiree, veuillez vous reconnecter');
+        setSendError('Session expirée, veuillez vous reconnecter');
         setSending(false);
         return;
       }
@@ -107,7 +107,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
       setEmailSent(data.email_status === 'sent');
       onSent?.();
     } catch {
-      setSendError('Erreur reseau, veuillez reessayer');
+      setSendError('Erreur réseau, veuillez réessayer');
     }
 
     setSending(false);
@@ -134,11 +134,11 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
                 <Check className="h-5 w-5 text-emerald-600" />
               </div>
-              <p className="font-semibold text-emerald-800 text-sm">Facture envoyee !</p>
+              <p className="font-semibold text-emerald-800 text-sm">Facture envoyée !</p>
               {emailSent && (
                 <p className="text-xs text-emerald-600 mt-1">
                   <Mail className="inline h-3 w-3 mr-1" />
-                  Email envoye a {clientEmail}
+                  Email envoyé à {clientEmail}
                 </p>
               )}
             </div>
@@ -196,7 +196,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                 onChange={e => setClientEmail(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Si renseigne, un email avec le lien sera envoye automatiquement via Gmail
+                Si renseigné, un email avec le lien sera envoyé automatiquement via Gmail
               </p>
             </div>
 
@@ -204,7 +204,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               <div>
                 <label className="text-sm font-medium flex items-center gap-1.5">
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                  Pieces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
+                  Pièces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
                 </label>
                 <ul className="mt-1.5 rounded-lg border divide-y">
                   {attachments.map(att => {
@@ -233,13 +233,13 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                   })}
                 </ul>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Vos attestations sont jointes par defaut. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
+                  Vos attestations sont jointes par défaut. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
                 </p>
               </div>
             )}
 
             <div>
-              <label className="text-sm font-medium">Validite du lien</label>
+              <label className="text-sm font-medium">Validité du lien</label>
               <select
                 value={expiresIn}
                 onChange={e => setExpiresIn(e.target.value)}
@@ -255,7 +255,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               <div className="flex items-start gap-2">
                 <CreditCard className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-blue-700">
-                  Si votre compte Stripe est connecte, le client pourra payer directement en ligne depuis le lien de la facture.
+                  Si votre compte Stripe est connecté, le client pourra payer directement en ligne depuis le lien de la facture.
                 </p>
               </div>
             </div>
@@ -268,7 +268,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                 ) : (
                   <Link2 className="h-4 w-4" />
                 )}
-                {sending ? 'Envoi...' : 'Generer le lien'}
+                {sending ? 'Envoi...' : 'Générer le lien'}
               </Button>
             </div>
           </div>

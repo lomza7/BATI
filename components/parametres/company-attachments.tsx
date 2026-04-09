@@ -67,7 +67,7 @@ export function CompanyAttachmentsCard() {
     setError(null);
 
     if (file.size > MAX_FILE_BYTES) {
-      setError(`Le fichier depasse la taille maximale de ${formatBytes(MAX_FILE_BYTES)}.`);
+      setError(`Le fichier dépasse la taille maximale de ${formatBytes(MAX_FILE_BYTES)}.`);
       return;
     }
 
@@ -85,7 +85,7 @@ export function CompanyAttachmentsCard() {
       });
 
     if (uploadError) {
-      setError(`Echec de l'envoi : ${uploadError.message}`);
+      setError(`Échec de l'envoi : ${uploadError.message}`);
       setUploading(false);
       return;
     }
@@ -100,7 +100,7 @@ export function CompanyAttachmentsCard() {
     if (insertError) {
       // Rollback storage upload to keep storage and DB in sync
       await supabase.storage.from('company-attachments').remove([storagePath]);
-      setError(`Echec de l'enregistrement : ${insertError.message}`);
+      setError(`Échec de l'enregistrement : ${insertError.message}`);
       setUploading(false);
       return;
     }
@@ -131,13 +131,13 @@ export function CompanyAttachmentsCard() {
           <Paperclip className="h-5 w-5" /> Attestations et assurances
         </CardTitle>
         <CardDescription>
-          Deposez ici vos attestations d&apos;assurance, decennale, RGE, Kbis, etc. Elles seront jointes par defaut a vos devis et factures envoyes au client. Vous pourrez les decocher avant l&apos;envoi.
+          Déposez ici vos attestations d&apos;assurance, décennale, RGE, Kbis, etc. Elles seront jointes par défaut à vos devis et factures envoyés au client. Vous pourrez les décocher avant l&apos;envoi.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            Formats acceptes : PDF, JPG, PNG. Taille max : 10 Mo par fichier.
+            Formats acceptés : PDF, JPG, PNG. Taille max : 10 Mo par fichier.
           </p>
           <div>
             <Button
@@ -176,7 +176,7 @@ export function CompanyAttachmentsCard() {
           <div className="rounded-xl border-2 border-dashed border-muted-foreground/20 px-4 py-8 text-center">
             <FileText className="mx-auto h-8 w-8 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground mt-2">
-              Aucun document deposes pour l&apos;instant.
+              Aucun document déposé pour l&apos;instant.
             </p>
           </div>
         ) : (

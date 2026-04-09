@@ -72,6 +72,16 @@ export interface MappedInvoice {
   paid_at: string | null;
 }
 
+export interface MappedService {
+  externalId: string;
+  name: string;
+  description: string;
+  unit: string;
+  unit_price: number;
+  category: string;
+  tva_rate: number;
+}
+
 export interface ImportSummary<T> {
   rows: T[];
   errors: { line: number; reason: string }[];
@@ -435,6 +445,72 @@ const INVOICE_HEADERS = {
   paidAt: ['Date de paiement', 'Date paiement', 'Paid at', 'Date reglement'],
   quoteRef: ['Devis', 'Quote', 'Devis lie'],
 };
+
+// ── Services / bibliothèque de prix ──────────────────────────────────────────
+
+const SERVICE_HEADERS = {
+  id: ['ID', 'Identifiant', 'Code', 'Reference', 'Référence'],
+  name: ['Nom', 'Libelle', 'Libellé', 'Designation', 'Désignation', 'Name', 'Title', 'Titre'],
+  description: ['Description', 'Detail', 'Détail', 'Notes', 'Note'],
+  unit: ['Unite', 'Unité', 'Unit', 'U'],
+  unitPrice: ['Prix unitaire', 'Prix HT', 'PU HT', 'PU', 'Prix', 'Price', 'Tarif'],
+  category: ['Categorie', 'Catégorie', 'Famille', 'Category', 'Type', 'Groupe'],
+  tva: ['TVA', 'Taux TVA', 'VAT', 'Taux'],
+};
+
+/**
+ * Normalize a free-form unit string into one of the canonical UNITS keys we use
+ * in the prestations form. Falls back to the trimmed string itself when no
+ * obvious mapping is found — the user can fix it from the prestations page.
+ */
+function normalizeUnit(value: string): string {
+  if (!value) return 'u';
+  const v = value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  if (v === 'u' || v === 'unite' || v === 'unit' || v === 'piece' || v === 'pce') return 'u';
+  if (v === 'h' || v === 'heure' || v === 'hour' || v === 'hr') return 'h';
+  if (v === 'm2' || v === 'metrecarre' || v === 'mcarre' || v === 'mq') return 'm2';
+  if (v === 'ml' || v === 'metrelineaire' || v === 'metrelinear') return 'ml';
+  if (v === 'm3' || v === 'metrecube' || v === 'mcube') return 'm3';
+  if (v === 'kg' || v === 'kilo' || v === 'kilogramme') return 'kg';
+  if (v === 'forfait' || v === 'forf' || v === 'lot' || v === 'ens') return 'forfait';
+  if (v === 'jour' || v === 'j' || v === 'day') return 'jour';
+  // Unknown unit — keep raw lowercased value, the user can edit it later.
+  return value.trim().toLowerCase();
+}
+
+export function mapServicesCSV(parsed: ParsedCSV): ImportSummary<MappedService> {
+  const repaired = repairParsedCsv(parsed);
+  const rows: MappedService[] = [];
+  const errors: { line: number; reason: string }[] = [];
+
+  repaired.rows.forEach((row, idx) => {
+    const lineNumber = idx + 2;
+    const name = pick(row, SERVICE_HEADERS.name);
+    if (!name) {
+      errors.push({ line: lineNumber, reason: 'Nom de la prestation manquant' });
+      return;
+    }
+    const tvaRaw = pick(row, SERVICE_HEADERS.tva);
+    const tvaParsed = parseFrenchNumber(tvaRaw);
+    const tvaRate = tvaParsed > 0 && tvaParsed <= 50 ? tvaParsed : 20;
+
+    rows.push({
+      externalId: pick(row, SERVICE_HEADERS.id) || String(lineNumber),
+      name,
+      description: pick(row, SERVICE_HEADERS.description),
+      unit: normalizeUnit(pick(row, SERVICE_HEADERS.unit)),
+      unit_price: parseFrenchNumber(pick(row, SERVICE_HEADERS.unitPrice)),
+      category: pick(row, SERVICE_HEADERS.category),
+      tva_rate: tvaRate,
+    });
+  });
+
+  return { rows, errors };
+}
 
 export function mapInvoicesCSV(parsed: ParsedCSV): ImportSummary<MappedInvoice> {
   const repaired = repairParsedCsv(parsed);

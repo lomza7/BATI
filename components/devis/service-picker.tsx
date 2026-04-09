@@ -69,7 +69,7 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
   // Group by category
   const grouped = new Map<string, Service[]>();
   for (const s of filtered) {
-    const cat = s.category || 'Sans categorie';
+    const cat = s.category || 'Sans catégorie';
     if (!grouped.has(cat)) grouped.set(cat, []);
     grouped.get(cat)!.push(s);
   }
@@ -103,11 +103,11 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
       {services.length === 0 ? (
         <div className="text-center py-6 text-sm text-muted-foreground">
           <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
-          <p>Aucune prestation enregistree.</p>
-          <p className="text-xs mt-1">Allez dans "Mes prestations" pour en creer.</p>
+          <p>Aucune prestation enregistrée.</p>
+          <p className="text-xs mt-1">Allez dans &quot;Mes prestations&quot; pour en créer.</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-4 text-sm text-muted-foreground">Aucun resultat.</div>
+        <div className="text-center py-4 text-sm text-muted-foreground">Aucun résultat.</div>
       ) : (
         <div className="max-h-[300px] overflow-y-auto space-y-3">
           {Array.from(grouped.entries()).map(([category, items]) => (

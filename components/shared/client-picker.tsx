@@ -163,7 +163,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
             value={search}
             onChange={e => { setSearch(e.target.value); setOpen(true); setShowCreate(false); }}
             onFocus={() => setOpen(true)}
-            placeholder="Rechercher ou creer un client..."
+            placeholder="Rechercher ou créer un client..."
             className="pl-10"
           />
         </div>
@@ -218,7 +218,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                       <SelectValue placeholder="Source..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Non renseigne</SelectItem>
+                      <SelectItem value="none">Non renseigné</SelectItem>
                       {DEFAULT_LEAD_SOURCES.map(s => (
                         <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
                       ))}
@@ -227,10 +227,10 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 </div>
               </div>
 
-              {/* Telephone + Email */}
+              {/* Téléphone + Email */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Telephone</label>
+                  <label className="text-xs font-medium text-muted-foreground">Téléphone</label>
                   <Input className="mt-1" placeholder="06 12 34 56 78" value={createForm.phone} onChange={e => setCreateForm({ ...createForm, phone: e.target.value })} />
                 </div>
                 <div>
@@ -239,7 +239,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 </div>
               </div>
 
-              {/* Adresse avec autocompletion */}
+              {/* Adresse avec autocomplétion */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Adresse</label>
                 <AddressAutocomplete
@@ -251,7 +251,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 />
               </div>
 
-              {/* CP + Ville (pre-remplis par l'autocompletion) */}
+              {/* CP + Ville (pré-remplis par l'autocomplétion) */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Code postal</label>
@@ -269,7 +269,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 <textarea
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   rows={2}
-                  placeholder="Informations complementaires..."
+                  placeholder="Informations complémentaires..."
                   value={createForm.notes}
                   onChange={e => setCreateForm({ ...createForm, notes: e.target.value })}
                 />
@@ -278,7 +278,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Annuler</Button>
-                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim() || !createForm.email.trim()}>Creer le client</Button>
+                <Button size="sm" onClick={createClient} disabled={!createForm.name.trim() || !createForm.email.trim()}>Créer le client</Button>
               </div>
             </div>
           ) : (
@@ -286,7 +286,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
               <div className="max-h-[220px] overflow-y-auto">
                 {filtered.length === 0 ? (
                   <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                    Aucun client trouve
+                    Aucun client trouvé
                   </div>
                 ) : filtered.map(c => (
                   <button
@@ -318,7 +318,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
                   onClick={() => { setShowCreate(true); setCreateForm({ ...emptyForm, name: search }); }}
                 >
-                  <Plus className="h-4 w-4" /> Creer un nouveau client{search ? ` "${search}"` : ''}
+                  <Plus className="h-4 w-4" /> Créer un nouveau client{search ? ` "${search}"` : ''}
                 </button>
               </div>
             </>

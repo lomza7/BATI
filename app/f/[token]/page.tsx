@@ -50,6 +50,9 @@ interface InvoiceData {
   created_at: string;
   payment_method: string;
   bank_account_id: string | null;
+  invoice_type: 'standard' | 'acompte' | 'solde';
+  deposit_percentage: number | null;
+  quote_id: string | null;
   clients: {
     name: string;
     email: string | null;
@@ -58,6 +61,16 @@ interface InvoiceData {
     city: string | null;
     postal_code: string | null;
   } | null;
+}
+
+interface LinkedDeposit {
+  id: string;
+  invoice_number: string;
+  total_ttc: number;
+  issued_at: string | null;
+  created_at: string;
+  status: string;
+  deposit_percentage: number | null;
 }
 
 interface BankAccountData {
@@ -150,6 +163,8 @@ export default function PublicInvoicePage() {
   const [stripeAvailable, setStripeAvailable] = useState(false);
   const [paying, setPaying] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
+  const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
+  const [linkedQuoteNumber, setLinkedQuoteNumber] = useState<string | null>(null);
 
   const paymentStatus = searchParams.get('payment');
 
@@ -189,7 +204,7 @@ export default function PublicInvoicePage() {
     // 2. Fetch invoice with client
     const { data: invoiceData } = await anonClient
       .from('invoices')
-      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, bank_account_id, clients(name, email, phone, address, city, postal_code)')
+      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, bank_account_id, invoice_type, deposit_percentage, quote_id, clients(name, email, phone, address, city, postal_code)')
       .eq('id', send.invoice_id)
       .maybeSingle();
 
@@ -197,6 +212,34 @@ export default function PublicInvoicePage() {
       setInvoice(invoiceData as unknown as InvoiceData);
       if (invoiceData.status === 'payee' || invoiceData.paid_at) {
         setIsPaid(true);
+      }
+
+      const typedInvoice = invoiceData as unknown as InvoiceData;
+
+      // Pour les factures d'acompte ou de solde : on récupère le numéro du devis
+      // source pour l'afficher dans le header.
+      if (typedInvoice.quote_id && (typedInvoice.invoice_type === 'acompte' || typedInvoice.invoice_type === 'solde')) {
+        const { data: srcQuote } = await anonClient
+          .from('quotes')
+          .select('quote_number')
+          .eq('id', typedInvoice.quote_id)
+          .maybeSingle();
+        if (srcQuote?.quote_number) setLinkedQuoteNumber(srcQuote.quote_number);
+      }
+
+      // Pour les factures de solde : on charge les acomptes déjà émis pour
+      // afficher la déduction. Lecture autorisée par la policy RLS anon
+      // "Public can view deposit invoices via final invoice send".
+      if (typedInvoice.invoice_type === 'solde' && typedInvoice.quote_id) {
+        const { data: depositRows } = await anonClient
+          .from('invoices')
+          .select('id, invoice_number, total_ttc, issued_at, created_at, status, deposit_percentage')
+          .eq('quote_id', typedInvoice.quote_id)
+          .eq('invoice_type', 'acompte')
+          .neq('status', 'annulee')
+          .order('issued_at', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
+        if (depositRows) setLinkedDeposits(depositRows as LinkedDeposit[]);
       }
     }
 
@@ -328,6 +371,27 @@ export default function PublicInvoicePage() {
 
   const fontClass = dc.font === 'serif' ? 'font-serif' : 'font-sans';
 
+  const isDepositInvoice = invoice.invoice_type === 'acompte';
+  const isFinalInvoice = invoice.invoice_type === 'solde';
+  const documentLabel = isDepositInvoice
+    ? "FACTURE D'ACOMPTE"
+    : isFinalInvoice
+      ? 'FACTURE DE SOLDE'
+      : 'FACTURE';
+  const depositPercentageLabel = invoice.deposit_percentage
+    ? Number.isInteger(invoice.deposit_percentage)
+      ? String(invoice.deposit_percentage)
+      : invoice.deposit_percentage.toFixed(2).replace('.', ',')
+    : null;
+
+  // Montant à déduire (calcul au rendu pour rester cohérent si un acompte est
+  // annulé après coup). Ne compte que les acomptes non annulés (déjà filtré).
+  const deductedTtc = linkedDeposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0);
+  const finalRemainingTtc = Math.max(0, invoice.total_ttc - deductedTtc);
+  // Montant réellement à encaisser en ligne : pour un solde c'est le reste,
+  // sinon c'est le total de la facture courante.
+  const payableAmount = isFinalInvoice ? finalRemainingTtc : invoice.total_ttc;
+
   return (
     <div className={`min-h-screen bg-[#faf9f7] ${fontClass}`}>
       {/* Header */}
@@ -431,8 +495,15 @@ export default function PublicInvoicePage() {
                 </div>
               </div>
               <div className="sm:text-right flex-shrink-0">
-                <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>FACTURE</p>
+                <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>{documentLabel}</p>
                 <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{invoice.invoice_number}</p>
+                {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
+                  <p className="text-xs mt-1" style={{ color: accent }}>
+                    {isDepositInvoice
+                      ? `Acompte${depositPercentageLabel ? ` ${depositPercentageLabel}%` : ''} sur devis ${linkedQuoteNumber}`
+                      : `Solde du devis ${linkedQuoteNumber}`}
+                  </p>
+                )}
                 <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
                   <p>Date : {formatDate(invoice.created_at)}</p>
                   {invoice.due_date && (
@@ -545,6 +616,53 @@ export default function PublicInvoicePage() {
             </div>
           </div>
 
+          {/* Acomptes déduits — factures de solde uniquement */}
+          {isFinalInvoice && linkedDeposits.length > 0 && (
+            <div className="border-t-2 border-dashed px-5 sm:px-8 py-5" style={{ borderColor: accent + '4d' }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: accent }}>
+                Acomptes déjà versés
+              </p>
+              <div className="flex flex-col items-end gap-1.5">
+                {linkedDeposits.map((d) => {
+                  const dateStr = d.issued_at || d.created_at;
+                  const isDepositPaid = d.status === 'payee';
+                  return (
+                    <div key={d.id} className="flex items-center justify-between w-full sm:w-[22rem] text-sm">
+                      <span className="text-[#6b6560] truncate mr-2">
+                        {d.invoice_number}
+                        {dateStr && (
+                          <span className="text-[11px] ml-1">({formatDate(dateStr)})</span>
+                        )}
+                        {!isDepositPaid && (
+                          <span className="ml-1.5 text-[10px] text-amber-700 uppercase tracking-wide">
+                            non payé
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-medium tabular-nums" style={{ color: textColor }}>
+                        − {formatCurrency(Number(d.total_ttc))}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t border-dashed border-[#e5e1da] mt-1">
+                  <span className="text-sm text-[#6b6560]">Total déduit</span>
+                  <span className="text-sm font-medium tabular-nums" style={{ color: textColor }}>
+                    − {formatCurrency(deductedTtc)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t-2 mt-1" style={{ borderColor: accent }}>
+                  <span className="text-base font-semibold" style={{ color: textColor }}>
+                    Reste à payer
+                  </span>
+                  <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>
+                    {formatCurrency(finalRemainingTtc)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Coordonnees bancaires */}
           {bankAccount && (
             <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
@@ -579,7 +697,7 @@ export default function PublicInvoicePage() {
           )}
 
           {/* Payment section */}
-          {!isPaid && stripeAvailable && (
+          {!isPaid && stripeAvailable && payableAmount > 0 && (
             <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
               <div className="flex items-center gap-2 mb-4">
                 <CreditCard className="h-4 w-4 text-[#6b6560]" />
@@ -588,7 +706,9 @@ export default function PublicInvoicePage() {
                 </p>
               </div>
               <p className="text-sm text-[#6b6560] mb-4">
-                Payez cette facture en ligne de maniere securisee par carte bancaire, Apple Pay ou Google Pay.
+                {isDepositInvoice
+                  ? 'Réglez cet acompte en ligne de manière sécurisée pour démarrer les travaux.'
+                  : 'Payez cette facture en ligne de manière sécurisée par carte bancaire, Apple Pay ou Google Pay.'}
               </p>
               <button
                 onClick={handlePay}
@@ -601,7 +721,7 @@ export default function PublicInvoicePage() {
                 ) : (
                   <CreditCard className="h-4 w-4" />
                 )}
-                {paying ? 'Redirection vers Stripe...' : `Payer ${formatCurrency(invoice.total_ttc)}`}
+                {paying ? 'Redirection vers Stripe...' : `Payer ${formatCurrency(payableAmount)}`}
               </button>
               <p className="text-[11px] text-[#6b6560]/60 mt-3 flex items-center gap-1">
                 <Shield className="h-3 w-3" />
@@ -625,6 +745,11 @@ export default function PublicInvoicePage() {
                 )}
               </p>
             </div>
+            {isDepositInvoice && (
+              <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5 italic">
+                TVA exigible à l&apos;encaissement conformément à l&apos;article 269-2 du CGI.
+              </p>
+            )}
             <InsuranceFooter insurance={artisan} />
             {footerText && (
               <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   // Fetch invoice
   const { data: invoice } = await supabaseAdmin
     .from('invoices')
-    .select('id, invoice_number, title, total_ttc, status')
+    .select('id, invoice_number, title, total_ttc, status, invoice_type, quote_id')
     .eq('id', send.invoice_id)
     .single();
 
@@ -47,6 +47,31 @@ export async function POST(request: Request) {
 
   if (invoice.status === 'payee') {
     return NextResponse.json({ error: 'Cette facture est deja payee' }, { status: 400 });
+  }
+
+  // Pour les factures de solde : on calcule le reste à payer en déduisant les
+  // acomptes liés non annulés. C'est volontairement recalculé à la lecture
+  // (pas stocké) pour rester correct si un acompte est annulé après coup.
+  let effectiveTotalTtc = Number(invoice.total_ttc);
+  if (invoice.invoice_type === 'solde' && invoice.quote_id) {
+    const { data: deposits } = await supabaseAdmin
+      .from('invoices')
+      .select('total_ttc')
+      .eq('quote_id', invoice.quote_id)
+      .eq('invoice_type', 'acompte')
+      .neq('status', 'annulee');
+    const deducted = (deposits || []).reduce(
+      (sum, d) => sum + Number(d.total_ttc || 0),
+      0,
+    );
+    effectiveTotalTtc = Math.max(0, Number(invoice.total_ttc) - deducted);
+  }
+
+  if (effectiveTotalTtc <= 0) {
+    return NextResponse.json(
+      { error: 'Cette facture ne comporte aucun montant à régler' },
+      { status: 400 },
+    );
   }
 
   // Fetch artisan's Stripe connection
@@ -68,7 +93,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const feePercent = parseFloat(config?.value || '2.5');
-  const amountCents = Math.round(invoice.total_ttc * 100);
+  const amountCents = Math.round(effectiveTotalTtc * 100);
   const feeCents = Math.round(amountCents * feePercent / 100);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';

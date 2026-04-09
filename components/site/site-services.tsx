@@ -8,9 +8,9 @@ interface SiteServicesProps {
 }
 
 export function SiteServices({ aiServices, dbServices }: SiteServicesProps) {
-  // Les services afficher sont ceux edites dans /site-web (site_content.services).
-  // Ils sont edites manuellement par l'artisan avec une icone au choix. Si aucun
-  // service n'a ete saisi, on retombe sur la liste des prestations (services table).
+  // Les services à afficher sont ceux édités dans /site-web (site_content.services).
+  // Ils sont édités manuellement par l'artisan avec une icône au choix. Si aucun
+  // service n'a été saisi, on retombe sur la liste des prestations (services table).
   const services =
     aiServices.length > 0
       ? aiServices

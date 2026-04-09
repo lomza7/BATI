@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     const [invoiceRes, profileRes, stripeRes] = await Promise.all([
       admin
         .from('invoices')
-        .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, clients(name, email)')
+        .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, invoice_type, deposit_percentage, quote_id, clients(name, email)')
         .eq('id', invoice_id)
         .single(),
       admin
@@ -85,8 +85,23 @@ export async function POST(request: Request) {
       status: string;
       due_date: string | null;
       issued_at: string | null;
+      invoice_type: 'standard' | 'acompte' | 'solde' | null;
+      deposit_percentage: number | null;
+      quote_id: string | null;
       clients?: { name?: string | null; email?: string | null } | null;
     };
+
+    // Pour un acompte / solde, on récupère le numéro du devis source pour
+    // l'afficher dans la narration de l'email.
+    let relatedQuoteNumber: string | null = null;
+    if (invoice.quote_id && (invoice.invoice_type === 'acompte' || invoice.invoice_type === 'solde')) {
+      const { data: quoteRow } = await admin
+        .from('quotes')
+        .select('quote_number')
+        .eq('id', invoice.quote_id)
+        .maybeSingle();
+      relatedQuoteNumber = quoteRow?.quote_number || null;
+    }
 
     const profile = (profileRes.data || {}) as {
       company_name?: string | null;
@@ -146,11 +161,28 @@ export async function POST(request: Request) {
       const dc = (profile.document_config || {}) as Record<string, string>;
       const companyName = profile.company_name || profile.full_name || 'Artisan';
 
+      // Pour un solde : on déduit les acomptes versés du montant affiché dans
+      // l'email pour éviter de montrer un montant incorrect au client.
+      let displayTotalTtc = Number(invoice.total_ttc) || 0;
+      if (invoice.invoice_type === 'solde' && invoice.quote_id) {
+        const { data: deposits } = await admin
+          .from('invoices')
+          .select('total_ttc')
+          .eq('quote_id', invoice.quote_id)
+          .eq('invoice_type', 'acompte')
+          .neq('status', 'annulee');
+        const deducted = (deposits || []).reduce(
+          (sum, d) => sum + Number(d.total_ttc || 0),
+          0,
+        );
+        displayTotalTtc = Math.max(0, displayTotalTtc - deducted);
+      }
+
       const totalFormatted = new Intl.NumberFormat('fr-FR', {
         style: 'currency',
         currency: 'EUR',
         minimumFractionDigits: 2,
-      }).format(Number(invoice.total_ttc) || 0);
+      }).format(displayTotalTtc);
 
       const dueDateFormatted = invoice.due_date
         ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(invoice.due_date))
@@ -166,6 +198,9 @@ export async function POST(request: Request) {
         magicLink,
         hasOnlinePayment,
         accentColor: dc.primary_color || '#d35400',
+        invoiceType: invoice.invoice_type || 'standard',
+        depositPercentage: invoice.deposit_percentage,
+        relatedQuoteNumber,
       });
 
       // Pieces jointes par defaut (attestations, assurances, etc.) — on
@@ -179,11 +214,18 @@ export async function POST(request: Request) {
 
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@hellobat.app>';
 
+      // Sujet : adapte le libellé selon le type de facture
+      const subjectPrefix = invoice.invoice_type === 'acompte'
+        ? `Facture d'acompte ${invoice.invoice_number}`
+        : invoice.invoice_type === 'solde'
+          ? `Facture de solde ${invoice.invoice_number}`
+          : `Facture ${invoice.invoice_number}`;
+
       try {
         const result = await resend.emails.send({
           from: fromEmail,
           to: recipientEmail,
-          subject: `Facture ${invoice.invoice_number} — ${companyName}`,
+          subject: `${subjectPrefix} — ${companyName}`,
           html: emailHtml,
           attachments: companyAttachments.map(att => ({
             filename: att.name,

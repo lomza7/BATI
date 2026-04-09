@@ -46,31 +46,31 @@ export function StepReady({ data, onBack, onFinish, saving }: Props) {
 
   // Build checklist based on what the user actually configured
   const checklist: { label: string; done: boolean }[] = [
-    { label: 'Profil entreprise enregistre', done: !!data.companyName },
-    { label: 'Identite visuelle configuree', done: !!data.logoUrl || !!data.primaryColor },
+    { label: 'Profil entreprise enregistré', done: !!data.companyName },
+    { label: 'Identité visuelle configurée', done: !!data.logoUrl || !!data.primaryColor },
     {
       label: data.wantsHellobatSite
-        ? 'Site web Hellobat en preparation'
+        ? 'Site web Hellobat en préparation'
         : data.hasExistingWebsite
-        ? 'Site externe conserve'
-        : 'Site web a configurer plus tard',
+        ? 'Site externe conservé'
+        : 'Site web à configurer plus tard',
       done: data.hasExistingWebsite !== null,
     },
-    { label: 'Rappels TVA & fiscalite actives', done: !!data.vatRegime },
+    { label: 'Rappels TVA & fiscalité activés', done: !!data.vatRegime },
     {
       label:
         data.hasEmployees && data.invitedEmployees.filter((e) => e.email).length > 0
-          ? `${data.invitedEmployees.filter((e) => e.email).length} salarie(s) invite(s)`
+          ? `${data.invitedEmployees.filter((e) => e.email).length} salarié(s) invité(s)`
           : data.wantsMaurice
-          ? 'Maurice IA active pour la compta'
-          : 'Comptabilite configuree',
+          ? 'Maurice IA activé pour la compta'
+          : 'Comptabilité configurée',
       done: data.hasAccountingSoftware !== null || data.hasEmployees !== null,
     },
     {
       label:
         data.serviceCategories.length > 0
-          ? `${data.serviceCategories.length} categorie(s) de prestations`
-          : 'Prestations a ajouter plus tard',
+          ? `${data.serviceCategories.length} catégorie(s) de prestations`
+          : 'Prestations à ajouter plus tard',
       done: data.serviceCategories.length > 0,
     },
   ];
@@ -102,7 +102,7 @@ export function StepReady({ data, onBack, onFinish, saving }: Props) {
         transition={{ delay: 0.2 }}
         className="text-sm text-muted-foreground mt-2"
       >
-        Votre espace Hellobat est pret. Voici ce qui a ete configure pour vous :
+        Votre espace Hellobat est prêt. Voici ce qui a été configuré pour vous :
       </motion.p>
 
       <div className="mt-6 flex-1 space-y-2">
@@ -153,7 +153,7 @@ export function StepReady({ data, onBack, onFinish, saving }: Props) {
           ) : (
             <>
               <Rocket className="h-4 w-4" />
-              Acceder a mon tableau de bord
+              Accéder à mon tableau de bord
             </>
           )}
         </motion.button>

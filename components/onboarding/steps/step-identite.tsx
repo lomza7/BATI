@@ -39,7 +39,7 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
 
   async function handleLogoUpload(file: File) {
     if (!file.type.startsWith('image/')) {
-      setUploadError('Seules les images sont acceptees');
+      setUploadError('Seules les images sont acceptées');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -77,10 +77,10 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
       </div>
 
       <h2 className="text-xl font-semibold text-foreground mt-3">
-        Votre identite visuelle
+        Votre identité visuelle
       </h2>
       <p className="text-sm text-muted-foreground mt-2">
-        Ajoutez votre logo et choisissez une couleur. Ca servira pour vos devis,
+        Ajoutez votre logo et choisissez une couleur. Ça servira pour vos devis,
         factures et site web.
       </p>
 
@@ -109,7 +109,7 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-emerald-800 flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5" />
-                  Logo ajoute
+                  Logo ajouté
                 </p>
                 <button
                   type="button"
@@ -135,7 +135,7 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
               ) : (
                 <>
                   <Upload className="h-4 w-4" />
-                  Cliquez pour telecharger votre logo
+                  Cliquez pour télécharger votre logo
                 </>
               )}
             </button>
@@ -175,7 +175,7 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Utilisee pour vos documents et votre site web.
+            Utilisée pour vos documents et votre site web.
           </p>
         </div>
 
@@ -194,7 +194,7 @@ export function StepIdentite({ data, onChange, onNext, onBack, onSkip, userId }:
             className="flex h-11 w-full rounded-xl border border-border bg-muted/30 px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
           />
           <p className="text-[11px] text-muted-foreground text-right">
-            {data.tagline.length}/80 caracteres
+            {data.tagline.length}/80 caractères
           </p>
         </div>
       </div>

@@ -179,7 +179,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
           <div className="h-2 w-2 rounded-full bg-amber-500" />
           <div className="h-2 w-2 rounded-full bg-emerald-500" />
           <p className="ml-3 text-sm font-medium truncate">
-            Apercu &mdash;{' '}
+            Aperçu &mdash;{' '}
             <span className="text-white/60 font-mono">
               hellobat.app/site/{previewSlug}
             </span>
@@ -196,7 +196,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
                 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
                 device === 'desktop' ? 'bg-white text-neutral-900' : 'text-white/70 hover:text-white hover:bg-white/5'
               )}
-              aria-label="Apercu bureau"
+              aria-label="Aperçu bureau"
             >
               <Monitor className="h-3.5 w-3.5" />
               Bureau
@@ -208,7 +208,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
                 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l border-white/15',
                 device === 'mobile' ? 'bg-white text-neutral-900' : 'text-white/70 hover:text-white hover:bg-white/5'
               )}
-              aria-label="Apercu mobile"
+              aria-label="Aperçu mobile"
             >
               <Smartphone className="h-3.5 w-3.5" />
               Mobile
@@ -219,7 +219,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
             type="button"
             onClick={props.onClose}
             className="inline-flex items-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs font-medium text-white/90 hover:bg-white/10 transition-colors"
-            aria-label="Fermer l'apercu"
+            aria-label="Fermer l'aperçu"
           >
             <X className="h-3.5 w-3.5" />
             Fermer
@@ -232,7 +232,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
         {loading || !previewProfile ? (
           <div className="flex items-center justify-center w-full text-white/70">
             <Loader2 className="h-6 w-6 animate-spin mr-3" />
-            <span className="text-sm">Chargement de l&apos;apercu...</span>
+            <span className="text-sm">Chargement de l&apos;aperçu...</span>
           </div>
         ) : (
           <div
@@ -287,7 +287,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
                     className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8"
                     style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
                   >
-                    {siteContent.about?.title || 'A propos'}
+                    {siteContent.about?.title || 'À propos'}
                   </h2>
                   {siteContent.about?.paragraphs?.map((p, i) => (
                     <p key={i} className="mb-4 leading-relaxed text-sm sm:text-base" style={{ color: 'var(--site-text)' }}>

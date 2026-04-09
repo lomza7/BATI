@@ -149,6 +149,8 @@ interface InvoiceRow {
   created_at: string;
   clients: { name: string } | { name: string }[] | null;
   bank_transaction_id: string | null;
+  invoice_type?: string | null;
+  quote_id?: string | null;
 }
 
 interface AccessRow {
@@ -428,7 +430,8 @@ export default function ComptabilitePage() {
           .from('invoices')
           .select(
             `id, invoice_number, title, status, total_ht, total_ttc, tva_rate, tva_breakdown,
-             paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id`,
+             paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id,
+             invoice_type, quote_id`,
           )
           .order('issued_at', { ascending: false, nullsFirst: false }),
         supabase
@@ -444,7 +447,46 @@ export default function ComptabilitePage() {
       setExpenses((expRes.data as ExpenseRow[]) || []);
       setCategories((catRes.data as CategoryRow[]) || []);
       setProjects((projRes.data as ProjectRow[]) || []);
-      setInvoices((invRes.data as InvoiceRow[]) || []);
+
+      // Pour éviter un double-comptage du CA, on déduit les acomptes déjà
+      // émis du montant des factures de solde (même logique que l'export FEC et
+      // le dashboard). Le total brut reste en base, seul l'affichage comptable
+      // utilise le montant net.
+      const rawInvoices = (invRes.data as InvoiceRow[]) || [];
+      const depositsByQuote = new Map<string, number>();
+      for (const inv of rawInvoices) {
+        if (
+          inv.invoice_type === 'acompte' &&
+          inv.quote_id &&
+          inv.status !== 'annulee'
+        ) {
+          const prev = depositsByQuote.get(inv.quote_id) || 0;
+          depositsByQuote.set(inv.quote_id, prev + Number(inv.total_ttc || 0));
+        }
+      }
+      const normalizedInvoices: InvoiceRow[] = rawInvoices.map((inv) => {
+        if (inv.invoice_type !== 'solde' || !inv.quote_id) return inv;
+        const rawHt = Number(inv.total_ht || 0);
+        const rawTtc = Number(inv.total_ttc || 0);
+        const deducted = depositsByQuote.get(inv.quote_id) || 0;
+        const effectiveTtc = Math.max(0, rawTtc - deducted);
+        // Applique le même ratio au HT pour garder (HT + TVA) cohérent avec le
+        // TTC effectif (évite que TvaPanel double-compte la base).
+        const effectiveHt =
+          rawTtc > 0
+            ? Math.round((effectiveTtc * rawHt / rawTtc) * 100) / 100
+            : 0;
+        return {
+          ...inv,
+          total_ht: effectiveHt,
+          total_ttc: effectiveTtc,
+          // On neutralise le breakdown (qui correspond au brut) : le panneau
+          // TVA retombera sur le taux legacy pour générer une paire cohérente
+          // avec le HT effectif.
+          tva_breakdown: null,
+        };
+      });
+      setInvoices(normalizedInvoices);
       setAccesses((accRes.data as AccessRow[]) || []);
       setVatRegime(settingsRes.data?.vat_regime || null);
       setTvaMethod((settingsRes.data?.tva_method as 'encaissements' | 'debits') || 'encaissements');

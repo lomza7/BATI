@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import {
   BANK_CATEGORY_LABELS,
   FRENCH_BANKS,
+  bankLogoUrl,
+  findBankBySlug,
   formatIban,
   isValidBic,
   isValidIban,
@@ -54,6 +56,66 @@ function emptyForm(): FormState {
     bic: '',
     is_default: false,
   };
+}
+
+/**
+ * Petite vignette de logo pour une banque. Utilise le service de favicons
+ * Google (pas de cle API, pas de dependance a un CDN tiers) et tombe sur
+ * l'icone Landmark en cas de slug inconnu, de saisie libre ou d'erreur reseau.
+ */
+function BankLogo({
+  slug,
+  size = 'sm',
+  className,
+}: {
+  slug: string | null | undefined;
+  size?: 'sm' | 'md';
+  className?: string;
+}) {
+  const [errored, setErrored] = useState(false);
+  const bank = findBankBySlug(slug);
+
+  // Reinitialise l'etat d'erreur quand on change de banque, sinon le fallback
+  // reste colle apres une premiere erreur.
+  useEffect(() => {
+    setErrored(false);
+  }, [slug]);
+
+  const dims = size === 'md' ? 'h-7 w-7' : 'h-5 w-5';
+  const iconSize = size === 'md' ? 'h-3.5 w-3.5' : 'h-3 w-3';
+
+  if (!bank || errored) {
+    return (
+      <span
+        className={cn(
+          'flex shrink-0 items-center justify-center rounded-full bg-[#d35400]/10 text-[#d35400]',
+          dims,
+          className,
+        )}
+      >
+        <Landmark className={iconSize} />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/60 bg-white',
+        dims,
+        className,
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={bankLogoUrl(bank.domain, 64)}
+        alt=""
+        aria-hidden
+        className="h-full w-full object-contain p-0.5"
+        onError={() => setErrored(true)}
+      />
+    </span>
+  );
 }
 
 export function BankAccountForm({
@@ -197,7 +259,7 @@ export function BankAccountForm({
       {/* Label */}
       <div>
         <Label htmlFor="bank-label" className="text-xs font-medium text-muted-foreground">
-          Libelle *
+          Libellé *
         </Label>
         <Input
           id="bank-label"
@@ -220,8 +282,8 @@ export function BankAccountForm({
             onClick={() => setBankOpen((v) => !v)}
             className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm ring-offset-background transition-colors hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <span className="flex items-center gap-2 truncate">
-              <Landmark className="h-4 w-4 text-[#d35400]" />
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              <BankLogo slug={form.bank_slug} size="sm" />
               <span className={cn('truncate', !form.bank_name && 'text-muted-foreground')}>
                 {form.bank_name || 'Choisis ta banque'}
               </span>
@@ -246,7 +308,7 @@ export function BankAccountForm({
               <div className="max-h-[260px] overflow-y-auto py-1">
                 {filteredBanks.length === 0 ? (
                   <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                    Aucune banque ne correspond a ta recherche.
+                    Aucune banque ne correspond à ta recherche.
                   </div>
                 ) : (
                   filteredBanks.map((bank) => (
@@ -260,9 +322,7 @@ export function BankAccountForm({
                       )}
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#d35400]/10 text-[#d35400]">
-                          <Landmark className="h-3.5 w-3.5" />
-                        </div>
+                        <BankLogo slug={bank.slug} size="md" />
                         <div className="min-w-0">
                           <p className="truncate font-medium">{bank.name}</p>
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -320,7 +380,7 @@ export function BankAccountForm({
           autoCapitalize="characters"
         />
         {ibanClean.length > 0 && !ibanValid && (
-          <p className="mt-1 text-[11px] text-destructive">Format IBAN invalide (cle de controle).</p>
+          <p className="mt-1 text-[11px] text-destructive">Format IBAN invalide (clé de contrôle).</p>
         )}
         {ibanClean.length > 0 && ibanValid && (
           <p className="mt-1 text-[11px] text-emerald-600">IBAN valide.</p>
@@ -342,7 +402,7 @@ export function BankAccountForm({
           maxLength={11}
         />
         {bicClean.length > 0 && !bicValid && (
-          <p className="mt-1 text-[11px] text-destructive">Le BIC doit faire 8 ou 11 caracteres.</p>
+          <p className="mt-1 text-[11px] text-destructive">Le BIC doit faire 8 ou 11 caractères.</p>
         )}
       </div>
 
@@ -350,9 +410,9 @@ export function BankAccountForm({
       {!forceDefault && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-2.5">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Compte par defaut</p>
+            <p className="text-sm font-medium">Compte par défaut</p>
             <p className="text-[11px] text-muted-foreground">
-              Pre-selectionne sur les nouveaux devis et factures.
+              Pré-sélectionné sur les nouveaux devis et factures.
             </p>
           </div>
           <Switch

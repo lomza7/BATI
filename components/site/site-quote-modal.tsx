@@ -147,8 +147,8 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
             </h2>
             <p className="text-xs sm:text-sm mt-0.5" style={{ color: 'var(--site-text-muted)' }}>
               {success
-                ? 'Votre demande a ete envoyee'
-                : `Reponse rapide et personnalisee par ${companyName}`}
+                ? 'Votre demande a été envoyée'
+                : `Réponse rapide et personnalisée par ${companyName}`}
             </p>
           </div>
           <button
@@ -175,7 +175,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
               Merci pour votre demande
             </h3>
             <p className="text-sm mb-6" style={{ color: 'var(--site-text-muted)' }}>
-              {companyName} a bien recu votre message et vous recontactera tres rapidement.
+              {companyName} a bien reçu votre message et vous recontactera très rapidement.
             </p>
             <button
               type="button"
@@ -219,7 +219,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <FieldLabel required>Telephone</FieldLabel>
+                <FieldLabel required>Téléphone</FieldLabel>
                 <ThemedInput
                   type="tel"
                   required
@@ -282,12 +282,12 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
             </div>
 
             <div>
-              <FieldLabel required>Decrivez votre projet</FieldLabel>
+              <FieldLabel required>Décrivez votre projet</FieldLabel>
               <textarea
                 required
                 value={project}
                 onChange={e => setProject(e.target.value)}
-                placeholder="Ex: Renovation complete de ma salle de bain de 6 m2 : depose de l'existant, nouvelle plomberie, carrelage, douche italienne..."
+                placeholder="Ex: Rénovation complète de ma salle de bain de 6 m² : dépose de l'existant, nouvelle plomberie, carrelage, douche italienne..."
                 maxLength={4000}
                 rows={4}
                 className="w-full px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 transition-shadow"
@@ -301,12 +301,12 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
             </div>
 
             <div>
-              <FieldLabel>Budget envisage (optionnel)</FieldLabel>
+              <FieldLabel>Budget envisagé (optionnel)</FieldLabel>
               <ThemedInput
                 type="text"
                 value={budget}
                 onChange={e => setBudget(e.target.value)}
-                placeholder="Ex: 5 000 - 8 000 EUR"
+                placeholder="Ex: 5 000 - 8 000 €"
                 maxLength={40}
               />
             </div>
@@ -347,7 +347,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
             </button>
 
             <p className="text-xs text-center" style={{ color: 'var(--site-text-muted)' }}>
-              En soumettant ce formulaire, vous acceptez d&apos;etre recontacte par {companyName}.
+              En soumettant ce formulaire, vous acceptez d&apos;être recontacté par {companyName}.
             </p>
           </form>
         )}
