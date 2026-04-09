@@ -8,11 +8,11 @@ import { SchemaOrg } from '@/components/seo/schema-org';
 export const metadata: Metadata = {
   metadataBase: new URL('https://hellobat.app'),
   title: {
-    default: 'Hellobat — Logiciel du bâtiment tout-en-un pour artisans',
+    default: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
     template: '%s | Hellobat',
   },
   description:
-    'Hellobat, le logiciel du bâtiment tout-en-un pour artisans : devis IA vocal, facture électronique 2026, gestion chantiers, planning, CRM, paiements. Essai gratuit.',
+    'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
   keywords: [
     'logiciel bâtiment',
     'logiciel BTP',
@@ -38,17 +38,17 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://hellobat.app',
     siteName: 'Hellobat',
-    title: 'Hellobat — Logiciel du bâtiment tout-en-un pour artisans',
+    title: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
     description:
-      'Hellobat, le logiciel du bâtiment tout-en-un pour artisans : devis IA vocal, facture électronique 2026, gestion chantiers, planning, CRM, paiements. Essai gratuit.',
+      'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
     locale: 'fr_FR',
     // OG image generated dynamically by app/opengraph-image.tsx (Next.js file-based convention)
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hellobat — Logiciel du bâtiment tout-en-un pour artisans',
+    title: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
     description:
-      'Hellobat, le logiciel du bâtiment tout-en-un pour artisans : devis IA vocal, facture électronique 2026, gestion chantiers, planning, CRM, paiements. Essai gratuit.',
+      'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
     creator: '@hellobat',
     // Twitter image generated dynamically by app/twitter-image.tsx (Next.js file-based convention)
   },
