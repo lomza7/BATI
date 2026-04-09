@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { parseTvaBreakdown } from '@/lib/tva';
 
 interface ExpenseRow {
   date: string;
@@ -28,6 +29,7 @@ interface InvoiceRow {
   total_ht: number | null;
   total_ttc: number | null;
   tva_rate: number | null;
+  tva_breakdown?: unknown;
 }
 
 interface Props {
@@ -101,6 +103,20 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
       const refDate = tvaMethod === 'encaissements' ? inv.paid_at : inv.issued_at || inv.created_at;
       if (!refDate) continue;
       if (!isInPeriod(refDate, period)) continue;
+
+      // Prefer multi-rate breakdown when available
+      const breakdown = parseTvaBreakdown(inv.tva_breakdown);
+      if (breakdown.length > 0) {
+        for (const b of breakdown) {
+          const key = String(b.rate);
+          collected[key] = collected[key] || { ht: 0, tva: 0 };
+          collected[key].ht += b.base_ht;
+          collected[key].tva += b.tva_amount;
+        }
+        continue;
+      }
+
+      // Fallback to single legacy rate
       const ht = Number(inv.total_ht || 0);
       const ttc = Number(inv.total_ttc || 0);
       const tva = Math.max(0, ttc - ht);

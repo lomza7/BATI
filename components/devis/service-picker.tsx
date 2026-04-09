@@ -16,6 +16,7 @@ interface Service {
   unit: string;
   unit_price: number;
   category: string;
+  tva_rate: number | null;
   is_recurring: boolean;
   frequency: string;
 }
@@ -25,6 +26,7 @@ export interface PickedService {
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate: number;
   is_recurring?: boolean;
   frequency?: string;
 }
@@ -48,7 +50,7 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
   async function loadServices() {
     const { data } = await supabase
       .from('services')
-      .select('id, name, description, unit, unit_price, category, is_recurring, frequency')
+      .select('id, name, description, unit, unit_price, category, tva_rate, is_recurring, frequency')
       .eq('is_active', true)
       .is('deleted_at', null)
       .order('category')
@@ -78,6 +80,7 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
       quantity: 1,
       unit: s.unit,
       unit_price: s.unit_price,
+      tva_rate: s.tva_rate ?? 20,
       is_recurring: s.is_recurring,
       frequency: s.frequency,
     });

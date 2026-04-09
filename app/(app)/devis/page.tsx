@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download, BookmarkPlus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { QUOTE_STATUSES, QUOTE_UNITS, formatCurrency, formatDate } from '@/lib/constants';
+import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { ServicePicker } from '@/components/devis/service-picker';
@@ -68,8 +69,11 @@ interface QuoteLine {
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate: number;
   is_recurring?: boolean;
   frequency?: string;
+  _savedAsPrestation?: boolean;
+  _savingAsPrestation?: boolean;
 }
 
 export default function DevisPage() {
@@ -89,7 +93,7 @@ export default function DevisPage() {
   const [newQuote, setNewQuote] = useState({ title: '', description: '' });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [lines, setLines] = useState<QuoteLine[]>([
-    { description: '', quantity: 1, unit: 'u', unit_price: 0 },
+    { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 },
   ]);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [sendQuote, setSendQuote] = useState<Quote | null>(null);
@@ -218,8 +222,10 @@ export default function DevisPage() {
     if (!user) return;
 
     const validLines = lines.filter(l => l.description.trim());
-    const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
-    const totalTtc = totalHt * 1.2;
+    const tva = computeTvaBreakdown(validLines);
+    const totalHt = tva.total_ht;
+    const totalTva = tva.total_tva;
+    const totalTtc = tva.total_ttc;
     let savedQuoteId: string | null = null;
 
     if (draftId.current) {
@@ -232,7 +238,10 @@ export default function DevisPage() {
           title: newQuote.title,
           description: newQuote.description,
           total_ht: totalHt,
+          total_tva: totalTva,
           total_ttc: totalTtc,
+          tva_rate: tva.primary_rate,
+          tva_breakdown: tva.tva_breakdown,
           updated_at: new Date().toISOString(),
         })
         .eq('id', draftId.current);
@@ -248,6 +257,7 @@ export default function DevisPage() {
             quantity: l.quantity,
             unit: l.unit,
             unit_price: l.unit_price,
+            tva_rate: l.tva_rate,
             total: l.quantity * l.unit_price,
             position: i,
           }))
@@ -294,7 +304,10 @@ export default function DevisPage() {
           title: newQuote.title,
           description: newQuote.description,
           total_ht: totalHt,
+          total_tva: totalTva,
           total_ttc: totalTtc,
+          tva_rate: tva.primary_rate,
+          tva_breakdown: tva.tva_breakdown,
           valid_until: validUntil.toISOString().split('T')[0],
         })
         .select('id')
@@ -311,6 +324,7 @@ export default function DevisPage() {
             quantity: l.quantity,
             unit: l.unit,
             unit_price: l.unit_price,
+            tva_rate: l.tva_rate,
             total: l.quantity * l.unit_price,
             position: i,
           }))
@@ -365,7 +379,7 @@ export default function DevisPage() {
     setShowCreate(false);
     setNewQuote({ title: '', description: '' });
     setSelectedClientId(null);
-    setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+    setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
     draftId.current = null;
     prefillProjectId.current = null;
     loadQuotes();
@@ -459,7 +473,7 @@ export default function DevisPage() {
   );
 
   function addLine() {
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
   }
 
   function updateLine(index: number, field: keyof QuoteLine, value: string | number) {
@@ -472,6 +486,37 @@ export default function DevisPage() {
     if (lines.length > 1) {
       setLines(lines.filter((_, i) => i !== index));
     }
+  }
+
+  async function saveLineAsPrestation(index: number) {
+    if (!user) return;
+    const line = lines[index];
+    if (!line.description.trim() || line.unit_price <= 0 || line._savedAsPrestation || line._savingAsPrestation) return;
+
+    // Mark as saving
+    setLines(prev => prev.map((l, i) => i === index ? { ...l, _savingAsPrestation: true } : l));
+
+    const desc = line.description.trim();
+    // On utilise les 80 premiers caracteres comme nom (titre court) et la description complete comme detail
+    const name = desc.length > 80 ? desc.slice(0, 80) : desc;
+    const description = desc.length > 80 ? desc : '';
+
+    const { error } = await supabase.from('services').insert({
+      user_id: user.id,
+      name,
+      description,
+      unit: line.unit || 'u',
+      unit_price: line.unit_price,
+      category: '',
+      tva_rate: 20,
+      is_recurring: false,
+      is_active: true,
+    });
+
+    setLines(prev => prev.map((l, i) => i === index
+      ? { ...l, _savingAsPrestation: false, _savedAsPrestation: !error }
+      : l
+    ));
   }
 
   function openCreateOptions() {
@@ -508,11 +553,20 @@ export default function DevisPage() {
       title: draft.title,
       description: draft.description,
     });
-    setLines(draft.lines.map((line) => ({ ...line })));
+    setLines(draft.lines.map((line) => ({
+      ...line,
+      tva_rate: (line as { tva_rate?: number }).tva_rate ?? 20,
+    })));
     setShowAiCreate(false);
     setShowCreate(true);
 
-    // Try to match AI client name to an existing client
+    // If the assistant already has a client selected, use it directly
+    if (draft.clientId) {
+      setSelectedClientId(draft.clientId);
+      return;
+    }
+
+    // Otherwise fall back to matching by name
     if (draft.clientName?.trim()) {
       const { data } = await supabase
         .from('clients')
@@ -524,7 +578,7 @@ export default function DevisPage() {
     }
   }
 
-  const linesTotal = lines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
+  const linesTotals = computeTvaBreakdown(lines.filter(l => l.description.trim()));
 
   return (
     <div className="space-y-6">
@@ -912,7 +966,7 @@ export default function DevisPage() {
           }
           setNewQuote({ title: '', description: '' });
           setSelectedClientId(null);
-          setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0 }]);
+          setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
         }
       }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -966,7 +1020,7 @@ export default function DevisPage() {
                 <div className="mb-4 rounded-lg border bg-muted/30 p-3">
                   <ServicePicker
                     onSelect={(svc) => {
-                      setLines(prev => [...prev, svc]);
+                      setLines(prev => [...prev, { ...svc, _savedAsPrestation: true }]);
                     }}
                     onClose={() => setShowServicePicker(false)}
                   />
@@ -982,7 +1036,7 @@ export default function DevisPage() {
                         onChange={e => updateLine(i, 'description', e.target.value)}
                       />
                     </div>
-                    <div className="col-span-3 sm:col-span-2">
+                    <div className="col-span-2 sm:col-span-1">
                       <Input
                         type="number"
                         placeholder="Qte"
@@ -990,7 +1044,7 @@ export default function DevisPage() {
                         onChange={e => updateLine(i, 'quantity', Number(e.target.value))}
                       />
                     </div>
-                    <div className="col-span-4 sm:col-span-2">
+                    <div className="col-span-3 sm:col-span-2">
                       <Select
                         value={line.unit || 'u'}
                         onValueChange={(val) => updateLine(i, 'unit', val)}
@@ -1007,15 +1061,51 @@ export default function DevisPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-4 sm:col-span-3">
+                    <div className="col-span-3 sm:col-span-2">
                       <Input
                         type="number"
-                        placeholder="Prix unit."
+                        placeholder="Prix HT"
                         value={line.unit_price || ''}
                         onChange={e => updateLine(i, 'unit_price', Number(e.target.value))}
                       />
                     </div>
-                    <div className="col-span-1 flex justify-center pt-2">
+                    <div className="col-span-3 sm:col-span-2">
+                      <Select
+                        value={String(line.tva_rate ?? 20)}
+                        onValueChange={(val) => updateLine(i, 'tva_rate', Number(val))}
+                      >
+                        <SelectTrigger className="h-10" title="Taux de TVA">
+                          <SelectValue placeholder="TVA" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LINE_TVA_RATES.map((r) => (
+                            <SelectItem key={r} value={String(r)}>
+                              TVA {formatTvaRate(r)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-1 flex flex-col items-center gap-1.5 pt-2">
+                      {line._savedAsPrestation ? (
+                        <span title="Enregistrée dans vos prestations" className="text-emerald-600">
+                          <Check className="h-4 w-4" />
+                        </span>
+                      ) : line.description.trim() && line.unit_price > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => saveLineAsPrestation(i)}
+                          disabled={line._savingAsPrestation}
+                          title="Enregistrer dans mes prestations"
+                          className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                        >
+                          {line._savingAsPrestation ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <BookmarkPlus className="h-4 w-4" />
+                          )}
+                        </button>
+                      ) : null}
                       <button onClick={() => removeLine(i)} className="text-muted-foreground hover:text-destructive transition-colors">
                         <X className="h-4 w-4" />
                       </button>
@@ -1025,14 +1115,33 @@ export default function DevisPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-4">
-              <div className="text-sm text-muted-foreground">
-                <p>Total HT : {formatCurrency(linesTotal)}</p>
-                <p>TVA 20% : {formatCurrency(linesTotal * 0.2)}</p>
+            <div className="flex items-start justify-between gap-4 rounded-lg bg-muted/50 p-4">
+              <div className="text-sm text-muted-foreground space-y-1 flex-1 min-w-0">
+                <p>Total HT : <span className="text-foreground font-medium">{formatCurrency(linesTotals.total_ht)}</span></p>
+                {linesTotals.tva_breakdown.length === 0 ? (
+                  <p>TVA : <span className="text-foreground font-medium">{formatCurrency(0)}</span></p>
+                ) : linesTotals.tva_breakdown.length === 1 ? (
+                  <p>
+                    TVA {formatTvaRate(linesTotals.tva_breakdown[0].rate)} :{' '}
+                    <span className="text-foreground font-medium">{formatCurrency(linesTotals.tva_breakdown[0].tva_amount)}</span>
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {linesTotals.tva_breakdown.map((b) => (
+                      <p key={b.rate} className="text-xs">
+                        TVA {formatTvaRate(b.rate)} sur {formatCurrency(b.base_ht)} :{' '}
+                        <span className="text-foreground font-medium">{formatCurrency(b.tva_amount)}</span>
+                      </p>
+                    ))}
+                    <p className="text-xs pt-0.5 border-t border-border/50 mt-1">
+                      Total TVA : <span className="text-foreground font-medium">{formatCurrency(linesTotals.total_tva)}</span>
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="text-right">
+              <div className="text-right flex-shrink-0">
                 <p className="text-xs text-muted-foreground">Total TTC</p>
-                <p className="text-2xl font-semibold text-foreground">{formatCurrency(linesTotal * 1.2)}</p>
+                <p className="text-2xl font-semibold text-foreground">{formatCurrency(linesTotals.total_ttc)}</p>
               </div>
             </div>
 

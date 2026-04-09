@@ -73,6 +73,7 @@ export async function POST(request: Request) {
       quantity: Number(l.quantity) || 0,
       unit: (l.unit as string) || 'u',
       unit_price: Number(l.unit_price) || 0,
+      tva_rate: Number(l.tva_rate ?? 20),
       total: Number(l.total) || 0,
     }));
     const client = quote.clients || { name: client_name.trim() };
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
         total_tva: Number(quote.total_tva) || 0,
         total_ttc: Number(quote.total_ttc) || 0,
         tva_rate: Number(quote.tva_rate) || 20,
+        tva_breakdown: quote.tva_breakdown,
         created_at: quote.created_at,
         valid_until: quote.valid_until,
       },

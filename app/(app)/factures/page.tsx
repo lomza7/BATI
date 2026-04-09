@@ -22,6 +22,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
+import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -43,6 +44,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Invoice {
   id: string;
@@ -68,6 +76,7 @@ interface QuoteLine {
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate: number;
   total: number;
   position: number;
 }
@@ -114,7 +123,7 @@ export default function FacturesPage() {
   const [creatingFromQuoteId, setCreatingFromQuoteId] = useState<string | null>(null);
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
-  const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0 });
+  const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
   const [showArchived, setShowArchived] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
@@ -159,7 +168,7 @@ export default function FacturesPage() {
           created_at,
           valid_until,
           clients(name, deleted_at),
-          quote_lines(id, description, quantity, unit, unit_price, total, position),
+          quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position),
           invoices(id, invoice_number, status)
         `)
         .is('deleted_at', null)
@@ -204,6 +213,7 @@ export default function FacturesPage() {
               ...line,
               quantity: Number(line.quantity || 0),
               unit_price: Number(line.unit_price || 0),
+              tva_rate: Number(line.tva_rate ?? 20),
               total: Number(line.total || 0),
               position: Number(line.position || 0),
             }))
@@ -233,19 +243,41 @@ export default function FacturesPage() {
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
 
-    await supabase.from('invoices').insert({
+    const tva = computeTvaBreakdown([
+      { quantity: 1, unit_price: form.totalHt, tva_rate: form.tvaRate },
+    ]);
+
+    const { data: invoice } = await supabase.from('invoices').insert({
       user_id: user.id,
       invoice_number: invNumber,
       client_id: clientId,
       project_id: prefillProjectId.current || null,
       title: form.title,
-      total_ht: form.totalHt,
-      total_ttc: form.totalHt * 1.2,
+      total_ht: tva.total_ht,
+      total_tva: tva.total_tva,
+      total_ttc: tva.total_ttc,
+      tva_rate: tva.primary_rate,
+      tva_breakdown: tva.tva_breakdown,
       due_date: dueDate.toISOString().split('T')[0],
-    });
+    }).select('id').single();
+
+    // Crée une ligne unique pour que le PDF / la preview / la compta aient un breakdown cohérent
+    if (invoice && form.totalHt > 0) {
+      await supabase.from('invoice_lines').insert({
+        user_id: user.id,
+        invoice_id: invoice.id,
+        description: form.title || 'Prestation',
+        quantity: 1,
+        unit: 'forfait',
+        unit_price: form.totalHt,
+        tva_rate: form.tvaRate,
+        total: form.totalHt,
+        position: 0,
+      });
+    }
 
     setShowCreate(false);
-    setForm({ title: '', clientName: '', totalHt: 0 });
+    setForm({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
     prefillProjectId.current = null;
     loadData();
   }
@@ -266,6 +298,15 @@ export default function FacturesPage() {
         ? await supabase.from('clients').select('id').eq('name', quote.clients.name).is('deleted_at', null).maybeSingle()
         : { data: null };
 
+      // Recompute totals from lines to guarantee consistent tva_breakdown
+      const tva = computeTvaBreakdown(
+        quote.quote_lines.map(l => ({
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          tva_rate: l.tva_rate ?? 20,
+        }))
+      );
+
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
@@ -274,8 +315,11 @@ export default function FacturesPage() {
           quote_id: quote.id,
           client_id: client?.id || null,
           title: quote.title || `Facture ${quote.quote_number}`,
-          total_ht: quote.total_ht,
-          total_ttc: quote.total_ttc,
+          total_ht: tva.total_ht || quote.total_ht,
+          total_tva: tva.total_tva,
+          total_ttc: tva.total_ttc || quote.total_ttc,
+          tva_rate: tva.primary_rate,
+          tva_breakdown: tva.tva_breakdown,
           due_date: dueDate.toISOString().split('T')[0],
         })
         .select('id')
@@ -294,6 +338,7 @@ export default function FacturesPage() {
             quantity: line.quantity,
             unit: line.unit,
             unit_price: line.unit_price,
+            tva_rate: line.tva_rate ?? 20,
             total: line.total || line.quantity * line.unit_price,
             position: typeof line.position === 'number' ? line.position : index,
           }))
@@ -826,10 +871,38 @@ export default function FacturesPage() {
               <label className="text-sm font-medium">Client</label>
               <Input className="mt-1" placeholder="Nom du client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })} />
             </div>
-            <div>
-              <label className="text-sm font-medium">Montant HT</label>
-              <Input className="mt-1" type="number" placeholder="0" value={form.totalHt || ''} onChange={e => setForm({ ...form, totalHt: Number(e.target.value) })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium">Montant HT</label>
+                <Input className="mt-1" type="number" placeholder="0" value={form.totalHt || ''} onChange={e => setForm({ ...form, totalHt: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Taux de TVA</label>
+                <Select value={String(form.tvaRate)} onValueChange={v => setForm({ ...form, tvaRate: Number(v) })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LINE_TVA_RATES.map(r => (
+                      <SelectItem key={r} value={String(r)}>TVA {formatTvaRate(r)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            <div className="rounded-lg border border-border/70 bg-muted/30 p-3 text-sm flex items-center justify-between">
+              <div className="text-muted-foreground">
+                <p>Total HT : <span className="font-medium text-foreground">{formatCurrency(form.totalHt || 0)}</span></p>
+                <p className="text-xs mt-0.5">TVA {formatTvaRate(form.tvaRate)} : {formatCurrency((form.totalHt || 0) * form.tvaRate / 100)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">TTC</p>
+                <p className="text-lg font-semibold">{formatCurrency((form.totalHt || 0) * (1 + form.tvaRate / 100))}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Astuce : pour facturer avec plusieurs taux de TVA, créez d&apos;abord un devis détaillé puis convertissez-le en facture.
+            </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
               <Button onClick={createInvoice} disabled={!form.title.trim()}>Creer</Button>

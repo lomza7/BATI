@@ -1,5 +1,7 @@
 // DocuSeal API helpers (server-side only)
 
+import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from './tva';
+
 const DOCUSEAL_API_URL = process.env.DOCUSEAL_API_URL || 'https://api.docuseal.eu';
 
 interface DocuSealFetchOptions {
@@ -38,6 +40,7 @@ interface QuoteData {
   total_tva: number;
   total_ttc: number;
   tva_rate: number;
+  tva_breakdown?: unknown;
   created_at: string;
   valid_until: string | null;
 }
@@ -47,6 +50,7 @@ interface QuoteLine {
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate?: number;
   total: number;
 }
 
@@ -155,31 +159,57 @@ export function buildQuoteHtml(
   const footerText = (dc.footer_text as string) || '';
   const mentionsLegales = (dc.mentions_legales as string) || '';
 
-  const tvaRate = Number(quote.tva_rate) || 0;
+  const legacyRate = Number(quote.tva_rate) || 0;
   const totalHt = Number(quote.total_ht) || 0;
   const totalTva = Number(quote.total_tva) || 0;
   const totalTtc = Number(quote.total_ttc) || 0;
-  const isFranchise = tvaRate === 0;
 
-  // Lines rows — handle empty state
+  // Rebuild breakdown — prefer stored JSONB, fallback to single-rate
+  const parsed = parseTvaBreakdown(quote.tva_breakdown);
+  const tvaBreakdown: TvaBreakdownEntry[] = parsed.length > 0
+    ? parsed
+    : [{ rate: legacyRate, base_ht: totalHt, tva_amount: totalTva }];
+  const isFranchise = tvaBreakdown.length === 1 && tvaBreakdown[0].rate === 0;
+  const isMultiRate = tvaBreakdown.length > 1;
+
+  // Lines rows — handle empty state (+ TVA column per line)
   const linesRows = lines.length > 0
     ? lines.map((l) => {
         const lineTotal = Number(l.total) || Number(l.quantity) * Number(l.unit_price);
+        const lineTvaRate = Number(l.tva_rate ?? legacyRate);
         return `
           <tr>
             <td style="padding:10px 12px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};vertical-align:top;word-wrap:break-word">${escMultiline(l.description)}</td>
-            <td style="padding:10px 8px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:center;vertical-align:top">${esc(String(l.quantity))}</td>
-            <td style="padding:10px 8px;border-bottom:1px solid ${border};font-size:12px;color:${muted};text-align:center;vertical-align:top">${esc(UNIT_LABELS[l.unit] || l.unit || '')}</td>
-            <td style="padding:10px 8px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:right;vertical-align:top;white-space:nowrap">${esc(fmtCurrency(Number(l.unit_price) || 0))}</td>
+            <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:center;vertical-align:top">${esc(String(l.quantity))}</td>
+            <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${muted};text-align:center;vertical-align:top">${esc(UNIT_LABELS[l.unit] || l.unit || '')}</td>
+            <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:right;vertical-align:top;white-space:nowrap">${esc(fmtCurrency(Number(l.unit_price) || 0))}</td>
+            <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:10px;color:${muted};text-align:center;vertical-align:top;white-space:nowrap">${esc(formatTvaRate(lineTvaRate))}</td>
             <td style="padding:10px 12px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:right;font-weight:600;vertical-align:top;white-space:nowrap">${esc(fmtCurrency(lineTotal))}</td>
           </tr>`;
       }).join('')
     : `
         <tr>
-          <td colspan="5" style="padding:24px 12px;text-align:center;font-size:12px;color:${muted};font-style:italic">
+          <td colspan="6" style="padding:24px 12px;text-align:center;font-size:12px;color:${muted};font-style:italic">
             Aucune ligne saisie
           </td>
         </tr>`;
+
+  // TVA rows for the totals table — one row per rate when multi-rate
+  const tvaRowsHtml = isMultiRate
+    ? tvaBreakdown.map((b) => `
+          <tr style="border-top:1px solid ${border}">
+            <td style="padding:6px 14px;font-size:10px;color:${muted}">TVA ${esc(formatTvaRate(b.rate))} sur ${esc(fmtCurrency(b.base_ht))}</td>
+            <td style="padding:6px 14px;font-size:10px;text-align:right;color:${textColor};font-weight:500">${esc(fmtCurrency(b.tva_amount))}</td>
+          </tr>`).join('') + `
+          <tr style="border-top:1px dashed ${border}">
+            <td style="padding:6px 14px;font-size:11px;color:${muted};font-weight:600">Total TVA</td>
+            <td style="padding:6px 14px;font-size:11px;text-align:right;color:${textColor};font-weight:600">${esc(fmtCurrency(totalTva))}</td>
+          </tr>`
+    : `
+          <tr style="border-top:1px solid ${border}">
+            <td style="padding:8px 14px;font-size:11px;color:${muted}">TVA ${isFranchise ? '(non appl.)' : esc(formatTvaRate(tvaBreakdown[0]?.rate ?? legacyRate))}</td>
+            <td style="padding:8px 14px;font-size:11px;text-align:right;color:${textColor};font-weight:600">${esc(fmtCurrency(totalTva))}</td>
+          </tr>`;
 
   // Client block
   const clientLines: string[] = [];
@@ -266,10 +296,11 @@ export function buildQuoteHtml(
     <thead>
       <tr style="background:${accent}12">
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border}">Description</th>
-        <th style="padding:10px 8px;text-align:center;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:50px">Qté</th>
-        <th style="padding:10px 8px;text-align:center;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:70px">Unité</th>
-        <th style="padding:10px 8px;text-align:right;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:95px">P.U. HT</th>
-        <th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:100px">Total HT</th>
+        <th style="padding:10px 6px;text-align:center;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:44px">Qté</th>
+        <th style="padding:10px 6px;text-align:center;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:60px">Unité</th>
+        <th style="padding:10px 6px;text-align:right;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:85px">P.U. HT</th>
+        <th style="padding:10px 6px;text-align:center;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:52px">TVA</th>
+        <th style="padding:10px 12px;text-align:right;font-size:10px;font-weight:700;color:${accent};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid ${border};width:95px">Total HT</th>
       </tr>
     </thead>
     <tbody>
@@ -280,17 +311,14 @@ export function buildQuoteHtml(
   <!-- Totaux -->
   <table style="margin-top:14px;margin-bottom:24px" class="no-break">
     <tr>
-      <td style="width:60%"></td>
-      <td style="width:40%">
+      <td style="width:55%"></td>
+      <td style="width:45%">
         <table style="border:1px solid ${border};border-radius:8px;overflow:hidden">
           <tr>
             <td style="padding:8px 14px;font-size:11px;color:${muted}">Total HT</td>
             <td style="padding:8px 14px;font-size:11px;text-align:right;color:${textColor};font-weight:600">${esc(fmtCurrency(totalHt))}</td>
           </tr>
-          <tr style="border-top:1px solid ${border}">
-            <td style="padding:8px 14px;font-size:11px;color:${muted}">TVA ${isFranchise ? '(non appl.)' : `(${tvaRate}%)`}</td>
-            <td style="padding:8px 14px;font-size:11px;text-align:right;color:${textColor};font-weight:600">${esc(fmtCurrency(totalTva))}</td>
-          </tr>
+          ${tvaRowsHtml}
           <tr style="background:${accent}10;border-top:2px solid ${border}">
             <td style="padding:12px 14px;font-size:13px;font-weight:700;color:${textColor}">Total TTC</td>
             <td style="padding:12px 14px;font-size:16px;font-weight:800;text-align:right;color:${accent}">${esc(fmtCurrency(totalTtc))}</td>

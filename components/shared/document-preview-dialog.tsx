@@ -6,12 +6,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QUOTE_UNIT_LABELS } from '@/lib/constants';
+import { computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 
 interface PreviewLine {
   description: string;
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate?: number;
 }
 
 interface PreviewClient {
@@ -155,7 +157,7 @@ export function DocumentPreviewDialog({
 
             const { data: linesData } = await supabase
               .from('quote_lines')
-              .select('description, quantity, unit, unit_price, position')
+              .select('description, quantity, unit, unit_price, tva_rate, position')
               .eq('quote_id', documentId)
               .order('position', { ascending: true });
             if (!cancelled && linesData) {
@@ -190,7 +192,7 @@ export function DocumentPreviewDialog({
 
             const { data: linesData } = await supabase
               .from('invoice_lines')
-              .select('description, quantity, unit, unit_price, position')
+              .select('description, quantity, unit, unit_price, tva_rate, position')
               .eq('invoice_id', documentId)
               .order('position', { ascending: true });
             if (!cancelled && linesData) {
@@ -230,12 +232,20 @@ export function DocumentPreviewDialog({
     };
   }, [open, user, documentId, mode, clientIdProp]);
 
-  // Totals computed from the resolved lines
+  // Totals computed from the resolved lines — multi-rate TVA
   const validLines = resolvedLines.filter((l) => l.description.trim());
-  const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
-  const tvaRate = 20;
-  const tvaAmount = totalHt * (tvaRate / 100);
-  const totalTtc = totalHt + tvaAmount;
+  const tvaTotals = computeTvaBreakdown(
+    validLines.map((l) => ({
+      quantity: l.quantity,
+      unit_price: l.unit_price,
+      tva_rate: l.tva_rate ?? 20,
+    }))
+  );
+  const totalHt = tvaTotals.total_ht;
+  const totalTva = tvaTotals.total_tva;
+  const totalTtc = tvaTotals.total_ttc;
+  const tvaBreakdown = tvaTotals.tva_breakdown;
+  const singleRate = tvaBreakdown.length === 1 ? tvaBreakdown[0].rate : null;
 
   const dc = artisan?.document_config || {};
   const accent = dc.primary_color || '#d35400';
@@ -427,16 +437,17 @@ export function DocumentPreviewDialog({
                 <thead>
                   <tr className="border-b border-[#e5e1da]" style={{ backgroundColor: accent + '08' }}>
                     <th className="px-8 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Description</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qté</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unité</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Prix unit. HT</th>
+                    <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qté</th>
+                    <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unité</th>
+                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>P.U. HT</th>
+                    <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>TVA</th>
                     <th className="px-8 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e5e1da]">
                   {validLines.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-8 py-8 text-center text-sm text-[#6b6560] italic">
+                      <td colSpan={6} className="px-8 py-8 text-center text-sm text-[#6b6560] italic">
                         Aucune ligne saisie
                       </td>
                     </tr>
@@ -444,9 +455,10 @@ export function DocumentPreviewDialog({
                     validLines.map((line, idx) => (
                       <tr key={idx}>
                         <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>{line.description}</td>
-                        <td className="px-4 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
-                        <td className="px-4 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
-                        <td className="px-4 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                        <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
+                        <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
+                        <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                        <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? 20)}</td>
                         <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
                       </tr>
                     ))
@@ -467,7 +479,7 @@ export function DocumentPreviewDialog({
                     <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs text-[#6b6560]">
-                        {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)}
+                        {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? 20)}
                       </span>
                       <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</span>
                     </div>
@@ -479,15 +491,34 @@ export function DocumentPreviewDialog({
             {/* Totaux */}
             <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-5">
               <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center justify-between w-full sm:w-64">
+                <div className="flex items-center justify-between w-full sm:w-72">
                   <span className="text-sm text-[#6b6560]">Total HT</span>
                   <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(totalHt)}</span>
                 </div>
-                <div className="flex items-center justify-between w-full sm:w-64">
-                  <span className="text-sm text-[#6b6560]">TVA ({tvaRate}%)</span>
-                  <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(tvaAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between w-full sm:w-64 pt-2 border-t border-[#e5e1da] mt-1">
+                {tvaBreakdown.length <= 1 ? (
+                  <div className="flex items-center justify-between w-full sm:w-72">
+                    <span className="text-sm text-[#6b6560]">
+                      TVA {formatTvaRate(singleRate ?? 20)}
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(totalTva)}</span>
+                  </div>
+                ) : (
+                  <>
+                    {tvaBreakdown.map((b) => (
+                      <div key={b.rate} className="flex items-center justify-between w-full sm:w-72 text-xs">
+                        <span className="text-[#6b6560]">
+                          TVA {formatTvaRate(b.rate)} sur {formatCurrency(b.base_ht)}
+                        </span>
+                        <span style={{ color: textColor }}>{formatCurrency(b.tva_amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between w-full sm:w-72 pt-1 border-t border-dashed border-[#e5e1da]/70">
+                      <span className="text-sm text-[#6b6560]">Total TVA</span>
+                      <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(totalTva)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between w-full sm:w-72 pt-2 border-t border-[#e5e1da] mt-1">
                   <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
                   <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(totalTtc)}</span>
                 </div>
@@ -521,7 +552,10 @@ export function DocumentPreviewDialog({
                       <>
                         Facture émise le {formatDate(resolvedCreatedAt)}
                         {resolvedDueDate ? `, à régler avant le ${formatDate(resolvedDueDate)}` : ''}.
-                        TVA applicable au taux de {tvaRate}%. Tout retard de paiement entraîne
+                        {tvaBreakdown.length <= 1
+                          ? ` TVA applicable au taux de ${formatTvaRate(singleRate ?? 20)}.`
+                          : ` TVA applicable selon plusieurs taux : ${tvaBreakdown.map(b => formatTvaRate(b.rate)).join(', ')}.`}
+                        {' '}Tout retard de paiement entraîne
                         l&apos;application de pénalités de retard conformément aux conditions générales.
                       </>
                     ) : (

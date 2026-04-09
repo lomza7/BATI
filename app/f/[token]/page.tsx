@@ -16,6 +16,7 @@ import {
   PartyPopper,
   XCircle,
 } from 'lucide-react';
+import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -38,6 +39,8 @@ interface InvoiceData {
   status: string;
   total_ht: number;
   tva_rate: number;
+  total_tva: number | null;
+  tva_breakdown: unknown;
   total_ttc: number;
   due_date: string | null;
   paid_at: string | null;
@@ -59,6 +62,7 @@ interface InvoiceLine {
   quantity: number;
   unit: string;
   unit_price: number;
+  tva_rate: number;
   total: number;
   position: number;
 }
@@ -167,7 +171,7 @@ export default function PublicInvoicePage() {
     // 2. Fetch invoice with client
     const { data: invoiceData } = await anonClient
       .from('invoices')
-      .select('id, invoice_number, title, status, total_ht, tva_rate, total_ttc, due_date, paid_at, created_at, payment_method, clients(name, email, phone, address, city, postal_code)')
+      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, clients(name, email, phone, address, city, postal_code)')
       .eq('id', send.invoice_id)
       .maybeSingle();
 
@@ -181,7 +185,7 @@ export default function PublicInvoicePage() {
     // 3. Fetch invoice lines
     const { data: linesData } = await anonClient
       .from('invoice_lines')
-      .select('id, description, quantity, unit, unit_price, total, position')
+      .select('id, description, quantity, unit, unit_price, tva_rate, total, position')
       .eq('invoice_id', send.invoice_id)
       .order('position');
 
@@ -271,8 +275,17 @@ export default function PublicInvoicePage() {
 
   if (!invoice) return null;
 
-  const tvaRate = invoice.tva_rate || 20;
-  const tvaAmount = invoice.total_ht * (tvaRate / 100);
+  const legacyRate = invoice.tva_rate || 20;
+  const parsedBreakdown: TvaBreakdownEntry[] = parseTvaBreakdown(invoice.tva_breakdown);
+  const tvaBreakdown: TvaBreakdownEntry[] = parsedBreakdown.length > 0
+    ? parsedBreakdown
+    : [{
+        rate: legacyRate,
+        base_ht: invoice.total_ht,
+        tva_amount: invoice.total_ht * (legacyRate / 100),
+      }];
+  const totalTva = invoice.total_tva ?? tvaBreakdown.reduce((s, b) => s + b.tva_amount, 0);
+  const singleRate = tvaBreakdown.length === 1 ? tvaBreakdown[0].rate : null;
 
   const dc = artisan?.document_config || {};
   const accent = dc.primary_color || '#d35400';
@@ -431,9 +444,10 @@ export default function PublicInvoicePage() {
               <thead>
                 <tr className="border-b border-[#e5e1da]" style={{ backgroundColor: accent + '08' }}>
                   <th className="px-8 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Description</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qte</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unite</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Prix unit. HT</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qte</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unite</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>P.U. HT</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>TVA</th>
                   <th className="px-8 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
                 </tr>
               </thead>
@@ -441,9 +455,10 @@ export default function PublicInvoicePage() {
                 {lines.map((line) => (
                   <tr key={line.id}>
                     <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>{line.description}</td>
-                    <td className="px-4 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
-                    <td className="px-4 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
-                    <td className="px-4 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                    <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
+                    <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
+                    <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                    <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? legacyRate)}</td>
                     <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.total)}</td>
                   </tr>
                 ))}
@@ -458,7 +473,7 @@ export default function PublicInvoicePage() {
                 <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-[#6b6560]">
-                    {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)}
+                    {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? legacyRate)}
                   </span>
                   <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.total)}</span>
                 </div>
@@ -469,15 +484,32 @@ export default function PublicInvoicePage() {
           {/* Totals */}
           <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-5">
             <div className="flex flex-col items-end gap-1.5">
-              <div className="flex items-center justify-between w-full sm:w-64">
+              <div className="flex items-center justify-between w-full sm:w-72">
                 <span className="text-sm text-[#6b6560]">Total HT</span>
                 <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(invoice.total_ht)}</span>
               </div>
-              <div className="flex items-center justify-between w-full sm:w-64">
-                <span className="text-sm text-[#6b6560]">TVA ({tvaRate}%)</span>
-                <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(tvaAmount)}</span>
-              </div>
-              <div className="flex items-center justify-between w-full sm:w-64 pt-2 border-t border-[#e5e1da] mt-1">
+              {tvaBreakdown.length <= 1 ? (
+                <div className="flex items-center justify-between w-full sm:w-72">
+                  <span className="text-sm text-[#6b6560]">TVA {formatTvaRate(singleRate ?? legacyRate)}</span>
+                  <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(totalTva)}</span>
+                </div>
+              ) : (
+                <>
+                  {tvaBreakdown.map((b) => (
+                    <div key={b.rate} className="flex items-center justify-between w-full sm:w-72 text-xs">
+                      <span className="text-[#6b6560]">
+                        TVA {formatTvaRate(b.rate)} sur {formatCurrency(b.base_ht)}
+                      </span>
+                      <span style={{ color: textColor }}>{formatCurrency(b.tva_amount)}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between w-full sm:w-72 pt-1 border-t border-dashed border-[#e5e1da]/70">
+                    <span className="text-sm text-[#6b6560]">Total TVA</span>
+                    <span className="text-sm font-medium" style={{ color: textColor }}>{formatCurrency(totalTva)}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between w-full sm:w-72 pt-2 border-t border-[#e5e1da] mt-1">
                 <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
                 <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(invoice.total_ttc)}</span>
               </div>
