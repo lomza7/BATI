@@ -22,8 +22,8 @@ export function Hero() {
 
           <AiProvidersRow />
 
-          <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
-            Un <strong className="text-[var(--landing-text)] font-semibold">site web offert</strong> pour votre entreprise, une <strong className="text-[var(--landing-text)] font-semibold">IA qui rédige vos devis à la voix</strong>, une <strong className="text-[var(--landing-text)] font-semibold">compta qui se classe toute seule</strong> (prête pour la facture électronique 2026), le <strong className="text-[var(--landing-text)] font-semibold">paiement en ligne</strong> des factures et la <strong className="text-[var(--landing-text)] font-semibold">signature à distance</strong> des devis &mdash; bref, tout ce qui vous prend vos soirées, réglé dans une seule app.
+          <p className="text-base sm:text-lg text-[var(--landing-muted)] mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
+            <strong className="text-[var(--landing-text)] font-semibold">Votre site web est offert</strong>, une IA <strong className="text-[var(--landing-text)] font-semibold">dicte vos devis à la voix</strong>, votre <strong className="text-[var(--landing-text)] font-semibold">compta se classe toute seule</strong> (facture électronique 2026 incluse). Gmail et agenda Google connectés, CRM clients, carte de vos chantiers, paiement et signature en ligne &mdash; bref, tout ce qui vous prend vos soirées, réglé dans une seule app.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -247,35 +247,35 @@ function RappelItem({
  * Rendered between the H1 and the description to build trust in the
  * first seconds of the page visit. Logos are intentionally tiny and
  * muted — they are a signal, not a decoration.
+ *
+ * SVGs use each vendor's official monochrome logomark, recolored to
+ * currentColor so they inherit the muted landing palette.
  */
 function AiProvidersRow() {
   return (
-    <div className="flex flex-col items-center gap-2 mb-6 sm:mb-7">
+    <div className="flex flex-col items-center gap-2.5 mb-6 sm:mb-7">
       <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--landing-muted)] font-medium">
         Les intelligences artificielles qui travaillent pour vous
       </span>
       <div className="flex items-center gap-3 sm:gap-5 text-[var(--landing-muted)]">
         <AiBrand name="Claude">
-          {/* Anthropic — 8-ray burst */}
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <line x1="12" y1="3" x2="12" y2="21" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="5.64" y1="5.64" x2="18.36" y2="18.36" />
-            <line x1="18.36" y1="5.64" x2="5.64" y2="18.36" />
+          {/* Anthropic official logomark — stylized "A" wordmark */}
+          <svg viewBox="0 0 92 65" className="h-3.5 w-auto" fill="currentColor" aria-hidden>
+            <path d="M66.36 0H51.8L78 65h14.35L66.36 0zM21.76 0L0 65h14.47l4.45-13.17h23L46.4 65h14.47L39.07 0H21.76zm1.18 38.53L30.3 16.26l7.36 22.27H22.94z" />
           </svg>
         </AiBrand>
         <span aria-hidden className="text-[var(--landing-muted)] opacity-40 select-none">·</span>
         <AiBrand name="ChatGPT">
-          {/* OpenAI — knot ring */}
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c4.41 0 8 3.59 8 8s-3.59 8-8 8-8-3.59-8-8 3.59-8 8-8zm0 3a5 5 0 100 10 5 5 0 000-10zm0 2a3 3 0 110 6 3 3 0 010-6z" />
+          {/* OpenAI official logomark — hexagonal knot */}
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden>
+            <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.77.77 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5Z" />
           </svg>
         </AiBrand>
         <span aria-hidden className="text-[var(--landing-muted)] opacity-40 select-none">·</span>
         <AiBrand name="Gemini">
-          {/* Google Gemini — 4-point sparkle */}
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-            <path d="M12 1C11.5 6 7 10.5 2 11C7 11.5 11.5 16 12 21C12.5 16 17 11.5 22 11C17 10.5 12.5 6 12 1Z" />
+          {/* Google Gemini official sparkle mark */}
+          <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor" aria-hidden>
+            <path d="M16 8.016A8.522 8.522 0 0 0 8.016 16h-.032A8.521 8.521 0 0 0 0 8.016v-.032A8.521 8.521 0 0 0 7.984 0h.032A8.522 8.522 0 0 0 16 7.984v.032z" />
           </svg>
         </AiBrand>
       </div>
