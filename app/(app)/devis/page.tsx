@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { QUOTE_STATUSES, QUOTE_UNITS, formatCurrency, formatDate } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
-import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
+import { type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { ServicePicker } from '@/components/devis/service-picker';
 import { PageHeader } from '@/components/shared/page-header';
@@ -78,6 +78,7 @@ interface QuoteLine {
 
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
+  const AI_PENDING_DRAFT_KEY = 'hellobat_ai_quote_pending_draft';
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
@@ -87,9 +88,7 @@ export default function DevisPage() {
   const [search, setSearch] = useState('');
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [showAiIntro, setShowAiIntro] = useState(false);
-  const [showAiCreate, setShowAiCreate] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [aiPresetRequest, setAiPresetRequest] = useState<{ id: number; mode: 'empty' | 'example' } | null>(null);
   const [newQuote, setNewQuote] = useState({ title: '', description: '' });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [lines, setLines] = useState<QuoteLine[]>([
@@ -119,6 +118,22 @@ export default function DevisPage() {
       if (paramClientId) setSelectedClientId(paramClientId);
       setShowCreateOptions(true);
       router.replace('/devis', { scroll: false });
+    }
+
+    // Pick up a draft produced by /devis/ai before this page mounted. When
+    // the AI assistant finishes on its dedicated page, it stashes the draft
+    // in sessionStorage and navigates here — we consume it once and open the
+    // create dialog pre-filled.
+    try {
+      const stored = window.sessionStorage.getItem(AI_PENDING_DRAFT_KEY);
+      if (stored) {
+        window.sessionStorage.removeItem(AI_PENDING_DRAFT_KEY);
+        const draft = JSON.parse(stored) as AiQuoteDraft;
+        applyAiDraft(draft);
+      }
+    } catch {
+      // Corrupted JSON or storage quota issues — ignore silently, user will
+      // just see the devis list as usual.
     }
   }, []);
 
@@ -538,14 +553,12 @@ export default function DevisPage() {
       return;
     }
 
-    setAiPresetRequest({ id: Date.now(), mode: 'empty' });
-    setShowAiCreate(true);
+    router.push('/devis/ai');
   }
 
   function startAiCreate() {
     setShowAiIntro(false);
-    setAiPresetRequest({ id: Date.now(), mode: 'empty' });
-    setShowAiCreate(true);
+    router.push('/devis/ai');
   }
 
   async function applyAiDraft(draft: AiQuoteDraft) {
@@ -557,7 +570,6 @@ export default function DevisPage() {
       ...line,
       tva_rate: (line as { tva_rate?: number }).tva_rate ?? 20,
     })));
-    setShowAiCreate(false);
     setShowCreate(true);
 
     // If the assistant already has a client selected, use it directly
@@ -942,17 +954,6 @@ export default function DevisPage() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showAiCreate} onOpenChange={setShowAiCreate}>
-        <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Devis avec IA</DialogTitle>
-            <DialogDescription>Parlez, ajoutez des photos, puis lancez la magie.</DialogDescription>
-          </DialogHeader>
-
-          <QuoteAiAssistant onUseDraft={applyAiDraft} presetRequest={aiPresetRequest} />
         </DialogContent>
       </Dialog>
 
