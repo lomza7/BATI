@@ -67,10 +67,17 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setShowCreate(false);
+      const target = e.target as Node | null;
+      if (!containerRef.current || !target) return;
+      if (containerRef.current.contains(target)) return;
+      // Ignore clicks inside Radix Popper portals (Select / Popover / DropdownMenu),
+      // which are rendered at the body root and would otherwise be treated as
+      // "outside" and close the create-client form mid-interaction.
+      if (target instanceof Element && target.closest('[data-radix-popper-content-wrapper]')) {
+        return;
       }
+      setOpen(false);
+      setShowCreate(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
