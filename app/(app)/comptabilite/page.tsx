@@ -142,6 +142,7 @@ interface InvoiceRow {
   total_ht: number | null;
   total_ttc: number | null;
   tva_rate: number | null;
+  tva_breakdown: unknown;
   paid_at: string | null;
   issued_at: string | null;
   due_date: string | null;
@@ -426,7 +427,7 @@ export default function ComptabilitePage() {
         supabase
           .from('invoices')
           .select(
-            `id, invoice_number, title, status, total_ht, total_ttc, tva_rate,
+            `id, invoice_number, title, status, total_ht, total_ttc, tva_rate, tva_breakdown,
              paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id`,
           )
           .order('issued_at', { ascending: false, nullsFirst: false }),
@@ -2618,6 +2619,7 @@ export default function ComptabilitePage() {
               total_ht: i.total_ht,
               total_ttc: i.total_ttc,
               tva_rate: i.tva_rate,
+              tva_breakdown: i.tva_breakdown,
             }))}
             tvaMethod={tvaMethod}
             vatRegime={vatRegime}

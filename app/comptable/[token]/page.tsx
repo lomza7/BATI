@@ -26,6 +26,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@/components/ui/tabs';
+import { parseTvaBreakdown, formatTvaRate } from '@/lib/tva';
 
 interface SummaryPayload {
   artisan: {
@@ -87,6 +88,8 @@ interface InvoiceRow {
   total_ht: number | null;
   total_ttc: number | null;
   tva_rate: number | null;
+  total_tva: number | null;
+  tva_breakdown: unknown;
   clients: { name: string } | { name: string }[] | null;
 }
 
@@ -494,39 +497,69 @@ export default function ComptablePortalPage() {
                       <th className="px-3 py-2 text-left font-medium">Émise</th>
                       <th className="px-3 py-2 text-left font-medium">Statut</th>
                       <th className="px-3 py-2 text-right font-medium">HT</th>
+                      <th className="px-3 py-2 text-right font-medium">TVA</th>
                       <th className="px-3 py-2 text-right font-medium">TTC</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-t border-border/60">
-                        <td className="px-3 py-2 font-medium">{inv.invoice_number}</td>
-                        <td className="px-3 py-2">
-                          <div>{getClientName(inv.clients)}</div>
-                          {inv.title && (
-                            <div className="text-[11px] text-muted-foreground line-clamp-1">
-                              {inv.title}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.issued_at)}</td>
-                        <td className="px-3 py-2">
-                          <Badge
-                            variant={inv.paid_at || inv.status === 'paid' ? 'default' : 'secondary'}
-                            className="text-[10px]"
+                    {invoices.map((inv) => {
+                      const breakdown = parseTvaBreakdown(inv.tva_breakdown);
+                      const totalTva =
+                        inv.total_tva != null
+                          ? Number(inv.total_tva)
+                          : Math.max(0, Number(inv.total_ttc || 0) - Number(inv.total_ht || 0));
+                      const tvaLabel =
+                        breakdown.length > 1
+                          ? `Multi (${breakdown.map((b) => `${b.rate}%`).join(' + ')})`
+                          : inv.tva_rate != null
+                            ? formatTvaRate(Number(inv.tva_rate))
+                            : '—';
+                      const tvaTitle =
+                        breakdown.length > 1
+                          ? breakdown
+                              .map(
+                                (b) =>
+                                  `${formatTvaRate(b.rate)} sur ${fmtEur(b.base_ht)} = ${fmtEur(b.tva_amount)}`,
+                              )
+                              .join(' · ')
+                          : undefined;
+                      return (
+                        <tr key={inv.id} className="border-t border-border/60">
+                          <td className="px-3 py-2 font-medium">{inv.invoice_number}</td>
+                          <td className="px-3 py-2">
+                            <div>{getClientName(inv.clients)}</div>
+                            {inv.title && (
+                              <div className="text-[11px] text-muted-foreground line-clamp-1">
+                                {inv.title}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.issued_at)}</td>
+                          <td className="px-3 py-2">
+                            <Badge
+                              variant={inv.paid_at || inv.status === 'paid' ? 'default' : 'secondary'}
+                              className="text-[10px]"
+                            >
+                              {inv.paid_at || inv.status === 'paid' ? 'Payée' : inv.status}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{fmtEur(inv.total_ht)}</td>
+                          <td
+                            className="px-3 py-2 text-right tabular-nums text-muted-foreground"
+                            title={tvaTitle}
                           >
-                            {inv.paid_at || inv.status === 'paid' ? 'Payée' : inv.status}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{fmtEur(inv.total_ht)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums font-semibold">
-                          {fmtEur(inv.total_ttc)}
-                        </td>
-                      </tr>
-                    ))}
+                            {fmtEur(totalTva)}
+                            <span className="ml-1 text-[10px]">({tvaLabel})</span>
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                            {fmtEur(inv.total_ttc)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {invoices.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                        <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
                           Aucune facture sur le périmètre partagé
                         </td>
                       </tr>

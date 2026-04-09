@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateToken } from '@/lib/comptabilite/accountant-scope';
+import { parseTvaBreakdown, formatTvaRate } from '@/lib/tva';
 
 export const runtime = 'nodejs';
 
@@ -88,7 +89,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
     let q = supabaseAdmin
       .from('invoices')
       .select(
-        `invoice_number, title, status, issued_at, due_date, paid_at, total_ht, tva_rate, total_ttc,
+        `invoice_number, title, status, issued_at, due_date, paid_at, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc,
          clients(name)`,
       )
       .eq('user_id', access.user_id)
@@ -106,23 +107,43 @@ export async function GET(request: Request, { params }: { params: { token: strin
       'Échéance',
       'Payée le',
       'Montant HT',
-      'Taux TVA',
+      'Taux TVA principal',
+      'Montant TVA',
       'Montant TTC',
+      'Détail TVA multi-taux',
     ];
-    const rows = (data || []).map((inv: Record<string, unknown>) => [
-      inv.invoice_number,
-      inv.title,
-      Array.isArray(inv.clients)
-        ? ((inv.clients[0] as Record<string, unknown>)?.name as string | null) || ''
-        : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',
-      inv.status,
-      inv.issued_at || '',
-      inv.due_date || '',
-      inv.paid_at || '',
-      inv.total_ht,
-      inv.tva_rate,
-      inv.total_ttc,
-    ]);
+    const rows = (data || []).map((inv: Record<string, unknown>) => {
+      const breakdown = parseTvaBreakdown(inv.tva_breakdown);
+      const totalHt = Number(inv.total_ht || 0);
+      const totalTtc = Number(inv.total_ttc || 0);
+      const totalTva =
+        inv.total_tva != null ? Number(inv.total_tva) : Math.max(0, totalTtc - totalHt);
+      const detailTva =
+        breakdown.length > 1
+          ? breakdown
+              .map(
+                (b) =>
+                  `${formatTvaRate(b.rate)} sur ${b.base_ht.toFixed(2).replace('.', ',')} € HT = ${b.tva_amount.toFixed(2).replace('.', ',')} €`,
+              )
+              .join(' + ')
+          : '';
+      return [
+        inv.invoice_number,
+        inv.title,
+        Array.isArray(inv.clients)
+          ? ((inv.clients[0] as Record<string, unknown>)?.name as string | null) || ''
+          : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',
+        inv.status,
+        inv.issued_at || '',
+        inv.due_date || '',
+        inv.paid_at || '',
+        inv.total_ht,
+        inv.tva_rate,
+        totalTva.toFixed(2),
+        inv.total_ttc,
+        detailTva,
+      ];
+    });
 
     const csv = toCsv(headers, rows);
     return new NextResponse(csv, {

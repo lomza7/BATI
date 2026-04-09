@@ -39,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
   // Aggregates: invoices
   let invoicesQuery = supabaseAdmin
     .from('invoices')
-    .select('total_ht, total_ttc, status, paid_at, issued_at, created_at', { count: 'exact' })
+    .select('total_ht, total_ttc, total_tva, status, paid_at, issued_at, created_at', { count: 'exact' })
     .eq('user_id', access.user_id);
   if (scope.start) invoicesQuery = invoicesQuery.gte('created_at', scope.start);
   if (scope.end) invoicesQuery = invoicesQuery.lte('created_at', scope.end + 'T23:59:59');
@@ -54,7 +54,9 @@ export async function GET(_request: Request, { params }: { params: { token: stri
     const ttc = Number(inv.total_ttc || 0);
     totalRevenueHt += ht;
     totalRevenueTtc += ttc;
-    totalTvaCollectee += Math.max(0, ttc - ht);
+    // Prefer stored total_tva (per-rate aware) when available, fallback to ttc - ht
+    totalTvaCollectee +=
+      inv.total_tva != null ? Number(inv.total_tva) : Math.max(0, ttc - ht);
     if (inv.status === 'paid' || inv.paid_at) paidCount += 1;
   }
 

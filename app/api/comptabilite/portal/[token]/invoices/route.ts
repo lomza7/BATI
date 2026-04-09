@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
     .from('invoices')
     .select(
       `id, invoice_number, title, status, issued_at, due_date, paid_at, created_at,
-       total_ht, total_ttc, tva_rate, client_id,
+       total_ht, total_ttc, tva_rate, total_tva, tva_breakdown, client_id,
        clients(name)`,
     )
     .eq('user_id', access.user_id)

@@ -33,7 +33,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
 
   let invoiceQuery = supabaseAdmin
     .from('invoices')
-    .select('id, invoice_number, title, total_ht, total_ttc, tva_rate, paid_at, issued_at, created_at, client_id, clients(name)')
+    .select('id, invoice_number, title, total_ht, total_ttc, tva_rate, tva_breakdown, paid_at, issued_at, created_at, client_id, clients(name)')
     .eq('user_id', access.user_id)
     .order('created_at', { ascending: true });
   if (scope.start) invoiceQuery = invoiceQuery.gte('created_at', scope.start);
@@ -69,6 +69,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
         : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',
     total_ht: inv.total_ht as number | null,
     tva_rate: inv.tva_rate as number | null,
+    tva_breakdown: inv.tva_breakdown,
     total_ttc: inv.total_ttc as number | null,
     paid_at: inv.paid_at as string | null,
     issued_at: inv.issued_at as string | null,

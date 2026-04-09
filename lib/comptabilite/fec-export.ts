@@ -11,6 +11,7 @@
  */
 
 import { getPcgAccountForCategorySlug, PCG_ACCOUNTS, getPcgTvaAccount } from './pcg-accounts';
+import { parseTvaBreakdown, type TvaBreakdownEntry } from '../tva';
 
 interface FecExpense {
   id: string;
@@ -32,6 +33,7 @@ interface FecInvoice {
   client_name: string;
   total_ht: number | null;
   tva_rate: number | null;
+  tva_breakdown?: unknown;
   total_ttc: number | null;
   paid_at: string | null;
   issued_at?: string | null;
@@ -188,9 +190,19 @@ export function buildFecFile(opts: FecOptions): string {
 
     const ht = Number(inv.total_ht || 0);
     const ttc = Number(inv.total_ttc || 0);
-    const tva = Math.max(0, ttc - ht);
+    const totalTvaSimple = Math.max(0, ttc - ht);
     const lib = clean(`${inv.client_name || 'Client'} - ${inv.title || ''}`).slice(0, 200);
     const piece = clean(inv.invoice_number);
+
+    // Rebuild per-rate breakdown — prefer stored JSONB, fallback to single legacy rate
+    const parsed = parseTvaBreakdown(inv.tva_breakdown);
+    const rateGroups: TvaBreakdownEntry[] = parsed.length > 0
+      ? parsed
+      : [{
+          rate: Number(inv.tva_rate || 20),
+          base_ht: ht,
+          tva_amount: totalTvaSimple,
+        }];
 
     // Ligne 1 : débit client TTC
     lines.push([
@@ -214,50 +226,54 @@ export function buildFecFile(opts: FecOptions): string {
       '',
     ]);
 
-    // Ligne 2 : crédit prestations HT
-    lines.push([
-      'VE',
-      'Ventes',
-      num,
-      dt,
-      PCG_ACCOUNTS.ventes_prestations.account,
-      PCG_ACCOUNTS.ventes_prestations.label,
-      '',
-      '',
-      piece,
-      dt,
-      lib,
-      '0,00',
-      fmtAmount(ht),
-      '',
-      '',
-      dt,
-      '',
-      '',
-    ]);
-
-    // Ligne 3 : crédit TVA collectée
-    if (tva > 0) {
+    // Une paire de lignes (ventes HT + TVA collectée) par taux de TVA
+    for (const g of rateGroups) {
+      // Crédit prestations HT (par taux)
       lines.push([
         'VE',
         'Ventes',
         num,
         dt,
-        PCG_ACCOUNTS.tva_collectee.account,
-        PCG_ACCOUNTS.tva_collectee.label,
+        PCG_ACCOUNTS.ventes_prestations.account,
+        PCG_ACCOUNTS.ventes_prestations.label,
         '',
         '',
         piece,
         dt,
         lib,
         '0,00',
-        fmtAmount(tva),
+        fmtAmount(g.base_ht),
         '',
         '',
         dt,
         '',
         '',
       ]);
+
+      // Crédit TVA collectée (le libellé FEC intègre le taux pour lecture humaine)
+      if (g.tva_amount > 0) {
+        const tvaLibWithRate = `${PCG_ACCOUNTS.tva_collectee.label} (${g.rate}%)`.slice(0, 200);
+        lines.push([
+          'VE',
+          'Ventes',
+          num,
+          dt,
+          PCG_ACCOUNTS.tva_collectee.account,
+          tvaLibWithRate,
+          '',
+          '',
+          piece,
+          dt,
+          lib,
+          '0,00',
+          fmtAmount(g.tva_amount),
+          '',
+          '',
+          dt,
+          '',
+          '',
+        ]);
+      }
     }
 
     // === ENCAISSEMENT (Journal BQ) si payée ===
