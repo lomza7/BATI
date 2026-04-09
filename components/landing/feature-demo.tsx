@@ -24,7 +24,7 @@ const SLUG_TO_VIEW: Record<string, string> = {
   'contrats-recurrents': 'contrats',
   'comptabilite-ia': 'comptabilite',
   'agents-ia': 'agents',
-  'rendus-ia': 'plans-rendus',
+  'rendus-ia': 'rendus',
 };
 
 const SLUG_TO_PATH: Record<string, string> = {
