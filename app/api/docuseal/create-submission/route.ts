@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       {
         quote_number: quote.quote_number,
         title: quote.title || '',
+        description: quote.description || '',
         total_ht: Number(quote.total_ht) || 0,
         total_tva: Number(quote.total_tva) || 0,
         total_ttc: Number(quote.total_ttc) || 0,
