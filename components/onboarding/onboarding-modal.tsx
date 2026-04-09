@@ -13,6 +13,7 @@ import { StepIdentite } from './steps/step-identite';
 import { StepSiteWeb } from './steps/step-site-web';
 import { StepFiscalite } from './steps/step-fiscalite';
 import { StepComptaEquipe } from './steps/step-compta-equipe';
+import { StepImport } from './steps/step-import';
 import { StepPrestations } from './steps/step-prestations';
 import { StepReady } from './steps/step-ready';
 import { BTP_CATEGORIES } from './steps/step-prestations';
@@ -58,11 +59,13 @@ export interface OnboardingData {
   wantsMaurice: boolean;
   hasEmployees: boolean | null;
   invitedEmployees: { email: string; name: string; role: string }[];
+  // Import (depuis un autre logiciel)
+  importedCounts: { clients: number; quotes: number; invoices: number } | null;
   // Prestations
   serviceCategories: string[];
 }
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
 
 interface OnboardingModalProps {
   open: boolean;
@@ -107,6 +110,7 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
     wantsMaurice: false,
     hasEmployees: null,
     invitedEmployees: [],
+    importedCounts: null,
     serviceCategories: [],
   });
 
@@ -388,9 +392,12 @@ export function OnboardingModal({ open, userId, onComplete }: OnboardingModalPro
                 <StepComptaEquipe data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
               )}
               {step === 6 && (
-                <StepPrestations data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
+                <StepImport data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
               )}
               {step === 7 && (
+                <StepPrestations data={data} onChange={updateData} onNext={next} onBack={back} onSkip={skip} />
+              )}
+              {step === 8 && (
                 <StepReady data={data} onBack={back} onFinish={finish} saving={saving} />
               )}
             </motion.div>

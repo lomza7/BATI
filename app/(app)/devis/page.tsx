@@ -15,6 +15,8 @@ import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ClientPicker } from '@/components/shared/client-picker';
+import { BankAccountPicker } from '@/components/shared/bank-account-picker';
+import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +78,16 @@ interface QuoteLine {
   _savingAsPrestation?: boolean;
 }
 
+// Default expiration: 30 days from today, returned as YYYY-MM-DD (local time)
+function getDefaultValidUntil(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
   const { user } = useAuth();
@@ -90,6 +102,8 @@ export default function DevisPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newQuote, setNewQuote] = useState({ title: '', description: '' });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [validUntil, setValidUntil] = useState<string>(getDefaultValidUntil());
   const [lines, setLines] = useState<QuoteLine[]>([
     { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 },
   ]);
@@ -107,6 +121,9 @@ export default function DevisPage() {
   // the confirmation banner at the top of the list. Cleared automatically
   // after 5s.
   const [aiCreatedNumber, setAiCreatedNumber] = useState<string | null>(null);
+  // null = pas encore verifie, true/false = resultat de la verif
+  const [hasBankAccount, setHasBankAccount] = useState<boolean | null>(null);
+  const [showFirstRibDialog, setShowFirstRibDialog] = useState(false);
 
   useEffect(() => {
     loadQuotes();
@@ -189,6 +206,16 @@ export default function DevisPage() {
     }
     setQuoteSends(sendsMap);
     setLoading(false);
+
+    // Verifie si l'utilisateur a deja au moins un RIB (pour la modale
+    // de premier devis). Separe du load principal pour ne pas bloquer
+    // l'affichage de la liste.
+    const { data: bankRows } = await supabase
+      .from('bank_accounts')
+      .select('id')
+      .is('deleted_at', null)
+      .limit(1);
+    setHasBankAccount((bankRows?.length || 0) > 0);
   }
 
   // Auto-save: create a brouillon draft as soon as a client is selected
@@ -196,8 +223,6 @@ export default function DevisPage() {
     if (!user || draftId.current) return;
 
     const quoteNumber = await getNextQuoteNumber(supabase, user.id);
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 30);
 
     const { data } = await supabase
       .from('quotes')
@@ -206,12 +231,13 @@ export default function DevisPage() {
         quote_number: quoteNumber,
         client_id: clientId,
         project_id: prefillProjectId.current || null,
+        bank_account_id: selectedBankAccountId,
         title: newQuote.title || '',
         description: newQuote.description || '',
         status: 'brouillon',
         total_ht: 0,
         total_ttc: 0,
-        valid_until: validUntil.toISOString().split('T')[0],
+        valid_until: validUntil,
       })
       .select('id')
       .single();
@@ -245,6 +271,7 @@ export default function DevisPage() {
         .update({
           client_id: selectedClientId,
           project_id: prefillProjectId.current || null,
+          bank_account_id: selectedBankAccountId,
           title: newQuote.title,
           description: newQuote.description,
           total_ht: totalHt,
@@ -252,6 +279,7 @@ export default function DevisPage() {
           total_ttc: totalTtc,
           tva_rate: tva.primary_rate,
           tva_breakdown: tva.tva_breakdown,
+          valid_until: validUntil,
           updated_at: new Date().toISOString(),
         })
         .eq('id', draftId.current);
@@ -306,8 +334,6 @@ export default function DevisPage() {
     } else {
       // No draft yet — create everything from scratch
       const quoteNumber = await getNextQuoteNumber(supabase, user.id);
-      const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + 30);
 
       const { data: quote } = await supabase
         .from('quotes')
@@ -316,6 +342,7 @@ export default function DevisPage() {
           quote_number: quoteNumber,
           client_id: selectedClientId,
           project_id: prefillProjectId.current || null,
+          bank_account_id: selectedBankAccountId,
           title: newQuote.title,
           description: newQuote.description,
           total_ht: totalHt,
@@ -323,7 +350,7 @@ export default function DevisPage() {
           total_ttc: totalTtc,
           tva_rate: tva.primary_rate,
           tva_breakdown: tva.tva_breakdown,
-          valid_until: validUntil.toISOString().split('T')[0],
+          valid_until: validUntil,
         })
         .select('id')
         .single();
@@ -394,6 +421,8 @@ export default function DevisPage() {
     setShowCreate(false);
     setNewQuote({ title: '', description: '' });
     setSelectedClientId(null);
+    setSelectedBankAccountId(null);
+    setValidUntil(getDefaultValidUntil());
     setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
     draftId.current = null;
     prefillProjectId.current = null;
@@ -535,6 +564,11 @@ export default function DevisPage() {
   }
 
   function openCreateOptions() {
+    // Premier devis : on force l'ajout d'un RIB avant tout
+    if (hasBankAccount === false) {
+      setShowFirstRibDialog(true);
+      return;
+    }
     setShowCreateOptions(true);
   }
 
@@ -860,6 +894,18 @@ export default function DevisPage() {
         </>
       )}
 
+      <FirstBankAccountDialog
+        open={showFirstRibDialog}
+        onOpenChange={setShowFirstRibDialog}
+        context="devis"
+        onSaved={(account) => {
+          setHasBankAccount(true);
+          setSelectedBankAccountId(account.id);
+          setShowFirstRibDialog(false);
+          setShowCreateOptions(true);
+        }}
+      />
+
       <Dialog open={showCreateOptions} onOpenChange={setShowCreateOptions}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
@@ -948,7 +994,12 @@ export default function DevisPage() {
 
       <Dialog open={showCreate} onOpenChange={(open) => {
         setShowCreate(open);
-        if (!open) {
+        if (open) {
+          // Refresh the default expiration each time the dialog opens, so the
+          // "+30 days" is computed from "today" rather than from when the page
+          // was first mounted.
+          setValidUntil(getDefaultValidUntil());
+        } else {
           // Reload list to show any auto-saved draft
           if (draftId.current) {
             loadQuotes();
@@ -956,6 +1007,8 @@ export default function DevisPage() {
           }
           setNewQuote({ title: '', description: '' });
           setSelectedClientId(null);
+          setSelectedBankAccountId(null);
+          setValidUntil(getDefaultValidUntil());
           setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
         }
       }}>
@@ -983,6 +1036,24 @@ export default function DevisPage() {
                 />
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <label htmlFor="quote-valid-until" className="text-sm font-medium text-foreground">
+                Valable jusqu&apos;au
+              </label>
+              <Input
+                id="quote-valid-until"
+                type="date"
+                className="h-9 w-auto max-w-[180px]"
+                value={validUntil}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setValidUntil(e.target.value || getDefaultValidUntil())}
+              />
+              <span className="text-xs text-muted-foreground">30 jours par défaut</span>
+            </div>
+            <BankAccountPicker
+              value={selectedBankAccountId}
+              onChange={setSelectedBankAccountId}
+            />
             <div>
               <label className="text-sm font-medium text-foreground">Description</label>
               <textarea
@@ -1162,6 +1233,7 @@ export default function DevisPage() {
         description={newQuote.description}
         lines={lines}
         clientId={selectedClientId}
+        bankAccountId={selectedBankAccountId}
       />
 
       <DocumentPreviewDialog

@@ -45,6 +45,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
+import { BankAccountPicker } from '@/components/shared/bank-account-picker';
+import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import {
   Select,
   SelectContent,
@@ -91,6 +93,7 @@ interface QuoteCandidate {
   total_ttc: number;
   created_at: string;
   valid_until: string | null;
+  bank_account_id: string | null;
   clients: { name: string } | null;
   invoice_id: string | null;
   invoice_number: string | null;
@@ -125,6 +128,11 @@ export default function FacturesPage() {
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
   const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [hasBankAccount, setHasBankAccount] = useState<boolean | null>(null);
+  const [showFirstRibDialog, setShowFirstRibDialog] = useState(false);
+  // Quote en attente lorsqu'on doit forcer l'ajout d'un RIB avant la conversion
+  const [pendingQuoteForInvoice, setPendingQuoteForInvoice] = useState<QuoteCandidate | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
@@ -168,6 +176,7 @@ export default function FacturesPage() {
           total_ttc,
           created_at,
           valid_until,
+          bank_account_id,
           clients(name, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position),
           invoices(id, invoice_number, status)
@@ -203,6 +212,7 @@ export default function FacturesPage() {
         total_ttc: Number(quote.total_ttc || 0),
         created_at: String(quote.created_at || ''),
         valid_until: quote.valid_until ? String(quote.valid_until) : null,
+        bank_account_id: quote.bank_account_id ? String(quote.bank_account_id) : null,
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
@@ -224,6 +234,33 @@ export default function FacturesPage() {
 
     setQuotes(nextQuotes);
     setLoading(false);
+
+    // Verifie la presence d'un RIB pour la modale de premiere facture.
+    const { data: bankRows } = await supabase
+      .from('bank_accounts')
+      .select('id')
+      .is('deleted_at', null)
+      .limit(1);
+    setHasBankAccount((bankRows?.length || 0) > 0);
+  }
+
+  function handleOpenCreate() {
+    if (hasBankAccount === false) {
+      setShowFirstRibDialog(true);
+      return;
+    }
+    setShowCreate(true);
+  }
+
+  function handleConvertQuote(quote: QuoteCandidate) {
+    // Si le devis a deja son propre RIB, on peut convertir directement
+    if (quote.bank_account_id || hasBankAccount) {
+      createInvoiceFromQuote(quote);
+      return;
+    }
+    // Sinon, on force l'ajout d'un RIB avant la conversion
+    setPendingQuoteForInvoice(quote);
+    setShowFirstRibDialog(true);
   }
 
   async function createInvoice() {
@@ -252,6 +289,7 @@ export default function FacturesPage() {
       invoice_number: invNumber,
       client_id: clientId,
       project_id: prefillProjectId.current || null,
+      bank_account_id: selectedBankAccountId,
       title: form.title,
       total_ht: tva.total_ht,
       total_tva: tva.total_tva,
@@ -278,6 +316,7 @@ export default function FacturesPage() {
 
     setShowCreate(false);
     setForm({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
+    setSelectedBankAccountId(null);
     prefillProjectId.current = null;
     loadData();
   }
@@ -313,6 +352,7 @@ export default function FacturesPage() {
           invoice_number: invNumber,
           quote_id: quote.id,
           client_id: client?.id || null,
+          bank_account_id: quote.bank_account_id,
           title: quote.title || `Facture ${quote.quote_number}`,
           total_ht: tva.total_ht || quote.total_ht,
           total_tva: tva.total_tva,
@@ -620,7 +660,7 @@ export default function FacturesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
+        <Button onClick={handleOpenCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>
       </PageHeader>
@@ -718,7 +758,7 @@ export default function FacturesPage() {
 
                       <div className="flex flex-col items-stretch gap-2 sm:min-w-[180px]">
                         <Button
-                          onClick={() => createInvoiceFromQuote(quote)}
+                          onClick={() => handleConvertQuote(quote)}
                           disabled={!canCreateInvoice || creatingFromQuoteId === quote.id}
                           className="gap-2"
                         >
@@ -753,7 +793,7 @@ export default function FacturesPage() {
             <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>
           ) : filteredInvoices.length === 0 ? (
             <EmptyState icon={Receipt} title="Aucune facture" description="Creez votre premiere facture ou convertissez un devis.">
-              <Button onClick={() => setShowCreate(true)} className="gap-2"><Plus className="h-4 w-4" /> Creer une facture</Button>
+              <Button onClick={handleOpenCreate} className="gap-2"><Plus className="h-4 w-4" /> Creer une facture</Button>
             </EmptyState>
           ) : (
             <>
@@ -858,6 +898,29 @@ export default function FacturesPage() {
         documentId={previewInvoiceId}
       />
 
+      <FirstBankAccountDialog
+        open={showFirstRibDialog}
+        onOpenChange={(open) => {
+          setShowFirstRibDialog(open);
+          if (!open) setPendingQuoteForInvoice(null);
+        }}
+        context="facture"
+        onSaved={(account) => {
+          setHasBankAccount(true);
+          setShowFirstRibDialog(false);
+          // Si on etait en train de convertir un devis, on reprend le flow
+          if (pendingQuoteForInvoice) {
+            const quoteWithBank = { ...pendingQuoteForInvoice, bank_account_id: account.id };
+            setPendingQuoteForInvoice(null);
+            createInvoiceFromQuote(quoteWithBank);
+            return;
+          }
+          // Sinon on ouvre le formulaire de facture manuelle avec ce RIB selectionne
+          setSelectedBankAccountId(account.id);
+          setShowCreate(true);
+        }}
+      />
+
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader><DialogTitle>Nouvelle facture</DialogTitle></DialogHeader>
@@ -889,6 +952,10 @@ export default function FacturesPage() {
                 </Select>
               </div>
             </div>
+            <BankAccountPicker
+              value={selectedBankAccountId}
+              onChange={setSelectedBankAccountId}
+            />
             <div className="rounded-lg border border-border/70 bg-muted/30 p-3 text-sm flex items-center justify-between">
               <div className="text-muted-foreground">
                 <p>Total HT : <span className="font-medium text-foreground">{formatCurrency(form.totalHt || 0)}</span></p>

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { docusealFetch, buildQuoteHtml } from '@/lib/docuseal';
 import { buildQuoteSignatureEmail } from '@/lib/email-templates';
+import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 
 export const runtime = 'nodejs';
 
@@ -45,11 +46,12 @@ export async function POST(request: Request) {
     });
 
     const body = await request.json();
-    const { quote_id, client_name, client_email, expires_in_days } = body as {
+    const { quote_id, client_name, client_email, expires_in_days, excluded_attachment_ids } = body as {
       quote_id: string;
       client_name: string;
       client_email?: string;
       expires_in_days: number;
+      excluded_attachment_ids?: string[];
     };
 
     if (!quote_id || !client_name?.trim()) {
@@ -229,6 +231,15 @@ export async function POST(request: Request) {
 
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
 
+      // Charger les attestations / pieces jointes par defaut de l'artisan
+      // (sauf celles que l'utilisateur a explicitement decochees dans le dialog).
+      const companyAttachments = await fetchCompanyAttachmentsForUser(
+        admin,
+        user.id,
+        'quotes',
+        { excludeIds: excluded_attachment_ids },
+      );
+
       // Resend SDK v6+ retourne { data, error } au lieu de throw —
       // on vérifie explicitement l'erreur pour ne plus avaler silencieusement
       // les échecs de délivrabilité (domaine non vérifié, adresse invalide, etc.)
@@ -238,6 +249,10 @@ export async function POST(request: Request) {
           to: recipientEmail,
           subject: `Devis ${quote.quote_number} — ${companyName}`,
           html: emailHtml,
+          attachments: companyAttachments.map(att => ({
+            filename: att.name,
+            content: att.content_base64,
+          })),
         });
 
         if (result.error) {

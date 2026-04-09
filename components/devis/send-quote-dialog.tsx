@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail, TriangleAlert as AlertTriangle, Paperclip, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,12 @@ interface Props {
   onSent?: () => void;
 }
 
+interface CompanyAttachmentRow {
+  id: string;
+  name: string;
+  size_bytes: number;
+}
+
 export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
   const { user } = useAuth();
   const [clientName, setClientName] = useState(quote.clients?.name || '');
@@ -35,6 +41,31 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
   const [sendError, setSendError] = useState('');
   const [emailStatus, setEmailStatus] = useState<EmailStatus>(null);
   const [emailErrorMsg, setEmailErrorMsg] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<CompanyAttachmentRow[]>([]);
+  const [excludedAttachmentIds, setExcludedAttachmentIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('company_attachments')
+        .select('id, name, size_bytes')
+        .eq('attach_to_quotes', true)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (!cancelled) setAttachments((data as CompanyAttachmentRow[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function toggleAttachment(id: string) {
+    setExcludedAttachmentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function handleSend() {
     if (!user || !clientName.trim()) return;
@@ -61,6 +92,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
           client_name: clientName.trim(),
           client_email: clientEmail.trim() || undefined,
           expires_in_days: parseInt(expiresIn),
+          excluded_attachment_ids: Array.from(excludedAttachmentIds),
         }),
       });
 
@@ -204,6 +236,46 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   className="w-full h-11 rounded-xl border border-border bg-muted/30 px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
                 />
               </div>
+
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                      Pieces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
+                    </label>
+                  </div>
+                  <ul className="rounded-xl border border-border divide-y">
+                    {attachments.map(att => {
+                      const included = !excludedAttachmentIds.has(att.id);
+                      return (
+                        <li key={att.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className={`text-xs truncate ${included ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                              {att.name}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleAttachment(att.id)}
+                            className={`h-6 px-2 rounded-md text-[11px] font-medium transition-colors ${
+                              included
+                                ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                            }`}
+                          >
+                            {included ? 'Joint' : 'Exclu'}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p className="text-[11px] text-muted-foreground">
+                    Vos attestations sont jointes par defaut a tous les devis. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Expiration du lien</label>

@@ -1,12 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Hexagon, Building2, User, PenLine, Shield, X } from 'lucide-react';
+import { Hexagon, Building2, User, PenLine, Shield, X, Landmark } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QUOTE_UNIT_LABELS } from '@/lib/constants';
 import { computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { formatIban } from '@/lib/banks';
+import { InsuranceFooter } from '@/components/shared/insurance-footer';
+
+interface PreviewBankAccount {
+  label: string;
+  bank_name: string;
+  account_holder: string;
+  iban: string;
+  bic: string;
+}
 
 interface PreviewLine {
   description: string;
@@ -35,6 +45,11 @@ interface ArtisanProfile {
   company_city: string | null;
   company_phone: string | null;
   logo_url: string | null;
+  insurance_company: string | null;
+  insurance_address: string | null;
+  insurance_coverage_zone: string | null;
+  insurance_contract_number: string | null;
+  insurance_warranty_type: string | null;
   document_config: {
     primary_color?: string;
     secondary_color?: string;
@@ -61,6 +76,7 @@ interface Props {
   documentNumber?: string;
   validUntil?: string | null;
   dueDate?: string | null;
+  bankAccountId?: string | null;
   // DB-load mode (used by list rows — fetches the saved quote/invoice)
   documentId?: string | null;
 }
@@ -93,6 +109,7 @@ export function DocumentPreviewDialog({
   documentNumber: documentNumberProp,
   validUntil: validUntilProp,
   dueDate: dueDateProp,
+  bankAccountId: bankAccountIdProp,
   documentId,
 }: Props) {
   const { user } = useAuth();
@@ -108,6 +125,7 @@ export function DocumentPreviewDialog({
   const [resolvedValidUntil, setResolvedValidUntil] = useState<string | null | undefined>(validUntilProp);
   const [resolvedDueDate, setResolvedDueDate] = useState<string | null | undefined>(dueDateProp);
   const [resolvedCreatedAt, setResolvedCreatedAt] = useState<Date>(new Date());
+  const [bankAccount, setBankAccount] = useState<PreviewBankAccount | null>(null);
 
   // Keep in-memory props in sync when the dialog is used without documentId.
   useEffect(() => {
@@ -131,7 +149,7 @@ export function DocumentPreviewDialog({
       // 1. Always load the artisan profile
       const profileRes = await supabase
         .from('profiles')
-        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
+        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
         .eq('id', user!.id)
         .maybeSingle();
 
@@ -139,11 +157,12 @@ export function DocumentPreviewDialog({
       if (profileRes.data) setArtisan(profileRes.data as ArtisanProfile);
 
       // 2. Load the document + lines + client when documentId is provided
+      let resolvedBankAccountId: string | null = bankAccountIdProp ?? null;
       if (documentId) {
         if (mode === 'quote') {
           const { data: quote } = await supabase
             .from('quotes')
-            .select('quote_number, title, description, valid_until, created_at, client_id')
+            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -154,6 +173,7 @@ export function DocumentPreviewDialog({
             setResolvedValidUntil(quote.valid_until);
             setResolvedDueDate(null);
             setResolvedCreatedAt(new Date(quote.created_at));
+            resolvedBankAccountId = quote.bank_account_id || null;
 
             const { data: linesData } = await supabase
               .from('quote_lines')
@@ -178,7 +198,7 @@ export function DocumentPreviewDialog({
         } else {
           const { data: invoice } = await supabase
             .from('invoices')
-            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -189,6 +209,7 @@ export function DocumentPreviewDialog({
             setResolvedValidUntil(null);
             setResolvedDueDate(invoice.due_date);
             setResolvedCreatedAt(new Date(invoice.issued_at || invoice.created_at));
+            resolvedBankAccountId = invoice.bank_account_id || null;
 
             const { data: linesData } = await supabase
               .from('invoice_lines')
@@ -223,6 +244,18 @@ export function DocumentPreviewDialog({
         setClient(null);
       }
 
+      // 3. Load the bank account (from DB documentId or from in-memory prop)
+      if (resolvedBankAccountId) {
+        const { data: bankData } = await supabase
+          .from('bank_accounts')
+          .select('label, bank_name, account_holder, iban, bic')
+          .eq('id', resolvedBankAccountId)
+          .maybeSingle();
+        if (!cancelled) setBankAccount((bankData as PreviewBankAccount) || null);
+      } else if (!cancelled) {
+        setBankAccount(null);
+      }
+
       if (!cancelled) setLoading(false);
     }
 
@@ -230,7 +263,7 @@ export function DocumentPreviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, user, documentId, mode, clientIdProp]);
+  }, [open, user, documentId, mode, clientIdProp, bankAccountIdProp]);
 
   // Totals computed from the resolved lines — multi-rate TVA
   const validLines = resolvedLines.filter((l) => l.description.trim());
@@ -525,6 +558,36 @@ export function DocumentPreviewDialog({
               </div>
             </div>
 
+            {/* Coordonnees bancaires */}
+            {bankAccount && (
+              <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Landmark className="h-4 w-4" style={{ color: accent }} />
+                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
+                    {isInvoice ? 'Coordonnées bancaires pour le paiement' : 'Règlement par virement'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#e5e1da] bg-[#faf9f7] p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-[#6b6560]">Titulaire</p>
+                      <p className="text-sm font-medium" style={{ color: textColor }}>{bankAccount.account_holder}</p>
+                      <p className="mt-2 text-xs text-[#6b6560]">Banque</p>
+                      <p className="text-sm" style={{ color: textColor }}>{bankAccount.bank_name}</p>
+                    </div>
+                    <div className="min-w-0 flex-1 sm:text-right">
+                      <p className="text-xs text-[#6b6560]">IBAN</p>
+                      <p className="font-mono text-[13px] tracking-wide" style={{ color: textColor }}>
+                        {formatIban(bankAccount.iban)}
+                      </p>
+                      <p className="mt-2 text-xs text-[#6b6560]">BIC</p>
+                      <p className="font-mono text-[13px]" style={{ color: textColor }}>{bankAccount.bic}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Signature placeholder — quotes only */}
             {!isInvoice && (
               <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
@@ -570,6 +633,7 @@ export function DocumentPreviewDialog({
                   )}
                 </p>
               </div>
+              <InsuranceFooter insurance={artisan} />
               {footerText && (
                 <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>
               )}

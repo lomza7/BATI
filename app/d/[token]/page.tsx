@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -9,15 +9,19 @@ import {
   TriangleAlert as AlertTriangle,
   CircleCheck as CheckCircle,
   Clock,
+  Calendar,
   Building2,
   User,
   PenLine,
   Shield,
   Download,
+  Landmark,
 } from 'lucide-react';
 import { SignatureCanvas } from '@/components/devis/signature-canvas';
 import { DocusealSigning } from '@/components/devis/docuseal-signing';
+import { InsuranceFooter } from '@/components/shared/insurance-footer';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
+import { formatIban } from '@/lib/banks';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -51,6 +55,7 @@ interface QuoteData {
   valid_until: string | null;
   signed_at: string | null;
   created_at: string;
+  bank_account_id: string | null;
   clients: {
     name: string;
     email: string | null;
@@ -59,6 +64,14 @@ interface QuoteData {
     city: string | null;
     postal_code: string | null;
   } | null;
+}
+
+interface BankAccountData {
+  label: string;
+  bank_name: string;
+  account_holder: string;
+  iban: string;
+  bic: string;
 }
 
 interface QuoteLine {
@@ -82,6 +95,11 @@ interface ArtisanProfile {
   company_city: string | null;
   company_phone: string | null;
   logo_url: string | null;
+  insurance_company: string | null;
+  insurance_address: string | null;
+  insurance_coverage_zone: string | null;
+  insurance_contract_number: string | null;
+  insurance_warranty_type: string | null;
   document_config: {
     primary_color?: string;
     secondary_color?: string;
@@ -130,6 +148,7 @@ export default function PublicQuotePage() {
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [lines, setLines] = useState<QuoteLine[]>([]);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [bankAccount, setBankAccount] = useState<BankAccountData | null>(null);
   const [signing, setSigning] = useState(false);
   const [signed, setSigned] = useState(false);
   const [signedAt, setSignedAt] = useState<string | null>(null);
@@ -182,7 +201,7 @@ export default function PublicQuotePage() {
     // 2. Fetch quote with client
     const { data: quoteData } = await anonClient
       .from('quotes')
-      .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, clients(name, email, phone, address, city, postal_code)')
+      .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, bank_account_id, clients(name, email, phone, address, city, postal_code)')
       .eq('id', send.quote_id)
       .is('deleted_at', null)
       .maybeSingle();
@@ -217,13 +236,24 @@ export default function PublicQuotePage() {
     if (sendFull?.user_id) {
       const { data: profile } = await anonClient
         .from('profiles')
-        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
+        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
         .eq('id', sendFull.user_id)
         .maybeSingle();
 
       if (profile) {
         setArtisan(profile as ArtisanProfile);
       }
+    }
+
+    // 5. Fetch bank account if attached to the quote
+    const quoteBankId = (quoteData as unknown as QuoteData).bank_account_id;
+    if (quoteBankId) {
+      const { data: bankData } = await anonClient
+        .from('bank_accounts')
+        .select('label, bank_name, account_holder, iban, bic')
+        .eq('id', quoteBankId)
+        .maybeSingle();
+      if (bankData) setBankAccount(bankData as BankAccountData);
     }
 
     setLoading(false);
@@ -519,6 +549,83 @@ export default function PublicQuotePage() {
             </div>
           )}
 
+          {/* Quote dates — prominent for the client */}
+          {(() => {
+            const createdLabel = formatDate(quote.created_at);
+            let expiryBlock: ReactNode = null;
+            if (quote.valid_until) {
+              const expiry = new Date(quote.valid_until + 'T23:59:59');
+              const now = new Date();
+              const isExpired = expiry.getTime() < now.getTime();
+              const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              const isSoon = !isExpired && daysLeft <= 7;
+              const badgeColor = isExpired ? '#dc2626' : isSoon ? '#b45309' : accent;
+              const bgColor = isExpired ? '#fee2e2' : isSoon ? '#fef3c7' : accent + '15';
+              const expiryLabel = isExpired ? 'Expiré le' : 'Valable jusqu\'au';
+              const helperText = isExpired
+                ? 'Ce devis a expiré'
+                : daysLeft === 0
+                  ? "Expire aujourd'hui"
+                  : daysLeft === 1
+                    ? 'Expire demain'
+                    : isSoon
+                      ? `Plus que ${daysLeft} jours`
+                      : null;
+              expiryBlock = (
+                <div className="flex items-start gap-3 flex-1">
+                  <div
+                    className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    <Clock className="h-5 w-5" style={{ color: badgeColor }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className="text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: badgeColor }}
+                    >
+                      {expiryLabel}
+                    </p>
+                    <p className="text-base font-semibold mt-0.5" style={{ color: textColor }}>
+                      {formatDate(quote.valid_until)}
+                    </p>
+                    {helperText && (
+                      <p className="text-xs mt-0.5 font-medium" style={{ color: badgeColor }}>
+                        {helperText}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div className="px-5 sm:px-8 py-5 border-b border-[#e5e1da] bg-white">
+                <div className="flex flex-col sm:flex-row gap-5 sm:gap-8">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div
+                      className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: accent + '15' }}
+                    >
+                      <Calendar className="h-5 w-5" style={{ color: accent }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p
+                        className="text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: accent }}
+                      >
+                        Émis le
+                      </p>
+                      <p className="text-base font-semibold mt-0.5" style={{ color: textColor }}>
+                        {createdLabel}
+                      </p>
+                    </div>
+                  </div>
+                  {expiryBlock}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Quote title & description */}
           <div className="px-5 sm:px-8 py-5 border-b border-[#e5e1da]">
             <h2 className="text-lg font-semibold" style={{ color: textColor }}>{quote.title}</h2>
@@ -604,6 +711,36 @@ export default function PublicQuotePage() {
               </div>
             </div>
           </div>
+
+          {/* Coordonnees bancaires */}
+          {bankAccount && (
+            <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Landmark className="h-4 w-4" style={{ color: accent }} />
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
+                  Règlement par virement
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#e5e1da] bg-[#faf9f7] p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-[#6b6560]">Titulaire</p>
+                    <p className="text-sm font-medium" style={{ color: textColor }}>{bankAccount.account_holder}</p>
+                    <p className="mt-2 text-xs text-[#6b6560]">Banque</p>
+                    <p className="text-sm" style={{ color: textColor }}>{bankAccount.bank_name}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 sm:text-right">
+                    <p className="text-xs text-[#6b6560]">IBAN</p>
+                    <p className="font-mono text-[13px] tracking-wide" style={{ color: textColor }}>
+                      {formatIban(bankAccount.iban)}
+                    </p>
+                    <p className="mt-2 text-xs text-[#6b6560]">BIC</p>
+                    <p className="font-mono text-[13px]" style={{ color: textColor }}>{bankAccount.bic}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Signature section — no horizontal padding on mobile for max canvas width */}
           <div id="signature-section" className="border-t-2 border-[#e5e1da] px-2 sm:px-8 py-6">
@@ -705,6 +842,7 @@ export default function PublicQuotePage() {
                 )}
               </p>
             </div>
+            <InsuranceFooter insurance={artisan} />
             {footerText && (
               <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>
             )}

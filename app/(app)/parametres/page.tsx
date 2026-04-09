@@ -21,6 +21,7 @@ import {
   Settings2,
   Shield,
   Sparkles,
+  Upload,
   Users,
   Zap,
   Crown,
@@ -38,6 +39,9 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
+import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
+import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
+import { ImportModal } from '@/components/onboarding/import-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,7 +89,7 @@ import {
   type WorkspaceRole,
 } from '@/lib/workspace';
 
-type SettingsTab = 'parametres' | 'documents' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'documents' | 'banque' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -107,6 +111,11 @@ interface SettingsProfile {
   company_postal_code: string;
   company_website: string;
   rcs: string;
+  insurance_company: string;
+  insurance_address: string;
+  insurance_coverage_zone: string;
+  insurance_contract_number: string;
+  insurance_warranty_type: string;
   onboarding_completed: boolean;
   plan: PricingPlanKey;
   plan_started_at: string | null;
@@ -335,6 +344,11 @@ export default function ParametresPage() {
     tva_number: '',
     team_size: 'seul',
     referral_source: '',
+    insurance_company: '',
+    insurance_address: '',
+    insurance_coverage_zone: '',
+    insurance_contract_number: '',
+    insurance_warranty_type: '',
   });
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>({});
   const [reminderSettings, setReminderSettings] = useState(defaultReminderSettings);
@@ -346,6 +360,7 @@ export default function ParametresPage() {
   const [savingStageId, setSavingStageId] = useState<string | null>(null);
   const [creatingSource, setCreatingSource] = useState(false);
   const [creatingStage, setCreatingStage] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
@@ -399,7 +414,7 @@ export default function ParametresPage() {
       supabase
         .from('profiles')
         .select(
-          'id, full_name, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, onboarding_completed, plan, plan_started_at, stripe_customer_id, project_phases_config'
+          'id, full_name, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, onboarding_completed, plan, plan_started_at, stripe_customer_id, project_phases_config'
         )
         .eq('id', user.id)
         .maybeSingle(),
@@ -485,6 +500,11 @@ export default function ParametresPage() {
       tva_number: nextProfile?.tva_number || '',
       team_size: nextProfile?.team_size || 'seul',
       referral_source: nextProfile?.referral_source || '',
+      insurance_company: nextProfile?.insurance_company || '',
+      insurance_address: nextProfile?.insurance_address || '',
+      insurance_coverage_zone: nextProfile?.insurance_coverage_zone || '',
+      insurance_contract_number: nextProfile?.insurance_contract_number || '',
+      insurance_warranty_type: nextProfile?.insurance_warranty_type || '',
     });
     // Charger la config des phases personnalisées
     const savedPhases = (nextProfile as any)?.project_phases_config;
@@ -1199,9 +1219,10 @@ export default function ParametresPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
-        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-6 rounded-xl bg-muted/60 p-1">
+        <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 rounded-xl bg-muted/60 p-1">
           <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
           <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
+          <TabsTrigger value="banque" className="rounded-lg py-2.5 text-xs sm:text-sm">Banque</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
           <TabsTrigger value="equipe" className="rounded-lg py-2.5 text-xs sm:text-sm">Equipe</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
@@ -1312,6 +1333,79 @@ export default function ParametresPage() {
                       onChange={(e) => setForm((prev) => ({ ...prev, tva_number: e.target.value }))}
                       placeholder="FRXX123456789"
                     />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Assurance professionnelle</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Obligatoire sur tous les devis et factures. Ces informations apparaîtront en pied
+                      de page de vos documents.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="insurance_company">Nom de l&apos;assureur</Label>
+                      <Input
+                        id="insurance_company"
+                        value={form.insurance_company}
+                        onChange={(e) => setForm((prev) => ({ ...prev, insurance_company: e.target.value }))}
+                        placeholder="MAAF Pro, AXA, Allianz..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="insurance_contract_number">Numéro de contrat</Label>
+                      <Input
+                        id="insurance_contract_number"
+                        value={form.insurance_contract_number}
+                        onChange={(e) => setForm((prev) => ({ ...prev, insurance_contract_number: e.target.value }))}
+                        placeholder="123 456 789"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="insurance_address">Adresse de l&apos;assureur</Label>
+                      <Input
+                        id="insurance_address"
+                        value={form.insurance_address}
+                        onChange={(e) => setForm((prev) => ({ ...prev, insurance_address: e.target.value }))}
+                        placeholder="1 cours Michelet, 92800 Puteaux"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="insurance_coverage_zone">Zone de couverture</Label>
+                      <select
+                        id="insurance_coverage_zone"
+                        value={form.insurance_coverage_zone}
+                        onChange={(e) => setForm((prev) => ({ ...prev, insurance_coverage_zone: e.target.value }))}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Choisir une zone</option>
+                        <option value="France">France métropolitaine</option>
+                        <option value="France + DOM-TOM">France + DOM-TOM</option>
+                        <option value="Europe">Europe</option>
+                        <option value="International">International</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="insurance_warranty_type">Type de garantie</Label>
+                      <select
+                        id="insurance_warranty_type"
+                        value={form.insurance_warranty_type}
+                        onChange={(e) => setForm((prev) => ({ ...prev, insurance_warranty_type: e.target.value }))}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Choisir une garantie</option>
+                        <option value="Garantie décennale">Garantie décennale</option>
+                        <option value="Garantie biennale">Garantie biennale (bon fonctionnement)</option>
+                        <option value="Garantie décennale + biennale">Décennale + biennale</option>
+                        <option value="Responsabilité civile professionnelle">Responsabilité civile pro</option>
+                        <option value="Garantie décennale + RC Pro">Décennale + RC Pro</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -2144,10 +2238,51 @@ export default function ParametresPage() {
                 ))}
             </CardContent>
           </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Importer mes données
+              </CardTitle>
+              <CardDescription>
+                Migrez vos clients, devis et factures depuis Constructeur ou tout autre logiciel qui exporte en CSV ou Excel.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-xl bg-white border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      Compatible Constructeur, Excel, Obat, EBP, Sage, Henrri…
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Hellobat reconnaît automatiquement les colonnes de vos exports CSV.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setImportOpen(true)}
+                  className="flex-shrink-0"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Lancer l&apos;import
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-6">
           <DocumentTemplateSettings />
+          <CompanyAttachmentsCard />
+        </TabsContent>
+
+        <TabsContent value="banque" className="space-y-6">
+          <BankAccountsCard />
         </TabsContent>
 
         <TabsContent value="equipe" className="space-y-6">
@@ -2824,6 +2959,8 @@ export default function ParametresPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ImportModal open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

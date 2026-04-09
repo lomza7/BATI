@@ -15,8 +15,11 @@ import {
   CreditCard,
   PartyPopper,
   XCircle,
+  Landmark,
 } from 'lucide-react';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
+import { formatIban } from '@/lib/banks';
+import { InsuranceFooter } from '@/components/shared/insurance-footer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -46,6 +49,7 @@ interface InvoiceData {
   paid_at: string | null;
   created_at: string;
   payment_method: string;
+  bank_account_id: string | null;
   clients: {
     name: string;
     email: string | null;
@@ -54,6 +58,14 @@ interface InvoiceData {
     city: string | null;
     postal_code: string | null;
   } | null;
+}
+
+interface BankAccountData {
+  label: string;
+  bank_name: string;
+  account_holder: string;
+  iban: string;
+  bic: string;
 }
 
 interface InvoiceLine {
@@ -77,6 +89,11 @@ interface ArtisanProfile {
   company_city: string | null;
   company_phone: string | null;
   logo_url: string | null;
+  insurance_company: string | null;
+  insurance_address: string | null;
+  insurance_coverage_zone: string | null;
+  insurance_contract_number: string | null;
+  insurance_warranty_type: string | null;
   document_config: {
     primary_color?: string;
     secondary_color?: string;
@@ -129,6 +146,7 @@ export default function PublicInvoicePage() {
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
+  const [bankAccount, setBankAccount] = useState<BankAccountData | null>(null);
   const [stripeAvailable, setStripeAvailable] = useState(false);
   const [paying, setPaying] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
@@ -171,7 +189,7 @@ export default function PublicInvoicePage() {
     // 2. Fetch invoice with client
     const { data: invoiceData } = await anonClient
       .from('invoices')
-      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, clients(name, email, phone, address, city, postal_code)')
+      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, bank_account_id, clients(name, email, phone, address, city, postal_code)')
       .eq('id', send.invoice_id)
       .maybeSingle();
 
@@ -180,6 +198,17 @@ export default function PublicInvoicePage() {
       if (invoiceData.status === 'payee' || invoiceData.paid_at) {
         setIsPaid(true);
       }
+    }
+
+    // Fetch bank account if attached
+    const invoiceBankId = (invoiceData as unknown as InvoiceData | null)?.bank_account_id;
+    if (invoiceBankId) {
+      const { data: bankData } = await anonClient
+        .from('bank_accounts')
+        .select('label, bank_name, account_holder, iban, bic')
+        .eq('id', invoiceBankId)
+        .maybeSingle();
+      if (bankData) setBankAccount(bankData as BankAccountData);
     }
 
     // 3. Fetch invoice lines
@@ -196,7 +225,7 @@ export default function PublicInvoicePage() {
     // 4. Fetch artisan profile
     const { data: profile } = await anonClient
       .from('profiles')
-      .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
+      .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
       .eq('id', send.user_id)
       .maybeSingle();
 
@@ -516,6 +545,39 @@ export default function PublicInvoicePage() {
             </div>
           </div>
 
+          {/* Coordonnees bancaires */}
+          {bankAccount && (
+            <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Landmark className="h-4 w-4" style={{ color: accent }} />
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
+                  Coordonnées bancaires pour le virement
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#e5e1da] bg-[#faf9f7] p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-[#6b6560]">Titulaire</p>
+                    <p className="text-sm font-medium" style={{ color: textColor }}>{bankAccount.account_holder}</p>
+                    <p className="mt-2 text-xs text-[#6b6560]">Banque</p>
+                    <p className="text-sm" style={{ color: textColor }}>{bankAccount.bank_name}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 sm:text-right">
+                    <p className="text-xs text-[#6b6560]">IBAN</p>
+                    <p className="font-mono text-[13px] tracking-wide" style={{ color: textColor }}>
+                      {formatIban(bankAccount.iban)}
+                    </p>
+                    <p className="mt-2 text-xs text-[#6b6560]">BIC</p>
+                    <p className="font-mono text-[13px]" style={{ color: textColor }}>{bankAccount.bic}</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-[11px] text-[#6b6560]/70">
+                  Merci d&apos;indiquer le numéro de facture <span className="font-medium">{invoice.invoice_number}</span> en référence du virement.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Payment section */}
           {!isPaid && stripeAvailable && (
             <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
@@ -563,6 +625,7 @@ export default function PublicInvoicePage() {
                 )}
               </p>
             </div>
+            <InsuranceFooter insurance={artisan} />
             {footerText && (
               <p className="text-[11px] text-[#6b6560]/80 mt-2 text-center font-medium">{footerText}</p>
             )}

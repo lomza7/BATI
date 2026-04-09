@@ -1,0 +1,224 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
+import { buildInvoicePaymentEmail } from '@/lib/email-templates';
+import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
+
+export const runtime = 'nodejs';
+
+function generateToken(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 32; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export async function POST(request: Request) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+    }
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY manquante' }, { status: 503 });
+    }
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const body = await request.json();
+    const { invoice_id, client_name, client_email, expires_in_days, excluded_attachment_ids } = body as {
+      invoice_id: string;
+      client_name: string;
+      client_email?: string;
+      expires_in_days: number;
+      excluded_attachment_ids?: string[];
+    };
+
+    if (!invoice_id || !client_name?.trim()) {
+      return NextResponse.json({ error: 'invoice_id et client_name requis' }, { status: 400 });
+    }
+
+    // Charger la facture + le profil + la connexion Stripe en parallele
+    const [invoiceRes, profileRes, stripeRes] = await Promise.all([
+      admin
+        .from('invoices')
+        .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, clients(name, email)')
+        .eq('id', invoice_id)
+        .single(),
+      admin
+        .from('profiles')
+        .select('company_name, full_name, document_config')
+        .eq('id', user.id)
+        .single(),
+      admin
+        .from('stripe_connections')
+        .select('charges_enabled')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ]);
+
+    if (invoiceRes.error || !invoiceRes.data) {
+      return NextResponse.json({ error: 'Facture introuvable' }, { status: 404 });
+    }
+
+    const invoice = invoiceRes.data as {
+      id: string;
+      invoice_number: string;
+      title: string;
+      total_ttc: number;
+      status: string;
+      due_date: string | null;
+      issued_at: string | null;
+      clients?: { name?: string | null; email?: string | null } | null;
+    };
+
+    const profile = (profileRes.data || {}) as {
+      company_name?: string | null;
+      full_name?: string | null;
+      document_config?: Record<string, unknown> | null;
+    };
+
+    const hasOnlinePayment = Boolean(stripeRes.data?.charges_enabled);
+
+    // Creer le magic link
+    const token = generateToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (expires_in_days || 30));
+
+    const { error: insertError } = await admin.from('invoice_sends').insert({
+      user_id: user.id,
+      invoice_id,
+      client_name: client_name.trim(),
+      client_email: client_email?.trim() || null,
+      token,
+      expires_at: expiresAt.toISOString(),
+    });
+
+    if (insertError) {
+      return NextResponse.json({ error: 'Erreur creation du lien' }, { status: 500 });
+    }
+
+    // Passer la facture en envoyee + set issued_at si necessaire
+    const updates: Record<string, string> = {
+      status: 'envoyee',
+      updated_at: new Date().toISOString(),
+    };
+    if (invoice.status === 'brouillon' || invoice.status === 'creee') {
+      updates.issued_at = new Date().toISOString();
+    }
+    await admin.from('invoices').update(updates).eq('id', invoice_id);
+
+    const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
+    const magicLink = `${base}/f/${token}`;
+
+    // Envoi email via Resend
+    const resendKey = process.env.RESEND_API_KEY;
+    const recipientEmail = client_email?.trim() || invoice.clients?.email || '';
+
+    let emailStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
+    let emailError: string | null = null;
+    let emailId: string | null = null;
+
+    if (!resendKey) {
+      emailStatus = 'skipped';
+      emailError = 'Service email non configure (RESEND_API_KEY manquante)';
+    } else if (!recipientEmail) {
+      emailStatus = 'skipped';
+      emailError = 'Aucune adresse email fournie pour le client';
+    } else {
+      const resend = new Resend(resendKey);
+      const dc = (profile.document_config || {}) as Record<string, string>;
+      const companyName = profile.company_name || profile.full_name || 'Artisan';
+
+      const totalFormatted = new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+      }).format(Number(invoice.total_ttc) || 0);
+
+      const dueDateFormatted = invoice.due_date
+        ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(invoice.due_date))
+        : null;
+
+      const emailHtml = buildInvoicePaymentEmail({
+        clientName: client_name.trim(),
+        artisanName: companyName,
+        invoiceNumber: invoice.invoice_number,
+        invoiceTitle: invoice.title || '',
+        totalTtc: totalFormatted,
+        dueDate: dueDateFormatted,
+        magicLink,
+        hasOnlinePayment,
+        accentColor: dc.primary_color || '#d35400',
+      });
+
+      // Pieces jointes par defaut (attestations, assurances, etc.) — on
+      // exclut celles que l'utilisateur a decochees dans le dialog.
+      const companyAttachments = await fetchCompanyAttachmentsForUser(
+        admin,
+        user.id,
+        'invoices',
+        { excludeIds: excluded_attachment_ids },
+      );
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@hellobat.app>';
+
+      try {
+        const result = await resend.emails.send({
+          from: fromEmail,
+          to: recipientEmail,
+          subject: `Facture ${invoice.invoice_number} — ${companyName}`,
+          html: emailHtml,
+          attachments: companyAttachments.map(att => ({
+            filename: att.name,
+            content: att.content_base64,
+          })),
+        });
+
+        if (result.error) {
+          emailStatus = 'failed';
+          emailError = result.error.message || 'Erreur inconnue lors de l\'envoi';
+          console.error('[factures/send] Resend API error:', result.error);
+        } else if (result.data?.id) {
+          emailStatus = 'sent';
+          emailId = result.data.id;
+        } else {
+          emailStatus = 'failed';
+          emailError = 'Reponse Resend inattendue (pas d\'ID de message)';
+        }
+      } catch (sendErr) {
+        emailStatus = 'failed';
+        emailError = sendErr instanceof Error ? sendErr.message : 'Erreur reseau lors de l\'envoi';
+        console.error('[factures/send] Resend send exception:', sendErr);
+      }
+    }
+
+    return NextResponse.json({
+      magic_link: magicLink,
+      token,
+      email_status: emailStatus,
+      email_error: emailError,
+      email_provider_id: emailId,
+      recipient_email: recipientEmail || null,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erreur interne';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

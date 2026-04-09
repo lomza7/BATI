@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Send, Copy, Check, Link2, Loader as Loader2, Mail, CreditCard } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Send, Copy, Check, Link2, Loader as Loader2, Mail, CreditCard, Paperclip, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,12 @@ interface Props {
   onSent?: () => void;
 }
 
+interface CompanyAttachmentRow {
+  id: string;
+  name: string;
+  size_bytes: number;
+}
+
 export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const { user } = useAuth();
   const [clientName, setClientName] = useState(invoice.clients?.name || '');
@@ -35,6 +41,31 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const [copied, setCopied] = useState(false);
   const [sendError, setSendError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [attachments, setAttachments] = useState<CompanyAttachmentRow[]>([]);
+  const [excludedAttachmentIds, setExcludedAttachmentIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('company_attachments')
+        .select('id, name, size_bytes')
+        .eq('attach_to_invoices', true)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (!cancelled) setAttachments((data as CompanyAttachmentRow[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  function toggleAttachment(id: string) {
+    setExcludedAttachmentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function handleSend() {
     if (!user || !clientName.trim()) return;
@@ -42,105 +73,38 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
     setSendError('');
 
     try {
-      const token = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + parseInt(expiresIn));
-
-      // Insert invoice_send
-      const { error: insertError } = await supabase.from('invoice_sends').insert({
-        user_id: user.id,
-        invoice_id: invoice.id,
-        client_name: clientName.trim(),
-        client_email: clientEmail.trim() || null,
-        token,
-        expires_at: expiresAt.toISOString(),
-      });
-
-      if (insertError) {
-        setSendError('Erreur lors de la creation du lien');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setSendError('Session expiree, veuillez vous reconnecter');
         setSending(false);
         return;
       }
 
-      // Update invoice status to 'envoyee' + set issued_at
-      const updates: Record<string, string> = {
-        status: 'envoyee',
-        updated_at: new Date().toISOString(),
-      };
-      // Set issued_at if not already set
-      if (invoice.status === 'brouillon' || invoice.status === 'creee') {
-        updates.issued_at = new Date().toISOString();
-      }
-      await supabase.from('invoices').update(updates).eq('id', invoice.id);
+      const res = await fetch('/api/factures/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          invoice_id: invoice.id,
+          client_name: clientName.trim(),
+          client_email: clientEmail.trim() || undefined,
+          expires_in_days: parseInt(expiresIn),
+          excluded_attachment_ids: Array.from(excludedAttachmentIds),
+        }),
+      });
 
-      const siteUrl = window.location.origin;
-      const link = `${siteUrl}/f/${token}`;
-      setMagicLink(link);
+      const data = await res.json();
 
-      // Try sending email via Gmail if connected and email provided
-      if (clientEmail.trim()) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            const gmailStatusRes = await fetch('/api/gmail/status', {
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            const gmailStatus = await gmailStatusRes.json();
-
-            if (gmailStatus.connected) {
-              // Fetch artisan profile for email
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('company_name, full_name, document_config')
-                .eq('id', user.id)
-                .single();
-
-              const artisanName = profile?.company_name || profile?.full_name || 'Votre artisan';
-              const accent = profile?.document_config?.primary_color || '#d35400';
-              const totalFormatted = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(invoice.total_ttc);
-
-              // Check if artisan has Stripe connected
-              const stripeRes = await fetch('/api/stripe/connect/status', {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-              });
-              const stripeStatus = await stripeRes.json();
-              const hasOnlinePayment = stripeStatus.connected && stripeStatus.charges_enabled;
-
-              // Import email template dynamically
-              const { buildInvoicePaymentEmail } = await import('@/lib/email-templates');
-              const html = buildInvoicePaymentEmail({
-                clientName: clientName.trim(),
-                artisanName,
-                invoiceNumber: invoice.invoice_number,
-                invoiceTitle: invoice.title,
-                totalTtc: totalFormatted,
-                dueDate: null,
-                magicLink: link,
-                hasOnlinePayment,
-                accentColor: accent,
-              });
-
-              await fetch('/api/gmail/send', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({
-                  to: clientEmail.trim(),
-                  subject: `Facture ${invoice.invoice_number} — ${artisanName}`,
-                  html,
-                }),
-              });
-
-              setEmailSent(true);
-            }
-          }
-        } catch {
-          // Email sending failed — link still works
-        }
+      if (!res.ok) {
+        setSendError(data.error || 'Erreur lors de l\'envoi de la facture');
+        setSending(false);
+        return;
       }
 
+      setMagicLink(data.magic_link);
+      setEmailSent(data.email_status === 'sent');
       onSent?.();
     } catch {
       setSendError('Erreur reseau, veuillez reessayer');
@@ -235,6 +199,44 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                 Si renseigne, un email avec le lien sera envoye automatiquement via Gmail
               </p>
             </div>
+
+            {attachments.length > 0 && (
+              <div>
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  Pieces jointes ({attachments.length - excludedAttachmentIds.size}/{attachments.length})
+                </label>
+                <ul className="mt-1.5 rounded-lg border divide-y">
+                  {attachments.map(att => {
+                    const included = !excludedAttachmentIds.has(att.id);
+                    return (
+                      <li key={att.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                          <span className={`text-xs truncate ${included ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                            {att.name}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleAttachment(att.id)}
+                          className={`h-6 px-2 rounded-md text-[11px] font-medium transition-colors ${
+                            included
+                              ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                          }`}
+                        >
+                          {included ? 'Joint' : 'Exclu'}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Vos attestations sont jointes par defaut. Cliquez sur un fichier pour l&apos;exclure de cet envoi.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="text-sm font-medium">Validite du lien</label>
