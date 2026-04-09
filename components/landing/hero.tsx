@@ -8,9 +8,9 @@ export function Hero() {
     <section className="pt-24 sm:pt-32 pb-12 sm:pb-20 bg-[var(--landing-off)]">
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-up">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] text-sm font-semibold mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--landing-accent)] animate-pulse" />
-            Boostez votre boîte avec l'intelligence artificielle
+            +10h par semaine gagnées grâce à l&apos;IA
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif leading-[1.1] mb-6 text-[var(--landing-text)]">

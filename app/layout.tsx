@@ -8,11 +8,11 @@ import { SchemaOrg } from '@/components/seo/schema-org';
 export const metadata: Metadata = {
   metadataBase: new URL('https://hellobat.app'),
   title: {
-    default: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
+    default: 'Hellobat — +10h gagnées par semaine grâce à l\'IA | Logiciel bâtiment',
     template: '%s | Hellobat',
   },
   description:
-    'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
+    '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
   keywords: [
     'logiciel bâtiment',
     'logiciel BTP',
@@ -38,17 +38,17 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://hellobat.app',
     siteName: 'Hellobat',
-    title: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
+    title: 'Hellobat — +10h gagnées par semaine grâce à l\'IA',
     description:
-      'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
+      '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
     locale: 'fr_FR',
     // OG image generated dynamically by app/opengraph-image.tsx (Next.js file-based convention)
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hellobat — Logiciel du bâtiment tout-en-un, boosté par l\'IA',
+    title: 'Hellobat — +10h gagnées par semaine grâce à l\'IA',
     description:
-      'Fini la paperasse. Devis IA vocal, facture électronique 2026, chantiers, planning, CRM, paiements — tout le bâtiment dans une seule app pensée pour les artisans. Essai 30 jours, sans carte bancaire.',
+      '+10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
     creator: '@hellobat',
     // Twitter image generated dynamically by app/twitter-image.tsx (Next.js file-based convention)
   },
