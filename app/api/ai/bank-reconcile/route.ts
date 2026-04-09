@@ -9,6 +9,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { bankReconcileResponseSchema } from '@/lib/ai/bank-reconcile-schema';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -84,6 +86,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   }
 
+  // Burst protection (sliding window) — per-user
+  const rl = checkRateLimit(`ai-bank-reconcile:${user.id}`, 15, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   const limitCheck = await checkAiLimit(user.id);
   if (!limitCheck.allowed) {
     return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
@@ -112,7 +118,10 @@ export async function POST(request: Request) {
 
   const { data: txs, error: txErr } = await txQuery;
   if (txErr) {
-    return NextResponse.json({ error: txErr.message }, { status: 500 });
+    return apiError('DB_READ', {
+      cause: txErr,
+      context: { route: 'ai/bank-reconcile', step: 'load_transactions', user_id: user.id },
+    });
   }
   const transactions = txs || [];
 
@@ -194,7 +203,10 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const err = await response.text();
       await trackAiUsage({ user_id: user.id, route: 'ai/bank-reconcile', status: 'error' });
-      return NextResponse.json({ error: `Erreur API IA: ${err}` }, { status: 502 });
+      return apiError('AI_FAILED', {
+        cause: err,
+        context: { route: 'ai/bank-reconcile', user_id: user.id, status: response.status },
+      });
     }
 
     const data = (await response.json()) as {
@@ -218,13 +230,10 @@ export async function POST(request: Request) {
         output_tokens: data.usage?.output_tokens || 0,
         status: 'error',
       });
-      return NextResponse.json(
-        {
-          error: `Impossible d'analyser la réponse IA: ${e instanceof Error ? e.message : 'parse error'}`,
-          raw: rawText,
-        },
-        { status: 422 },
-      );
+      return apiError('AI_PARSE', {
+        cause: e,
+        context: { route: 'ai/bank-reconcile', user_id: user.id, raw_preview: rawText.slice(0, 200) },
+      });
     }
 
     await trackAiUsage({
@@ -240,10 +249,10 @@ export async function POST(request: Request) {
       tokens_used: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur IA' },
-      { status: 500 },
-    );
+    return apiError('INTERNAL', {
+      cause: error,
+      context: { route: 'ai/bank-reconcile', user_id: user.id },
+    });
   }
 }
 

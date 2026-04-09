@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +38,10 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
+
+  // Burst protection (sliding window) — per-user
+  const rl = checkRateLimit(`ai-project-description:${user.id}`, 20, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
 
   const limitCheck = await checkAiLimit(user.id);
   if (!limitCheck.allowed) {
@@ -134,10 +140,10 @@ ${quoteLines ? `Prestations (extraites des devis) :\n${quoteLines}` : ''}
 
     if (!res.ok) {
       const text = await res.text();
-      return NextResponse.json(
-        { error: `Erreur API IA (${res.status}): ${text.slice(0, 200)}` },
-        { status: 502 }
-      );
+      return apiError('AI_FAILED', {
+        cause: text,
+        context: { route: 'ai/project-description', user_id: user.id, status: res.status },
+      });
     }
 
     const data = await res.json();
@@ -159,7 +165,9 @@ ${quoteLines ? `Prestations (extraites des devis) :\n${quoteLines}` : ''}
       category: parsed.category || '',
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur interne';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError('INTERNAL', {
+      cause: err,
+      context: { route: 'ai/project-description', user_id: user.id },
+    });
   }
 }

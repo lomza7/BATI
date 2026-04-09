@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyTurnstile } from '@/lib/turnstile';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -27,11 +30,26 @@ export async function POST(
     return NextResponse.json({ error: 'Lien invalide' }, { status: 404 });
   }
 
+  // Burst protection — 10 lead captures par IP par minute
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`rendu-lead:ip:${ip}`, 10, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   const body = await request.json().catch(() => ({}));
   const leadName = String(body?.lead_name || '').trim();
   const leadEmail = String(body?.lead_email || '').trim().toLowerCase();
+  const turnstileToken = String(body?.turnstile_token || '').trim();
   if (!leadEmail || !leadEmail.includes('@')) {
     return NextResponse.json({ error: 'Email invalide' }, { status: 400 });
+  }
+
+  // Vérification Turnstile (no-op si TURNSTILE_SECRET_KEY pas configurée)
+  const turnstile = await verifyTurnstile(turnstileToken, ip);
+  if (!turnstile.ok) {
+    return NextResponse.json(
+      { error: 'Vérification anti-bot échouée. Rechargez la page et réessayez.' },
+      { status: 400 },
+    );
   }
 
   const { data: campaign } = await supabaseAdmin
@@ -84,10 +102,11 @@ export async function POST(
     .single();
 
   if (insertError || !created) {
-    return NextResponse.json(
-      { error: insertError?.message || 'Erreur création lead' },
-      { status: 400 },
-    );
+    return apiError('DB_WRITE', {
+      message: 'Erreur création lead',
+      cause: insertError,
+      context: { route: 'rendus/public/lead', campaign_id: campaign.id },
+    });
   }
 
   return NextResponse.json({

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
+import { Turnstile } from '@/components/shared/turnstile';
 
 interface SiteQuoteModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
   const [budget, setBudget] = useState('');
   // Honeypot field
   const [companyWebsite, setCompanyWebsite] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -54,6 +56,12 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (captchaToken === null) {
+      setError('Vérification anti-bot en cours, réessayez dans un instant');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -71,6 +79,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
           project,
           budget,
           company_website: companyWebsite,
+          turnstile_token: captchaToken,
         }),
       });
 
@@ -301,6 +310,8 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
                 maxLength={40}
               />
             </div>
+
+            <Turnstile onVerify={(token) => setCaptchaToken(token)} />
 
             {error && (
               <div

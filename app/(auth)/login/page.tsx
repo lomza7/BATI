@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Hexagon, Eye, EyeOff, ArrowRight, ArrowLeft, Zap, RefreshCw, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Turnstile } from '@/components/shared/turnstile';
 
 export default function LoginPage() {
   return (
@@ -24,6 +25,7 @@ function LoginContent() {
   const [error, setError] = useState('');
   const [magicLinkSending, setMagicLinkSending] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const teamInvite = searchParams.get('team') === '1';
   const invitedEmail = searchParams.get('email') || '';
 
@@ -36,11 +38,18 @@ function LoginContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (captchaToken === null) {
+      setError('Vérification anti-bot en cours, réessayez dans un instant');
+      return;
+    }
+
     setLoading(true);
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     });
 
     if (signInError) {
@@ -78,7 +87,10 @@ function LoginContent() {
 
     const { error: mlError } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
     });
 
     setMagicLinkSending(false);
@@ -211,6 +223,8 @@ function LoginContent() {
                 </button>
               </div>
             </div>
+
+            <Turnstile onVerify={(token) => setCaptchaToken(token)} />
 
             <button
               type="submit"

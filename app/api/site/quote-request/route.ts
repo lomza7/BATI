@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyTurnstile } from '@/lib/turnstile';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +20,11 @@ export const runtime = 'nodejs';
  * Service role is required to bypass RLS since the caller is anonymous.
  */
 export async function POST(request: Request) {
+  // Burst protection — 5 demandes par IP par minute
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`site-quote:ip:${ip}`, 5, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   let body: {
     slug?: string;
     name?: string;
@@ -28,6 +35,7 @@ export async function POST(request: Request) {
     city?: string;
     project?: string;
     budget?: string;
+    turnstile_token?: string;
     // Honeypot — should always be empty
     company_website?: string;
   };
@@ -42,6 +50,15 @@ export async function POST(request: Request) {
   if (body.company_website && body.company_website.trim().length > 0) {
     // Return 200 to not tip off bots
     return NextResponse.json({ success: true });
+  }
+
+  // Vérification Turnstile (no-op si TURNSTILE_SECRET_KEY pas configurée)
+  const turnstile = await verifyTurnstile(body.turnstile_token, ip);
+  if (!turnstile.ok) {
+    return NextResponse.json(
+      { error: 'Vérification anti-bot échouée. Rechargez la page et réessayez.' },
+      { status: 400 },
+    );
   }
 
   const slug = body.slug?.trim();

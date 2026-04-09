@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -69,6 +71,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
 
+  // Burst protection (sliding window) — per-user, plan IA is Claude vision
+  const rl = checkRateLimit(`ai-plan:${user.id}`, 15, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   const limitCheck = await checkAiLimit(user.id);
   if (!limitCheck.allowed) {
     return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
@@ -120,7 +126,10 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const err = await response.text();
-      return NextResponse.json({ error: `Erreur API IA: ${err}` }, { status: 502 });
+      return apiError('AI_FAILED', {
+        cause: err,
+        context: { route: 'ai/plan', user_id: user.id, status: response.status },
+      });
     }
 
     const data = await response.json() as {
@@ -135,8 +144,11 @@ export async function POST(request: Request) {
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       plan = JSON.parse(jsonMatch?.[0] || rawText);
-    } catch {
-      return NextResponse.json({ error: 'Impossible de parser le plan genere', raw: rawText }, { status: 422 });
+    } catch (e) {
+      return apiError('AI_PARSE', {
+        cause: e,
+        context: { route: 'ai/plan', user_id: user.id, raw_preview: rawText.slice(0, 200) },
+      });
     }
 
     await trackAiUsage({
@@ -149,9 +161,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ plan });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur generation plan' },
-      { status: 500 },
-    );
+    return apiError('INTERNAL', {
+      cause: error,
+      context: { route: 'ai/plan', user_id: user.id },
+    });
   }
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -29,6 +31,10 @@ export async function POST(request: Request) {
   if (authError || !user) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
+
+  // Burst protection (sliding window) — per-user
+  const rl = checkRateLimit(`ai-email-reply:${user.id}`, 20, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
 
   const body = await request.json().catch(() => null);
   if (!body?.emailBody || !body?.emailFrom || !body?.emailSubject) {
@@ -189,7 +195,10 @@ Redige une reponse appropriee a cet email.`;
 
     if (!response.ok) {
       const err = await response.text();
-      return NextResponse.json({ error: `Erreur API IA: ${err}` }, { status: 502 });
+      return apiError('AI_FAILED', {
+        cause: err,
+        context: { route: 'ai/email-reply', user_id: user.id, status: response.status },
+      });
     }
 
     const data = await response.json() as { content: { type: string; text: string }[] };
@@ -201,9 +210,9 @@ Redige une reponse appropriee a cet email.`;
       senderEmail,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur generation IA' },
-      { status: 500 },
-    );
+    return apiError('INTERNAL', {
+      cause: error,
+      context: { route: 'ai/email-reply', user_id: user.id },
+    });
   }
 }

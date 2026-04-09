@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { WORKSPACE_ROLE_LABELS, WORKSPACE_ROLE_OPTIONS, canManageWorkspaceTeam } from '@/lib/workspace';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -71,7 +72,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (ownerProfileError) {
-    return NextResponse.json({ error: ownerProfileError.message }, { status: 400 });
+    return apiError('DB_READ', {
+      cause: ownerProfileError,
+      context: { route: 'team/invite', step: 'load_owner_profile', user_id: user.id },
+    });
   }
 
   if (!ownerProfile || ownerProfile.plan === 'starter') {
@@ -119,7 +123,11 @@ export async function POST(request: Request) {
     .single();
 
   if (membershipError || !membership) {
-    return NextResponse.json({ error: membershipError?.message || 'Impossible de creer l invitation.' }, { status: 400 });
+    return apiError('DB_WRITE', {
+      message: 'Impossible de creer l\'invitation.',
+      cause: membershipError,
+      context: { route: 'team/invite', step: 'upsert_membership', user_id: user.id, invited_email: invitedEmail },
+    });
   }
 
   const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';

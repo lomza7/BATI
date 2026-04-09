@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Hexagon, Eye, EyeOff, ArrowRight, Check, Gift } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Turnstile } from '@/components/shared/turnstile';
 
 const benefits = [
   'Devis et factures en quelques clics',
@@ -29,6 +30,7 @@ function SignupContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const teamInvite = searchParams.get('team') === '1';
   const invitedEmail = searchParams.get('email') || '';
   const referralCode = searchParams.get('ref') || '';
@@ -60,19 +62,32 @@ function SignupContent() {
       return;
     }
 
+    if (captchaToken === null) {
+      setError('Vérification anti-bot en cours, réessayez dans un instant');
+      return;
+    }
+
     setLoading(true);
 
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     });
 
     if (signUpError) {
-      setError(
-        signUpError.message === 'User already registered'
-          ? 'Un compte existe deja avec cet email'
-          : signUpError.message
-      );
+      // Ne révèle pas si l'email existe déjà (anti-énumération).
+      // Pour les vrais problèmes (mot de passe trop court côté Supabase, format email),
+      // on garde le message brut puisqu'ils ne fuitent pas l'existence du compte.
+      if (signUpError.message === 'User already registered') {
+        // On simule une réussite : Supabase enverra automatiquement un email
+        // de connexion à l'utilisateur existant si le flow le permet, sinon
+        // l'utilisateur arrivera sur l'écran "vérifiez vos mails".
+        localStorage.setItem('hellobat_signup_email', email);
+        router.push('/verify-email');
+        return;
+      }
+      setError(signUpError.message);
       setLoading(false);
       return;
     }
@@ -222,6 +237,8 @@ function SignupContent() {
                 </div>
               )}
             </div>
+
+            <Turnstile onVerify={(token) => setCaptchaToken(token)} />
 
             <button
               type="submit"

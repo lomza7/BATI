@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateImage } from '@/lib/ai/image-generation';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -36,6 +38,12 @@ export async function POST(
   if (!campaignToken || campaignToken.length < 16) {
     return NextResponse.json({ error: 'Lien invalide' }, { status: 404 });
   }
+
+  // Burst protection (sliding window) — par IP en premier rideau
+  // (le rate-limit par session est ajouté plus bas après validation du lead)
+  const ip = getClientIp(request);
+  const rlIp = checkRateLimit(`rendu-generate:ip:${ip}`, 10, 60_000);
+  if (!rlIp.ok) return rateLimitResponse(rlIp);
 
   const body = await request.json().catch(() => ({}));
   const sessionToken = String(body?.session_token || '').trim();
@@ -73,6 +81,10 @@ export async function POST(
     return NextResponse.json({ error: 'Session invalide' }, { status: 401 });
   }
 
+  // Burst protection par session (en plus du cap lifetime à 12)
+  const rlSession = checkRateLimit(`rendu-generate:${sessionToken}`, 5, 60_000);
+  if (!rlSession.ok) return rateLimitResponse(rlSession);
+
   // Cap per-lead generations to avoid abuse
   if ((lead.generation_count || 0) >= 12) {
     return NextResponse.json(
@@ -94,10 +106,10 @@ export async function POST(
       size: '1024x1024',
     });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Erreur génération IA' },
-      { status: 502 },
-    );
+    return apiError('AI_FAILED', {
+      cause: e,
+      context: { route: 'rendus/public/generate', campaign_id: campaign.id, lead_id: lead.id },
+    });
   }
 
   // Upload both before + after to storage
@@ -117,7 +129,10 @@ export async function POST(
       upsert: false,
     });
   if (beforeUploadErr) {
-    return NextResponse.json({ error: `Upload avant: ${beforeUploadErr.message}` }, { status: 500 });
+    return apiError('UPLOAD_FAILED', {
+      cause: beforeUploadErr,
+      context: { route: 'rendus/public/generate', step: 'before_upload', path: beforePath },
+    });
   }
 
   const { error: afterUploadErr } = await supabaseAdmin.storage
@@ -127,7 +142,10 @@ export async function POST(
       upsert: false,
     });
   if (afterUploadErr) {
-    return NextResponse.json({ error: `Upload après: ${afterUploadErr.message}` }, { status: 500 });
+    return apiError('UPLOAD_FAILED', {
+      cause: afterUploadErr,
+      context: { route: 'rendus/public/generate', step: 'after_upload', path: afterPath },
+    });
   }
 
   const { data: beforeUrlData } = supabaseAdmin.storage
@@ -156,10 +174,10 @@ export async function POST(
     .single();
 
   if (insertError || !generation) {
-    return NextResponse.json(
-      { error: insertError?.message || 'Erreur enregistrement' },
-      { status: 500 },
-    );
+    return apiError('DB_WRITE', {
+      cause: insertError,
+      context: { route: 'rendus/public/generate', step: 'insert_generation', lead_id: lead.id },
+    });
   }
 
   await supabaseAdmin

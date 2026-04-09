@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +46,10 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
+
+  // Burst protection (sliding window) — per-user
+  const rl = checkRateLimit(`ai-site-content:${user.id}`, 20, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
 
   // Check AI limit
   const limitCheck = await checkAiLimit(user.id);
@@ -201,18 +207,10 @@ Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdo
 
     if (!res.ok) {
       const text = await res.text();
-      console.error('OpenAI API error:', res.status, text);
-      let detail = text;
-      try {
-        const parsed = JSON.parse(text);
-        detail = parsed?.error?.message || text;
-      } catch {
-        // keep raw text
-      }
-      return NextResponse.json(
-        { error: `Erreur API IA (${res.status}): ${detail}` },
-        { status: 502 }
-      );
+      return apiError('AI_FAILED', {
+        cause: text,
+        context: { route: 'ai/site-content', user_id: user.id, status: res.status },
+      });
     }
 
     const data = await res.json();
@@ -234,8 +232,9 @@ Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdo
 
     return NextResponse.json({ site_content: siteContent });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur interne';
-    console.error('AI site-content error:', err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError('INTERNAL', {
+      cause: err,
+      context: { route: 'ai/site-content', user_id: user.id },
+    });
   }
 }

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { aiQuoteAnalysisSchema } from '@/lib/ai/quote-schema';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +46,11 @@ export async function POST(request: Request) {
     const { data: { user } } = await userClient.auth.getUser();
     userId = user?.id || null;
   }
+
+  // Burst protection (sliding window) — per-user when authenticated, per-IP otherwise
+  const rlKey = userId ? `ai-quote:${userId}` : `ai-quote:ip:${getClientIp(request)}`;
+  const rl = checkRateLimit(rlKey, 20, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
 
   if (userId) {
     const limitCheck = await checkAiLimit(userId);
@@ -153,10 +160,10 @@ export async function POST(request: Request) {
 
     if (!anthropicResponse.ok) {
       const errorText = await anthropicResponse.text();
-      return NextResponse.json(
-        { error: `Anthropic a renvoye une erreur: ${errorText.slice(0, 400)}` },
-        { status: anthropicResponse.status }
-      );
+      return apiError('AI_FAILED', {
+        cause: errorText,
+        context: { route: 'ai/quote', user_id: userId, status: anthropicResponse.status },
+      });
     }
 
     const responseJson = (await anthropicResponse.json()) as {
@@ -191,7 +198,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ analysis: parsed });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "L'analyse IA a echoue.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError('INTERNAL', {
+      message: "L'analyse IA a echoue.",
+      cause: error,
+      context: { route: 'ai/quote', user_id: userId },
+    });
   }
 }

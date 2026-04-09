@@ -17,6 +17,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Turnstile } from '@/components/shared/turnstile';
 
 const STYLES = [
   { id: 'moderne', name: 'Moderne', desc: 'Lignes épurées, matériaux contemporains' },
@@ -70,6 +71,7 @@ export default function PublicRenduPage() {
   const [leadName, setLeadName] = useState('');
   const [leadEmail, setLeadEmail] = useState('');
   const [submittingLead, setSubmittingLead] = useState(false);
+  const [leadCaptchaToken, setLeadCaptchaToken] = useState<string | null>(null);
 
   // Session state (after capture)
   const [sessionToken, setSessionToken] = useState('');
@@ -142,12 +144,20 @@ export default function PublicRenduPage() {
   async function handleSubmitLead(e: React.FormEvent) {
     e.preventDefault();
     if (!leadEmail.includes('@')) return;
+    if (leadCaptchaToken === null) {
+      setError('Vérification anti-bot en cours, réessayez dans un instant');
+      return;
+    }
     setSubmittingLead(true);
     try {
       const res = await fetch(`/api/rendus/public/${encodeURIComponent(token)}/lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_name: leadName, lead_email: leadEmail }),
+        body: JSON.stringify({
+          lead_name: leadName,
+          lead_email: leadEmail,
+          turnstile_token: leadCaptchaToken,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -378,6 +388,10 @@ export default function PublicRenduPage() {
                   style={{ '--tw-ring-color': `${accent}30` } as React.CSSProperties}
                 />
               </div>
+            </div>
+
+            <div className="mt-3 flex justify-center">
+              <Turnstile onVerify={(t) => setLeadCaptchaToken(t)} />
             </div>
 
             <button

@@ -4,30 +4,35 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Turnstile } from '@/components/shared/turnstile';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim() || loading) return;
     setError('');
-    setLoading(true);
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    setLoading(false);
-
-    if (resetError) {
-      setError(resetError.message);
+    if (captchaToken === null) {
+      setError('Vérification anti-bot en cours, réessayez dans un instant');
       return;
     }
 
+    setLoading(true);
+
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+      ...(captchaToken ? { captchaToken } : {}),
+    });
+
+    setLoading(false);
+    // On affiche toujours l'écran de succès, qu'un compte existe ou non,
+    // pour éviter l'énumération d'emails.
     setSent(true);
   }
 
@@ -49,12 +54,11 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-              Email envoye
+              Verifiez votre boite mail
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed mb-2">
-              Un lien de reinitialisation a ete envoye a
+            <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+              Si un compte existe avec cette adresse, vous recevrez un lien de reinitialisation dans quelques instants.
             </p>
-            <p className="text-foreground font-medium mb-6">{email}</p>
 
             <div className="rounded-xl border border-border bg-white p-5 mb-6 text-left space-y-3">
               <div className="flex items-start gap-3">
@@ -105,6 +109,8 @@ export default function ForgotPasswordPage() {
                 placeholder="vous@entreprise.fr"
                 className="flex h-11 w-full rounded-lg border border-border bg-white px-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
+
+              <Turnstile onVerify={(token) => setCaptchaToken(token)} />
 
               <button
                 type="submit"

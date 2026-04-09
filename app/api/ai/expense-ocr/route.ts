@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { expenseOcrSchema } from '@/lib/ai/expense-ocr-schema';
 import { extractPdfText } from '@/lib/ai/pdf-extract';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -90,6 +92,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   }
 
+  // Burst protection (sliding window) — per-user, expense-ocr is expensive (Claude vision)
+  const rl = checkRateLimit(`ai-expense-ocr:${user.id}`, 15, 60_000);
+  if (!rl.ok) return rateLimitResponse(rl);
+
   const limitCheck = await checkAiLimit(user.id);
   if (!limitCheck.allowed) {
     return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
@@ -152,10 +158,11 @@ export async function POST(request: Request) {
         text: `Voici le texte extrait d'un PDF de facture (${pageCount} page${pageCount > 1 ? 's' : ''}). Analyse-le et renvoie le JSON :\n\n${text}`,
       });
     } catch (e) {
-      return NextResponse.json(
-        { error: `Impossible de lire le PDF: ${e instanceof Error ? e.message : 'erreur inconnue'}` },
-        { status: 422 },
-      );
+      return apiError('AI_PARSE', {
+        message: 'Impossible de lire le PDF, photographiez plutôt la facture.',
+        cause: e,
+        context: { route: 'ai/expense-ocr', step: 'pdf_extract', user_id: user.id },
+      });
     }
   } else {
     const base64 = buffer.toString('base64');
@@ -190,7 +197,10 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const err = await response.text();
       await trackAiUsage({ user_id: user.id, route: 'ai/expense-ocr', status: 'error' });
-      return NextResponse.json({ error: `Erreur API IA: ${err}` }, { status: 502 });
+      return apiError('AI_FAILED', {
+        cause: err,
+        context: { route: 'ai/expense-ocr', user_id: user.id, status: response.status },
+      });
     }
 
     const data = (await response.json()) as {
@@ -214,13 +224,10 @@ export async function POST(request: Request) {
         output_tokens: data.usage?.output_tokens || 0,
         status: 'error',
       });
-      return NextResponse.json(
-        {
-          error: `Impossible d'analyser la réponse IA: ${e instanceof Error ? e.message : 'parse error'}`,
-          raw: rawText,
-        },
-        { status: 422 },
-      );
+      return apiError('AI_PARSE', {
+        cause: e,
+        context: { route: 'ai/expense-ocr', user_id: user.id, raw_preview: rawText.slice(0, 200) },
+      });
     }
 
     await trackAiUsage({
@@ -276,9 +283,9 @@ export async function POST(request: Request) {
       tokens_used: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erreur OCR' },
-      { status: 500 },
-    );
+    return apiError('INTERNAL', {
+      cause: error,
+      context: { route: 'ai/expense-ocr', user_id: user.id },
+    });
   }
 }

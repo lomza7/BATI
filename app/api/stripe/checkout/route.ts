@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { resolveStripePrice } from '../utils';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
@@ -76,7 +77,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: session.url });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Erreur Stripe';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return apiError('EXTERNAL_API', {
+      message: 'Impossible de creer la session de paiement.',
+      cause: e,
+      context: { route: 'stripe/checkout' },
+    });
   }
 }
