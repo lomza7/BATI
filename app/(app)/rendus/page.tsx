@@ -61,7 +61,7 @@ export default function RendusPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Rendus IA"
+        title="Avant/Après IA"
         description="Le lead magnet qui transforme vos prospects en clients signés"
       >
         {mode === 'self' && (
@@ -112,7 +112,7 @@ function HubView({
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-              <Wand2 className="h-3.5 w-3.5" /> Rendus IA personnalisés à votre marque
+              <Wand2 className="h-3.5 w-3.5" /> Avant/Après IA personnalisés à votre marque
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
               Vos prospects projettent leurs travaux,
@@ -121,7 +121,7 @@ function HubView({
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Envoyez un lien <strong className="text-foreground">personnalisé à votre nom et logo</strong> à
-              vos prospects. Ils uploadent une photo de leur pièce, génèrent plusieurs styles de rendus IA, marquent
+              vos prospects. Ils uploadent une photo de leur pièce, génèrent plusieurs avant/après IA, marquent
               leurs préférés — et vous voyez tout. Ils doivent laisser leur nom et email pour recevoir le résultat
               par mail : <strong className="text-foreground">vous capturez un lead qualifié à chaque essai.</strong>
             </p>
@@ -171,7 +171,7 @@ function HubView({
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Créez un lien personnalisé <strong className="text-foreground">{companyName}</strong> à envoyer
-                à un prospect. Il génère ses rendus, vous récupérez son email, vous voyez ses choix, vous
+                à un prospect. Il génère ses avant/après, vous récupérez son email, vous voyez ses choix, vous
                 relancez avec un devis.
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-xs text-primary font-medium">
@@ -193,11 +193,11 @@ function HubView({
             <div className="flex-1 min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-foreground mb-1">L'utiliser moi-même</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Générez des rendus pour vos propres présentations commerciales. Idéal pour préparer un
+                Générez des avant/après pour vos propres présentations commerciales. Idéal pour préparer un
                 rendez-vous client ou enrichir un devis avec un visuel projeté.
               </p>
               <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground font-medium group-hover:text-primary">
-                Lancer un rendu <ArrowRight className="w-3.5 h-3.5" />
+                Lancer un avant/après <ArrowRight className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
@@ -209,7 +209,7 @@ function HubView({
         {[
           { icon: Send, label: 'Campagnes envoyées', value: '0', sub: 'Aucune pour le moment' },
           { icon: Users, label: 'Leads capturés', value: '0', sub: 'Email + nom' },
-          { icon: Eye, label: 'Rendus générés', value: '0', sub: 'Par vos prospects' },
+          { icon: Eye, label: 'Avant/après générés', value: '0', sub: 'Par vos prospects' },
           { icon: TrendingUp, label: 'Taux de conversion', value: '—', sub: 'Lead → devis' },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-border bg-card p-4">
@@ -242,7 +242,7 @@ function HubView({
             },
             {
               n: 3,
-              title: 'Il génère ses rendus',
+              title: 'Il génère ses avant/après',
               desc: 'Photo de sa pièce + style choisi. Il peut tester plusieurs combinaisons et marquer ses favoris.',
             },
             {
@@ -322,11 +322,11 @@ function WhiteLabelPreview({ companyName }: { companyName: string }) {
               Votre adresse email
             </div>
             <div className="rounded-md bg-primary text-white text-center text-[10px] font-semibold py-1.5">
-              Commencer mes rendus
+              Commencer mes avant/après
             </div>
           </div>
           <p className="text-[8px] text-muted-foreground">
-            Vos rendus vous seront envoyés par email · Aucune carte requise
+            Vos avant/après vous seront envoyés par email · Aucune carte requise
           </p>
         </div>
       </div>
@@ -378,7 +378,7 @@ function CampaignDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="w-4 h-4 text-primary" />
-            Créer une campagne Rendus IA
+            Créer une campagne Avant/Après IA
           </DialogTitle>
           <DialogDescription>
             Générez un lien personnalisé <strong>{companyName}</strong> à envoyer à votre prospect. Il devra
@@ -446,7 +446,7 @@ function CampaignDialog({
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Aperçu : page white-label à votre nom, formulaire email obligatoire, multiples rendus possibles,
+              Aperçu : page white-label à votre nom, formulaire email obligatoire, multiples avant/après possibles,
               tracking activité.
             </p>
           </div>
@@ -630,7 +630,7 @@ function SelfRenderingWizard() {
               Retour
             </Button>
             <Button className="flex-1" onClick={handleGenerate} disabled={!selectedStyle}>
-              <Sparkles className="mr-2 h-4 w-4" /> Générer le rendu
+              <Sparkles className="mr-2 h-4 w-4" /> Générer l&apos;avant/après
             </Button>
           </div>
         </div>
@@ -644,10 +644,10 @@ function SelfRenderingWizard() {
           </div>
           <h3 className="mt-6 font-semibold text-foreground">Génération en cours...</h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            L&apos;IA transforme votre photo en rendu {selectedStyle}
+            L&apos;IA transforme votre photo en {selectedStyle}
           </p>
           <div className="mt-6 space-y-2">
-            {['Analyse de la photo...', 'Application du style...', 'Rendu final...'].map((t, i) => (
+            {['Analyse de la photo...', 'Application du style...', 'Image finale...'].map((t, i) => (
               <div key={t} className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
                 <div className={cn('h-2 w-2 rounded-full', i < 2 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse')} />
                 {t}
@@ -674,11 +674,11 @@ function SelfRenderingWizard() {
               <div className="bg-gradient-to-br from-primary/10 to-primary/5 h-64 flex items-center justify-center">
                 <div className="text-center">
                   <Sparkles className="h-8 w-8 text-primary mx-auto" />
-                  <p className="mt-2 text-sm font-medium text-foreground">Rendu IA généré</p>
+                  <p className="mt-2 text-sm font-medium text-foreground">Image générée par l&apos;IA</p>
                   <p className="text-xs text-muted-foreground">Style {selectedStyle}</p>
                 </div>
               </div>
-              <div className="p-3 text-center text-sm font-medium text-primary">Après - Rendu IA</div>
+              <div className="p-3 text-center text-sm font-medium text-primary">Après — généré par IA</div>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3">
@@ -686,7 +686,7 @@ function SelfRenderingWizard() {
               <Download className="h-4 w-4" /> Télécharger HD
             </Button>
             <Button variant="outline" className="gap-2" onClick={reset}>
-              Nouveau rendu
+              Nouvel avant/après
             </Button>
             <Button className="gap-2">
               <Eye className="h-4 w-4" /> Partager au client

@@ -30,7 +30,7 @@ const features = [
   { icon: Target, label: 'Prospection CRM', href: '/fonctionnalites/prospection-crm' },
   { icon: Mail, label: 'Gmail intégré', href: '/fonctionnalites/gmail-integre' },
   { icon: Star, label: 'Avis Google', href: '/fonctionnalites/avis-google' },
-  { icon: FileImage, label: 'Rendus IA', href: '/fonctionnalites/rendus-ia' },
+  { icon: FileImage, label: 'Avant/Après IA', href: '/fonctionnalites/rendus-ia' },
   { icon: CreditCard, label: 'Paiements Stripe', href: '/fonctionnalites/paiements-stripe' },
   { icon: Calculator, label: 'Maurice — Comptable IA', href: '/fonctionnalites/comptabilite-ia' },
   { icon: Bot, label: 'Agents IA', href: '/fonctionnalites/agents-ia' },

@@ -64,7 +64,7 @@ export default function CguPage() {
                 <li>Contrats récurrents et facturation automatique</li>
                 <li>Comptabilité et suivi des dépenses</li>
                 <li>Agents IA spécialisés bâtiment</li>
-                <li>Plans et rendus générés par IA</li>
+                <li>Avant/Après IA générés à partir d&apos;une photo</li>
               </ul>
               <p>
                 Les fonctionnalités disponibles dépendent du plan souscrit (Starter, Pro
@@ -141,7 +141,7 @@ export default function CguPage() {
               <p>
                 Hellobat utilise l&apos;intelligence artificielle (Claude d&apos;Anthropic) pour
                 certaines fonctionnalités : génération de devis, réponse aux emails,
-                contenu de site web, agents spécialisés, comptabilité et plans/rendus.
+                contenu de site web, agents spécialisés, comptabilité et avant/après visuels.
               </p>
               <p>
                 Les contenus générés par l&apos;IA sont des suggestions et ne constituent pas

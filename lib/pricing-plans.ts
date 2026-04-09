@@ -62,7 +62,7 @@ export const PRICING_PLAN_DEFAULTS: PricingPlanDefinition[] = [
     features: [
       'Tout le plan Pro, plus :',
       '5 agents IA spécialisés (pannes, DTU, chiffrage, juridique, RGE/CEE)',
-      'Plans et rendus générés par IA',
+      'Avant/Après IA générés à partir d\'une photo',
       'Comptabilité IA automatisée',
       'Contrats de maintenance récurrents',
       'Paiement en ligne Stripe',

@@ -11,7 +11,7 @@ INSERT INTO platform_config (key, value, label) VALUES
   ),
   (
     'features_business',
-    '["Tout le plan Pro","Agents IA illimites","Paiements Stripe","Contrats de maintenance","Plans & Rendus IA","Comptabilite avancee","Carte publique partageable","API & Webhooks","Support dedie"]',
+    '["Tout le plan Pro","Agents IA illimites","Paiements Stripe","Contrats de maintenance","Avant/Apres IA","Comptabilite avancee","Carte publique partageable","API & Webhooks","Support dedie"]',
     'Fonctionnalites Business (JSON)'
   )
 ON CONFLICT (key) DO NOTHING;

@@ -582,18 +582,18 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
   },
   {
     slug: 'rendus-ia',
-    title: 'Rendus IA',
-    subtitle: 'Visualisez vos projets avant de construire',
-    heroDescription: 'Générez des rendus visuels à partir de photos ou de descriptions textuelles. L\'IA crée des représentations de vos projets pour aider vos clients à se projeter.',
+    title: 'Avant/Après IA',
+    subtitle: 'Vendez le résultat avant même de signer',
+    heroDescription: 'Transformez la photo d\'une pièce ou d\'une façade en projection photoréaliste après travaux. Vos clients voient l\'avant et l\'après côte à côte — l\'argument commercial le plus puissant pour faire signer.',
     sections: [
       {
-        title: 'Rendus visuels',
-        content: 'Obtenez des rendus visuels de vos projets : façades, aménagements intérieurs, extérieur. Les rendus aident vos clients à visualiser le résultat final et facilitent la prise de décision.',
+        title: 'Avant/après photoréalistes',
+        content: 'Une simple photo suffit : façade, salon, cuisine, salle de bain… L\'IA génère l\'image après travaux dans le style que vous choisissez. Vos clients comparent l\'avant et l\'après et se projettent sans effort.',
       },
     ],
     highlights: [
-      'Rendus visuels de projets',
-      'Aide à la décision client',
+      'Avant/après photoréalistes en quelques secondes',
+      'Argument de vente décisif pour faire signer',
     ],
     plan: 'business',
   },

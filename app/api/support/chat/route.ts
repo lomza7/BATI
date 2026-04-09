@@ -20,7 +20,7 @@ A propos de Hellobat :
 - Generateur de site web vitrine par IA
 - Boite mail Gmail integree avec reponse IA contextuelle
 - Avis Google Business avec reponse assistee
-- Rendus IA pour visualiser des transformations
+- Avant/Apres IA : transforme une photo de piece ou de facade en projection apres travaux
 - 5 agents IA experts : pannes, DTU, chiffrage, juridique, RGE/CEE
 - Paiements Stripe, contrats recurrents
 - Comptabilite IA avec OCR Maurice (recus, factures fournisseurs) et reconciliation bancaire

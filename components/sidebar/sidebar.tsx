@@ -14,7 +14,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <Hexagon className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="text-[15px] font-semibold tracking-tight text-foreground">
+        <span className="text-base font-semibold tracking-tight text-foreground">
           Hellobat
         </span>
       </div>
@@ -25,33 +25,33 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <a
           href="/parrainage"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
         >
-          <Gift className="h-4 w-4" />
+          <Gift className="h-[18px] w-[18px]" />
           <span>Lien de parrainage</span>
         </a>
         <a
           href="/parametres"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-[18px] w-[18px]" />
           <span>Parametres</span>
         </a>
         <a
           href="/corbeille"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-[18px] w-[18px]" />
           <span>Corbeille</span>
         </a>
         <a
           href="/aide"
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
         >
-          <HelpCircle className="h-4 w-4" />
+          <HelpCircle className="h-[18px] w-[18px]" />
           <span>Aide</span>
         </a>
       </div>
@@ -68,7 +68,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden lg:flex w-[220px] flex-col bg-sidebar border-r border-sidebar-border">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden lg:flex w-[240px] flex-col bg-sidebar border-r border-sidebar-border">
         <SidebarContent />
       </aside>
 

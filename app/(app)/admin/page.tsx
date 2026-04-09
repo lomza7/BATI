@@ -885,7 +885,7 @@ export default function AdminPage() {
                   <Wand2 className="h-4 w-4 text-primary" /> Generation d'images IA
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Cles API utilisees pour les Rendus IA. Choisis le provider actif et renseigne sa cle.
+                  Cles API utilisees pour la generation Avant/Apres IA. Choisis le provider actif et renseigne sa cle.
                 </p>
               </div>
               <Button

@@ -560,13 +560,13 @@ export function PlansSection() {
     <FeatureSection
       id="rendus"
       slug="rendus-ia"
-      badge="Rendus IA"
-      title="Vos rendus,"
+      badge="Avant/Après IA"
+      title="Vos avant/après,"
       titleAccent="générés par IA"
-      description="Transformez vos photos et plans en rendus 3D photoréalistes. Aidez vos clients à visualiser le résultat avant le début des travaux."
+      description="Transformez la photo d'une pièce ou d'une façade en projection photoréaliste après travaux. Vos clients voient le résultat avant même de signer."
       bulletPoints={[
-        'Rendus 3D photoréalistes',
-        'Génération depuis photo ou description',
+        'Avant/après photoréalistes en quelques secondes',
+        'Génération depuis une simple photo',
         'Partage client par lien sécurisé',
         'Plusieurs styles disponibles',
       ]}
@@ -574,7 +574,7 @@ export function PlansSection() {
       visual={
         <MockBrowser>
           <div className="grid grid-cols-3 gap-2">
-            {['Facade.jpg', 'Salon 3D.png', 'Cuisine.jpg', 'Photo 1.jpg', 'Rendu 3D.png', 'Salle de bain.png'].map((file) => (
+            {['Facade — avant.jpg', 'Facade — après.jpg', 'Salon — avant.jpg', 'Salon — après.jpg', 'Cuisine — avant.jpg', 'Cuisine — après.jpg'].map((file) => (
               <div key={file} className="aspect-square rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)] flex items-center justify-center p-2">
                 <div className="text-center">
                   <FileImage className="w-5 h-5 text-[var(--landing-muted)] mx-auto mb-1" />

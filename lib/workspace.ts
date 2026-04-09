@@ -99,7 +99,7 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
   site_web: 'Site web IA',
   mail: 'Boîte mail',
   avis: 'Avis Google',
-  plans_rendus: 'Rendus IA',
+  plans_rendus: 'Avant/Après IA',
   agents: 'Agents IA',
   paiements: 'Paiements',
   contrats: 'Contrats récurrents',
