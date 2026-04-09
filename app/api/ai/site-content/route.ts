@@ -4,22 +4,29 @@ import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 
-function extractJson(content: string): string {
-  const fenced = content.match(/```json\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) return fenced[1].trim();
-  const start = content.indexOf('{');
-  const end = content.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) throw new Error('Pas de JSON dans la reponse IA');
-  return content.slice(start, end + 1);
+async function loadOpenAiKey(): Promise<string> {
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { data } = await sb
+    .from('platform_secrets')
+    .select('key, value')
+    .eq('key', 'openai_api_key')
+    .maybeSingle();
+  return data?.value || '';
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await loadOpenAiKey();
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'Cle API OpenAI manquante. Configure-la dans Administration.' },
+      { status: 503 }
+    );
   }
 
   // Auth
@@ -173,28 +180,28 @@ Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdo
 - Les icones doivent etre des noms valides de lucide-react.
 - Ne mets JAMAIS de faux chiffres (ex: "500 chantiers" si non fourni).`;
 
-    const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+    const model = process.env.OPENAI_TEXT_MODEL || DEFAULT_MODEL;
 
-    const res = await fetch(ANTHROPIC_API_URL, {
+    const res = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
         max_tokens: 4000,
+        response_format: { type: 'json_object' },
         messages: [
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        system: systemPrompt,
       }),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      console.error('Anthropic API error:', res.status, text);
+      console.error('OpenAI API error:', res.status, text);
       let detail = text;
       try {
         const parsed = JSON.parse(text);
@@ -209,17 +216,19 @@ Retourne un JSON avec cette structure exacte (pas de commentaires, pas de markdo
     }
 
     const data = await res.json();
-    const rawText = data.content?.[0]?.text || '';
-    const jsonStr = extractJson(rawText);
-    const siteContent = JSON.parse(jsonStr);
+    const rawText: string = data.choices?.[0]?.message?.content || '';
+    if (!rawText) {
+      throw new Error('Reponse IA vide');
+    }
+    const siteContent = JSON.parse(rawText);
 
     // Track usage
     trackAiUsage({
       user_id: user.id,
       route: 'ai/site-content',
       model,
-      input_tokens: data.usage?.input_tokens || 0,
-      output_tokens: data.usage?.output_tokens || 0,
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
       status: 'success',
     }).catch(() => {});
 

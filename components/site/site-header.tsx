@@ -1,7 +1,10 @@
 import type { SiteProfile } from '@/lib/site-utils';
+import { SiteHeaderCta } from './site-header-cta';
 
 interface SiteHeaderProps {
   profile: SiteProfile;
+  slug: string;
+  phone?: string;
   showServices: boolean;
   showProjects: boolean;
   showReviews: boolean;
@@ -19,6 +22,8 @@ interface SiteHeaderProps {
 
 export function SiteHeader({
   profile,
+  slug,
+  phone,
   showServices,
   showProjects,
   showReviews,
@@ -41,17 +46,17 @@ export function SiteHeader({
 
   return (
     <header
-      className="sticky top-0 z-50 backdrop-blur-md border-b"
+      className="sticky top-0 z-50 border-b"
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--site-bg) 85%, transparent)',
+        backgroundColor: 'var(--site-bg)',
         borderColor: 'var(--site-border)',
       }}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         {/* Logo + company name */}
         <a
           href={homeHref}
-          className="flex items-center gap-3 font-bold text-lg truncate"
+          className="flex items-center gap-3 font-bold text-base sm:text-lg truncate min-w-0"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
           {profile.logo_url && (
@@ -64,8 +69,8 @@ export function SiteHeader({
           <span className="truncate">{profile.company_name}</span>
         </a>
 
-        {/* Navigation — hidden on mobile, visible on md+ */}
-        <nav className="hidden md:flex items-center gap-6">
+        {/* Navigation links — hidden on mobile, visible on md+ */}
+        <nav className="hidden md:flex items-center gap-5 flex-1 justify-center">
           {links.map((link) => (
             <a
               key={link.href}
@@ -76,18 +81,10 @@ export function SiteHeader({
               {link.label}
             </a>
           ))}
-          <a
-            href={prefix('#contact')}
-            className="text-sm font-semibold px-4 py-2 rounded-md transition-colors"
-            style={{
-              backgroundColor: 'var(--site-accent)',
-              color: '#ffffff',
-              borderRadius: 'var(--site-radius)',
-            }}
-          >
-            Devis gratuit
-          </a>
         </nav>
+
+        {/* CTA block — phone + devis modal, visible on every breakpoint */}
+        <SiteHeaderCta slug={slug} companyName={profile.company_name} phone={phone} />
       </div>
     </header>
   );

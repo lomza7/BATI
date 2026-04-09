@@ -1,12 +1,15 @@
-import { Phone, MapPin, Mail, ExternalLink } from 'lucide-react';
+import { Phone, MapPin, ExternalLink } from 'lucide-react';
 import type { SiteProfile, SiteContentContact } from '@/lib/site-utils';
+import { SiteContactCta } from './site-contact-cta';
 
 interface SiteContactProps {
   profile: SiteProfile;
   contact: SiteContentContact;
+  slug: string;
+  phone?: string;
 }
 
-export function SiteContact({ profile, contact }: SiteContactProps) {
+export function SiteContact({ profile, contact, slug, phone }: SiteContactProps) {
   const address = [
     profile.company_address,
     profile.company_postal_code,
@@ -18,6 +21,8 @@ export function SiteContact({ profile, contact }: SiteContactProps) {
   const mapsQuery = encodeURIComponent(
     address || `${profile.company_name} ${profile.company_city || ''}`
   );
+
+  const displayPhone = phone || profile.company_phone || undefined;
 
   return (
     <section id="contact" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg-alt)' }}>
@@ -37,9 +42,9 @@ export function SiteContact({ profile, contact }: SiteContactProps) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Phone */}
-          {profile.company_phone && (
+          {displayPhone && (
             <a
-              href={`tel:${profile.company_phone}`}
+              href={`tel:${displayPhone.replace(/\s+/g, '')}`}
               className="flex items-center gap-4 p-5 border transition-shadow hover:shadow-md"
               style={{
                 backgroundColor: 'var(--site-card-bg)',
@@ -58,7 +63,7 @@ export function SiteContact({ profile, contact }: SiteContactProps) {
                   Telephone
                 </p>
                 <p className="font-semibold" style={{ color: 'var(--site-heading)' }}>
-                  {profile.company_phone}
+                  {displayPhone}
                 </p>
               </div>
             </a>
@@ -125,21 +130,9 @@ export function SiteContact({ profile, contact }: SiteContactProps) {
           )}
         </div>
 
-        {/* CTA button */}
-        <div className="mt-10 text-center">
-          {profile.company_phone && (
-            <a
-              href={`tel:${profile.company_phone}`}
-              className="inline-block text-base font-semibold px-8 py-3.5 transition-all hover:scale-105"
-              style={{
-                backgroundColor: 'var(--site-accent)',
-                color: '#ffffff',
-                borderRadius: 'var(--site-radius)',
-              }}
-            >
-              Appelez-nous
-            </a>
-          )}
+        {/* CTA block — demander un devis + telephone a cote */}
+        <div className="mt-10">
+          <SiteContactCta slug={slug} companyName={profile.company_name} phone={displayPhone} />
         </div>
       </div>
     </section>

@@ -64,8 +64,11 @@ export interface ArtisanSite {
   show_contact: boolean;
   show_map: boolean;
   hero_image_url: string;
+  hero_layout: 'single' | 'grid' | 'carousel';
+  hero_images: string[];
   legal_text: string;
   custom_slogan: string;
+  public_phone: string;
   published_at: string | null;
   created_at: string;
   updated_at: string;

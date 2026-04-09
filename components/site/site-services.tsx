@@ -1,15 +1,6 @@
 import type { SiteContentService, SiteService } from '@/lib/site-utils';
-import {
-  Hammer, PaintBucket, Wrench, Home, Shield, Ruler, Zap, Droplets,
-  Flame, Layers, Brush, HardHat, Building2, Plug, Thermometer,
-  Pipette, TreePine, Warehouse, Lightbulb, Settings,
-} from 'lucide-react';
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
-  Hammer, PaintBucket, Wrench, Home, Shield, Ruler, Zap, Droplets,
-  Flame, Layers, Brush, HardHat, Building2, Plug, Thermometer,
-  Pipette, TreePine, Warehouse, Lightbulb, Settings,
-};
+import { SERVICE_ICON_MAP, DEFAULT_SERVICE_ICON } from './site-service-icons';
+import { Wrench } from 'lucide-react';
 
 interface SiteServicesProps {
   aiServices: SiteContentService[];
@@ -17,14 +8,17 @@ interface SiteServicesProps {
 }
 
 export function SiteServices({ aiServices, dbServices }: SiteServicesProps) {
-  // Merge: use DB services if available, otherwise AI-generated
-  const services = dbServices.length > 0
-    ? dbServices.map((s) => ({
-        name: s.name,
-        description: s.description,
-        icon: 'Wrench',
-      }))
-    : aiServices;
+  // Les services afficher sont ceux edites dans /site-web (site_content.services).
+  // Ils sont edites manuellement par l'artisan avec une icone au choix. Si aucun
+  // service n'a ete saisi, on retombe sur la liste des prestations (services table).
+  const services =
+    aiServices.length > 0
+      ? aiServices
+      : dbServices.map((s) => ({
+          name: s.name,
+          description: s.description,
+          icon: DEFAULT_SERVICE_ICON,
+        }));
 
   if (services.length === 0) return null;
 
@@ -40,7 +34,7 @@ export function SiteServices({ aiServices, dbServices }: SiteServicesProps) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {services.map((service, i) => {
-            const Icon = ICON_MAP[service.icon] || Wrench;
+            const Icon = SERVICE_ICON_MAP[service.icon] || Wrench;
             return (
               <div
                 key={i}

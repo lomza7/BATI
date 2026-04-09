@@ -222,9 +222,19 @@ export default function VerifyEmailPage() {
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground mb-5">
-          Le code expire dans 10 minutes. Pensez a verifier vos spams.
+        <p className="text-xs text-muted-foreground mb-3">
+          Le code expire dans 10 minutes.
         </p>
+
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 mb-5 flex items-start gap-2.5 text-left">
+          <Mail className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Vous n&apos;avez pas recu le code&nbsp;?</p>
+            <p className="text-amber-800/90 text-xs mt-0.5">
+              Regardez dans vos spams ou courriers indesirables. Sinon, cliquez sur &laquo;&nbsp;Renvoyer le code&nbsp;&raquo; ci-dessous.
+            </p>
+          </div>
+        </div>
 
         <button
           onClick={() => sendCode({ manual: true })}

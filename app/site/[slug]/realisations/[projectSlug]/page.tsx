@@ -277,6 +277,8 @@ export default async function ProjectDetailPage({
 
       <SiteHeader
         profile={profile}
+        slug={slug}
+        phone={site.public_phone || profile.company_phone || undefined}
         showServices={site.show_services}
         showProjects={site.show_projects}
         showReviews={site.show_reviews}
@@ -547,7 +549,14 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* Contact */}
-      {site.show_contact && <SiteContact profile={profile} contact={content.contact} />}
+      {site.show_contact && (
+        <SiteContact
+          profile={profile}
+          contact={content.contact}
+          slug={slug}
+          phone={site.public_phone || profile.company_phone || undefined}
+        />
+      )}
 
       <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} />
     </div>

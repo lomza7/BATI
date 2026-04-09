@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Globe, Sparkles, Eye, Palette, Type, ArrowRight, Check,
   RefreshCw, ExternalLink, Copy, CheckCircle2, Pencil, X,
@@ -13,10 +14,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
-import { generateSlug, SITE_THEMES, type SiteTheme, type SiteContent, type ArtisanSite } from '@/lib/site-utils';
+import { generateSlug, slugify, SITE_THEMES, type SiteTheme, type SiteContent, type ArtisanSite } from '@/lib/site-utils';
 import { SiteImageUpload } from '@/components/site/site-image-upload';
 import { ThemePreviewCard } from '@/components/site/theme-preview-card';
 import { ThemePreviewModal } from '@/components/site/theme-preview-modal';
+import { SERVICE_ICONS } from '@/components/site/site-service-icons';
+
+// Chargement dynamique cote client uniquement : la modale embarque Leaflet
+// qui touche `window` a l'import et casserait le prerendering SSR.
+const SitePreviewModal = dynamic(
+  () => import('@/components/site/site-preview-modal').then((m) => m.SitePreviewModal),
+  { ssr: false }
+);
 
 const STEPS = [
   { id: 1, label: 'Informations', icon: Type },
@@ -71,7 +80,18 @@ export default function SiteWebPage() {
   // Images + legal
   const [logoUrl, setLogoUrl] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [heroLayout, setHeroLayout] = useState<'single' | 'grid' | 'carousel'>('single');
+  const [heroImages, setHeroImages] = useState<string[]>(['', '', '']);
   const [legalText, setLegalText] = useState('');
+
+  // Telephone affiche sur le site public (a cote du bouton devis)
+  const [publicPhone, setPublicPhone] = useState('');
+
+  // Adresse publique du site (slug) + controle de disponibilite
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
+  const [slugMessage, setSlugMessage] = useState('');
 
   // Section toggles
   const [showServices, setShowServices] = useState(true);
@@ -85,6 +105,9 @@ export default function SiteWebPage() {
 
   // Theme preview modal
   const [previewTheme, setPreviewTheme] = useState<SiteTheme | null>(null);
+
+  // Full site preview modal (Step 4)
+  const [showSitePreview, setShowSitePreview] = useState(false);
 
   // Load existing profile + site
   const loadData = useCallback(async () => {
@@ -105,6 +128,14 @@ export default function SiteWebPage() {
         phone: profileRes.data.company_phone || '',
       }));
       if (profileRes.data.logo_url) setLogoUrl(profileRes.data.logo_url);
+      // Par defaut, le telephone public affiche le telephone de l'entreprise
+      setPublicPhone(profileRes.data.company_phone || '');
+      // Slug par defaut genere a partir du nom + ville
+      const defaultSlug = generateSlug(
+        profileRes.data.company_name || '',
+        profileRes.data.company_city || null,
+      );
+      if (defaultSlug) setSlug(defaultSlug);
     }
 
     if (siteRes.data) {
@@ -118,10 +149,20 @@ export default function SiteWebPage() {
       setShowContact(site.show_contact);
       setShowMap(site.show_map ?? true);
       if (site.hero_image_url) setHeroImageUrl(site.hero_image_url);
+      if (site.hero_layout) setHeroLayout(site.hero_layout);
+      // On s'assure d'avoir toujours 3 slots pour l'edition
+      const imgs = Array.isArray(site.hero_images) ? site.hero_images.slice(0, 3) : [];
+      // Compat : si hero_images est vide mais qu'il y a une hero_image_url legacy,
+      // on l'injecte en premier slot pour ne pas perdre l'image existante.
+      if (imgs.length === 0 && site.hero_image_url) imgs.push(site.hero_image_url);
+      while (imgs.length < 3) imgs.push('');
+      setHeroImages(imgs);
       if (site.legal_text) setLegalText(site.legal_text);
       if (site.custom_slogan) {
         setProfile(prev => ({ ...prev, slogan: site.custom_slogan }));
       }
+      if (site.public_phone) setPublicPhone(site.public_phone);
+      if (site.slug) setSlug(site.slug);
       if (site.status === 'published') {
         setPublished(true);
         setSiteUrl(`https://hellobat.app/site/${site.slug}`);
@@ -133,6 +174,44 @@ export default function SiteWebPage() {
   }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Debounced slug availability check
+  useEffect(() => {
+    if (!slug) {
+      setSlugStatus('idle');
+      setSlugMessage('');
+      return;
+    }
+    setSlugStatus('checking');
+    setSlugMessage('');
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch(`/api/site/check-slug?slug=${encodeURIComponent(slug)}`, {
+          signal: controller.signal,
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json();
+        if (data.available) {
+          setSlugStatus('available');
+          setSlugMessage(data.reason === 'owned' ? 'C\u2019est votre adresse actuelle' : 'Adresse disponible');
+        } else {
+          setSlugStatus('unavailable');
+          setSlugMessage(data.message || 'Adresse indisponible');
+        }
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          setSlugStatus('idle');
+        }
+      }
+    }, 400);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [slug]);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -197,11 +276,25 @@ export default function SiteWebPage() {
 
   async function handlePublish() {
     if (!user || !siteContent) return;
+
+    // Slug de secours si l'utilisateur n'a rien saisi
+    const finalSlug = slug || generateSlug(profile.company, profile.city);
+    if (!finalSlug) {
+      setError('Veuillez choisir une adresse pour votre site');
+      return;
+    }
+    if (slugStatus === 'unavailable') {
+      setError('Cette adresse n\u2019est pas disponible, choisissez-en une autre');
+      return;
+    }
+    if (slugStatus === 'checking') {
+      setError('Verification de l\u2019adresse en cours, merci de patienter un instant');
+      return;
+    }
+
     setPublishing(true);
     setError('');
     try {
-      const slug = existingSite?.slug || generateSlug(profile.company, profile.city);
-
       // Save logo to profiles if changed
       if (logoUrl) {
         await supabase.from('profiles').update({ logo_url: logoUrl }).eq('id', user.id);
@@ -209,7 +302,7 @@ export default function SiteWebPage() {
 
       const payload = {
         user_id: user.id,
-        slug,
+        slug: finalSlug,
         status: 'published',
         theme,
         site_content: siteContent,
@@ -218,9 +311,12 @@ export default function SiteWebPage() {
         show_reviews: showReviews,
         show_contact: showContact,
         show_map: showMap,
-        hero_image_url: heroImageUrl || '',
+        hero_image_url: heroImageUrl || heroImages.find(Boolean) || '',
+        hero_layout: heroLayout,
+        hero_images: heroImages.filter(Boolean).slice(0, 3),
         legal_text: legalText || '',
         custom_slogan: profile.slogan || '',
+        public_phone: publicPhone.trim() || '',
         published_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -245,7 +341,7 @@ export default function SiteWebPage() {
 
       setExistingSite(result.data as ArtisanSite);
       setPublished(true);
-      const url = `https://hellobat.app/site/${slug}`;
+      const url = `https://hellobat.app/site/${finalSlug}`;
       setSiteUrl(url);
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -256,7 +352,7 @@ export default function SiteWebPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ slug }),
+          body: JSON.stringify({ slug: finalSlug }),
         }).catch(() => {});
       }
     } catch (err: unknown) {
@@ -278,7 +374,10 @@ export default function SiteWebPage() {
     if (!siteContent) return;
     setSiteContent({ ...siteContent, hero: { ...siteContent.hero, [field]: value } });
   }
-  function updateAbout(field: string, value: string | string[]) {
+  function updateAbout(
+    field: string,
+    value: string | string[] | { label: string; value: string }[],
+  ) {
     if (!siteContent) return;
     setSiteContent({ ...siteContent, about: { ...siteContent.about, [field]: value } });
   }
@@ -430,6 +529,80 @@ export default function SiteWebPage() {
                 <label className="text-sm font-medium">Annees d&apos;experience</label>
                 <Input className="mt-1" placeholder="Ex: 15" value={profile.years_experience} onChange={e => setProfile({ ...profile, years_experience: e.target.value })} />
               </div>
+              <div className="sm:col-span-2">
+                <label className="text-sm font-medium">Telephone affiche sur le site public</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Ex: 04 78 12 34 56"
+                  value={publicPhone}
+                  onChange={e => setPublicPhone(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ce numero apparait a cote du bouton &laquo;&nbsp;Demander un devis gratuit&nbsp;&raquo; sur votre site. Vous pouvez le modifier a tout moment.
+                </p>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-sm font-medium">Adresse publique de votre site</label>
+                <div
+                  className={cn(
+                    'mt-1 flex items-stretch rounded-md border bg-background overflow-hidden transition-colors',
+                    slugTouched && slugStatus === 'unavailable'
+                      ? 'border-red-500 focus-within:ring-2 focus-within:ring-red-500/30'
+                      : slugTouched && slugStatus === 'available'
+                      ? 'border-green-500 focus-within:ring-2 focus-within:ring-green-500/30'
+                      : 'border-input focus-within:ring-2 focus-within:ring-ring/30'
+                  )}
+                >
+                  <span className="flex items-center px-3 text-sm text-muted-foreground bg-muted/40 border-r border-input select-none">
+                    hellobat.app/site/
+                  </span>
+                  <input
+                    type="text"
+                    className="flex-1 min-w-0 px-3 py-2 text-sm bg-transparent outline-none"
+                    placeholder="mon-entreprise"
+                    value={slug}
+                    onChange={e => {
+                      setSlugTouched(true);
+                      // Normalise la saisie en direct pour eviter les caracteres invalides
+                      setSlug(slugify(e.target.value, 60));
+                    }}
+                    maxLength={60}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <span className="flex items-center pr-3 text-xs font-medium">
+                    {slugStatus === 'checking' && (
+                      <RefreshCw className="w-3.5 h-3.5 text-muted-foreground animate-spin" />
+                    )}
+                    {slugStatus === 'available' && (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    )}
+                    {slugStatus === 'unavailable' && (
+                      <X className="w-4 h-4 text-red-600" />
+                    )}
+                  </span>
+                </div>
+                {slugTouched && slugMessage ? (
+                  <p
+                    className={cn(
+                      'text-xs mt-1',
+                      slugStatus === 'unavailable' ? 'text-red-600' : 'text-green-600'
+                    )}
+                  >
+                    {slugMessage}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Personnalisez la fin de l&apos;URL. Lettres minuscules, chiffres et tirets uniquement.
+                  </p>
+                )}
+                {existingSite?.slug && slug && existingSite.slug !== slug && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Attention : changer l&apos;adresse rendra l&apos;ancienne URL inaccessible.
+                  </p>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Slogan / phrase d&apos;accroche</label>
@@ -494,9 +667,10 @@ export default function SiteWebPage() {
           {/* Images */}
           <div className="rounded-xl border border-border bg-card p-6 sm:p-8 space-y-5">
             <h2 className="font-semibold text-foreground">Images du site</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Logo de l&apos;entreprise</label>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Logo de l&apos;entreprise</label>
+              <div className="max-w-[200px]">
                 <SiteImageUpload
                   value={logoUrl}
                   onChange={setLogoUrl}
@@ -505,19 +679,17 @@ export default function SiteWebPage() {
                   aspectRatio="aspect-square"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Image hero (fond de la page d&apos;accueil)</label>
-                <SiteImageUpload
-                  value={heroImageUrl}
-                  onChange={setHeroImageUrl}
-                  label="Photo de chantier, equipe..."
-                  hint="Format paysage recommande, 5 Mo max"
-                  aspectRatio="aspect-video"
-                />
-              </div>
             </div>
+
+            <HeroImagesEditor
+              layout={heroLayout}
+              onLayoutChange={setHeroLayout}
+              images={heroImages}
+              onImagesChange={setHeroImages}
+            />
+
             <p className="text-xs text-muted-foreground">
-              Ces images seront affichees sur votre site. Vous pourrez les modifier apres publication.
+              Vous pourrez modifier ces images a tout moment apres publication.
             </p>
           </div>
 
@@ -600,37 +772,90 @@ export default function SiteWebPage() {
 
       {/* ═══ Step 3: Sections + generate ═══ */}
       {step === 3 && (
-        <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-8 space-y-5">
-          <h2 className="font-semibold text-foreground">Sections du site</h2>
-          <p className="text-sm text-muted-foreground">Activez ou desactivez les sections</p>
+        <div className="max-w-2xl mx-auto rounded-xl border border-border bg-card p-6 sm:p-8 space-y-5">
+          <div>
+            <h2 className="font-semibold text-foreground">Sections du site</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Activez ou desactivez chaque section. Le contenu reste vivant et se met a jour automatiquement avec votre activite sur Hellobat.
+            </p>
+          </div>
 
           {[
-            { label: 'Accueil & Hero', enabled: true, toggle: null },
-            { label: 'A propos', enabled: true, toggle: null },
-            { label: 'Nos services', enabled: showServices, toggle: () => setShowServices(!showServices) },
-            { label: 'Realisations', enabled: showProjects, toggle: () => setShowProjects(!showProjects) },
-            { label: 'Carte des chantiers', enabled: showMap, toggle: () => setShowMap(!showMap), icon: MapPin },
-            { label: 'Temoignages', enabled: showReviews, toggle: () => setShowReviews(!showReviews) },
-            { label: 'FAQ', enabled: true, toggle: null },
-            { label: 'Contact', enabled: showContact, toggle: () => setShowContact(!showContact) },
+            {
+              label: 'Accueil & Hero',
+              enabled: true,
+              toggle: null,
+              description: 'La premiere section vue par vos visiteurs avec votre photo d\u2019accroche, votre slogan et le bouton "Demander un devis gratuit".',
+            },
+            {
+              label: 'A propos',
+              enabled: true,
+              toggle: null,
+              description: 'Votre histoire, vos valeurs et vos chiffres cles (annees d\u2019experience, clients satisfaits, note Google...). Editable dans l\u2019etape 4.',
+            },
+            {
+              label: 'Nos services',
+              enabled: showServices,
+              toggle: () => setShowServices(!showServices),
+              description: 'Les prestations que vous ajoutez dans l\u2019onglet "Mes prestations" apparaissent automatiquement ici. Vous pouvez aussi les editer dans l\u2019etape 4.',
+            },
+            {
+              label: 'Realisations',
+              enabled: showProjects,
+              toggle: () => setShowProjects(!showProjects),
+              description: 'Des qu\u2019un chantier est marque comme termine et publie depuis l\u2019onglet Chantiers (bouton "Publier sur mon site"), il apparait automatiquement ici avec ses photos.',
+            },
+            {
+              label: 'Carte des chantiers',
+              enabled: showMap,
+              toggle: () => setShowMap(!showMap),
+              icon: MapPin,
+              description: 'Une carte interactive qui affiche l\u2019emplacement de tous les chantiers publies. Vous choisissez chantier par chantier lesquels sont publics ou prives depuis l\u2019onglet Chantiers.',
+            },
+            {
+              label: 'Temoignages',
+              enabled: showReviews,
+              toggle: () => setShowReviews(!showReviews),
+              description: 'Les avis clients publies depuis l\u2019onglet Avis Google s\u2019affichent ici. Vous pouvez aussi ajouter le lien vers votre fiche Google My Business pour recevoir de nouveaux avis.',
+            },
+            {
+              label: 'FAQ',
+              enabled: true,
+              toggle: null,
+              description: 'Les questions frequentes generees par l\u2019IA a partir de votre activite. Editable dans l\u2019etape 4.',
+            },
+            {
+              label: 'Contact',
+              enabled: showContact,
+              toggle: () => setShowContact(!showContact),
+              description: 'Quand un visiteur remplit le formulaire "Demander un devis", vous recevez un email, un lead CRM est cree, un devis en brouillon est genere, une fiche client est ajoutee et une tache apparait dans votre liste. Plus rien ne se perd.',
+            },
           ].map((section) => (
-            <div key={section.label} className="flex items-center justify-between rounded-lg border border-border p-3">
-              <div className="flex items-center gap-3">
-                <div className={cn('flex h-8 w-8 items-center justify-center rounded-md', section.enabled ? 'bg-primary/10' : 'bg-muted')}>
-                  <Check className={cn('h-4 w-4', section.enabled ? 'text-primary' : 'text-muted-foreground')} />
+            <div key={section.label} className="rounded-lg border border-border p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className={cn('flex h-8 w-8 items-center justify-center rounded-md shrink-0', section.enabled ? 'bg-primary/10' : 'bg-muted')}>
+                    <Check className={cn('h-4 w-4', section.enabled ? 'text-primary' : 'text-muted-foreground')} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={cn('text-sm font-medium', section.enabled ? 'text-foreground' : 'text-muted-foreground')}>
+                      {section.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {section.description}
+                    </p>
+                  </div>
                 </div>
-                <span className={cn('text-sm font-medium', section.enabled ? 'text-foreground' : 'text-muted-foreground')}>
-                  {section.label}
-                </span>
+                {section.toggle && (
+                  <button
+                    onClick={section.toggle}
+                    className={cn('relative h-6 w-11 rounded-full transition-colors shrink-0 mt-0.5', section.enabled ? 'bg-primary' : 'bg-muted')}
+                    aria-label={`Activer ou desactiver ${section.label}`}
+                  >
+                    <span className={cn('absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform', section.enabled && 'translate-x-5')} />
+                  </button>
+                )}
               </div>
-              {section.toggle && (
-                <button
-                  onClick={section.toggle}
-                  className={cn('relative h-6 w-11 rounded-full transition-colors', section.enabled ? 'bg-primary' : 'bg-muted')}
-                >
-                  <span className={cn('absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform', section.enabled && 'translate-x-5')} />
-                </button>
-              )}
             </div>
           ))}
 
@@ -706,6 +931,9 @@ export default function SiteWebPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end w-full sm:w-auto">
+                  <Button variant="outline" size="sm" onClick={() => setShowSitePreview(true)}>
+                    <Eye className="mr-1.5 h-4 w-4" /> Apercu du site
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => { setSiteContent(null); handleGenerate(); }} disabled={generating}>
                     <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerer
                   </Button>
@@ -778,7 +1006,7 @@ export default function SiteWebPage() {
               {/* ── About ── */}
               <EditableSection title="A propos" editing={editing} section="about" setEditing={setEditing}>
                 {editing === 'about' ? (
-                  <div className="space-y-3 p-4">
+                  <div className="space-y-4 p-4">
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Titre</label>
                       <Input value={siteContent.about.title} onChange={e => updateAbout('title', e.target.value)} />
@@ -800,6 +1028,64 @@ export default function SiteWebPage() {
                     <Button variant="outline" size="sm" onClick={() => updateAbout('paragraphs', [...siteContent.about.paragraphs, ''])}>
                       <Plus className="h-3 w-3 mr-1" /> Ajouter un paragraphe
                     </Button>
+
+                    {/* Chiffres cles editables */}
+                    <div className="pt-3 border-t border-border">
+                      <label className="text-xs font-medium text-muted-foreground">Chiffres cles</label>
+                      <p className="text-xs text-muted-foreground/80 mb-2">
+                        Affiches en gros sous le texte (ex: annees d&apos;experience, clients satisfaits, note Google).
+                      </p>
+                      <div className="space-y-2">
+                        {(siteContent.about.highlights || []).map((h, i) => (
+                          <div key={i} className="flex gap-2 items-start">
+                            <Input
+                              value={h.value}
+                              onChange={e => {
+                                const hs = [...(siteContent.about.highlights || [])];
+                                hs[i] = { ...hs[i], value: e.target.value };
+                                updateAbout('highlights', hs);
+                              }}
+                              placeholder="15+"
+                              className="flex-1"
+                              maxLength={20}
+                            />
+                            <Input
+                              value={h.label}
+                              onChange={e => {
+                                const hs = [...(siteContent.about.highlights || [])];
+                                hs[i] = { ...hs[i], label: e.target.value };
+                                updateAbout('highlights', hs);
+                              }}
+                              placeholder="annees d'experience"
+                              className="flex-[2]"
+                              maxLength={60}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 shrink-0"
+                              onClick={() => {
+                                const hs = (siteContent.about.highlights || []).filter((_, j) => j !== i);
+                                updateAbout('highlights', hs);
+                              }}
+                              aria-label="Supprimer ce chiffre"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const hs = [...(siteContent.about.highlights || []), { value: '', label: '' }];
+                            updateAbout('highlights', hs);
+                          }}
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Ajouter un chiffre
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-4">
@@ -824,16 +1110,42 @@ export default function SiteWebPage() {
               {/* ── Services ── */}
               <EditableSection title="Services" editing={editing} section="services" setEditing={setEditing}>
                 {editing === 'services' ? (
-                  <div className="space-y-3 p-4">
+                  <div className="space-y-4 p-4">
                     {siteContent.services.map((s, i) => (
-                      <div key={i} className="flex gap-2 items-start">
-                        <div className="flex-1 space-y-1">
-                          <Input value={s.name} onChange={e => updateService(i, 'name', e.target.value)} placeholder="Nom" />
-                          <Input value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder="Description" />
+                      <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+                        <div className="flex gap-2 items-start">
+                          <div className="flex-1 space-y-1">
+                            <Input value={s.name} onChange={e => updateService(i, 'name', e.target.value)} placeholder="Nom" />
+                            <Input value={s.description} onChange={e => updateService(i, 'description', e.target.value)} placeholder="Description" />
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => removeService(i)} className="text-red-500 mt-1">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => removeService(i)} className="text-red-500 mt-1">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1.5">Icone</p>
+                          <div className="flex flex-wrap gap-1.5 rounded-md border border-border bg-muted/30 p-2">
+                            {SERVICE_ICONS.map(({ name, Icon, label }) => {
+                              const selected = (s.icon || 'Wrench') === name;
+                              return (
+                                <button
+                                  key={name}
+                                  type="button"
+                                  onClick={() => updateService(i, 'icon', name)}
+                                  title={label}
+                                  className={cn(
+                                    'w-8 h-8 rounded flex items-center justify-center transition-colors',
+                                    selected
+                                      ? 'bg-primary text-primary-foreground shadow-sm'
+                                      : 'bg-background text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                  )}
+                                >
+                                  <Icon className="w-4 h-4" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     ))}
                     <Button variant="outline" size="sm" onClick={addService}>
@@ -842,12 +1154,23 @@ export default function SiteWebPage() {
                   </div>
                 ) : (
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {siteContent.services.map((s, i) => (
-                      <div key={i} className="rounded-lg border border-border p-3">
-                        <p className="text-sm font-semibold text-foreground">{s.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{s.description}</p>
-                      </div>
-                    ))}
+                    {siteContent.services.map((s, i) => {
+                      const iconEntry = SERVICE_ICONS.find((ic) => ic.name === (s.icon || 'Wrench'));
+                      const Icon = iconEntry?.Icon;
+                      return (
+                        <div key={i} className="rounded-lg border border-border p-3 flex items-start gap-3">
+                          {Icon && (
+                            <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Icon className="w-4 h-4 text-primary" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">{s.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{s.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </EditableSection>
@@ -950,28 +1273,39 @@ export default function SiteWebPage() {
               {/* ── Images ── */}
               <EditableSection title="Images" editing={editing} section="images" setEditing={setEditing}>
                 {editing === 'images' ? (
-                  <div className="p-4 space-y-4">
+                  <div className="p-4 space-y-5">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Logo</label>
                       <SiteImageUpload value={logoUrl} onChange={setLogoUrl} aspectRatio="aspect-square" className="max-w-[160px]" />
                     </div>
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Image hero</label>
-                      <SiteImageUpload value={heroImageUrl} onChange={setHeroImageUrl} aspectRatio="aspect-video" />
-                    </div>
+                    <HeroImagesEditor
+                      layout={heroLayout}
+                      onLayoutChange={setHeroLayout}
+                      images={heroImages}
+                      onImagesChange={setHeroImages}
+                    />
                   </div>
                 ) : (
-                  <div className="p-4 flex gap-4">
+                  <div className="p-4 flex gap-4 flex-wrap">
                     {logoUrl ? (
                       <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-lg object-cover border border-border" />
                     ) : (
                       <div className="h-16 w-16 rounded-lg bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">Logo</div>
                     )}
-                    {heroImageUrl ? (
-                      <img src={heroImageUrl} alt="Hero" className="h-16 w-28 rounded-lg object-cover border border-border" />
-                    ) : (
-                      <div className="h-16 w-28 rounded-lg bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">Hero</div>
-                    )}
+                    <div className="flex gap-2 items-center">
+                      {heroImages.filter(Boolean).length > 0 ? (
+                        heroImages.filter(Boolean).slice(0, 3).map((src, i) => (
+                          <img key={i} src={src} alt={`Hero ${i + 1}`} className="h-16 w-20 rounded-lg object-cover border border-border" />
+                        ))
+                      ) : (
+                        <div className="h-16 w-28 rounded-lg bg-muted/30 flex items-center justify-center text-xs text-muted-foreground">Hero</div>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-1">
+                        {heroLayout === 'single' && '1 photo'}
+                        {heroLayout === 'grid' && 'Grille de 3'}
+                        {heroLayout === 'carousel' && 'Carrousel de 3'}
+                      </span>
+                    </div>
                   </div>
                 )}
               </EditableSection>
@@ -985,6 +1319,28 @@ export default function SiteWebPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Full-site preview modal */}
+      {siteContent && (
+        <SitePreviewModal
+          open={showSitePreview}
+          onClose={() => setShowSitePreview(false)}
+          theme={theme}
+          siteContent={siteContent}
+          slug={slug}
+          logoUrl={logoUrl}
+          heroImageUrl={heroImageUrl}
+          heroImages={heroImages}
+          heroLayout={heroLayout}
+          publicPhone={publicPhone}
+          legalText={legalText}
+          showServices={showServices}
+          showProjects={showProjects}
+          showReviews={showReviews}
+          showContact={showContact}
+          showMap={showMap}
+        />
       )}
     </div>
   );
@@ -1019,6 +1375,91 @@ function EditableSection({
         </Button>
       </div>
       {children}
+    </div>
+  );
+}
+
+// ── Hero images editor (layout + 1 ou 3 photos) ──────────────
+
+interface HeroImagesEditorProps {
+  layout: 'single' | 'grid' | 'carousel';
+  onLayoutChange: (v: 'single' | 'grid' | 'carousel') => void;
+  images: string[];
+  onImagesChange: (v: string[]) => void;
+}
+
+function HeroImagesEditor({ layout, onLayoutChange, images, onImagesChange }: HeroImagesEditorProps) {
+  const slots = layout === 'single' ? 1 : 3;
+
+  const setImageAt = (i: number, url: string) => {
+    const next = [...images];
+    while (next.length < 3) next.push('');
+    next[i] = url;
+    onImagesChange(next);
+  };
+
+  const options: { value: 'single' | 'grid' | 'carousel'; label: string; description: string }[] = [
+    {
+      value: 'single',
+      label: '1 photo',
+      description: 'Une grande photo en fond',
+    },
+    {
+      value: 'grid',
+      label: '3 photos',
+      description: 'Grille a cote du texte',
+    },
+    {
+      value: 'carousel',
+      label: 'Carrousel',
+      description: '3 photos qui defilent',
+    },
+  ];
+
+  return (
+    <div>
+      <label className="text-sm font-medium block">Photos de la section d&apos;accueil</label>
+      <p className="text-xs text-muted-foreground mb-3">
+        Photos de chantiers, equipe, realisations... Format paysage recommande.
+      </p>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onLayoutChange(opt.value)}
+            className={cn(
+              'rounded-lg border p-3 text-left transition-all',
+              layout === opt.value
+                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                : 'border-border hover:border-primary/40 bg-card'
+            )}
+          >
+            <p className={cn('text-sm font-semibold', layout === opt.value ? 'text-primary' : 'text-foreground')}>
+              {opt.label}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{opt.description}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className={cn('grid gap-3', slots === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3')}>
+        {Array.from({ length: slots }).map((_, i) => (
+          <div key={i}>
+            <p className="text-xs text-muted-foreground mb-1.5">
+              {slots === 1 ? 'Photo principale' : `Photo ${i + 1}`}
+            </p>
+            <SiteImageUpload
+              value={images[i] || ''}
+              onChange={(url) => setImageAt(i, url)}
+              label="Photo de chantier, equipe..."
+              hint="5 Mo max"
+              aspectRatio="aspect-video"
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
