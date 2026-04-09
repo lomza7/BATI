@@ -23,22 +23,22 @@ export function SiteServices({ aiServices, dbServices }: SiteServicesProps) {
   if (services.length === 0) return null;
 
   return (
-    <section id="services" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
+    <section id="services" className="py-12 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
       <div className="max-w-6xl mx-auto">
         <h2
-          className="text-2xl sm:text-3xl font-bold text-center mb-12"
+          className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
           Nos services
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {services.map((service, i) => {
             const Icon = SERVICE_ICON_MAP[service.icon] || Wrench;
             return (
               <div
                 key={i}
-                className="p-6 border transition-shadow hover:shadow-lg"
+                className="p-5 sm:p-6 border transition-shadow hover:shadow-lg"
                 style={{
                   backgroundColor: 'var(--site-card-bg)',
                   borderColor: 'var(--site-card-border)',
@@ -46,13 +46,13 @@ export function SiteServices({ aiServices, dbServices }: SiteServicesProps) {
                 }}
               >
                 <div
-                  className="w-12 h-12 flex items-center justify-center rounded-lg mb-4"
+                  className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-lg mb-3 sm:mb-4"
                   style={{ backgroundColor: 'var(--site-accent-light)' }}
                 >
-                  <Icon className="w-6 h-6" style={{ color: 'var(--site-accent)' }} />
+                  <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: 'var(--site-accent)' }} />
                 </div>
                 <h3
-                  className="text-lg font-semibold mb-2"
+                  className="text-base sm:text-lg font-semibold mb-1.5 sm:mb-2"
                   style={{ color: 'var(--site-heading)' }}
                 >
                   {service.name}

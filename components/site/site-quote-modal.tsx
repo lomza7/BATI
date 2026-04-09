@@ -120,7 +120,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-lg max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         style={{
           backgroundColor: 'var(--site-card-bg)',
           borderRadius: 'var(--site-radius)',
@@ -131,7 +131,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
       >
         {/* Header */}
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-5 sm:px-6 py-4 border-b"
+          className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b"
           style={{
             backgroundColor: 'var(--site-card-bg)',
             borderColor: 'var(--site-card-border)',
@@ -191,7 +191,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="px-5 sm:px-6 py-5 space-y-4">
+          <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 sm:py-5 space-y-3 sm:space-y-4">
             {/* Honeypot — hidden from users, visible to bots */}
             <div style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }} aria-hidden="true">
               <label>
@@ -217,7 +217,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
               maxLength={120}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <FieldLabel required>Telephone</FieldLabel>
                 <ThemedInput
@@ -256,7 +256,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
               <div className="col-span-1">
                 <FieldLabel>Code postal</FieldLabel>
                 <ThemedInput

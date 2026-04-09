@@ -240,29 +240,29 @@ export default async function SitePage({
       />
 
       {/* About + Highlights */}
-      <section id="a-propos" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
+      <section id="a-propos" className="py-12 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
         <div className="max-w-3xl mx-auto text-center">
           <h2
-            className="text-2xl sm:text-3xl font-bold mb-8"
+            className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8"
             style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
           >
             {content.about?.title || 'A propos'}
           </h2>
           {content.about?.paragraphs?.map((p, i) => (
-            <p key={i} className="mb-4 leading-relaxed" style={{ color: 'var(--site-text)' }}>
+            <p key={i} className="mb-4 leading-relaxed text-sm sm:text-base" style={{ color: 'var(--site-text)' }}>
               {p}
             </p>
           ))}
 
           {/* Highlights / key figures */}
           {content.about?.highlights && content.about.highlights.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-8 mt-10">
+            <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mt-8 sm:mt-10">
               {content.about.highlights.map((h, i) => (
                 <div key={i} className="text-center">
                   <p className="text-3xl sm:text-4xl font-bold" style={{ color: 'var(--site-accent)' }}>
                     {h.value}
                   </p>
-                  <p className="text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
+                  <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
                     {h.label}
                   </p>
                 </div>

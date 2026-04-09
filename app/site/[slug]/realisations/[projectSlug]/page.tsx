@@ -291,7 +291,7 @@ export default async function ProjectDetailPage({
 
       {/* Hero photo */}
       {heroPhoto && (
-        <div className="relative h-[40vh] sm:h-[55vh] overflow-hidden">
+        <div className="relative h-[45vh] sm:h-[55vh] overflow-hidden">
           <img
             src={heroPhoto.url}
             alt={project.name}
@@ -299,31 +299,31 @@ export default async function ProjectDetailPage({
           />
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)' }}
+            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)' }}
           />
-          <div className="absolute inset-x-0 bottom-0 p-6 sm:p-12">
+          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-8 lg:p-12">
             <div className="max-w-4xl mx-auto">
               {project.public_category && (
                 <span
-                  className="inline-block rounded-full px-3 py-1 text-xs font-semibold mb-3"
+                  className="inline-block rounded-full px-3 py-1 text-xs font-semibold mb-2 sm:mb-3"
                   style={{ backgroundColor: 'var(--site-accent)', color: '#ffffff' }}
                 >
                   {project.public_category}
                 </span>
               )}
-              <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white drop-shadow-md">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white drop-shadow-md leading-tight">
                 {project.name}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/90">
+              <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-white/90">
                 {city && (
                   <span className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4" />
+                    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     {city}
                   </span>
                 )}
                 {completionLabel && (
                   <span className="flex items-center gap-1.5 capitalize">
-                    <Calendar className="h-4 w-4" />
+                    <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     {completionLabel}
                   </span>
                 )}
@@ -334,9 +334,9 @@ export default async function ProjectDetailPage({
       )}
 
       {/* Breadcrumb + content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 lg:py-16">
         {/* Breadcrumb */}
-        <nav className="mb-8 text-xs" aria-label="Breadcrumb">
+        <nav className="mb-6 sm:mb-8 text-xs" aria-label="Breadcrumb">
           <ol className="flex items-center gap-2 flex-wrap">
             <li>
               <Link
@@ -366,7 +366,7 @@ export default async function ProjectDetailPage({
         </nav>
 
         {!heroPhoto && (
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             {project.public_category && (
               <span
                 className="inline-block rounded-full px-3 py-1 text-xs font-semibold mb-3"
@@ -375,19 +375,19 @@ export default async function ProjectDetailPage({
                 {project.public_category}
               </span>
             )}
-            <h1 className="text-3xl sm:text-4xl font-bold" style={{ color: 'var(--site-heading)' }}>
+            <h1 className="text-2xl sm:text-4xl font-bold leading-tight" style={{ color: 'var(--site-heading)' }}>
               {project.name}
             </h1>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm" style={{ color: 'var(--site-text-muted)' }}>
+            <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm" style={{ color: 'var(--site-text-muted)' }}>
               {city && (
                 <span className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {city}
                 </span>
               )}
               {completionLabel && (
                 <span className="flex items-center gap-1.5 capitalize">
-                  <Calendar className="h-4 w-4" />
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {completionLabel}
                 </span>
               )}
@@ -397,14 +397,14 @@ export default async function ProjectDetailPage({
 
         {/* Description */}
         {(project.public_description || project.description) && (
-          <div className="prose max-w-none mb-12">
+          <div className="prose max-w-none mb-8 sm:mb-12">
             {(project.public_description || project.description || '')
               .split('\n')
               .filter((p) => p.trim())
               .map((paragraph, i) => (
                 <p
                   key={i}
-                  className="text-base sm:text-lg leading-relaxed mb-5"
+                  className="text-sm sm:text-base lg:text-lg leading-relaxed mb-4 sm:mb-5"
                   style={{ color: 'var(--site-text)' }}
                 >
                   {paragraph}
@@ -415,14 +415,14 @@ export default async function ProjectDetailPage({
 
         {/* Gallery */}
         {galleryPhotos.length > 0 && (
-          <section className="mb-12">
+          <section className="mb-8 sm:mb-12">
             <h2
-              className="text-xl sm:text-2xl font-bold mb-6"
+              className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6"
               style={{ color: 'var(--site-heading)' }}
             >
               Galerie du chantier
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {galleryPhotos.map((photo) => (
                 <figure
                   key={photo.id}
@@ -436,12 +436,12 @@ export default async function ProjectDetailPage({
                   <img
                     src={photo.url}
                     alt={photo.caption || `${project.name} - photo ${photo.category}`}
-                    className="w-full h-64 object-cover"
+                    className="w-full h-56 sm:h-64 object-cover"
                     loading="lazy"
                   />
                   {(photo.caption || photo.category) && (
                     <figcaption
-                      className="px-4 py-3 text-xs capitalize"
+                      className="px-4 py-2.5 sm:py-3 text-xs capitalize"
                       style={{ color: 'var(--site-text-muted)' }}
                     >
                       {photo.caption || `Photo ${photo.category}`}
@@ -455,7 +455,7 @@ export default async function ProjectDetailPage({
 
         {/* Trust block / CTA */}
         <div
-          className="border p-6 sm:p-8 text-center"
+          className="border p-5 sm:p-8 text-center"
           style={{
             backgroundColor: 'var(--site-bg-alt)',
             borderColor: 'var(--site-border)',
@@ -463,21 +463,21 @@ export default async function ProjectDetailPage({
           }}
         >
           <CheckCircle2
-            className="mx-auto h-10 w-10 mb-3"
+            className="mx-auto h-9 w-9 sm:h-10 sm:w-10 mb-3"
             style={{ color: 'var(--site-accent)' }}
           />
           <h2
-            className="text-xl sm:text-2xl font-bold mb-2"
+            className="text-lg sm:text-2xl font-bold mb-2 leading-tight"
             style={{ color: 'var(--site-heading)' }}
           >
             Vous avez un projet similaire {city ? `a ${city}` : ''}?
           </h2>
-          <p className="text-sm mb-6 max-w-xl mx-auto" style={{ color: 'var(--site-text-muted)' }}>
+          <p className="text-xs sm:text-sm mb-5 sm:mb-6 max-w-xl mx-auto" style={{ color: 'var(--site-text-muted)' }}>
             {profile.company_name} intervient sur tous vos projets de {activity.toLowerCase()}. Devis gratuit et sans engagement.
           </p>
           <Link
             href={`/site/${slug}#contact`}
-            className="inline-block text-sm sm:text-base font-semibold px-6 py-3 transition-all hover:scale-105"
+            className="inline-flex items-center justify-center w-full sm:w-auto text-sm sm:text-base font-semibold px-6 py-3 transition-all hover:scale-105"
             style={{
               backgroundColor: 'var(--site-accent)',
               color: '#ffffff',
@@ -490,14 +490,14 @@ export default async function ProjectDetailPage({
 
         {/* Related projects */}
         {relatedProjects.length > 0 && (
-          <section className="mt-16">
+          <section className="mt-10 sm:mt-16">
             <h2
-              className="text-xl sm:text-2xl font-bold mb-6"
+              className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6"
               style={{ color: 'var(--site-heading)' }}
             >
               Nos autres realisations
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {relatedProjects.slice(0, 3).map((rp) => {
                 const photos = (rp.project_photos || []) as ProjectPhoto[];
                 const cover =

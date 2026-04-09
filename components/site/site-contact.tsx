@@ -25,27 +25,27 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
   const displayPhone = phone || profile.company_phone || undefined;
 
   return (
-    <section id="contact" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg-alt)' }}>
+    <section id="contact" className="py-12 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg-alt)' }}>
       <div className="max-w-4xl mx-auto">
         <h2
-          className="text-2xl sm:text-3xl font-bold text-center mb-4"
+          className="text-2xl sm:text-3xl font-bold text-center mb-3 sm:mb-4"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
           {contact.title}
         </h2>
         <p
-          className="text-center max-w-xl mx-auto mb-12"
+          className="text-center text-sm sm:text-base max-w-xl mx-auto mb-8 sm:mb-12"
           style={{ color: 'var(--site-text-muted)' }}
         >
           {contact.description}
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
           {/* Phone */}
           {displayPhone && (
             <a
               href={`tel:${displayPhone.replace(/\s+/g, '')}`}
-              className="flex items-center gap-4 p-5 border transition-shadow hover:shadow-md"
+              className="flex items-center gap-3 sm:gap-4 p-4 sm:p-5 border transition-shadow hover:shadow-md"
               style={{
                 backgroundColor: 'var(--site-card-bg)',
                 borderColor: 'var(--site-card-border)',
@@ -75,7 +75,7 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
               href={`https://www.google.com/maps/search/?api=1&query=${mapsQuery}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-4 p-5 border transition-shadow hover:shadow-md"
+              className="flex items-center gap-3 sm:gap-4 p-4 sm:p-5 border transition-shadow hover:shadow-md"
               style={{
                 backgroundColor: 'var(--site-card-bg)',
                 borderColor: 'var(--site-card-border)',
@@ -105,7 +105,7 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
               href={profile.google_business_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-4 p-5 border transition-shadow hover:shadow-md"
+              className="flex items-center gap-3 sm:gap-4 p-4 sm:p-5 border transition-shadow hover:shadow-md"
               style={{
                 backgroundColor: 'var(--site-card-bg)',
                 borderColor: 'var(--site-card-border)',
@@ -131,7 +131,7 @@ export function SiteContact({ profile, contact, slug, phone }: SiteContactProps)
         </div>
 
         {/* CTA block — demander un devis + telephone a cote */}
-        <div className="mt-10">
+        <div className="mt-8 sm:mt-10">
           <SiteContactCta slug={slug} companyName={profile.company_name} phone={displayPhone} />
         </div>
       </div>

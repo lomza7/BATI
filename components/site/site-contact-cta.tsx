@@ -15,11 +15,11 @@ export function SiteContactCta({ slug, companyName, phone }: SiteContactCtaProps
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 w-full max-w-sm sm:max-w-none mx-auto">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-block text-base font-semibold px-8 py-3.5 transition-all hover:scale-105"
+          className="w-full sm:w-auto inline-flex items-center justify-center text-base font-semibold px-6 sm:px-8 py-3.5 transition-all hover:scale-105"
           style={{
             backgroundColor: 'var(--site-accent)',
             color: '#ffffff',
@@ -32,7 +32,7 @@ export function SiteContactCta({ slug, companyName, phone }: SiteContactCtaProps
         {phone && (
           <a
             href={`tel:${phone.replace(/\s+/g, '')}`}
-            className="inline-flex items-center gap-2 text-base font-semibold px-6 py-3.5 transition-all hover:scale-105"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-base font-semibold px-6 py-3.5 transition-all hover:scale-105"
             style={{
               backgroundColor: 'var(--site-accent-light)',
               color: 'var(--site-accent)',

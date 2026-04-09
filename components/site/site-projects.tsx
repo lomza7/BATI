@@ -22,24 +22,24 @@ export function SiteProjects({ projects, siteSlug }: SiteProjectsProps) {
   return (
     <section
       id="realisations"
-      className="py-16 sm:py-20 px-4 sm:px-6"
+      className="py-12 sm:py-20 px-4 sm:px-6"
       style={{ backgroundColor: 'var(--site-bg-alt)' }}
     >
       <div className="max-w-6xl mx-auto">
         <h2
-          className="text-2xl sm:text-3xl font-bold text-center mb-4"
+          className="text-2xl sm:text-3xl font-bold text-center mb-3 sm:mb-4"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
           Nos realisations
         </h2>
         <p
-          className="text-center text-sm sm:text-base max-w-2xl mx-auto mb-12"
+          className="text-center text-sm sm:text-base max-w-2xl mx-auto mb-8 sm:mb-12 px-2"
           style={{ color: 'var(--site-text-muted)' }}
         >
           Decouvrez nos derniers chantiers : photos avant/apres, descriptif des travaux et resultats obtenus.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {projects.map((project) => {
             const cover = pickCoverPhoto(project);
             const href = project.public_slug

@@ -279,24 +279,24 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
               {/* About + Highlights */}
               <section
                 id="a-propos"
-                className="py-16 sm:py-20 px-4 sm:px-6"
+                className="py-12 sm:py-20 px-4 sm:px-6"
                 style={{ backgroundColor: 'var(--site-bg)' }}
               >
                 <div className="max-w-3xl mx-auto text-center">
                   <h2
-                    className="text-2xl sm:text-3xl font-bold mb-8"
+                    className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8"
                     style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
                   >
                     {siteContent.about?.title || 'A propos'}
                   </h2>
                   {siteContent.about?.paragraphs?.map((p, i) => (
-                    <p key={i} className="mb-4 leading-relaxed" style={{ color: 'var(--site-text)' }}>
+                    <p key={i} className="mb-4 leading-relaxed text-sm sm:text-base" style={{ color: 'var(--site-text)' }}>
                       {p}
                     </p>
                   ))}
 
                   {siteContent.about?.highlights && siteContent.about.highlights.length > 0 && (
-                    <div className="flex flex-wrap justify-center gap-8 mt-10">
+                    <div className="flex flex-wrap justify-center gap-6 sm:gap-8 mt-8 sm:mt-10">
                       {siteContent.about.highlights.map((h, i) => (
                         <div key={i} className="text-center">
                           <p
@@ -305,7 +305,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
                           >
                             {h.value}
                           </p>
-                          <p className="text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
+                          <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
                             {h.label}
                           </p>
                         </div>

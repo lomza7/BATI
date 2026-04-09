@@ -71,20 +71,20 @@ export function SiteMap({ projects, accentColor = '#3b82f6' }: SiteMapProps) {
   if (projects.length === 0) return null;
 
   return (
-    <section id="carte" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
+    <section id="carte" className="py-12 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
       <div className="max-w-6xl mx-auto">
         <h2
-          className="text-2xl sm:text-3xl font-bold text-center mb-12"
+          className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
           Nos chantiers
         </h2>
         <div
           ref={containerRef}
-          className="w-full h-[350px] sm:h-[450px]"
+          className="w-full h-[280px] sm:h-[450px]"
           style={{ borderRadius: 'var(--site-radius)', zIndex: 10 }}
         />
-        <p className="text-center text-sm mt-4" style={{ color: 'var(--site-text-muted)' }}>
+        <p className="text-center text-xs sm:text-sm mt-4" style={{ color: 'var(--site-text-muted)' }}>
           {projects.length} chantier{projects.length > 1 ? 's' : ''} realise{projects.length > 1 ? 's' : ''}
         </p>
       </div>

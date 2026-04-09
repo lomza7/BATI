@@ -1,5 +1,6 @@
 import type { SiteProfile } from '@/lib/site-utils';
 import { SiteHeaderCta } from './site-header-cta';
+import { SiteMobileNav } from './site-mobile-nav';
 
 interface SiteHeaderProps {
   profile: SiteProfile;
@@ -52,22 +53,27 @@ export function SiteHeader({
         borderColor: 'var(--site-border)',
       }}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-        {/* Logo + company name */}
-        <a
-          href={homeHref}
-          className="flex items-center gap-3 font-bold text-base sm:text-lg truncate min-w-0"
-          style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
-        >
-          {profile.logo_url && (
-            <img
-              src={profile.logo_url}
-              alt={profile.company_name}
-              className="h-8 w-8 rounded-md object-cover flex-shrink-0"
-            />
-          )}
-          <span className="truncate">{profile.company_name}</span>
-        </a>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 min-w-0 flex-1 md:flex-initial">
+          {/* Mobile hamburger — only on mobile */}
+          <SiteMobileNav links={links} />
+
+          {/* Logo + company name */}
+          <a
+            href={homeHref}
+            className="flex items-center gap-2 sm:gap-3 font-bold text-sm sm:text-lg truncate min-w-0"
+            style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
+          >
+            {profile.logo_url && (
+              <img
+                src={profile.logo_url}
+                alt={profile.company_name}
+                className="h-7 w-7 sm:h-8 sm:w-8 rounded-md object-cover flex-shrink-0"
+              />
+            )}
+            <span className="truncate">{profile.company_name}</span>
+          </a>
+        </div>
 
         {/* Navigation links — hidden on mobile, visible on md+ */}
         <nav className="hidden md:flex items-center gap-5 flex-1 justify-center">

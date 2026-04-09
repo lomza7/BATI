@@ -39,15 +39,15 @@ export function SiteHero({
     const gridImages = allImages.slice(0, 3);
     return (
       <section
-        className="relative py-16 sm:py-24 px-4 sm:px-6"
+        className="relative py-12 sm:py-20 lg:py-24 px-4 sm:px-6"
         style={{
           background: 'linear-gradient(135deg, var(--site-bg) 0%, var(--site-bg-alt) 100%)',
         }}
       >
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-10 lg:gap-16 items-center">
           <div className="text-center lg:text-left">
             <h1
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6"
               style={{
                 color: 'var(--site-heading)',
                 fontFamily: 'var(--site-font)',
@@ -56,7 +56,7 @@ export function SiteHero({
               {hero.headline}
             </h1>
             <p
-              className="text-base sm:text-lg md:text-xl max-w-xl mb-8 mx-auto lg:mx-0"
+              className="text-base sm:text-lg md:text-xl max-w-xl mb-6 sm:mb-8 mx-auto lg:mx-0"
               style={{ color: 'var(--site-text-muted)' }}
             >
               {hero.subheadline}
@@ -71,7 +71,7 @@ export function SiteHero({
               />
             </div>
             <p
-              className="mt-4 text-sm"
+              className="mt-4 text-xs sm:text-sm"
               style={{ color: 'var(--site-text-muted)' }}
             >
               {companyName} — Devis gratuit et sans engagement
@@ -79,7 +79,7 @@ export function SiteHero({
           </div>
 
           {/* Collage 3 photos */}
-          <div className="grid grid-cols-2 grid-rows-2 gap-3 h-[320px] sm:h-[420px] lg:h-[500px]">
+          <div className="grid grid-cols-2 grid-rows-2 gap-2 sm:gap-3 h-[260px] sm:h-[380px] lg:h-[500px]">
             <div
               className="row-span-2 overflow-hidden"
               style={{ borderRadius: 'var(--site-radius)' }}
@@ -128,20 +128,20 @@ export function SiteHero({
     const carouselImages = allImages.slice(0, 3);
     return (
       <section
-        className="relative min-h-[70vh] flex items-center justify-center text-center px-4 sm:px-6 overflow-hidden"
+        className="relative min-h-[85vh] sm:min-h-[70vh] flex items-center justify-center text-center px-4 sm:px-6 overflow-hidden"
         style={{ backgroundColor: 'var(--site-bg-alt)' }}
       >
         <SiteHeroCarousel images={carouselImages} />
 
-        <div className="relative z-10 max-w-3xl mx-auto py-20 sm:py-28">
+        <div className="relative z-10 w-full max-w-3xl mx-auto py-16 sm:py-24">
           <h1
-            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-white"
+            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6 text-white"
             style={{ fontFamily: 'var(--site-font)' }}
           >
             {hero.headline}
           </h1>
           <p
-            className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8"
+            className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-6 sm:mb-8"
             style={{ color: 'rgba(255,255,255,0.85)' }}
           >
             {hero.subheadline}
@@ -154,7 +154,7 @@ export function SiteHero({
             hasHeroImage={true}
           />
           <p
-            className="mt-4 text-sm"
+            className="mt-4 text-xs sm:text-sm"
             style={{ color: 'rgba(255,255,255,0.65)' }}
           >
             {companyName} — Devis gratuit et sans engagement
@@ -168,7 +168,7 @@ export function SiteHero({
   const singleImage = allImages[0];
   return (
     <section
-      className="relative min-h-[70vh] flex items-center justify-center text-center px-4 sm:px-6"
+      className="relative min-h-[85vh] sm:min-h-[70vh] flex items-center justify-center text-center px-4 sm:px-6"
       style={{ backgroundColor: 'var(--site-bg-alt)' }}
     >
       {singleImage ? (
@@ -192,9 +192,9 @@ export function SiteHero({
         />
       )}
 
-      <div className="relative z-10 max-w-3xl mx-auto py-20 sm:py-28">
+      <div className="relative z-10 w-full max-w-3xl mx-auto py-16 sm:py-24">
         <h1
-          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6"
+          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6"
           style={{
             color: hasAnyImage ? '#ffffff' : 'var(--site-heading)',
             fontFamily: 'var(--site-font)',
@@ -204,7 +204,7 @@ export function SiteHero({
         </h1>
 
         <p
-          className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8"
+          className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-6 sm:mb-8"
           style={{ color: hasAnyImage ? 'rgba(255,255,255,0.8)' : 'var(--site-text-muted)' }}
         >
           {hero.subheadline}
@@ -219,7 +219,7 @@ export function SiteHero({
         />
 
         <p
-          className="mt-4 text-sm"
+          className="mt-4 text-xs sm:text-sm"
           style={{ color: hasAnyImage ? 'rgba(255,255,255,0.6)' : 'var(--site-text-muted)' }}
         >
           {companyName} — Devis gratuit et sans engagement

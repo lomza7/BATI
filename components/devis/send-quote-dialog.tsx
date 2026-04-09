@@ -114,10 +114,10 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                     <Mail className="h-4 w-4 text-emerald-600" />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-emerald-800">Devis envoyé par email</p>
-                    <p className="text-xs text-emerald-600 mt-0.5">
-                      Un email de signature a été envoyé à <strong>{clientEmail}</strong>.
+                    <p className="text-xs text-emerald-600 mt-0.5 break-words">
+                      Un email de signature a été envoyé à <strong className="break-all">{clientEmail}</strong>.
                       S&apos;il ne le reçoit pas, demandez-lui de vérifier ses spams ou envoyez-lui le lien de secours ci-dessous.
                     </p>
                   </div>
@@ -129,9 +129,9 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-red-800">L&apos;email n&apos;a pas pu être envoyé</p>
-                    <p className="text-xs text-red-600 mt-0.5">
+                    <p className="text-xs text-red-600 mt-0.5 break-words">
                       {emailErrorMsg || 'Erreur inconnue.'} Le devis est enregistré — utilisez le lien de secours ci-dessous pour le transmettre par SMS, WhatsApp ou copier-coller.
                     </p>
                   </div>
@@ -143,9 +143,9 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-amber-800">Email non envoyé</p>
-                    <p className="text-xs text-amber-700 mt-0.5">
+                    <p className="text-xs text-amber-700 mt-0.5 break-words">
                       {emailErrorMsg || 'Aucune adresse email fournie.'} Utilisez le lien de secours ci-dessous.
                     </p>
                   </div>
@@ -157,7 +157,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                   {emailStatus === 'sent' ? 'Lien de secours (si le client ne reçoit pas l\u2019email)' : 'Lien de signature du devis'}
                 </label>
                 <div className="flex gap-2">
-                  <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">
+                  <div className="flex-1 min-w-0 flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">
                     <Link2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                     <span className="text-sm text-foreground truncate">{magicLink}</span>
                   </div>

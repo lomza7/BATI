@@ -29,7 +29,7 @@ export function SiteReviews({ reviews, googleReviewLink }: SiteReviewsProps) {
   const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
 
   return (
-    <section id="avis" className="py-16 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
+    <section id="avis" className="py-12 sm:py-20 px-4 sm:px-6" style={{ backgroundColor: 'var(--site-bg)' }}>
       <div className="max-w-6xl mx-auto">
         <h2
           className="text-2xl sm:text-3xl font-bold text-center mb-2"
@@ -38,18 +38,18 @@ export function SiteReviews({ reviews, googleReviewLink }: SiteReviewsProps) {
           Avis clients
         </h2>
 
-        <div className="flex items-center justify-center gap-2 mb-12">
+        <div className="flex items-center justify-center gap-2 mb-8 sm:mb-12">
           <Stars rating={Math.round(avgRating)} />
           <span className="text-sm font-medium" style={{ color: 'var(--site-text-muted)' }}>
             {avgRating.toFixed(1)}/5 — {reviews.length} avis
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {reviews.slice(0, 6).map((review) => (
             <div
               key={review.id}
-              className="p-6 border"
+              className="p-5 sm:p-6 border"
               style={{
                 backgroundColor: 'var(--site-card-bg)',
                 borderColor: 'var(--site-card-border)',
@@ -78,7 +78,7 @@ export function SiteReviews({ reviews, googleReviewLink }: SiteReviewsProps) {
         </div>
 
         {googleReviewLink && (
-          <div className="mt-10 text-center">
+          <div className="mt-8 sm:mt-10 text-center">
             <a
               href={googleReviewLink}
               target="_blank"

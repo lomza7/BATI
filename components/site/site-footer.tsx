@@ -11,19 +11,19 @@ export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
 
   return (
     <footer
-      className="py-10 px-4 sm:px-6 border-t"
+      className="py-8 sm:py-10 px-4 sm:px-6 border-t"
       style={{
         backgroundColor: 'var(--site-bg)',
         borderColor: 'var(--site-border)',
       }}
     >
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-4">
           <div className="text-center sm:text-left">
-            <p className="font-bold text-lg" style={{ color: 'var(--site-heading)' }}>
+            <p className="font-bold text-base sm:text-lg" style={{ color: 'var(--site-heading)' }}>
               {profile.company_name}
             </p>
-            <p className="text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
+            <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--site-text-muted)' }}>
               {footer.tagline}
             </p>
           </div>
