@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { QuotePreviewDialog } from '@/components/devis/quote-preview-dialog';
+import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 
 interface QuoteSend {
   id: string;
@@ -100,6 +100,7 @@ export default function DevisPage() {
   const [resendingQuoteId, setResendingQuoteId] = useState<string | null>(null);
   const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -639,6 +640,9 @@ export default function DevisPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
+                                <Eye className="mr-2 h-4 w-4" /> Visualiser
+                              </DropdownMenuItem>
                               {(q.status === 'brouillon' || q.status === 'envoye') && (
                                 <DropdownMenuItem onClick={() => setSendQuote(q)}>
                                   <PenLine className="mr-2 h-4 w-4" /> {send ? 'Renvoyer pour signature' : 'Envoyer pour signature'}
@@ -670,12 +674,6 @@ export default function DevisPage() {
                                   <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>
-                                <Send className="mr-2 h-4 w-4" /> Marquer envoye
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>
-                                <Check className="mr-2 h-4 w-4" /> Marquer accepte
-                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>
                                 <X className="mr-2 h-4 w-4" /> Marquer refuse
                               </DropdownMenuItem>
@@ -713,6 +711,9 @@ export default function DevisPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
+                          <Eye className="mr-2 h-4 w-4" /> Visualiser
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setSendQuote(q)}>
                           <PenLine className="mr-2 h-4 w-4" /> {send ? 'Renvoyer' : 'Envoyer pour signature'}
                         </DropdownMenuItem>
@@ -742,8 +743,6 @@ export default function DevisPage() {
                             <Download className="mr-2 h-4 w-4" /> Telecharger le devis signe
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'envoye')}>Marquer envoye</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>Marquer accepte</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refuse</DropdownMenuItem>
                         {q.status === 'brouillon' && (
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
@@ -1056,13 +1055,21 @@ export default function DevisPage() {
         </DialogContent>
       </Dialog>
 
-      <QuotePreviewDialog
+      <DocumentPreviewDialog
+        mode="quote"
         open={showPreview}
         onClose={() => setShowPreview(false)}
         title={newQuote.title}
         description={newQuote.description}
         lines={lines}
         clientId={selectedClientId}
+      />
+
+      <DocumentPreviewDialog
+        mode="quote"
+        open={!!previewQuoteId}
+        onClose={() => setPreviewQuoteId(null)}
+        documentId={previewQuoteId}
       />
 
       {sendQuote && (

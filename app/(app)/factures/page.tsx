@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Clock,
   CreditCard,
+  Eye,
   FileCheck,
   MoveHorizontal as MoreHorizontal,
   Plus,
@@ -41,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
+import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 
 interface Invoice {
   id: string;
@@ -115,6 +117,7 @@ export default function FacturesPage() {
   const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0 });
   const [showArchived, setShowArchived] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
+  const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -455,6 +458,9 @@ export default function FacturesPage() {
               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
+                <Eye className="mr-2 h-4 w-4" /> Visualiser
+              </DropdownMenuItem>
               {!archived && (
                 <>
                   {inv.status === 'brouillon' && (
@@ -501,6 +507,9 @@ export default function FacturesPage() {
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreHorizontal className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
+                <Eye className="mr-2 h-4 w-4" /> Visualiser
+              </DropdownMenuItem>
               {!archived && (
                 <>
                   {inv.status === 'brouillon' && (
@@ -797,6 +806,13 @@ export default function FacturesPage() {
           onSent={() => loadData()}
         />
       )}
+
+      <DocumentPreviewDialog
+        mode="invoice"
+        open={!!previewInvoiceId}
+        onClose={() => setPreviewInvoiceId(null)}
+        documentId={previewInvoiceId}
+      />
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>

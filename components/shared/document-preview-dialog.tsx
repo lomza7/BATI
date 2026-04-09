@@ -45,15 +45,22 @@ interface ArtisanProfile {
   } | null;
 }
 
+export type DocumentPreviewMode = 'quote' | 'invoice';
+
 interface Props {
   open: boolean;
   onClose: () => void;
-  title: string;
-  description: string;
-  lines: PreviewLine[];
-  clientId: string | null;
-  quoteNumber?: string;
+  mode?: DocumentPreviewMode;
+  // In-memory mode (used by the create/edit form before the row exists)
+  title?: string;
+  description?: string;
+  lines?: PreviewLine[];
+  clientId?: string | null;
+  documentNumber?: string;
   validUntil?: string | null;
+  dueDate?: string | null;
+  // DB-load mode (used by list rows — fetches the saved quote/invoice)
+  documentId?: string | null;
 }
 
 function formatCurrency(amount: number): string {
@@ -73,20 +80,44 @@ function formatDate(date: string | Date): string {
   }).format(new Date(date));
 }
 
-export function QuotePreviewDialog({
+export function DocumentPreviewDialog({
   open,
   onClose,
-  title,
-  description,
-  lines,
-  clientId,
-  quoteNumber,
-  validUntil,
+  mode = 'quote',
+  title: titleProp,
+  description: descriptionProp,
+  lines: linesProp,
+  clientId: clientIdProp,
+  documentNumber: documentNumberProp,
+  validUntil: validUntilProp,
+  dueDate: dueDateProp,
+  documentId,
 }: Props) {
   const { user } = useAuth();
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [client, setClient] = useState<PreviewClient | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Resolved values — either from DB (when documentId is set) or from props.
+  const [resolvedTitle, setResolvedTitle] = useState<string>(titleProp || '');
+  const [resolvedDescription, setResolvedDescription] = useState<string>(descriptionProp || '');
+  const [resolvedLines, setResolvedLines] = useState<PreviewLine[]>(linesProp || []);
+  const [resolvedNumber, setResolvedNumber] = useState<string | undefined>(documentNumberProp);
+  const [resolvedValidUntil, setResolvedValidUntil] = useState<string | null | undefined>(validUntilProp);
+  const [resolvedDueDate, setResolvedDueDate] = useState<string | null | undefined>(dueDateProp);
+  const [resolvedCreatedAt, setResolvedCreatedAt] = useState<Date>(new Date());
+
+  // Keep in-memory props in sync when the dialog is used without documentId.
+  useEffect(() => {
+    if (documentId) return;
+    setResolvedTitle(titleProp || '');
+    setResolvedDescription(descriptionProp || '');
+    setResolvedLines(linesProp || []);
+    setResolvedNumber(documentNumberProp);
+    setResolvedValidUntil(validUntilProp);
+    setResolvedDueDate(dueDateProp);
+    setResolvedCreatedAt(new Date());
+  }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp]);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -94,42 +125,118 @@ export function QuotePreviewDialog({
 
     async function load() {
       setLoading(true);
-      const [profileRes, clientRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
-          .eq('id', user!.id)
-          .maybeSingle(),
-        clientId
-          ? supabase
-              .from('clients')
-              .select('name, email, phone, address, city, postal_code')
-              .eq('id', clientId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
+
+      // 1. Always load the artisan profile
+      const profileRes = await supabase
+        .from('profiles')
+        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, document_config')
+        .eq('id', user!.id)
+        .maybeSingle();
 
       if (cancelled) return;
-
       if (profileRes.data) setArtisan(profileRes.data as ArtisanProfile);
-      if (clientRes.data) setClient(clientRes.data as PreviewClient);
-      setLoading(false);
+
+      // 2. Load the document + lines + client when documentId is provided
+      if (documentId) {
+        if (mode === 'quote') {
+          const { data: quote } = await supabase
+            .from('quotes')
+            .select('quote_number, title, description, valid_until, created_at, client_id')
+            .eq('id', documentId)
+            .maybeSingle();
+          if (cancelled) return;
+          if (quote) {
+            setResolvedTitle(quote.title || '');
+            setResolvedDescription(quote.description || '');
+            setResolvedNumber(quote.quote_number);
+            setResolvedValidUntil(quote.valid_until);
+            setResolvedDueDate(null);
+            setResolvedCreatedAt(new Date(quote.created_at));
+
+            const { data: linesData } = await supabase
+              .from('quote_lines')
+              .select('description, quantity, unit, unit_price, position')
+              .eq('quote_id', documentId)
+              .order('position', { ascending: true });
+            if (!cancelled && linesData) {
+              setResolvedLines(linesData as PreviewLine[]);
+            }
+
+            if (quote.client_id) {
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('name, email, phone, address, city, postal_code')
+                .eq('id', quote.client_id)
+                .maybeSingle();
+              if (!cancelled && clientData) setClient(clientData as PreviewClient);
+            } else if (!cancelled) {
+              setClient(null);
+            }
+          }
+        } else {
+          const { data: invoice } = await supabase
+            .from('invoices')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id')
+            .eq('id', documentId)
+            .maybeSingle();
+          if (cancelled) return;
+          if (invoice) {
+            setResolvedTitle(invoice.title || '');
+            setResolvedDescription(invoice.description || '');
+            setResolvedNumber(invoice.invoice_number);
+            setResolvedValidUntil(null);
+            setResolvedDueDate(invoice.due_date);
+            setResolvedCreatedAt(new Date(invoice.issued_at || invoice.created_at));
+
+            const { data: linesData } = await supabase
+              .from('invoice_lines')
+              .select('description, quantity, unit, unit_price, position')
+              .eq('invoice_id', documentId)
+              .order('position', { ascending: true });
+            if (!cancelled && linesData) {
+              setResolvedLines(linesData as PreviewLine[]);
+            }
+
+            if (invoice.client_id) {
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('name, email, phone, address, city, postal_code')
+                .eq('id', invoice.client_id)
+                .maybeSingle();
+              if (!cancelled && clientData) setClient(clientData as PreviewClient);
+            } else if (!cancelled) {
+              setClient(null);
+            }
+          }
+        }
+      } else if (clientIdProp) {
+        // In-memory mode — load the selected client if any
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('name, email, phone, address, city, postal_code')
+          .eq('id', clientIdProp)
+          .maybeSingle();
+        if (!cancelled && clientData) setClient(clientData as PreviewClient);
+      } else if (!cancelled) {
+        setClient(null);
+      }
+
+      if (!cancelled) setLoading(false);
     }
 
     load();
     return () => {
       cancelled = true;
     };
-  }, [open, user, clientId]);
+  }, [open, user, documentId, mode, clientIdProp]);
 
-  // Totaux calculés à partir des lignes en mémoire
-  const validLines = lines.filter((l) => l.description.trim());
+  // Totals computed from the resolved lines
+  const validLines = resolvedLines.filter((l) => l.description.trim());
   const totalHt = validLines.reduce((sum, l) => sum + l.quantity * l.unit_price, 0);
   const tvaRate = 20;
   const tvaAmount = totalHt * (tvaRate / 100);
   const totalTtc = totalHt + tvaAmount;
 
-  // Template config depuis le profil artisan
   const dc = artisan?.document_config || {};
   const accent = dc.primary_color || '#d35400';
   const textColor = dc.secondary_color || '#1a1a1a';
@@ -142,20 +249,25 @@ export function QuotePreviewDialog({
   const companyName = artisan?.company_name || artisan?.full_name || 'Artisan';
   const fontClass = dc.font === 'serif' ? 'font-serif' : 'font-sans';
 
-  const displayQuoteNumber = quoteNumber || 'D-AAAA-XXX';
-  const createdAt = new Date();
+  const isInvoice = mode === 'invoice';
+  const documentLabel = isInvoice ? 'FACTURE' : 'DEVIS';
+  const fallbackNumber = isInvoice ? 'F-AAAA-XXX' : 'D-AAAA-XXX';
+  const titlePlaceholder = isInvoice ? 'Titre de la facture' : 'Titre du devis';
+  const displayNumber = resolvedNumber || fallbackNumber;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0 bg-[#faf9f7]">
-        <DialogTitle className="sr-only">Aperçu du devis</DialogTitle>
+        <DialogTitle className="sr-only">
+          {isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
+        </DialogTitle>
 
         {/* Header preview bar */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 bg-white/90 backdrop-blur-md border-b border-[#e5e1da]">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-amber-400" />
             <span className="text-xs font-medium text-[#6b6560]">
-              Aperçu — non envoyé
+              Aperçu — tel que le client le verra
             </span>
           </div>
           <button
@@ -189,9 +301,9 @@ export function QuotePreviewDialog({
                     </div>
                   </div>
                   <div className="sm:text-right">
-                    <p className="text-2xl sm:text-3xl font-bold text-white">DEVIS</p>
-                    <p className="text-sm font-medium text-white/80 mt-1">{displayQuoteNumber}</p>
-                    <p className="text-xs text-white/60 mt-1">Date : {formatDate(createdAt)}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-white">{documentLabel}</p>
+                    <p className="text-sm font-medium text-white/80 mt-1">{displayNumber}</p>
+                    <p className="text-xs text-white/60 mt-1">Date : {formatDate(resolvedCreatedAt)}</p>
                   </div>
                 </div>
               </div>
@@ -206,9 +318,9 @@ export function QuotePreviewDialog({
                   {artisan?.siret && <span className="text-xs text-[#6b6560]">SIRET {artisan.siret}</span>}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-lg font-bold" style={{ color: accent }}>DEVIS</span>
-                  <span className="text-sm font-medium" style={{ color: textColor }}>{displayQuoteNumber}</span>
-                  <span className="text-xs text-[#6b6560]">{formatDate(createdAt)}</span>
+                  <span className="text-lg font-bold" style={{ color: accent }}>{documentLabel}</span>
+                  <span className="text-sm font-medium" style={{ color: textColor }}>{displayNumber}</span>
+                  <span className="text-xs text-[#6b6560]">{formatDate(resolvedCreatedAt)}</span>
                 </div>
               </div>
             ) : (
@@ -243,12 +355,14 @@ export function QuotePreviewDialog({
                     </div>
                   </div>
                   <div className="sm:text-right flex-shrink-0">
-                    <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>DEVIS</p>
-                    <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{displayQuoteNumber}</p>
+                    <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>{documentLabel}</p>
+                    <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{displayNumber}</p>
                     <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
-                      <p>Date : {formatDate(createdAt)}</p>
-                      {validUntil && (
-                        <p>Valable jusqu&apos;au : {formatDate(validUntil)}</p>
+                      <p>Date : {formatDate(resolvedCreatedAt)}</p>
+                      {isInvoice ? (
+                        resolvedDueDate && <p>Échéance : {formatDate(resolvedDueDate)}</p>
+                      ) : (
+                        resolvedValidUntil && <p>Valable jusqu&apos;au : {formatDate(resolvedValidUntil)}</p>
                       )}
                     </div>
                   </div>
@@ -300,10 +414,10 @@ export function QuotePreviewDialog({
             {/* Titre + description */}
             <div className="px-5 sm:px-8 py-5 border-b border-[#e5e1da]">
               <h2 className="text-lg font-semibold" style={{ color: textColor }}>
-                {title || <span className="text-[#6b6560] font-normal italic">Titre du devis</span>}
+                {resolvedTitle || <span className="text-[#6b6560] font-normal italic">{titlePlaceholder}</span>}
               </h2>
-              {description && (
-                <p className="text-sm text-[#6b6560] mt-1 leading-relaxed whitespace-pre-wrap">{description}</p>
+              {resolvedDescription && (
+                <p className="text-sm text-[#6b6560] mt-1 leading-relaxed whitespace-pre-wrap">{resolvedDescription}</p>
               )}
             </div>
 
@@ -380,20 +494,22 @@ export function QuotePreviewDialog({
               </div>
             </div>
 
-            {/* Signature placeholder */}
-            <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
-              <div className="flex items-center gap-2 mb-3">
-                <PenLine className="h-4 w-4 text-[#6b6560]" />
-                <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
-                  Signature électronique
-                </p>
+            {/* Signature placeholder — quotes only */}
+            {!isInvoice && (
+              <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <PenLine className="h-4 w-4 text-[#6b6560]" />
+                  <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
+                    Signature électronique
+                  </p>
+                </div>
+                <div className="rounded-xl border border-dashed border-[#e5e1da] bg-[#faf9f7] py-8 text-center">
+                  <p className="text-xs text-[#6b6560]">
+                    Le client signera ici depuis le lien sécurisé envoyé par email.
+                  </p>
+                </div>
               </div>
-              <div className="rounded-xl border border-dashed border-[#e5e1da] bg-[#faf9f7] py-8 text-center">
-                <p className="text-xs text-[#6b6560]">
-                  Le client signera ici depuis le lien sécurisé envoyé par email.
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Legal mentions */}
             <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-4 bg-[#faf9f7]">
@@ -401,13 +517,22 @@ export function QuotePreviewDialog({
                 <Shield className="h-3.5 w-3.5 text-[#6b6560]/50 mt-0.5 flex-shrink-0" />
                 <p className="text-[11px] text-[#6b6560]/60 leading-relaxed">
                   {mentionsLegales || (
-                    <>
-                      {validUntil
-                        ? `Devis valable jusqu'au ${formatDate(validUntil)}. `
-                        : ''}
-                      Signature électronique réalisée au sens du règlement européen eIDAS.
-                      Ce document a valeur contractuelle entre les parties.
-                    </>
+                    isInvoice ? (
+                      <>
+                        Facture émise le {formatDate(resolvedCreatedAt)}
+                        {resolvedDueDate ? `, à régler avant le ${formatDate(resolvedDueDate)}` : ''}.
+                        TVA applicable au taux de {tvaRate}%. Tout retard de paiement entraîne
+                        l&apos;application de pénalités de retard conformément aux conditions générales.
+                      </>
+                    ) : (
+                      <>
+                        {resolvedValidUntil
+                          ? `Devis valable jusqu'au ${formatDate(resolvedValidUntil)}. `
+                          : ''}
+                        Signature électronique réalisée au sens du règlement européen eIDAS.
+                        Ce document a valeur contractuelle entre les parties.
+                      </>
+                    )
                   )}
                 </p>
               </div>
