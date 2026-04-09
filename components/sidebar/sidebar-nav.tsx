@@ -301,7 +301,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             'absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded transition-all duration-200 ease-out hover:scale-125',
             isFav
               ? 'opacity-100 text-amber-500 hover:text-amber-600'
-              : 'opacity-0 group-hover/item:opacity-100 text-muted-foreground/60 hover:text-amber-500'
+              : 'opacity-0 pointer-events-none group-hover/item:opacity-100 group-hover/item:pointer-events-auto text-muted-foreground/60 hover:text-amber-500'
           )}
         >
           <Star className={cn('h-3.5 w-3.5 transition-all', isFav && 'fill-amber-500')} />
