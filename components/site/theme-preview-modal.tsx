@@ -17,27 +17,27 @@ interface ThemePreviewModalProps {
 }
 
 const DUMMY_SERVICES = [
-  { icon: Droplets, name: 'Plomberie generale', desc: 'Installation, depannage et renovation de tous vos equipements sanitaires.' },
-  { icon: Flame, name: 'Chauffage & chaudieres', desc: 'Pose, entretien et remplacement de chaudieres gaz, fioul et pompes a chaleur.' },
-  { icon: Wrench, name: 'Renovation salle de bain', desc: 'Conception et realisation cle en main, du devis aux finitions.' },
+  { icon: Droplets, name: 'Plomberie générale', desc: 'Installation, dépannage et rénovation de tous vos équipements sanitaires.' },
+  { icon: Flame, name: 'Chauffage & chaudières', desc: 'Pose, entretien et remplacement de chaudières gaz, fioul et pompes à chaleur.' },
+  { icon: Wrench, name: 'Rénovation salle de bain', desc: 'Conception et réalisation clé en main, du devis aux finitions.' },
 ];
 
 const DUMMY_HIGHLIGHTS = [
-  { value: '15+', label: "Annees d'experience" },
-  { value: '500+', label: 'Chantiers realises' },
+  { value: '15+', label: "Années d'expérience" },
+  { value: '500+', label: 'Chantiers réalisés' },
   { value: '4.9/5', label: 'Note Google' },
 ];
 
 const DUMMY_REVIEWS = [
-  { name: 'Marie L.', rating: 5, text: "Equipe tres professionnelle, intervention rapide et travail soigne. Je recommande !" },
-  { name: 'Pierre D.', rating: 5, text: "Devis clair, prix juste, chantier termine dans les delais. Parfait." },
-  { name: 'Sophie M.', rating: 5, text: "Tres a l'ecoute, conseils avises. Notre nouvelle salle de bain est magnifique." },
+  { name: 'Marie L.', rating: 5, text: "Équipe très professionnelle, intervention rapide et travail soigné. Je recommande !" },
+  { name: 'Pierre D.', rating: 5, text: "Devis clair, prix juste, chantier terminé dans les délais. Parfait." },
+  { name: 'Sophie M.', rating: 5, text: "Très à l'écoute, conseils avisés. Notre nouvelle salle de bain est magnifique." },
 ];
 
 const DUMMY_FAQ = [
-  { q: 'Proposez-vous des devis gratuits ?', a: 'Oui, tous nos devis sont gratuits et sans engagement. Nous nous deplacons sous 48h.' },
-  { q: 'Quelle est votre zone d\'intervention ?', a: 'Nous intervenons dans toute la metropole lyonnaise et les communes alentours.' },
-  { q: 'Etes-vous certifies RGE ?', a: 'Oui, nous sommes certifies RGE Qualibat, ce qui vous permet de beneficier des aides de l\'Etat.' },
+  { q: 'Proposez-vous des devis gratuits ?', a: 'Oui, tous nos devis sont gratuits et sans engagement. Nous nous déplaçons sous 48h.' },
+  { q: 'Quelle est votre zone d\'intervention ?', a: 'Nous intervenons dans toute la métropole lyonnaise et les communes alentours.' },
+  { q: 'Êtes-vous certifiés RGE ?', a: 'Oui, nous sommes certifiés RGE Qualibat, ce qui vous permet de bénéficier des aides de l\'État.' },
 ];
 
 export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSelection }: ThemePreviewModalProps) {
@@ -65,7 +65,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
             <X className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">Apercu du theme : {s.name}</p>
+            <p className="text-sm font-semibold text-foreground truncate">Aperçu du thème : {s.name}</p>
             <p className="text-xs text-muted-foreground truncate hidden sm:block">{s.tagline}</p>
           </div>
         </div>
@@ -74,7 +74,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
             Fermer
           </Button>
           <Button size="sm" onClick={onConfirm}>
-            {isCurrentSelection ? 'Garder ce theme' : 'Choisir ce theme'}
+            {isCurrentSelection ? 'Garder ce thème' : 'Choisir ce thème'}
           </Button>
         </div>
       </div>
@@ -112,11 +112,11 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                   <p className="font-bold text-base sm:text-lg leading-tight" style={{ color: s.heading }}>
                     Dupont Plomberie
                   </p>
-                  <p className="text-xs" style={{ color: s.textMuted }}>Lyon &amp; metropole</p>
+                  <p className="text-xs" style={{ color: s.textMuted }}>Lyon &amp; métropole</p>
                 </div>
               </div>
               <nav className="hidden md:flex items-center gap-6 text-sm">
-                {['Accueil', 'Services', 'Realisations', 'Avis', 'Contact'].map((item) => (
+                {['Accueil', 'Services', 'Réalisations', 'Avis', 'Contact'].map((item) => (
                   <a key={item} href="#" style={{ color: s.text }} className="hover:opacity-70">
                     {item}
                   </a>
@@ -158,7 +158,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                   borderRadius: s.radius,
                 }}
               >
-                <Award className="h-3 w-3" /> Certifie RGE Qualibat
+                <Award className="h-3 w-3" /> Certifié RGE Qualibat
               </div>
               <h1
                 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6"
@@ -483,7 +483,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
               Annuler
             </Button>
             <Button size="sm" onClick={onConfirm}>
-              {isCurrentSelection ? 'Garder ce theme' : 'Choisir ce theme'}
+              {isCurrentSelection ? 'Garder ce thème' : 'Choisir ce thème'}
             </Button>
           </div>
         </div>
