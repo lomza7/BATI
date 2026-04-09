@@ -51,7 +51,21 @@ export async function POST(request: Request) {
   });
 
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    console.error('[api/demo/clear] RPC error:', {
+      message: rpcError.message,
+      details: rpcError.details,
+      hint: rpcError.hint,
+      code: rpcError.code,
+    });
+    return NextResponse.json(
+      {
+        error: rpcError.message,
+        details: rpcError.details,
+        hint: rpcError.hint,
+        code: rpcError.code,
+      },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ ok: true });

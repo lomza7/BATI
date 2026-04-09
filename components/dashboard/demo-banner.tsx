@@ -83,27 +83,57 @@ export function DemoBanner() {
   }
 
   async function handleClearDemo() {
-    if (!session?.access_token) return;
     setClosing(true);
     try {
+      // Grab a fresh session at click time — the one in auth context can be
+      // momentarily null/stale during a token refresh, which used to silently
+      // abort this handler and make the button look broken.
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      const accessToken = freshSession?.access_token;
+      if (!accessToken) {
+        toast({
+          title: 'Session expirée',
+          description: 'Veuillez vous reconnecter puis réessayer.',
+          variant: 'destructive',
+        });
+        setClosing(false);
+        return;
+      }
+
       const res = await fetch('/api/demo/clear', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (!res.ok) throw new Error('clear failed');
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const msg = (errData as { error?: string }).error || `HTTP ${res.status}`;
+        console.error('[demo-banner] clear failed:', msg);
+        toast({
+          title: 'Erreur',
+          description: `Impossible de fermer la démo : ${msg}`,
+          variant: 'destructive',
+        });
+        setClosing(false);
+        return;
+      }
+
       setState({ status: 'hidden' });
-      toast({ title: 'Demo fermee', description: 'Les donnees de demonstration ont ete supprimees.' });
+      toast({
+        title: 'Démo fermée',
+        description: 'Les données de démonstration ont été supprimées.',
+      });
       // Force a reload so every already-mounted page clears its cached demo data
       if (typeof window !== 'undefined') {
         window.location.reload();
       }
-    } catch {
+    } catch (err) {
+      console.error('[demo-banner] unexpected error:', err);
       toast({
-        title: 'Erreur',
-        description: 'Impossible de fermer la demo. Reessayez dans un instant.',
+        title: 'Erreur réseau',
+        description: err instanceof Error ? err.message : 'Réessayez dans un instant.',
         variant: 'destructive',
       });
-    } finally {
       setClosing(false);
     }
   }
