@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Analytics } from '@vercel/analytics/next';
+import { AnalyticsConsent } from '@/components/analytics-consent';
 import { Providers } from '@/components/providers';
 import { SchemaOrg } from '@/components/seo/schema-org';
 
@@ -83,6 +84,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         <SchemaOrg />
         <Analytics />
+        <AnalyticsConsent />
       </body>
     </html>
   );
