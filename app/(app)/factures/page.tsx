@@ -462,10 +462,25 @@ export default function FacturesPage() {
   const totalLate = activeInvoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
   const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice);
 
+  function handleInvoiceClick(inv: Invoice) {
+    if (inv.quote_id) {
+      const linkedQuote = quotes.find((q) => q.id === inv.quote_id);
+      if (linkedQuote) {
+        setBillingQuote(linkedQuote);
+        return;
+      }
+    }
+    setPreviewInvoiceId(inv.id);
+  }
+
   function renderInvoiceRow(inv: Invoice, archived = false) {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
     return (
-      <tr key={inv.id} className={`transition-colors hover:bg-muted/20 ${archived ? 'opacity-60' : ''}`}>
+      <tr
+        key={inv.id}
+        className={`transition-colors hover:bg-muted/20 cursor-pointer ${archived ? 'opacity-60' : ''}`}
+        onClick={() => handleInvoiceClick(inv)}
+      >
         <td className="px-4 py-3 text-sm font-medium text-foreground">
           <div className="flex items-center gap-1.5">
             {inv.invoice_number}
@@ -496,7 +511,7 @@ export default function FacturesPage() {
                 size="sm"
                 variant="outline"
                 className="h-7 gap-1 border-violet-300 text-violet-700 hover:bg-violet-50 text-xs"
-                onClick={() => updateStatus(inv.id, 'creee')}
+                onClick={(e) => { e.stopPropagation(); updateStatus(inv.id, 'creee'); }}
               >
                 <FileCheck className="h-3 w-3" /> Créer
               </Button>
@@ -513,7 +528,7 @@ export default function FacturesPage() {
           )}
         </td>
         <td className="px-4 py-3 text-sm text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -522,6 +537,11 @@ export default function FacturesPage() {
               <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
                 <Eye className="mr-2 h-4 w-4" /> Visualiser
               </DropdownMenuItem>
+              {inv.quote_id && (
+                <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
+                  <Receipt className="mr-2 h-4 w-4" /> Suivi facturation
+                </DropdownMenuItem>
+              )}
               {!archived && (
                 <>
                   {inv.status === 'brouillon' && (
@@ -557,45 +577,56 @@ export default function FacturesPage() {
   function renderInvoiceCard(inv: Invoice, archived = false) {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
     return (
-      <div key={inv.id} className={`rounded-xl border border-border bg-card p-4 space-y-3 ${archived ? 'opacity-60' : ''}`}>
+      <div
+        key={inv.id}
+        className={`rounded-xl border border-border bg-card p-4 space-y-3 cursor-pointer transition-colors hover:bg-muted/10 ${archived ? 'opacity-60' : ''}`}
+        onClick={() => handleInvoiceClick(inv)}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{inv.title}</p>
             <p className="text-xs text-muted-foreground">{inv.clients?.name || '-'}</p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreHorizontal className="h-4 w-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
-                <Eye className="mr-2 h-4 w-4" /> Visualiser
-              </DropdownMenuItem>
-              {!archived && (
-                <>
-                  {inv.status === 'brouillon' && (
-                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'creee')}>
-                      <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
+          <div onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreHorizontal className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
+                  <Eye className="mr-2 h-4 w-4" /> Visualiser
+                </DropdownMenuItem>
+                {inv.quote_id && (
+                  <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
+                    <Receipt className="mr-2 h-4 w-4" /> Suivi facturation
+                  </DropdownMenuItem>
+                )}
+                {!archived && (
+                  <>
+                    {inv.status === 'brouillon' && (
+                      <DropdownMenuItem onClick={() => updateStatus(inv.id, 'creee')}>
+                        <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
+                      <Send className="mr-2 h-4 w-4" /> Envoyer au client
                     </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
-                    <Send className="mr-2 h-4 w-4" /> Envoyer au client
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
-                    <Archive className="mr-2 h-4 w-4" /> Archiver
-                  </DropdownMenuItem>
-                </>
-              )}
-              {archived && (
-                <DropdownMenuItem onClick={() => unarchiveInvoice(inv.id)}>Désarchiver</DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
+                      <Archive className="mr-2 h-4 w-4" /> Archiver
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {archived && (
+                  <DropdownMenuItem onClick={() => unarchiveInvoice(inv.id)}>Désarchiver</DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">{inv.invoice_number}</span>
@@ -615,7 +646,7 @@ export default function FacturesPage() {
               size="sm"
               variant="outline"
               className="h-7 gap-1 border-violet-300 text-violet-700 hover:bg-violet-50 text-xs"
-              onClick={() => updateStatus(inv.id, 'creee')}
+              onClick={(e) => { e.stopPropagation(); updateStatus(inv.id, 'creee'); }}
             >
               <FileCheck className="h-3 w-3" /> Créer la facture
             </Button>

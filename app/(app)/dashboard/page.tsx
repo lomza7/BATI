@@ -758,6 +758,7 @@ export default function DashboardPage() {
       supabase
         .from('invoices')
         .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, invoice_type, created_at, updated_at, clients(name, deleted_at)')
+        .neq('status', 'brouillon')
         .order('created_at', { ascending: false }),
       supabase
         .from('projects')

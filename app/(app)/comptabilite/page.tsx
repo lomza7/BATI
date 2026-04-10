@@ -433,6 +433,7 @@ export default function ComptabilitePage() {
              paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id,
              invoice_type, quote_id`,
           )
+          .neq('status', 'brouillon')
           .order('issued_at', { ascending: false, nullsFirst: false }),
         supabase
           .from('accountant_access')
