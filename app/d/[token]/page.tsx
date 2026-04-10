@@ -155,108 +155,127 @@ export default function PublicQuotePage() {
   const [signatureDisplayUrl, setSignatureDisplayUrl] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    // 1. Fetch send by token
-    const { data: send } = await anonClient
-      .from('quote_sends')
-      .select('id, quote_id, client_name, expires_at, signed_at, signature_url, docuseal_slug, docuseal_submission_id, docuseal_certificate_url, docuseal_audit_log_url, docuseal_signed_document_url')
-      .eq('token', token)
-      .maybeSingle();
-
-    if (!send) {
-      setError('Ce lien est invalide ou a expire.');
-      setLoading(false);
-      return;
-    }
-
-    if (new Date(send.expires_at) < new Date()) {
-      setError('Ce lien a expire. Contactez votre artisan pour obtenir un nouveau lien.');
-      setLoading(false);
-      return;
-    }
-
-    setSendData(send);
-
-    // Deja signe ?
-    if (send.signed_at) {
-      setSigned(true);
-      setSignedAt(send.signed_at);
-      if (send.signature_url) {
-        setSignatureDisplayUrl(send.signature_url);
-      }
-    }
-
-    // Mark viewed_at (premiere fois) + incrementer le compteur
-    await anonClient
-      .from('quote_sends')
-      .update({ viewed_at: new Date().toISOString() })
-      .eq('id', send.id)
-      .is('viewed_at', null);
-
-    // Log chaque ouverture dans quote_send_views
-    await anonClient.from('quote_send_views').insert({
-      send_id: send.id,
-      user_agent: navigator.userAgent,
-    });
-
-    // 2. Fetch quote with client
-    const { data: quoteData } = await anonClient
-      .from('quotes')
-      .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, bank_account_id, clients(name, email, phone, address, city, postal_code)')
-      .eq('id', send.quote_id)
-      .is('deleted_at', null)
-      .maybeSingle();
-
-    if (!quoteData) {
-      setError('Ce devis n est plus disponible.');
-      setLoading(false);
-      return;
-    }
-
-    setQuote(quoteData as unknown as QuoteData);
-
-    // 3. Fetch quote lines
-    const { data: linesData } = await anonClient
-      .from('quote_lines')
-      .select('id, description, quantity, unit, unit_price, tva_rate, total, position')
-      .eq('quote_id', send.quote_id)
-      .order('position');
-
-    if (linesData) {
-      setLines(linesData as QuoteLine[]);
-    }
-
-    // 4. Fetch artisan profile via user_id from quote
-    // We need user_id — get it from quote_sends
-    const { data: sendFull } = await anonClient
-      .from('quote_sends')
-      .select('user_id')
-      .eq('id', send.id)
-      .single();
-
-    if (sendFull?.user_id) {
-      const { data: profile } = await anonClient
-        .from('profiles')
-        .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
-        .eq('id', sendFull.user_id)
+    try {
+      // 1. Fetch send by token
+      const { data: send, error: sendError } = await anonClient
+        .from('quote_sends')
+        .select('id, quote_id, client_name, expires_at, signed_at, signature_url, docuseal_slug, docuseal_submission_id, docuseal_certificate_url, docuseal_audit_log_url, docuseal_signed_document_url')
+        .eq('token', token)
         .maybeSingle();
 
-      if (profile) {
-        setArtisan(profile as ArtisanProfile);
+      if (sendError) {
+        console.error('[d/token] quote_sends fetch error:', sendError);
+        setError('Une erreur technique est survenue. Veuillez réessayer.');
+        setLoading(false);
+        return;
       }
-    }
 
-    // 5. Fetch bank account if attached to the quote
-    const quoteBankId = (quoteData as unknown as QuoteData).bank_account_id;
-    if (quoteBankId) {
-      const { data: bankData } = await anonClient
-        .from('bank_accounts')
-        .select('label, bank_name, account_holder, iban, bic')
-        .eq('id', quoteBankId)
+      if (!send) {
+        setError('Ce lien est invalide ou a expiré.');
+        setLoading(false);
+        return;
+      }
+
+      if (new Date(send.expires_at) < new Date()) {
+        setError('Ce lien a expiré. Contactez votre artisan pour obtenir un nouveau lien.');
+        setLoading(false);
+        return;
+      }
+
+      setSendData(send);
+
+      // Deja signe ?
+      if (send.signed_at) {
+        setSigned(true);
+        setSignedAt(send.signed_at);
+        if (send.signature_url) {
+          setSignatureDisplayUrl(send.signature_url);
+        }
+      }
+
+      // Mark viewed_at + log view (non-blocking, ne doit pas bloquer le chargement)
+      anonClient
+        .from('quote_sends')
+        .update({ viewed_at: new Date().toISOString() })
+        .eq('id', send.id)
+        .is('viewed_at', null)
+        .then(({ error }) => { if (error) console.warn('[d/token] viewed_at update:', error.message); });
+
+      anonClient.from('quote_send_views').insert({
+        send_id: send.id,
+        user_agent: navigator.userAgent,
+      }).then(({ error }) => { if (error) console.warn('[d/token] view log:', error.message); });
+
+      // 2. Fetch quote with client
+      const { data: quoteData, error: quoteError } = await anonClient
+        .from('quotes')
+        .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, bank_account_id, clients(name, email, phone, address, city, postal_code)')
+        .eq('id', send.quote_id)
+        .is('deleted_at', null)
         .maybeSingle();
-      if (bankData) setBankAccount(bankData as BankAccountData);
-    }
 
-    setLoading(false);
+      if (quoteError) {
+        console.error('[d/token] quotes fetch error:', quoteError);
+        setError('Une erreur technique est survenue. Veuillez réessayer.');
+        setLoading(false);
+        return;
+      }
+
+      if (!quoteData) {
+        setError("Ce devis n'est plus disponible.");
+        setLoading(false);
+        return;
+      }
+
+      setQuote(quoteData as unknown as QuoteData);
+
+      // 3. Fetch quote lines
+      const { data: linesData } = await anonClient
+        .from('quote_lines')
+        .select('id, description, quantity, unit, unit_price, tva_rate, total, position')
+        .eq('quote_id', send.quote_id)
+        .order('position');
+
+      if (linesData) {
+        setLines(linesData as QuoteLine[]);
+      }
+
+      // 4. Fetch artisan profile via user_id from quote
+      const { data: sendFull } = await anonClient
+        .from('quote_sends')
+        .select('user_id')
+        .eq('id', send.id)
+        .single();
+
+      if (sendFull?.user_id) {
+        const { data: profile } = await anonClient
+          .from('profiles')
+          .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
+          .eq('id', sendFull.user_id)
+          .maybeSingle();
+
+        if (profile) {
+          setArtisan(profile as ArtisanProfile);
+        }
+      }
+
+      // 5. Fetch bank account if attached to the quote
+      const quoteBankId = (quoteData as unknown as QuoteData).bank_account_id;
+      if (quoteBankId) {
+        const { data: bankData } = await anonClient
+          .from('bank_accounts')
+          .select('label, bank_name, account_holder, iban, bic')
+          .eq('id', quoteBankId)
+          .maybeSingle();
+        if (bankData) setBankAccount(bankData as BankAccountData);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error('[d/token] unexpected error:', err);
+      setError('Une erreur technique est survenue. Veuillez réessayer.');
+      setLoading(false);
+    }
   }, [token]);
 
   useEffect(() => {

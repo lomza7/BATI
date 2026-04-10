@@ -169,21 +169,29 @@ export default function PublicInvoicePage() {
   const paymentStatus = searchParams.get('payment');
 
   const fetchData = useCallback(async () => {
+    try {
     // 1. Fetch send by token
-    const { data: send } = await anonClient
+    const { data: send, error: sendError } = await anonClient
       .from('invoice_sends')
       .select('id, invoice_id, user_id, client_name, expires_at, viewed_at, paid_at')
       .eq('token', token)
       .maybeSingle();
 
+    if (sendError) {
+      console.error('[f/token] invoice_sends fetch error:', sendError);
+      setError('Une erreur technique est survenue. Veuillez réessayer.');
+      setLoading(false);
+      return;
+    }
+
     if (!send) {
-      setError('Ce lien est invalide ou a expire.');
+      setError('Ce lien est invalide ou a expiré.');
       setLoading(false);
       return;
     }
 
     if (new Date(send.expires_at) < new Date()) {
-      setError('Ce lien a expire. Contactez votre artisan pour obtenir un nouveau lien.');
+      setError('Ce lien a expiré. Contactez votre artisan pour obtenir un nouveau lien.');
       setLoading(false);
       return;
     }
@@ -194,12 +202,13 @@ export default function PublicInvoicePage() {
       setIsPaid(true);
     }
 
-    // Mark viewed_at (first time)
-    await anonClient
+    // Mark viewed_at (non-blocking)
+    anonClient
       .from('invoice_sends')
       .update({ viewed_at: new Date().toISOString() })
       .eq('id', send.id)
-      .is('viewed_at', null);
+      .is('viewed_at', null)
+      .then(({ error }) => { if (error) console.warn('[f/token] viewed_at update:', error.message); });
 
     // 2. Fetch invoice with client
     const { data: invoiceData } = await anonClient
@@ -288,6 +297,11 @@ export default function PublicInvoicePage() {
     }
 
     setLoading(false);
+    } catch (err) {
+      console.error('[f/token] unexpected error:', err);
+      setError('Une erreur technique est survenue. Veuillez réessayer.');
+      setLoading(false);
+    }
   }, [token]);
 
   useEffect(() => {
