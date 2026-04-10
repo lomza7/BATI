@@ -383,7 +383,7 @@ export async function POST(request: Request) {
       '- Reponds en francais.',
       '- Le titre doit etre court et exploitable pour un devis.',
       '- clientName peut etre vide si aucun nom n est identifiable.',
-      "- description doit resumer le besoin et indiquer qu'il s'agit d'un brouillon IA a valider.",
+      "- description doit resumer le besoin du client de maniere claire et professionnelle (sans mentionner 'brouillon' ni 'a valider').",
       '- confidence doit etre un entier de 0 a 100.',
       '- assumptions doit contenir seulement des hypotheses utiles (liste les elements incertains).',
       '- lines doit contenir des lignes concretes de devis avec quantites et prix unitaires plausibles.',

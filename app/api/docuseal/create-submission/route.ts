@@ -82,12 +82,16 @@ export async function POST(request: Request) {
     const artisanRaw = profileRes.data || { company_name: 'Artisan' };
     const artisan = artisanRaw as Record<string, unknown> & { company_name: string };
 
+    // Nettoyer la description si elle contient un texte de brouillon IA
+    const rawDesc = (quote.description || '') as string;
+    const cleanDescription = rawDesc.replace(/^Brouillon (de devis |préparé ).*$/im, '').trim();
+
     // Generer le HTML du devis
     const html = buildQuoteHtml(
       {
         quote_number: quote.quote_number,
         title: quote.title || '',
-        description: quote.description || '',
+        description: cleanDescription,
         total_ht: Number(quote.total_ht) || 0,
         total_tva: Number(quote.total_tva) || 0,
         total_ttc: Number(quote.total_ttc) || 0,
@@ -183,6 +187,7 @@ export async function POST(request: Request) {
     if (quote.status === 'brouillon') {
       await admin.from('quotes').update({
         status: 'envoye',
+        description: cleanDescription,
         updated_at: new Date().toISOString(),
       }).eq('id', quote_id);
     }

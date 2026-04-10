@@ -842,7 +842,8 @@ export function QuoteAiAssistant({ onUseDraft, saving = false, presetRequest = n
       clientId,
       description:
         analysis.description ||
-        `Brouillon préparé avec l'assistant IA à partir d'une demande vocale. ${analysis.summary}`,
+        analysis.summary ||
+        '',
       lines: editedLines.map((line) => ({ ...line })),
     });
   }
