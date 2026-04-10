@@ -35,7 +35,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground"
         >
           <Settings className="h-[18px] w-[18px]" />
-          <span>Parametres</span>
+          <span>Paramètres</span>
         </a>
         <a
           href="/corbeille"

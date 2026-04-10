@@ -18,12 +18,12 @@ const PERIOD_LABELS: Record<Period, string> = {
   aujourdhui: "Aujourd'hui",
   semaine: 'Cette semaine',
   mois: 'Ce mois-ci',
-  annee: "Cette annee",
+  annee: "Cette année",
 };
 
 const countChartConfig = {
   count: {
-    label: 'Taches',
+    label: 'Tâches',
     color: 'hsl(var(--chart-2))',
   },
 } satisfies ChartConfig;
@@ -99,8 +99,8 @@ export function TimeByCategoryChart({ todos, compact }: TimeByChartProps) {
   const dataKey = mode === 'count' ? 'count' : 'minutes';
   const config = mode === 'count' ? countChartConfig : timeChartConfig;
   const emptyLabel = mode === 'count'
-    ? 'Aucune tache pour cette periode'
-    : 'Aucun temps enregistre pour cette periode';
+    ? 'Aucune tâche pour cette période'
+    : 'Aucun temps enregistré pour cette période';
 
   return (
     <div className={compact ? '' : 'rounded-xl border bg-card p-4 sm:p-6'}>
@@ -112,10 +112,10 @@ export function TimeByCategoryChart({ todos, compact }: TimeByChartProps) {
             <Clock className="h-4 w-4 text-muted-foreground" />
           )}
           <h3 className="font-semibold text-sm">
-            {mode === 'count' ? 'Taches par categorie' : 'Temps par categorie'}
+            {mode === 'count' ? 'Tâches par catégorie' : 'Temps par catégorie'}
           </h3>
           {mode === 'count' && totalCount > 0 && (
-            <span className="text-xs text-muted-foreground">({totalCount} tache{totalCount > 1 ? 's' : ''})</span>
+            <span className="text-xs text-muted-foreground">({totalCount} tâche{totalCount > 1 ? 's' : ''})</span>
           )}
           {mode === 'time' && totalMinutes > 0 && (
             <span className="text-xs text-muted-foreground">({formatDuration(totalMinutes)})</span>
@@ -125,7 +125,7 @@ export function TimeByCategoryChart({ todos, compact }: TimeByChartProps) {
             className="ml-1 flex items-center gap-1 px-2 py-0.5 text-xs rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
           >
             {mode === 'count' ? <Clock className="h-3 w-3" /> : <BarChart3 className="h-3 w-3" />}
-            {mode === 'count' ? 'Temps' : 'Quantite'}
+            {mode === 'count' ? 'Temps' : 'Quantité'}
           </button>
         </div>
         <div className="flex gap-1">
@@ -174,7 +174,7 @@ export function TimeByCategoryChart({ todos, compact }: TimeByChartProps) {
                 <ChartTooltipContent
                   formatter={mode === 'time'
                     ? (value) => formatDuration(Number(value))
-                    : (value) => `${value} tache${Number(value) > 1 ? 's' : ''}`
+                    : (value) => `${value} tâche${Number(value) > 1 ? 's' : ''}`
                   }
                 />
               }

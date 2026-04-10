@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 
 interface SiteHeroCarouselProps {
   images: string[];
-  /** Duree d'affichage de chaque photo, en ms. Defaut 5000. */
+  /** Durée d'affichage de chaque photo, en ms. Défaut 5000. */
   interval?: number;
 }
 
 /**
- * Carrousel plein ecran utilise en fond du hero.
- * Fait defiler automatiquement les images avec un fondu.
+ * Carrousel plein écran utilisé en fond du hero.
+ * Fait défiler automatiquement les images avec un fondu.
  */
 export function SiteHeroCarousel({ images, interval = 5000 }: SiteHeroCarouselProps) {
   const [index, setIndex] = useState(0);

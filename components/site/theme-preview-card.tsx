@@ -28,7 +28,7 @@ export function ThemePreviewCard({ theme, selected, onSelect, onPreview }: Theme
         type="button"
         onClick={onSelect}
         className="block w-full text-left"
-        aria-label={`Selectionner le theme ${s.name}`}
+        aria-label={`Sélectionner le thème ${s.name}`}
       >
         <div
           className="relative aspect-[16/11] overflow-hidden"
@@ -120,7 +120,7 @@ export function ThemePreviewCard({ theme, selected, onSelect, onPreview }: Theme
         </div>
 
         <p className="text-xs text-muted-foreground line-clamp-2 leading-snug">
-          <span className="font-medium text-foreground/80">Ideal pour : </span>
+          <span className="font-medium text-foreground/80">Idéal pour : </span>
           {s.target}
         </p>
 

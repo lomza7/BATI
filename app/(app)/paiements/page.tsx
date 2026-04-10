@@ -117,7 +117,7 @@ export default function PaiementsPage() {
   }
 
   async function handleDisconnect() {
-    if (!confirm('Deconnecter votre compte Stripe ? Les liens de paiement existants ne fonctionneront plus.')) return;
+    if (!confirm('Déconnecter votre compte Stripe ? Les liens de paiement existants ne fonctionneront plus.')) return;
     setDisconnecting(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -193,7 +193,7 @@ export default function PaiementsPage() {
                 <div>
                   <h3 className="font-semibold text-foreground">Onboarding Stripe incomplet</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Votre compte Stripe est cree mais l&apos;inscription n&apos;est pas terminee.
+                    Votre compte Stripe est créé mais l&apos;inscription n&apos;est pas terminée.
                     Completez votre profil Stripe pour commencer a recevoir des paiements.
                   </p>
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -239,7 +239,7 @@ export default function PaiementsPage() {
               </div>
               <Button variant="outline" onClick={handleDisconnect} disabled={disconnecting} className="gap-2 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                 {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
-                Deconnecter
+                Déconnecter
               </Button>
             </div>
           )}

@@ -104,8 +104,8 @@ const PRESET_LABELS: Record<DatePreset, string> = {
   jour: "Aujourd'hui",
   semaine: 'Cette semaine',
   mois: 'Ce mois',
-  annee: 'Cette annee',
-  custom: 'Date precise',
+  annee: 'Cette année',
+  custom: 'Date précise',
 };
 
 interface QuoteRow {
@@ -287,11 +287,11 @@ type StageConversionPoint = {
 
 const revenueChartConfig = {
   encaisse: {
-    label: 'CA encaisse',
+    label: 'CA encaissé',
     color: 'hsl(var(--chart-1))',
   },
   factures: {
-    label: 'Factures creees',
+    label: 'Factures créées',
     color: 'hsl(var(--chart-2))',
   },
   devis: {
@@ -469,15 +469,15 @@ function createAdminReminders(
     if (days <= 10) {
       reminders.push({
         id: 'admin-vat',
-        title: 'TVA a preparer',
+        title: 'TVA à préparer',
         description: companyProfile?.tva_number
-          ? `Votre numero de TVA est bien renseigne. Preparez votre declaration ${settings.vat_frequency || 'periodique'}.`
-          : 'Pensez a preparer votre declaration de TVA et a verifier vos justificatifs.',
-        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Rappel programme dans ${days} jour${days > 1 ? 's' : ''}`,
+          ? `Votre numéro de TVA est bien renseigné. Préparez votre déclaration ${settings.vat_frequency || 'périodique'}.`
+          : 'Pensez à préparer votre déclaration de TVA et à vérifier vos justificatifs.',
+        dueLabel: days <= 0 ? "Échéance aujourd'hui" : `Rappel programmé dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Verifier les reglages',
+        actionLabel: 'Vérifier les réglages',
         kind: 'administratif',
       });
     }
@@ -489,13 +489,13 @@ function createAdminReminders(
     if (days <= 7) {
       reminders.push({
         id: 'admin-payroll',
-        title: 'Paie a lancer',
-        description: `La paie de votre equipe approche${settings.employee_count ? ` pour ${settings.employee_count} personne${settings.employee_count > 1 ? 's' : ''}` : ''}.`,
-        dueLabel: days <= 0 ? "Paie prevue aujourd'hui" : `Paie dans ${days} jour${days > 1 ? 's' : ''}`,
+        title: 'Paie à lancer',
+        description: `La paie de votre équipe approche${settings.employee_count ? ` pour ${settings.employee_count} personne${settings.employee_count > 1 ? 's' : ''}` : ''}.`,
+        dueLabel: days <= 0 ? "Paie prévue aujourd'hui" : `Paie dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Voir les reglages paie',
+        actionLabel: 'Voir les réglages paie',
         kind: 'administratif',
       });
     }
@@ -507,13 +507,13 @@ function createAdminReminders(
     if (days <= 10) {
       reminders.push({
         id: 'admin-dsn',
-        title: 'DSN a transmettre',
-        description: 'Votre declaration sociale nominative doit etre verifiee avant l echeance.',
+        title: 'DSN à transmettre',
+        description: 'Votre déclaration sociale nominative doit être vérifiée avant l\'échéance.',
         dueLabel: days <= 0 ? "DSN due aujourd'hui" : `DSN dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 2 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Verifier la DSN',
+        actionLabel: 'Vérifier la DSN',
         kind: 'administratif',
       });
     }
@@ -525,15 +525,15 @@ function createAdminReminders(
     if (days <= 60) {
       reminders.push({
         id: 'admin-cloture',
-        title: 'Cloture comptable a anticiper',
+        title: 'Clôture comptable à anticiper',
         description: benefitTaxRegime === 'is'
-          ? 'Preparez votre cloture, la liasse fiscale et les prochaines echeances IS.'
-          : 'Preparez vos pieces comptables pour votre prochaine cloture d exercice.',
-        dueLabel: days <= 0 ? "Cloture prevue aujourd'hui" : `Cloture dans ${days} jour${days > 1 ? 's' : ''}`,
+          ? 'Préparez votre clôture, la liasse fiscale et les prochaines échéances IS.'
+          : 'Préparez vos pièces comptables pour votre prochaine clôture d\'exercice.',
+        dueLabel: days <= 0 ? "Clôture prévue aujourd'hui" : `Clôture dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: dueDate.toISOString(),
         priority: days <= 15 ? 'high' : 'low',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Voir la cloture',
+        actionLabel: 'Voir la clôture',
         kind: 'administratif',
       });
     }
@@ -557,13 +557,13 @@ function createAdminReminders(
     if (days <= 20) {
       reminders.push({
         id: `admin-${nextInstallment.id}`,
-        title: 'Acompte d IS a verifier',
-        description: 'Votre prochaine echeance d impot sur les societes approche.',
-        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        title: 'Acompte d\'IS à vérifier',
+        description: 'Votre prochaine échéance d\'impôt sur les sociétés approche.',
+        dueLabel: days <= 0 ? "Échéance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: nextInstallment.date.toISOString(),
         priority: days <= 5 ? 'high' : 'medium',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Verifier l echeance',
+        actionLabel: 'Vérifier l\'échéance',
         kind: 'administratif',
       });
     }
@@ -586,12 +586,12 @@ function createAdminReminders(
       reminders.push({
         id: `admin-cfe-${nextCfe.month}`,
         title: nextCfe.label,
-        description: 'Pensez a verifier votre avis CFE et a anticiper le reglement.',
-        dueLabel: days <= 0 ? "Echeance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
+        description: 'Pensez à vérifier votre avis CFE et à anticiper le règlement.',
+        dueLabel: days <= 0 ? "Échéance aujourd'hui" : `Dans ${days} jour${days > 1 ? 's' : ''}`,
         dueDate: nextCfe.date.toISOString(),
         priority: days <= 5 ? 'high' : 'low',
         href: '/parametres?tab=parametres',
-        actionLabel: 'Voir la fiscalite',
+        actionLabel: 'Voir la fiscalité',
         kind: 'administratif',
       });
     }
@@ -1095,8 +1095,8 @@ export default function DashboardPage() {
           return {
             id: `invoice-due-${invoice.id}`,
             title: `Suivre ${invoice.invoice_number}`,
-            description: `${invoice.clients?.name || 'Ce client'} arrive a l'echeance de paiement.`,
-            dueLabel: days === 0 ? "Echeance aujourd'hui" : `Echeance dans ${days} jour${days > 1 ? 's' : ''}`,
+            description: `${invoice.clients?.name || 'Ce client'} arrive à l'échéance de paiement.`,
+            dueLabel: days === 0 ? "Échéance aujourd'hui" : `Échéance dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: invoice.due_date as string,
             href: '/factures',
@@ -1114,8 +1114,8 @@ export default function DashboardPage() {
           return {
             id: `quote-relaunch-${quote.id}`,
             title: `Relancer ${quote.quote_number}`,
-            description: `${quote.clients?.name || 'Ce client'} n'a pas encore repondu au devis.`,
-            dueLabel: `Envoye il y a ${sentSinceDays} jour${sentSinceDays > 1 ? 's' : ''}`,
+            description: `${quote.clients?.name || 'Ce client'} n'a pas encore répondu au devis.`,
+            dueLabel: `Envoyé il y a ${sentSinceDays} jour${sentSinceDays > 1 ? 's' : ''}`,
             priority: sentSinceDays >= 7 ? 'high' as const : 'medium' as const,
             dueDate: quote.valid_until || quote.created_at,
             href: '/devis',
@@ -1132,13 +1132,13 @@ export default function DashboardPage() {
 
           return {
             id: `quote-expiry-${quote.id}`,
-            title: `Validite bientot atteinte pour ${quote.quote_number}`,
-            description: `${quote.clients?.name || 'Ce client'} doit etre relance avant expiration.`,
+            title: `Validité bientôt atteinte pour ${quote.quote_number}`,
+            description: `${quote.clients?.name || 'Ce client'} doit être relancé avant expiration.`,
             dueLabel: days === 0 ? "Expire aujourd'hui" : `Expire dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: quote.valid_until as string,
             href: '/devis',
-            actionLabel: 'Verifier le devis',
+            actionLabel: 'Vérifier le devis',
             kind: 'commercial' as const,
           };
         })
@@ -1151,9 +1151,9 @@ export default function DashboardPage() {
 
           return {
             id: `project-start-${project.id}`,
-            title: `Preparer ${project.name}`,
+            title: `Préparer ${project.name}`,
             description: `${project.clients?.name || 'Le client'} attend le lancement du chantier.`,
-            dueLabel: days === 0 ? "Demarrage aujourd'hui" : `Demarrage dans ${days} jour${days > 1 ? 's' : ''}`,
+            dueLabel: days === 0 ? "Démarrage aujourd'hui" : `Démarrage dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 2 ? 'high' as const : 'medium' as const,
             dueDate: project.start_date as string,
             href: '/chantiers',
@@ -1171,8 +1171,8 @@ export default function DashboardPage() {
           return {
             id: `project-end-${project.id}`,
             title: `Clore ${project.name}`,
-            description: 'Pensez a finaliser le chantier, envoyer la facture et demander un avis client.',
-            dueLabel: days === 0 ? "Fin prevue aujourd'hui" : `Fin prevue dans ${days} jour${days > 1 ? 's' : ''}`,
+            description: 'Pensez à finaliser le chantier, envoyer la facture et demander un avis client.',
+            dueLabel: days === 0 ? "Fin prévue aujourd'hui" : `Fin prévue dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days === 0 ? 'high' as const : 'low' as const,
             dueDate: project.end_date as string,
             href: '/chantiers',
@@ -1190,7 +1190,7 @@ export default function DashboardPage() {
           return {
             id: `contract-billing-${c.id}`,
             title: `Facturation ${c.title}`,
-            description: `${c.clients?.name || 'Un client'} — contrat recurrent a facturer.`,
+            description: `${c.clients?.name || 'Un client'} — contrat récurrent à facturer.`,
             dueLabel: days === 0 ? "Facturation aujourd'hui" : `Facturation dans ${days} jour${days > 1 ? 's' : ''}`,
             priority: days <= 1 ? 'high' as const : 'medium' as const,
             dueDate: c.next_billing!,
@@ -1220,7 +1220,7 @@ export default function DashboardPage() {
         fill: 'hsl(var(--chart-3))',
       },
       {
-        label: 'Factures a encaisser',
+        label: 'Factures à encaisser',
         value: fInvoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length,
         fill: 'hsl(var(--chart-1))',
       },
@@ -1230,7 +1230,7 @@ export default function DashboardPage() {
         fill: 'hsl(var(--chart-2))',
       },
       {
-        label: 'A planifier',
+        label: 'À planifier',
         value: fProjects.filter((project) => project.status === 'a_planifier').length,
         fill: 'hsl(var(--chart-4))',
       },
@@ -1561,14 +1561,14 @@ export default function DashboardPage() {
       : customRange.from.toLocaleDateString('fr-FR')
     : PRESET_LABELS[datePreset];
   const revenueSubtitle = dashboardData.revenuePreviousMonth > 0
-    ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} sur la periode precedente`
+    ? `vs ${formatCurrency(dashboardData.revenuePreviousMonth)} sur la période précédente`
     : dashboardData.revenueThisMonth > 0
       ? `Premier encaissement sur ${periodLabel.toLowerCase()}`
       : `Aucun paiement sur ${periodLabel.toLowerCase()}`;
 
   const acceptanceSubtitle = quotes.length > 0
-    ? 'Sur les devis decides des 30 derniers jours'
-    : 'Le taux apparaitra des que vous aurez des devis';
+    ? 'Sur les devis décidés des 30 derniers jours'
+    : 'Le taux apparaîtra dès que vous aurez des devis';
 
   const hasConfiguredAdminSignals = Boolean(
     reminderSettings?.vat_regime ||
@@ -1603,7 +1603,7 @@ export default function DashboardPage() {
       <DemoBanner />
       <PageHeader
         title="Tableau de bord"
-        description="Le cockpit de votre activite : tresorerie, pipeline, chantiers et actions a lancer."
+        description="Le cockpit de votre activité : trésorerie, pipeline, chantiers et actions à lancer."
       >
         <div className="flex flex-wrap items-center gap-2">
           {(['jour', 'semaine', 'mois', 'annee'] as DatePreset[]).map((p) => (
@@ -1628,7 +1628,7 @@ export default function DashboardPage() {
                   ? customRange.to
                     ? `${customRange.from.toLocaleDateString('fr-FR')} — ${customRange.to.toLocaleDateString('fr-FR')}`
                     : customRange.from.toLocaleDateString('fr-FR')
-                  : 'Periode'}
+                  : 'Période'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -1656,17 +1656,17 @@ export default function DashboardPage() {
         <EmptyState
           icon={FolderKanban}
           title="Votre tableau de bord se remplira automatiquement"
-          description="Votre compte est pret. Creez un premier client, un devis ou un chantier pour voir vos vrais indicateurs apparaitre ici."
+          description="Votre compte est prêt. Créez un premier client, un devis ou un chantier pour voir vos vrais indicateurs apparaître ici."
         >
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Button asChild>
-              <Link href="/devis">Creer un devis</Link>
+              <Link href="/devis">Créer un devis</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/clients">Ajouter un client</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/chantiers">Creer un chantier</Link>
+              <Link href="/chantiers">Créer un chantier</Link>
             </Button>
           </div>
         </EmptyState>
@@ -1675,7 +1675,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
               <KpiCard
-                title={`CA encaisse — ${periodLabel.toLowerCase()}`}
+                title={`CA encaissé — ${periodLabel.toLowerCase()}`}
                 value={formatCurrency(dashboardData.revenueThisMonth)}
                 subtitle={revenueSubtitle}
                 trend={
@@ -1693,9 +1693,9 @@ export default function DashboardPage() {
             </Link>
             <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
               <KpiCard
-                title={`Devis crees — ${periodLabel.toLowerCase()}`}
+                title={`Devis créés — ${periodLabel.toLowerCase()}`}
                 value={formatCurrency(dashboardData.totalQuotesPeriod)}
-                subtitle={`${dashboardData.pendingQuotes.length} en attente de reponse`}
+                subtitle={`${dashboardData.pendingQuotes.length} en attente de réponse`}
                 icon={FileText}
                 sparkline={dashboardData.revenueChartData.map(p => ({ value: p.devis }))}
                 sparklineColor="hsl(var(--chart-3))"
@@ -1703,9 +1703,9 @@ export default function DashboardPage() {
             </Link>
             <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
               <KpiCard
-                title={`Factures creees — ${periodLabel.toLowerCase()}`}
+                title={`Factures créées — ${periodLabel.toLowerCase()}`}
                 value={formatCurrency(dashboardData.totalInvoicesPeriod)}
-                subtitle={`${dashboardData.unpaidInvoicesTotal > 0 ? formatCurrency(dashboardData.unpaidInvoicesTotal) + ' a encaisser' : 'Aucune facture impayee'}`}
+                subtitle={`${dashboardData.unpaidInvoicesTotal > 0 ? formatCurrency(dashboardData.unpaidInvoicesTotal) + ' à encaisser' : 'Aucune facture impayée'}`}
                 icon={Receipt}
                 sparkline={dashboardData.revenueChartData.map(p => ({ value: p.factures }))}
                 sparklineColor="hsl(var(--chart-2))"
@@ -1717,7 +1717,7 @@ export default function DashboardPage() {
                 value={String(dashboardData.pendingQuotes.length)}
                 subtitle={
                   dashboardData.quotesToRelaunch.length > 0
-                    ? `${dashboardData.quotesToRelaunch.length} a relancer cette semaine`
+                    ? `${dashboardData.quotesToRelaunch.length} à relancer cette semaine`
                     : 'Aucune relance urgente pour le moment'
                 }
                 icon={FileText}
@@ -1787,10 +1787,10 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Pipeline en un coup d&apos;oeil</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Les volumes a surveiller aujourd&apos;hui</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Les volumes à surveiller aujourd&apos;hui</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/devis">Voir le detail</Link>
+                  <Link href="/devis">Voir le détail</Link>
                 </Button>
               </div>
               <div className="mt-6">
@@ -2007,11 +2007,11 @@ export default function DashboardPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <RefreshCw className="h-4 w-4 text-primary" />
-                    <h2 className="text-base font-semibold text-foreground">Revenus recurrents (MRR)</h2>
+                    <h2 className="text-base font-semibold text-foreground">Revenus récurrents (MRR)</h2>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {formatCurrency(dashboardData.mrr)}/mois · {dashboardData.activeContractsCount} contrat{dashboardData.activeContractsCount > 1 ? 's' : ''} actif{dashboardData.activeContractsCount > 1 ? 's' : ''}
-                    {dashboardData.upcomingBillingsCount > 0 && ` · ${dashboardData.upcomingBillingsCount} a facturer cette semaine`}
+                    {dashboardData.upcomingBillingsCount > 0 && ` · ${dashboardData.upcomingBillingsCount} à facturer cette semaine`}
                   </p>
                 </div>
                 <Button asChild variant="outline" size="sm">
@@ -2046,7 +2046,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-foreground">Origine de vos leads</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Ou vos opportunites entrent vraiment, et dans quel etat elles se trouvent</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Où vos opportunités entrent vraiment, et dans quel état elles se trouvent</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href="/prospection">Ouvrir le CRM</Link>
@@ -2055,7 +2055,7 @@ export default function DashboardPage() {
 
               {dashboardData.leadSourceChartData.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Des que vos leads seront qualifies avec une source, vous verrez ici quels canaux performent le mieux.
+                  Dès que vos leads seront qualifiés avec une source, vous verrez ici quels canaux performent le mieux.
                 </div>
               ) : (
                 <div className="mt-6">
@@ -2082,13 +2082,13 @@ export default function DashboardPage() {
                   <p className="mt-1 text-sm text-muted-foreground">La course de vos meilleurs partenaires</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/parametres?tab=parametres">Gerer les sources</Link>
+                  <Link href="/parametres?tab=parametres">Gérer les sources</Link>
                 </Button>
               </div>
 
               {dashboardData.topPartnerSources.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Ajoutez vos apporteurs d affaires dans Parametres pour suivre ceux qui vous envoient les meilleurs leads.
+                  Ajoutez vos apporteurs d&apos;affaires dans Paramètres pour suivre ceux qui vous envoient les meilleurs leads.
                 </div>
               ) : (() => {
                 const maxValue = Math.max(...dashboardData.topPartnerSources.map((s) => s.wonValue), 1);
@@ -2127,7 +2127,7 @@ export default function DashboardPage() {
                             />
                             <div className="absolute inset-0 flex items-center px-3">
                               <span className="text-[11px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">
-                                {source.wonCount} signe{source.wonCount > 1 ? 's' : ''} · {source.leadCount} lead{source.leadCount > 1 ? 's' : ''}
+                                {source.wonCount} signé{source.wonCount > 1 ? 's' : ''} · {source.leadCount} lead{source.leadCount > 1 ? 's' : ''}
                               </span>
                             </div>
                           </div>
@@ -2142,8 +2142,8 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Lecture par etape</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Visualisez ou votre pipe se remplit et ou les leads stagnent</p>
+                  <h2 className="text-base font-semibold text-foreground">Lecture par étape</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Visualisez où votre pipe se remplit et où les leads stagnent</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href="/prospection">Voir le kanban</Link>
@@ -2152,7 +2152,7 @@ export default function DashboardPage() {
 
               {dashboardData.stageConversionData.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Des que votre pipe contiendra des leads, vous verrez ici le poids de chaque etape.
+                  Dès que votre pipe contiendra des leads, vous verrez ici le poids de chaque étape.
                 </div>
               ) : (
                 <div className="mt-6 space-y-4">
@@ -2177,8 +2177,8 @@ export default function DashboardPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {stage.slug === 'gagne'
-                          ? `${formatCurrency(stage.wonValue)} signes sur cette etape finale.`
-                          : `Surveillez cette etape si les leads y restent trop longtemps.`}
+                          ? `${formatCurrency(stage.wonValue)} signés sur cette étape finale.`
+                          : `Surveillez cette étape si les leads y restent trop longtemps.`}
                       </p>
                     </div>
                   ))}
@@ -2195,7 +2195,7 @@ export default function DashboardPage() {
                   <h2 className="text-base font-semibold text-foreground">Rappels chef d&apos;entreprise</h2>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Vos prochaines actions utiles, generees a partir de vos devis, factures, chantiers et reglages entreprise.
+                  Vos prochaines actions utiles, générées à partir de vos devis, factures, chantiers et réglages entreprise.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit border-primary/20 bg-primary/5 text-primary">
@@ -2205,7 +2205,7 @@ export default function DashboardPage() {
 
             {dashboardData.reminderItems.length === 0 ? (
               <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                Aucun rappel prioritaire pour le moment. Des rappels automatiques apparaitront ici des que vos devis,
+                Aucun rappel prioritaire pour le moment. Des rappels automatiques apparaîtront ici dès que vos devis,
                 factures ou chantiers auront besoin d&apos;une action.
               </div>
             ) : (
@@ -2216,10 +2216,10 @@ export default function DashboardPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className={getReminderPriorityClasses(reminder.priority)}>
                           {reminder.priority === 'high'
-                            ? 'Priorite haute'
+                            ? 'Priorité haute'
                             : reminder.priority === 'medium'
-                              ? 'Priorite moyenne'
-                              : 'Priorite basse'}
+                              ? 'Priorité moyenne'
+                              : 'Priorité basse'}
                         </Badge>
                         <Badge variant="outline" className="border-border bg-muted/50 text-muted-foreground">
                           {getReminderKindLabel(reminder.kind)}
@@ -2241,7 +2241,7 @@ export default function DashboardPage() {
 
                       <div className="mt-4 flex items-center justify-between gap-3">
                         <span className="text-xs text-muted-foreground">
-                          Hellobat vous aide a ne rien laisser trainer.
+                          Hellobat vous aide à ne rien laisser traîner.
                         </span>
                         <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                           {reminder.actionLabel}
@@ -2257,12 +2257,12 @@ export default function DashboardPage() {
             <div className="mt-5 rounded-xl border border-dashed border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
               {reminderSettings
                 ? hasConfiguredAdminSignals
-                  ? 'Vos reglages TVA, paie, DSN et cloture sont maintenant pris en compte ici. Vous pouvez les affiner a tout moment dans Parametres.'
-                  : 'Les rappels administratifs sont prets. Ajoutez vos vraies dates TVA, paie, DSN et cloture pour les rendre encore plus precis.'
-                : 'Ajoutez vos reglages TVA, paie, DSN et cloture dans Parametres pour faire apparaitre aussi les rappels administratifs.'}
+                  ? 'Vos réglages TVA, paie, DSN et clôture sont maintenant pris en compte ici. Vous pouvez les affiner à tout moment dans Paramètres.'
+                  : 'Les rappels administratifs sont prêts. Ajoutez vos vraies dates TVA, paie, DSN et clôture pour les rendre encore plus précis.'
+                : 'Ajoutez vos réglages TVA, paie, DSN et clôture dans Paramètres pour faire apparaître aussi les rappels administratifs.'}
               {' '}
               <Link href="/parametres?tab=parametres" className="font-medium text-primary underline-offset-2 hover:underline">
-                Ouvrir les parametres
+                Ouvrir les paramètres
               </Link>
             </div>
           </div>
@@ -2273,16 +2273,16 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Activite recente</h2>
+                  <h2 className="text-base font-semibold text-foreground">Activité récente</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Vos derniers mouvements utiles</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
-                  <Link href="/dashboard">Rafraichir</Link>
+                  <Link href="/dashboard">Rafraîchir</Link>
                 </Button>
               </div>
               {dashboardData.activityItems.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Aucun mouvement recent pour le moment.
+                  Aucun mouvement récent pour le moment.
                 </div>
               ) : (
                 <div className="mt-6 space-y-3">
@@ -2304,8 +2304,8 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Equipe au travail</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Qui est mobilise sur les prochains jours</p>
+                  <h2 className="text-base font-semibold text-foreground">Équipe au travail</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Qui est mobilisé sur les prochains jours</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href="/planning">Ouvrir le planning</Link>
@@ -2314,7 +2314,7 @@ export default function DashboardPage() {
 
               {dashboardData.activeTeamMembers.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Ajoutez vos salaries et prestataires pour obtenir une vraie vue d&apos;ensemble equipe.
+                  Ajoutez vos salariés et prestataires pour obtenir une vraie vue d&apos;ensemble équipe.
                 </div>
               ) : (
                 <div className="mt-6 space-y-3">
@@ -2334,14 +2334,14 @@ export default function DashboardPage() {
                             />
                             <p className="truncate text-sm font-medium text-foreground">{member.name}</p>
                             <StatusBadge
-                              label={MEMBER_TYPES[member.type]?.label || 'Equipe'}
+                              label={MEMBER_TYPES[member.type]?.label || 'Équipe'}
                               color={MEMBER_TYPES[member.type]?.color || 'bg-slate-100 text-slate-700'}
                             />
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {nextEvent
                               ? `${nextEvent.title} • ${formatDate(nextEvent.start_date)}`
-                              : 'Aucun evenement planifie prochainement'}
+                              : 'Aucun événement planifié prochainement'}
                           </p>
                         </div>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -2355,7 +2355,7 @@ export default function DashboardPage() {
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Prochaines echeances</h2>
+                  <h2 className="text-base font-semibold text-foreground">Prochaines échéances</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Ce qui arrive ensuite dans votre semaine</p>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -2365,7 +2365,7 @@ export default function DashboardPage() {
 
               {dashboardData.deadlineItems.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Aucune echeance proche. Votre planning est calme pour le moment.
+                  Aucune échéance proche. Votre planning est calme pour le moment.
                 </div>
               ) : (
                 <div className="mt-6 space-y-3">

@@ -45,17 +45,17 @@ interface PublishSiteDialogProps {
 }
 
 const CATEGORY_SUGGESTIONS = [
-  'Renovation salle de bain',
-  'Renovation cuisine',
-  'Amenagement combles',
+  'Rénovation salle de bain',
+  'Rénovation cuisine',
+  'Aménagement combles',
   'Extension maison',
   'Isolation thermique',
-  'Ravalement facade',
-  'Renovation complete',
-  'Menuiserie exterieure',
+  'Ravalement façade',
+  'Rénovation complète',
+  'Menuiserie extérieure',
   'Plomberie',
-  'Electricite',
-  'Peinture interieure',
+  'Électricité',
+  'Peinture intérieure',
   'Carrelage',
   'Toiture',
   'Terrasse',
@@ -102,7 +102,7 @@ export function PublishSiteDialog({
 
   const showcasePhotos = useMemo(() => {
     if (!project) return [] as PublishPhoto[];
-    // Les photos Apres + Presentation sont mises en avant pour le site.
+    // Les photos Après + Présentation sont mises en avant pour le site.
     const order = ['presentation', 'apres', 'pendant', 'avant'];
     return [...project.project_photos].sort(
       (a, b) => order.indexOf(a.category) - order.indexOf(b.category)
@@ -115,7 +115,7 @@ export function PublishSiteDialog({
     setError('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Session expiree');
+      if (!session?.access_token) throw new Error('Session expirée');
 
       const res = await fetch('/api/ai/project-description', {
         method: 'POST',
@@ -219,8 +219,8 @@ export function PublishSiteDialog({
             Publier ce chantier sur mon site
           </DialogTitle>
           <DialogDescription>
-            Decrivez le chantier en quelques phrases. Les photos et la description alimenteront votre site web pour etre
-            referencees sur Google.
+            Décrivez le chantier en quelques phrases. Les photos et la description alimenteront votre site web pour être
+            référencées sur Google.
           </DialogDescription>
         </DialogHeader>
 
@@ -233,11 +233,11 @@ export function PublishSiteDialog({
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  {isPublic ? 'Visible sur votre site' : 'Masque du site'}
+                  {isPublic ? 'Visible sur votre site' : 'Masqué du site'}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {isPublic
-                    ? 'Ce chantier apparaitra dans la section "Realisations" et aura sa propre page SEO.'
+                    ? 'Ce chantier apparaîtra dans la section « Réalisations » et aura sa propre page SEO.'
                     : 'Activez pour publier ce chantier sur votre site web public.'}
                 </p>
               </div>
@@ -258,12 +258,12 @@ export function PublishSiteDialog({
             <div className="mb-3 flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-semibold text-foreground">
-                Photos publiees ({showcasePhotos.length})
+                Photos publiées ({showcasePhotos.length})
               </p>
             </div>
             {showcasePhotos.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Ajoutez des photos (Avant / Pendant / Apres) au chantier pour illustrer votre page publique.
+                Ajoutez des photos (Avant / Pendant / Après) au chantier pour illustrer votre page publique.
               </p>
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -281,7 +281,7 @@ export function PublishSiteDialog({
               </div>
             )}
             <p className="mt-3 text-[11px] text-muted-foreground">
-              Toutes les photos du chantier sont publiees. Les photos &laquo;&nbsp;Apres&nbsp;&raquo; et &laquo;&nbsp;Presentation&nbsp;&raquo; sont mises en avant.
+              Toutes les photos du chantier sont publiées. Les photos &laquo;&nbsp;Après&nbsp;&raquo; et &laquo;&nbsp;Présentation&nbsp;&raquo; sont mises en avant.
             </p>
           </div>
 
@@ -290,7 +290,7 @@ export function PublishSiteDialog({
             <label className="text-sm font-medium text-foreground">Type de chantier</label>
             <Input
               className="mt-1"
-              placeholder="Ex: Renovation salle de bain"
+              placeholder="Ex : Rénovation salle de bain"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               list="chantier-category-suggestions"
@@ -301,13 +301,13 @@ export function PublishSiteDialog({
               ))}
             </datalist>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Utilise comme mot cle pour le referencement Google.
+              Utilisé comme mot-clé pour le référencement Google.
             </p>
           </div>
 
           {/* Completion date */}
           <div>
-            <label className="text-sm font-medium text-foreground">Date de realisation</label>
+            <label className="text-sm font-medium text-foreground">Date de réalisation</label>
             <Input
               className="mt-1"
               type="date"
@@ -320,7 +320,7 @@ export function PublishSiteDialog({
           <div>
             <div className="mb-1 flex items-center justify-between gap-2">
               <label className="text-sm font-medium text-foreground">
-                Description (ce qui a ete fait)
+                Description (ce qui a été fait)
               </label>
               <Button
                 type="button"
@@ -335,17 +335,17 @@ export function PublishSiteDialog({
                 ) : (
                   <Sparkles className="h-3 w-3 text-[#D35400]" />
                 )}
-                Generer avec l&apos;IA
+                Générer avec l&apos;IA
               </Button>
             </div>
             <Textarea
               className="min-h-[140px]"
-              placeholder="Decrivez les travaux realises : materiaux utilises, surface, duree, specificites, resultat obtenu..."
+              placeholder="Décrivez les travaux réalisés : matériaux utilisés, surface, durée, spécificités, résultat obtenu…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              150 a 300 mots ideal. Plus c&apos;est detaille, plus Google referencera votre page.
+              150 à 300 mots idéal. Plus c&apos;est détaillé, plus Google référencera votre page.
             </p>
           </div>
 
@@ -376,7 +376,7 @@ export function PublishSiteDialog({
 
           {isPublic && siteUrl && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-              <p className="text-xs font-semibold text-emerald-800">Une fois publie :</p>
+              <p className="text-xs font-semibold text-emerald-800">Une fois publié :</p>
               <a
                 href={siteUrl}
                 target="_blank"

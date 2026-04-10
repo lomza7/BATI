@@ -167,7 +167,7 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
               <input
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                placeholder="Description..."
+                placeholder="Description…"
                 className="text-sm text-muted-foreground bg-transparent outline-none w-full"
                 onKeyDown={(e) => { if (e.key === 'Enter') saveName(); }}
               />
@@ -190,7 +190,7 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
             className="h-9 px-4 rounded-lg border border-border bg-white text-sm font-medium text-foreground flex items-center gap-2 hover:bg-muted/50 disabled:opacity-40 transition-all"
           >
             <Eye className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Apercu</span>
+            <span className="hidden sm:inline">Aperçu</span>
           </button>
           <button
             onClick={onSend}
@@ -234,7 +234,7 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
           </div>
           {availableCollections.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              Toutes vos collections sont deja ajoutees.
+              Toutes vos collections sont déjà ajoutées.
             </p>
           ) : (
             <div className="space-y-1">
@@ -276,7 +276,7 @@ export function CatalogBuilder({ catalog, collections, onBack, onSend }: Props) 
           </div>
           <h3 className="text-lg font-semibold text-foreground">Catalogue vide</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Selectionnez les collections que vous souhaitez inclure dans ce catalogue.
+            Sélectionnez les collections que vous souhaitez inclure dans ce catalogue.
           </p>
         </div>
       ) : (
@@ -371,7 +371,7 @@ function CatalogPreview({
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex-1">
-          <p className="text-xs font-medium text-primary uppercase tracking-wider">Apercu client</p>
+          <p className="text-xs font-medium text-primary uppercase tracking-wider">Aperçu client</p>
           <h1 className="text-xl font-semibold text-foreground">{name}</h1>
         </div>
       </div>
@@ -383,7 +383,7 @@ function CatalogPreview({
             <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">{description}</p>
           )}
           <p className="text-xs text-muted-foreground/70 mt-4">
-            Selectionnez les modeles qui vous interessent
+            Sélectionnez les modèles qui vous intéressent
           </p>
         </div>
 

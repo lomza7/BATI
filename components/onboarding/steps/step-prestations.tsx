@@ -153,7 +153,7 @@ export function StepPrestations({ data, onChange, onNext, onBack, onSkip }: Prop
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un métier..."
+            placeholder="Rechercher un métier…"
             className="flex h-10 w-full rounded-xl border border-border bg-white pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
           />
         </div>

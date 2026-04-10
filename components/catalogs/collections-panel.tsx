@@ -101,7 +101,7 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
             Collections
           </h1>
           <p className="text-sm text-muted-foreground">
-            Organisez vos produits par collections thematiques
+            Organisez vos produits par collections thématiques
           </p>
         </div>
         <button
@@ -121,7 +121,7 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nom de la collection..."
+              placeholder="Nom de la collection…"
               className="flex-1 text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') createCollection();
@@ -156,7 +156,7 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
               disabled={!newName.trim()}
               className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-40 transition-all"
             >
-              Creer
+              Créer
             </button>
           </div>
         </div>
@@ -169,14 +169,14 @@ export function CollectionsPanel({ collections, onBack, onRefresh }: Props) {
           </div>
           <h3 className="text-lg font-semibold text-foreground">Aucune collection</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Les collections vous permettent d&apos;organiser vos produits par theme (ex: Salles de bain, Cuisines, Chauffage...).
+            Les collections vous permettent d&apos;organiser vos produits par thème (ex : Salles de bain, Cuisines, Chauffage…).
           </p>
           <button
             onClick={() => setShowNew(true)}
             className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all mt-6"
           >
             <Plus className="h-4 w-4" />
-            Creer une collection
+            Créer une collection
           </button>
         </div>
       ) : (

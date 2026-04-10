@@ -337,7 +337,7 @@ export function DocumentTemplateSettings() {
               <Textarea
                 className="mt-1.5 resize-none"
                 rows={3}
-                placeholder="Conditions générales, validité, tribunal compétent..."
+                placeholder="Conditions générales, validité, tribunal compétent…"
                 value={config.mentions_legales}
                 onChange={e => updateConfig('mentions_legales', e.target.value)}
               />

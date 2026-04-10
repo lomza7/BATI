@@ -63,7 +63,7 @@ function LoginContent() {
     }
 
     if (!data.session) {
-      setError('Connexion reussie, mais la session n a pas pu etre ouverte. Reessayez.');
+      setError('Connexion réussie, mais la session n\'a pas pu être ouverte. Réessayez.');
       setLoading(false);
       return;
     }
@@ -71,7 +71,7 @@ function LoginContent() {
     const { data: sessionState } = await supabase.auth.getSession();
 
     if (!sessionState.session) {
-      setError('La session utilisateur n est pas encore disponible. Reessayez.');
+      setError('La session utilisateur n\'est pas encore disponible. Réessayez.');
       setLoading(false);
       return;
     }
@@ -123,12 +123,12 @@ function LoginContent() {
           </div>
           <div className="space-y-6">
             <blockquote className="text-2xl font-serif italic text-white/90 leading-relaxed">
-              &ldquo;Hellobat a transformé notre facon de gèrer nos chantiers.
+              &ldquo;Hellobat a transformé notre façon de gérer nos chantiers.
               On gagne un temps fou sur la facturation.&rdquo;
             </blockquote>
             <div>
               <p className="text-white/80 font-medium">Marc Lefebvre</p>
-              <p className="text-white/50 text-sm">Plombier chauffagiste a Lyon</p>
+              <p className="text-white/50 text-sm">Plombier chauffagiste à Lyon</p>
             </div>
           </div>
           <p className="text-white/30 text-xs">
@@ -156,13 +156,13 @@ function LoginContent() {
               Content de vous revoir
             </h1>
             <p className="text-muted-foreground">
-              Connectez-vous pour accèder a votre espace
+              Connectez-vous pour accéder à votre espace
             </p>
           </div>
 
           {teamInvite && (
             <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Vous avez ete invite a rejoindre un espace equipe Hellobat. Connectez-vous avec cet email ou utilisez le magic link si vous avez deja un acces.
+              Vous avez été invité à rejoindre un espace équipe Hellobat. Connectez-vous avec cet email ou utilisez le magic link si vous avez déjà un accès.
             </div>
           )}
 
@@ -198,7 +198,7 @@ function LoginContent() {
                   href="/forgot-password"
                   className="text-xs text-primary hover:text-primary/80 transition-colors"
                 >
-                  Mot de passe oublie ?
+                  Mot de passe oublié ?
                 </Link>
               </div>
               <div className="relative">
@@ -240,7 +240,7 @@ function LoginContent() {
             </button>
           </form>
 
-          {/* Separateur */}
+          {/* Séparateur */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-border" />
             <span className="text-xs text-muted-foreground/60">ou</span>
@@ -256,7 +256,7 @@ function LoginContent() {
             {magicLinkSent ? (
               <>
                 <Check className="h-4 w-4 text-emerald-500" />
-                Lien envoye ! Verifiez votre boite mail
+                Lien envoyé ! Vérifiez votre boîte mail
               </>
             ) : magicLinkSending ? (
               <>

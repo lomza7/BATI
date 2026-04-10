@@ -118,10 +118,10 @@ export function ImageUpload({ value, onChange, aspectRatio = 'aspect-[4/3]' }: P
             </div>
             <div className="text-center">
               <p className="text-xs font-medium text-muted-foreground">
-                {dragOver ? 'Deposez ici' : 'Glissez une image ou cliquez'}
+                {dragOver ? 'Déposez ici' : 'Glissez une image ou cliquez'}
               </p>
               <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                JPG, PNG, WebP - 10 Mo max
+                JPG, PNG, WebP — 10 Mo max
               </p>
             </div>
           </>

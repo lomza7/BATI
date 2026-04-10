@@ -133,7 +133,7 @@ export default function CataloguesPage() {
             Catalogues
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Creez des catalogues produits et envoyez-les a vos clients
+            Créez des catalogues produits et envoyez-les à vos clients
           </p>
         </div>
         <div className="flex gap-2">
@@ -168,7 +168,7 @@ export default function CataloguesPage() {
           </div>
           <h3 className="text-lg font-semibold text-foreground">Aucun catalogue</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Commencez par creer des collections de produits, puis assemblez-les en catalogues personnalises pour vos clients.
+            Commencez par créer des collections de produits, puis assemblez-les en catalogues personnalisés pour vos clients.
           </p>
           <div className="flex gap-3 mt-6">
             <button
@@ -176,14 +176,14 @@ export default function CataloguesPage() {
               className="h-10 px-5 rounded-lg border border-border bg-white text-sm font-medium text-foreground flex items-center gap-2 hover:bg-muted/50 transition-all"
             >
               <Layers className="h-4 w-4" />
-              Creer des collections
+              Créer des collections
             </button>
             <button
               onClick={() => setShowNewDialog(true)}
               className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
             >
               <Plus className="h-4 w-4" />
-              Creer un catalogue
+              Créer un catalogue
             </button>
           </div>
         </div>
@@ -197,7 +197,7 @@ export default function CataloguesPage() {
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Nom du catalogue..."
+                  placeholder="Nom du catalogue…"
                   className="flex-1 text-base font-semibold text-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') createCatalog();
@@ -208,7 +208,7 @@ export default function CataloguesPage() {
               <textarea
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Description (optionnel)..."
+                placeholder="Description (optionnel)…"
                 rows={2}
                 className="w-full mt-2 text-sm text-muted-foreground bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
               />
@@ -224,7 +224,7 @@ export default function CataloguesPage() {
                   disabled={!newName.trim()}
                   className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-40 transition-all"
                 >
-                  Creer
+                  Créer
                 </button>
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function CataloguesPage() {
                   <span className={`h-1.5 w-1.5 rounded-full ${
                     catalog.status === 'published' ? 'bg-emerald-500' : 'bg-slate-400'
                   }`} />
-                  {catalog.status === 'published' ? 'Publie' : 'Brouillon'}
+                  {catalog.status === 'published' ? 'Publié' : 'Brouillon'}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {formatDate(catalog.created_at)}

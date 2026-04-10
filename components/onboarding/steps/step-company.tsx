@@ -221,7 +221,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onFocus={() => results.length > 0 && setShowDropdown(true)}
-              placeholder="Ex: Martin Plomberie, SIREN, ou nom du dirigeant..."
+              placeholder="Ex : Martin Plomberie, SIREN, ou nom du dirigeant…"
               autoFocus
               className="flex h-11 w-full rounded-xl border border-border bg-muted/30 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
             />
@@ -315,7 +315,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
                 type="text"
                 value={data.companyName}
                 onChange={(e) => onChange({ companyName: e.target.value })}
-                placeholder="Ou saisissez manuellement..."
+                placeholder="Ou saisissez manuellement…"
                 className="flex h-11 w-full rounded-xl border border-border bg-muted/30 px-4 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
               />
             </div>

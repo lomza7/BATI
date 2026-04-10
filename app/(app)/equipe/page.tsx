@@ -261,7 +261,7 @@ export default function EquipePage() {
     if (!user) return;
     const { error } = await supabase.from('team_notes').insert({ user_id: user.id, team_member_id: selectedId, content: newNote.trim() });
     if (error) {
-      alert(`Impossible d'ajouter la note. Executez la migration SQL dans Supabase.\n\nErreur: ${error.message}`);
+      alert(`Impossible d'ajouter la note. Exécutez la migration SQL dans Supabase.\n\nErreur : ${error.message}`);
       return;
     }
     setNewNote('');
@@ -337,7 +337,7 @@ export default function EquipePage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <PageHeader title="Equipe & Sous-traitants" description="Gerez votre equipe, suivez les heures et les couts">
+      <PageHeader title="Équipe & Sous-traitants" description="Gérez votre équipe, suivez les heures et les coûts">
         <Button onClick={() => { setForm(emptyForm); setEditingId(null); setShowCreate(true); }} className="gap-2">
           <Plus className="h-4 w-4" /> Ajouter
         </Button>
@@ -351,7 +351,7 @@ export default function EquipePage() {
           </div>
           <p className="mt-2 text-2xl font-semibold">{members.filter(m => m.status === 'actif').length}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {members.filter(m => m.type === 'salarie' && m.status === 'actif').length} salaries,{' '}
+            {members.filter(m => m.type === 'salarie' && m.status === 'actif').length} salariés,{' '}
             {members.filter(m => m.type === 'sous_traitant' && m.status === 'actif').length} sous-traitants
           </p>
         </div>
@@ -364,17 +364,17 @@ export default function EquipePage() {
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <TrendingUp className="h-4 w-4" /> Cout horaire moyen
+            <TrendingUp className="h-4 w-4" /> Coût horaire moyen
           </div>
           <p className="mt-2 text-2xl font-semibold">{formatCurrency(avgHourlyRate)}</p>
-          <p className="text-xs text-muted-foreground mt-1">/heure (salaries)</p>
+          <p className="text-xs text-muted-foreground mt-1">/heure (salariés)</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <HardHat className="h-4 w-4" /> Specialites
+            <HardHat className="h-4 w-4" /> Spécialités
           </div>
           <p className="mt-2 text-2xl font-semibold">{new Set(members.filter(m => m.specialty).map(m => m.specialty)).size}</p>
-          <p className="text-xs text-muted-foreground mt-1">metiers couverts</p>
+          <p className="text-xs text-muted-foreground mt-1">métiers couverts</p>
         </div>
       </div>
 
@@ -382,7 +382,7 @@ export default function EquipePage() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant={filterStatus === 'actif' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('actif')}>Actifs</Button>
@@ -404,7 +404,7 @@ export default function EquipePage() {
           {[1,2,3,4].map(i => <div key={i} className="h-36 animate-pulse rounded-xl bg-muted" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} title="Aucun membre" description="Ajoutez votre premier membre d'equipe ou sous-traitant.">
+        <EmptyState icon={Users} title="Aucun membre" description="Ajoutez votre premier membre d&apos;équipe ou sous-traitant.">
           <Button onClick={() => { setForm(emptyForm); setShowCreate(true); }} className="gap-2"><Plus className="h-4 w-4" /> Ajouter</Button>
         </EmptyState>
       ) : (
@@ -440,7 +440,7 @@ export default function EquipePage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleStatus(m.id, m.status); }}>
                               {m.status === 'actif' ? <UserX className="h-3.5 w-3.5 mr-2" /> : <UserCheck className="h-3.5 w-3.5 mr-2" />}
-                              {m.status === 'actif' ? 'Desactiver' : 'Reactiver'}
+                              {m.status === 'actif' ? 'Désactiver' : 'Réactiver'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); setShowDelete(m.id); }}>
@@ -467,7 +467,7 @@ export default function EquipePage() {
               <div className="h-full flex items-center justify-center rounded-xl border border-dashed border-border bg-card p-8">
                 <div className="text-center text-muted-foreground">
                   <Users className="h-10 w-10 mx-auto" />
-                  <p className="mt-3 text-sm">Selectionnez un membre pour voir ses details</p>
+                  <p className="mt-3 text-sm">Sélectionnez un membre pour voir ses détails</p>
                 </div>
               </div>
             ) : (
@@ -509,11 +509,11 @@ export default function EquipePage() {
                       </>
                     )}
                     <div className="rounded-lg bg-muted/50 p-3">
-                      <p className="text-xs text-muted-foreground">Cout horaire</p>
+                      <p className="text-xs text-muted-foreground">Coût horaire</p>
                       <p className="text-sm font-semibold mt-0.5">{formatCurrency(selectedCostPerHour)}/h</p>
                     </div>
                     <div className="rounded-lg bg-muted/50 p-3">
-                      <p className="text-xs text-muted-foreground">Heures pointees</p>
+                      <p className="text-xs text-muted-foreground">Heures pointées</p>
                       <p className="text-sm font-semibold mt-0.5">{totalHoursWorked}h</p>
                     </div>
                   </div>
@@ -531,7 +531,7 @@ export default function EquipePage() {
                   <TabsContent value="notes" className="mt-4 space-y-3">
                     <div className="flex gap-2">
                       <Textarea
-                        placeholder="Ajouter une note..."
+                        placeholder="Ajouter une note…"
                         value={newNote}
                         onChange={e => setNewNote(e.target.value)}
                         className="min-h-[60px] flex-1"
@@ -558,14 +558,14 @@ export default function EquipePage() {
                   {/* Heures tab */}
                   <TabsContent value="heures" className="mt-4 space-y-3">
                     <div className="flex justify-between items-center">
-                      <p className="text-sm font-medium">{totalHoursWorked}h pointees au total</p>
+                      <p className="text-sm font-medium">{totalHoursWorked}h pointées au total</p>
                       <Button size="sm" onClick={() => setShowAddHours(true)} className="gap-1.5">
                         <Plus className="h-3.5 w-3.5" /> Pointer des heures
                       </Button>
                     </div>
                     <div className="space-y-2 max-h-[300px] overflow-y-auto">
                       {assignments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-6">Aucune heure pointee</p>
+                        <p className="text-sm text-muted-foreground text-center py-6">Aucune heure pointée</p>
                       ) : assignments.map(a => (
                         <div key={a.id} className="rounded-lg border border-border p-3 flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -600,9 +600,9 @@ export default function EquipePage() {
                       return (
                         <>
                           <div>
-                            <h4 className="text-sm font-medium mb-3">Repartition par chantier</h4>
+                            <h4 className="text-sm font-medium mb-3">Répartition par chantier</h4>
                             {sorted.length === 0 ? (
-                              <p className="text-sm text-muted-foreground text-center py-4">Pas encore de donnees</p>
+                              <p className="text-sm text-muted-foreground text-center py-4">Pas encore de données</p>
                             ) : (
                               <div className="space-y-3">
                                 {sorted.map(p => (
@@ -619,22 +619,22 @@ export default function EquipePage() {
                           </div>
                           {selected.type === 'salarie' && selected.monthly_salary > 0 && (
                             <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-                              <h4 className="text-sm font-medium">Synthese salariale</h4>
+                              <h4 className="text-sm font-medium">Synthèse salariale</h4>
                               <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
                                   <p className="text-muted-foreground">Salaire annuel brut</p>
                                   <p className="font-semibold">{formatCurrency(selected.monthly_salary * 12)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">Cout horaire</p>
+                                  <p className="text-muted-foreground">Coût horaire</p>
                                   <p className="font-semibold">{formatCurrency(selectedCostPerHour)}/h</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">Cout total pointe</p>
+                                  <p className="text-muted-foreground">Coût total pointé</p>
                                   <p className="font-semibold">{formatCurrency(totalHoursWorked * selectedCostPerHour)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-muted-foreground">Heures/an theoriques</p>
+                                  <p className="text-muted-foreground">Heures/an théoriques</p>
                                   <p className="font-semibold">{Math.round(selected.weekly_hours * 52)}h</p>
                                 </div>
                               </div>
@@ -703,13 +703,13 @@ export default function EquipePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Poste / Role</label>
-                <Input className="mt-1" placeholder="Chef d'equipe" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} />
+                <label className="text-sm font-medium">Poste / Rôle</label>
+                <Input className="mt-1" placeholder="Chef d&apos;équipe" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Specialite</label>
+                <label className="text-sm font-medium">Spécialité</label>
                 <Select value={form.specialty} onValueChange={v => setForm({ ...form, specialty: v })}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Choisir…" /></SelectTrigger>
                   <SelectContent>
                     {SPECIALTIES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
@@ -718,7 +718,7 @@ export default function EquipePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Telephone</label>
+                <label className="text-sm font-medium">Téléphone</label>
                 <Input className="mt-1" placeholder="06 12 34 56 78" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
               </div>
               <div>
@@ -756,7 +756,7 @@ export default function EquipePage() {
             </div>
 
             <div className="border-t border-border pt-4">
-              <p className="text-sm font-medium mb-3">{form.type === 'sous_traitant' ? 'Tarification' : 'Remuneration'}</p>
+              <p className="text-sm font-medium mb-3">{form.type === 'sous_traitant' ? 'Tarification' : 'Rémunération'}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {(form.type === 'salarie' || form.type === 'interimaire') && (
                   <>
@@ -775,7 +775,7 @@ export default function EquipePage() {
                           ? `${(form.monthly_salary / (form.weekly_hours * 4.33)).toFixed(2)} €/h`
                           : '—'}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Calcule automatiquement</p>
+                      <p className="text-xs text-muted-foreground mt-1">Calculé automatiquement</p>
                     </div>
                   </>
                 )}
@@ -790,7 +790,7 @@ export default function EquipePage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium">Date debut</label>
+                <label className="text-sm font-medium">Date début</label>
                 <Input className="mt-1" type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
               </div>
               <div>
@@ -816,7 +816,7 @@ export default function EquipePage() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Supprimer ce membre ?</DialogTitle>
-            <DialogDescription>Cette action est irreversible. Toutes les notes et heures pointees seront supprimees.</DialogDescription>
+            <DialogDescription>Cette action est irréversible. Toutes les notes et heures pointées seront supprimées.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setShowDelete(null)}>Annuler</Button>
@@ -836,7 +836,7 @@ export default function EquipePage() {
             <div>
               <label className="text-sm font-medium">Chantier *</label>
               <Select value={hoursForm.project_id} onValueChange={v => setHoursForm({ ...hoursForm, project_id: v })}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Choisir un chantier..." /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Choisir un chantier…" /></SelectTrigger>
                 <SelectContent>
                   {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
@@ -854,7 +854,7 @@ export default function EquipePage() {
             </div>
             <div>
               <label className="text-sm font-medium">Description</label>
-              <Input className="mt-1" placeholder="Travail effectue..." value={hoursForm.description} onChange={e => setHoursForm({ ...hoursForm, description: e.target.value })} />
+              <Input className="mt-1" placeholder="Travail effectué…" value={hoursForm.description} onChange={e => setHoursForm({ ...hoursForm, description: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAddHours(false)}>Annuler</Button>

@@ -35,7 +35,7 @@ export default function VerifyEmailPage() {
         if (!opts.manual && res.status === 429) {
           // Silent on auto-send when throttled
         } else {
-          setError(data.error || 'Impossible d envoyer le code.');
+          setError(data.error || 'Impossible d\'envoyer le code.');
         }
         return;
       }
@@ -49,7 +49,7 @@ export default function VerifyEmailPage() {
       }
       setCooldown(30);
     } catch {
-      setError('Erreur reseau. Reessayez.');
+      setError('Erreur réseau. Réessayez.');
     } finally {
       setSending(false);
     }
@@ -152,7 +152,7 @@ export default function VerifyEmailPage() {
       // and the app layout guard sees email_verified = true.
       window.location.href = '/dashboard';
     } catch {
-      setError('Erreur reseau. Reessayez.');
+      setError('Erreur réseau. Réessayez.');
     } finally {
       setSubmitting(false);
     }
@@ -173,10 +173,10 @@ export default function VerifyEmailPage() {
         </div>
 
         <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-          Verifiez votre email
+          Vérifiez votre email
         </h1>
         <p className="text-muted-foreground text-sm leading-relaxed mb-1">
-          Nous avons envoye un code a 6 chiffres a
+          Nous avons envoyé un code à 6 chiffres à
         </p>
         {user?.email && (
           <p className="text-foreground font-medium mb-7">{user.email}</p>
@@ -218,7 +218,7 @@ export default function VerifyEmailPage() {
 
         {submitting && (
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
-            <Loader2 className="h-4 w-4 animate-spin" /> Verification...
+            <Loader2 className="h-4 w-4 animate-spin" /> Vérification...
           </div>
         )}
 
@@ -229,9 +229,9 @@ export default function VerifyEmailPage() {
         <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 mb-5 flex items-start gap-2.5 text-left">
           <Mail className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium">Vous n&apos;avez pas recu le code&nbsp;?</p>
+            <p className="font-medium">Vous n&apos;avez pas reçu le code&nbsp;?</p>
             <p className="text-amber-800/90 text-xs mt-0.5">
-              Regardez dans vos spams ou courriers indesirables. Sinon, cliquez sur &laquo;&nbsp;Renvoyer le code&nbsp;&raquo; ci-dessous.
+              Regardez dans vos spams ou courriers indésirables. Sinon, cliquez sur &laquo;&nbsp;Renvoyer le code&nbsp;&raquo; ci-dessous.
             </p>
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function VerifyEmailPage() {
           {sent ? (
             <>
               <Check className="h-4 w-4 text-emerald-500" />
-              Code renvoye !
+              Code renvoyé !
             </>
           ) : sending ? (
             <>
@@ -272,7 +272,7 @@ export default function VerifyEmailPage() {
 
         <div className="mt-8 pt-6 border-t border-border">
           <Link href="/login" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            Deja verifie ? Connectez-vous
+            Déjà vérifié ? Connectez-vous
           </Link>
         </div>
       </div>

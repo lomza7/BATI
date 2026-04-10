@@ -215,7 +215,7 @@ export default function AdminAgentsSection() {
         loadAgents();
       }
     } catch {
-      setUploadError('Erreur reseau');
+      setUploadError('Erreur réseau');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -248,7 +248,7 @@ export default function AdminAgentsSection() {
         </div>
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-1" />
-          Creer un agent
+          Créer un agent
         </Button>
       </div>
 
@@ -258,7 +258,7 @@ export default function AdminAgentsSection() {
         </div>
       ) : agents.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">
-          Aucun agent plateforme. Creez-en un pour commencer.
+          Aucun agent plateforme. Créez-en un pour commencer.
         </p>
       ) : (
         <div className="space-y-2">
@@ -317,14 +317,14 @@ export default function AdminAgentsSection() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Modifier l\'agent' : 'Creer un agent'}</DialogTitle>
+            <DialogTitle>{editing ? 'Modifier l\'agent' : 'Créer un agent'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
             {/* Row: icon + name + slug */}
             <div className="flex gap-3">
               <div className="w-20">
-                <label className="text-sm font-medium text-muted-foreground">Icone</label>
+                <label className="text-sm font-medium text-muted-foreground">Icône</label>
                 <Input
                   value={formIcon}
                   onChange={e => setFormIcon(e.target.value)}
@@ -361,19 +361,19 @@ export default function AdminAgentsSection() {
               <Input
                 value={formDescription}
                 onChange={e => setFormDescription(e.target.value)}
-                placeholder="Specialiste des Documents Techniques Unifies..."
+                placeholder="Spécialiste des Documents Techniques Unifiés…"
               />
             </div>
 
             {/* System prompt */}
             <div>
               <label className="text-sm font-medium text-muted-foreground">
-                Prompt systeme
+                Prompt système
               </label>
               <Textarea
                 value={formPrompt}
                 onChange={e => setFormPrompt(e.target.value)}
-                placeholder="Tu es un expert en DTU (Documents Techniques Unifies). Tu connais toutes les normes de construction francaises..."
+                placeholder="Tu es un expert en DTU (Documents Techniques Unifiés). Tu connais toutes les normes de construction françaises…"
                 className="min-h-[160px] font-mono text-sm"
               />
             </div>
@@ -421,7 +421,7 @@ export default function AdminAgentsSection() {
                       ) : (
                         <Upload className="h-4 w-4 mr-1" />
                       )}
-                      {uploading ? 'Extraction...' : 'Ajouter un PDF'}
+                      {uploading ? 'Extraction…' : 'Ajouter un PDF'}
                     </Button>
                   </div>
                 </div>
@@ -473,13 +473,13 @@ export default function AdminAgentsSection() {
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-1" />
                 ) : null}
-                {editing ? 'Enregistrer' : 'Creer'}
+                {editing ? 'Enregistrer' : 'Créer'}
               </Button>
             </div>
 
             {!editing && (
               <p className="text-xs text-muted-foreground">
-                Vous pourrez ajouter des documents PDF apres la creation de l&apos;agent.
+                Vous pourrez ajouter des documents PDF après la création de l&apos;agent.
               </p>
             )}
           </div>

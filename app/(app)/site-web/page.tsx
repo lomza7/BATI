@@ -31,7 +31,7 @@ const STEPS = [
   { id: 1, label: 'Informations', icon: Type },
   { id: 2, label: 'Design', icon: Palette },
   { id: 3, label: 'Sections', icon: Image },
-  { id: 4, label: 'Apercu', icon: Eye },
+  { id: 4, label: 'Aperçu', icon: Eye },
 ];
 
 const CERTIFICATIONS = [
@@ -84,10 +84,10 @@ export default function SiteWebPage() {
   const [heroImages, setHeroImages] = useState<string[]>(['', '', '']);
   const [legalText, setLegalText] = useState('');
 
-  // Telephone affiche sur le site public (a cote du bouton devis)
+  // Téléphone affiché sur le site public (à côté du bouton devis)
   const [publicPhone, setPublicPhone] = useState('');
 
-  // Adresse publique du site (slug) + controle de disponibilite
+  // Adresse publique du site (slug) + contrôle de disponibilité
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
@@ -128,9 +128,9 @@ export default function SiteWebPage() {
         phone: profileRes.data.company_phone || '',
       }));
       if (profileRes.data.logo_url) setLogoUrl(profileRes.data.logo_url);
-      // Par defaut, le telephone public affiche le telephone de l'entreprise
+      // Par défaut, le téléphone public affiche le téléphone de l'entreprise
       setPublicPhone(profileRes.data.company_phone || '');
-      // Slug par defaut genere a partir du nom + ville
+      // Slug par défaut généré à partir du nom + ville
       const defaultSlug = generateSlug(
         profileRes.data.company_name || '',
         profileRes.data.company_city || null,
@@ -150,7 +150,7 @@ export default function SiteWebPage() {
       setShowMap(site.show_map ?? true);
       if (site.hero_image_url) setHeroImageUrl(site.hero_image_url);
       if (site.hero_layout) setHeroLayout(site.hero_layout);
-      // On s'assure d'avoir toujours 3 slots pour l'edition
+      // On s'assure d'avoir toujours 3 slots pour l'édition
       const imgs = Array.isArray(site.hero_images) ? site.hero_images.slice(0, 3) : [];
       // Compat : si hero_images est vide mais qu'il y a une hero_image_url legacy,
       // on l'injecte en premier slot pour ne pas perdre l'image existante.
@@ -218,7 +218,7 @@ export default function SiteWebPage() {
     setError('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Session expiree');
+      if (!session?.access_token) throw new Error('Session expirée');
 
       const { data: services } = await supabase
         .from('services')
@@ -262,13 +262,13 @@ export default function SiteWebPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Erreur de generation');
+        throw new Error(err.error || 'Erreur de génération');
       }
 
       const data = await res.json();
       setSiteContent(data.site_content);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de generation');
+      setError(err instanceof Error ? err.message : 'Erreur de génération');
     } finally {
       setGenerating(false);
     }
@@ -288,7 +288,7 @@ export default function SiteWebPage() {
       return;
     }
     if (slugStatus === 'checking') {
-      setError('Verification de l\u2019adresse en cours, merci de patienter un instant');
+      setError('Vérification de l\u2019adresse en cours, merci de patienter un instant');
       return;
     }
 
@@ -415,7 +415,7 @@ export default function SiteWebPage() {
     if (!siteContent) return;
     setSiteContent({
       ...siteContent,
-      faq: [...(siteContent.faq || []), { question: 'Nouvelle question', answer: 'Reponse...' }],
+      faq: [...(siteContent.faq || []), { question: 'Nouvelle question', answer: 'Réponse…' }],
     });
   }
   function removeFaq(index: number) {
@@ -442,7 +442,7 @@ export default function SiteWebPage() {
   if (loadingProfile) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Site web IA" description="Generez automatiquement un site vitrine professionnel" />
+        <PageHeader title="Site web IA" description="Générez automatiquement un site vitrine professionnel" />
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 rounded-full border-2 border-muted animate-spin border-t-primary" />
         </div>
@@ -452,12 +452,12 @@ export default function SiteWebPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Site web IA" description="Generez automatiquement un site vitrine professionnel">
+      <PageHeader title="Site web IA" description="Générez automatiquement un site vitrine professionnel">
         {published && siteUrl && (
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleCopyUrl} className="gap-2">
               {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Copie !' : 'Copier le lien'}
+              {copied ? 'Copié !' : 'Copier le lien'}
             </Button>
             <Button size="sm" asChild className="gap-2">
               <a href={siteUrl} target="_blank" rel="noopener noreferrer">
@@ -511,34 +511,34 @@ export default function SiteWebPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className="text-sm font-medium">Nom de l&apos;entreprise *</label>
-                <Input className="mt-1" placeholder="Ex: Dupont Plomberie" value={profile.company} onChange={e => setProfile({ ...profile, company: e.target.value })} />
+                <Input className="mt-1" placeholder="Ex : Dupont Plomberie" value={profile.company} onChange={e => setProfile({ ...profile, company: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Activite principale *</label>
-                <Input className="mt-1" placeholder="Ex: Plombier chauffagiste" value={profile.activity} onChange={e => setProfile({ ...profile, activity: e.target.value })} />
+                <label className="text-sm font-medium">Activité principale *</label>
+                <Input className="mt-1" placeholder="Ex : Plombier chauffagiste" value={profile.activity} onChange={e => setProfile({ ...profile, activity: e.target.value })} />
               </div>
               <div>
                 <label className="text-sm font-medium">Ville</label>
-                <Input className="mt-1" placeholder="Ex: Lyon" value={profile.city} onChange={e => setProfile({ ...profile, city: e.target.value })} />
+                <Input className="mt-1" placeholder="Ex : Lyon" value={profile.city} onChange={e => setProfile({ ...profile, city: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Telephone</label>
-                <Input className="mt-1" placeholder="06 ..." value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} />
+                <label className="text-sm font-medium">Téléphone</label>
+                <Input className="mt-1" placeholder="06 …" value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Annees d&apos;experience</label>
-                <Input className="mt-1" placeholder="Ex: 15" value={profile.years_experience} onChange={e => setProfile({ ...profile, years_experience: e.target.value })} />
+                <label className="text-sm font-medium">Années d&apos;expérience</label>
+                <Input className="mt-1" placeholder="Ex : 15" value={profile.years_experience} onChange={e => setProfile({ ...profile, years_experience: e.target.value })} />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-sm font-medium">Telephone affiche sur le site public</label>
+                <label className="text-sm font-medium">Téléphone affiché sur le site public</label>
                 <Input
                   className="mt-1"
-                  placeholder="Ex: 04 78 12 34 56"
+                  placeholder="Ex : 04 78 12 34 56"
                   value={publicPhone}
                   onChange={e => setPublicPhone(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ce numero apparait a cote du bouton &laquo;&nbsp;Demander un devis gratuit&nbsp;&raquo; sur votre site. Vous pouvez le modifier a tout moment.
+                  Ce numéro apparaît à côté du bouton &laquo;&nbsp;Demander un devis gratuit&nbsp;&raquo; sur votre site. Vous pouvez le modifier à tout moment.
                 </p>
               </div>
 
@@ -564,7 +564,7 @@ export default function SiteWebPage() {
                     value={slug}
                     onChange={e => {
                       setSlugTouched(true);
-                      // Normalise la saisie en direct pour eviter les caracteres invalides
+                      // Normalise la saisie en direct pour éviter les caractères invalides
                       setSlug(slugify(e.target.value, 60));
                     }}
                     maxLength={60}
@@ -606,7 +606,7 @@ export default function SiteWebPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Slogan / phrase d&apos;accroche</label>
-              <Input className="mt-1" placeholder="Ex: Votre confort, notre priorite" value={profile.slogan} onChange={e => setProfile({ ...profile, slogan: e.target.value })} />
+              <Input className="mt-1" placeholder="Ex : Votre confort, notre priorité" value={profile.slogan} onChange={e => setProfile({ ...profile, slogan: e.target.value })} />
             </div>
           </div>
 
@@ -614,27 +614,27 @@ export default function SiteWebPage() {
           <div className="rounded-xl border border-border bg-card p-6 sm:p-8 space-y-5">
             <h2 className="font-semibold text-foreground">Pour un site encore meilleur</h2>
             <div>
-              <label className="text-sm font-medium">Decrivez votre entreprise en quelques phrases</label>
+              <label className="text-sm font-medium">Décrivez votre entreprise en quelques phrases</label>
               <Textarea
                 className="mt-1 min-h-[80px]"
-                placeholder="Ex: Entreprise familiale creee en 2008, specialisee dans la renovation energetique. Nous intervenons sur Lyon et sa region pour tous vos travaux de plomberie et chauffage..."
+                placeholder="Ex : Entreprise familiale créée en 2008, spécialisée dans la rénovation énergétique. Nous intervenons sur Lyon et sa région pour tous vos travaux de plomberie et chauffage…"
                 value={profile.description}
                 onChange={e => setProfile({ ...profile, description: e.target.value })}
               />
             </div>
             <div>
               <label className="text-sm font-medium">Zone d&apos;intervention</label>
-              <Input className="mt-1" placeholder="Ex: Lyon et sa metropole, Villeurbanne, Bron, Venissieux..." value={profile.zone} onChange={e => setProfile({ ...profile, zone: e.target.value })} />
+              <Input className="mt-1" placeholder="Ex : Lyon et sa métropole, Villeurbanne, Bron, Vénissieux…" value={profile.zone} onChange={e => setProfile({ ...profile, zone: e.target.value })} />
             </div>
             <div>
               <label className="text-sm font-medium">Vos clients cibles</label>
-              <Input className="mt-1" placeholder="Ex: Particuliers, syndics de copropriete, commerces..." value={profile.target_clients} onChange={e => setProfile({ ...profile, target_clients: e.target.value })} />
+              <Input className="mt-1" placeholder="Ex : Particuliers, syndics de copropriété, commerces…" value={profile.target_clients} onChange={e => setProfile({ ...profile, target_clients: e.target.value })} />
             </div>
             <div>
-              <label className="text-sm font-medium">Vos valeurs / ce qui vous differencie</label>
+              <label className="text-sm font-medium">Vos valeurs / ce qui vous différencie</label>
               <Textarea
                 className="mt-1 min-h-[60px]"
-                placeholder="Ex: Ponctualite, proprete du chantier, devis gratuit sous 24h, travail soigne..."
+                placeholder="Ex : Ponctualité, propreté du chantier, devis gratuit sous 24h, travail soigné…"
                 value={profile.values}
                 onChange={e => setProfile({ ...profile, values: e.target.value })}
               />
@@ -644,7 +644,7 @@ export default function SiteWebPage() {
           {/* Certifications */}
           <div className="rounded-xl border border-border bg-card p-6 sm:p-8 space-y-4">
             <h2 className="font-semibold text-foreground">Certifications et labels</h2>
-            <p className="text-sm text-muted-foreground">Selectionnez ceux que vous possedez</p>
+            <p className="text-sm text-muted-foreground">Sélectionnez ceux que vous possédez</p>
             <div className="flex flex-wrap gap-2">
               {CERTIFICATIONS.map(cert => (
                 <button
@@ -689,7 +689,7 @@ export default function SiteWebPage() {
             />
 
             <p className="text-xs text-muted-foreground">
-              Vous pourrez modifier ces images a tout moment apres publication.
+              Vous pourrez modifier ces images à tout moment après publication.
             </p>
           </div>
 
@@ -708,7 +708,7 @@ export default function SiteWebPage() {
             </div>
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">Choisissez le style de votre site</h2>
             <p className="text-sm text-muted-foreground max-w-lg mx-auto">
-              Quatre styles pensés pour les artisans. Cliquez sur <span className="font-medium text-foreground">Visualiser en grand</span> pour voir un apercu complet de chaque theme avec un contenu d&apos;exemple.
+              Quatre styles pensés pour les artisans. Cliquez sur <span className="font-medium text-foreground">Visualiser en grand</span> pour voir un aperçu complet de chaque thème avec un contenu d&apos;exemple.
             </p>
           </div>
 
@@ -717,9 +717,9 @@ export default function SiteWebPage() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
               <Lock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-semibold text-amber-900">Theme verrouille</p>
+                <p className="font-semibold text-amber-900">Thème verrouillé</p>
                 <p className="text-amber-800 mt-0.5">
-                  Votre site est deja publie. Le theme ne peut plus etre modifie pour preserver l&apos;identite visuelle de votre site.
+                  Votre site est déjà publié. Le thème ne peut plus être modifié pour préserver l&apos;identité visuelle de votre site.
                 </p>
               </div>
             </div>
@@ -727,9 +727,9 @@ export default function SiteWebPage() {
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
               <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-semibold text-blue-900">Choix definitif</p>
+                <p className="font-semibold text-blue-900">Choix définitif</p>
                 <p className="text-blue-800 mt-0.5">
-                  Le theme ne pourra plus etre change apres la publication de votre site. Prenez le temps de le visualiser avant de valider.
+                  Le thème ne pourra plus être changé après la publication de votre site. Prenez le temps de le visualiser avant de valider.
                 </p>
               </div>
             </div>
@@ -776,7 +776,7 @@ export default function SiteWebPage() {
           <div>
             <h2 className="font-semibold text-foreground">Sections du site</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Activez ou desactivez chaque section. Le contenu reste vivant et se met a jour automatiquement avec votre activite sur Hellobat.
+              Activez ou désactivez chaque section. Le contenu reste vivant et se met à jour automatiquement avec votre activité sur Hellobat.
             </p>
           </div>
 
@@ -785,50 +785,50 @@ export default function SiteWebPage() {
               label: 'Accueil & Hero',
               enabled: true,
               toggle: null,
-              description: 'La premiere section vue par vos visiteurs avec votre photo d\u2019accroche, votre slogan et le bouton "Demander un devis gratuit".',
+              description: 'La première section vue par vos visiteurs avec votre photo d\u2019accroche, votre slogan et le bouton "Demander un devis gratuit".',
             },
             {
-              label: 'A propos',
+              label: 'À propos',
               enabled: true,
               toggle: null,
-              description: 'Votre histoire, vos valeurs et vos chiffres cles (annees d\u2019experience, clients satisfaits, note Google...). Editable dans l\u2019etape 4.',
+              description: 'Votre histoire, vos valeurs et vos chiffres clés (années d\u2019expérience, clients satisfaits, note Google…). Éditable dans l\u2019étape 4.',
             },
             {
               label: 'Nos services',
               enabled: showServices,
               toggle: () => setShowServices(!showServices),
-              description: 'Les prestations que vous ajoutez dans l\u2019onglet "Mes prestations" apparaissent automatiquement ici. Vous pouvez aussi les editer dans l\u2019etape 4.',
+              description: 'Les prestations que vous ajoutez dans l\u2019onglet "Mes prestations" apparaissent automatiquement ici. Vous pouvez aussi les éditer dans l\u2019étape 4.',
             },
             {
-              label: 'Realisations',
+              label: 'Réalisations',
               enabled: showProjects,
               toggle: () => setShowProjects(!showProjects),
-              description: 'Des qu\u2019un chantier est marque comme termine et publie depuis l\u2019onglet Chantiers (bouton "Publier sur mon site"), il apparait automatiquement ici avec ses photos.',
+              description: 'Dès qu\u2019un chantier est marqué comme terminé et publié depuis l\u2019onglet Chantiers (bouton "Publier sur mon site"), il apparaît automatiquement ici avec ses photos.',
             },
             {
               label: 'Carte des chantiers',
               enabled: showMap,
               toggle: () => setShowMap(!showMap),
               icon: MapPin,
-              description: 'Une carte interactive qui affiche l\u2019emplacement de tous les chantiers publies. Vous choisissez chantier par chantier lesquels sont publics ou prives depuis l\u2019onglet Chantiers.',
+              description: 'Une carte interactive qui affiche l\u2019emplacement de tous les chantiers publiés. Vous choisissez chantier par chantier lesquels sont publics ou privés depuis l\u2019onglet Chantiers.',
             },
             {
-              label: 'Temoignages',
+              label: 'Témoignages',
               enabled: showReviews,
               toggle: () => setShowReviews(!showReviews),
-              description: 'Les avis clients publies depuis l\u2019onglet Avis Google s\u2019affichent ici. Vous pouvez aussi ajouter le lien vers votre fiche Google My Business pour recevoir de nouveaux avis.',
+              description: 'Les avis clients publiés depuis l\u2019onglet Avis Google s\u2019affichent ici. Vous pouvez aussi ajouter le lien vers votre fiche Google My Business pour recevoir de nouveaux avis.',
             },
             {
               label: 'FAQ',
               enabled: true,
               toggle: null,
-              description: 'Les questions frequentes generees par l\u2019IA a partir de votre activite. Editable dans l\u2019etape 4.',
+              description: 'Les questions fréquentes générées par l\u2019IA à partir de votre activité. Éditable dans l\u2019étape 4.',
             },
             {
               label: 'Contact',
               enabled: showContact,
               toggle: () => setShowContact(!showContact),
-              description: 'Quand un visiteur remplit le formulaire "Demander un devis", vous recevez un email, un lead CRM est cree, un devis en brouillon est genere, une fiche client est ajoutee et une tache apparait dans votre liste. Plus rien ne se perd.',
+              description: 'Quand un visiteur remplit le formulaire "Demander un devis", vous recevez un email, un lead CRM est créé, un devis en brouillon est généré, une fiche client est ajoutée et une tâche apparaît dans votre liste. Plus rien ne se perd.',
             },
           ].map((section) => (
             <div key={section.label} className="rounded-lg border border-border p-4">
@@ -850,7 +850,7 @@ export default function SiteWebPage() {
                   <button
                     onClick={section.toggle}
                     className={cn('relative h-6 w-11 rounded-full transition-colors shrink-0 mt-0.5', section.enabled ? 'bg-primary' : 'bg-muted')}
-                    aria-label={`Activer ou desactiver ${section.label}`}
+                    aria-label={`Activer ou désactiver ${section.label}`}
                   >
                     <span className={cn('absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform', section.enabled && 'translate-x-5')} />
                   </button>
@@ -862,7 +862,7 @@ export default function SiteWebPage() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStep(2)}>Retour</Button>
             <Button className="flex-1" onClick={() => { setStep(4); handleGenerate(); }} disabled={generating}>
-              <Sparkles className="mr-2 h-4 w-4" /> Generer le site
+              <Sparkles className="mr-2 h-4 w-4" /> Générer le site
             </Button>
           </div>
         </div>
@@ -877,8 +877,8 @@ export default function SiteWebPage() {
                 <div className="h-16 w-16 rounded-full border-4 border-muted animate-spin border-t-primary" />
                 <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-primary" />
               </div>
-              <p className="mt-6 font-semibold text-foreground">Generation en cours...</p>
-              <p className="mt-1 text-sm text-muted-foreground">L&apos;IA cree votre site vitrine</p>
+              <p className="mt-6 font-semibold text-foreground">Génération en cours…</p>
+              <p className="mt-1 text-sm text-muted-foreground">L&apos;IA crée votre site vitrine</p>
             </div>
           ) : siteContent ? (
             <>
@@ -902,7 +902,7 @@ export default function SiteWebPage() {
                   <div className="flex gap-2 w-full sm:w-auto">
                     <Button variant="outline" size="sm" onClick={handleCopyUrl} className="gap-1.5 flex-1 sm:flex-none">
                       {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                      {copied ? 'Copie' : 'Copier'}
+                      {copied ? 'Copié' : 'Copier'}
                     </Button>
                     <Button size="sm" asChild className="gap-1.5 flex-1 sm:flex-none">
                       <a href={siteUrl} target="_blank" rel="noopener noreferrer">
@@ -921,26 +921,26 @@ export default function SiteWebPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">
-                      {published ? 'Mode edition' : 'Apercu du site genere'}
+                      {published ? 'Mode édition' : 'Aperçu du site généré'}
                     </p>
                     <p className="text-xs text-muted-foreground line-clamp-1">
                       {published
-                        ? 'Modifiez chaque section puis cliquez sur Enregistrer pour mettre a jour votre site en ligne.'
-                        : 'Verifiez le contenu, modifiez si besoin, puis publiez votre site.'}
+                        ? 'Modifiez chaque section puis cliquez sur Enregistrer pour mettre à jour votre site en ligne.'
+                        : 'Vérifiez le contenu, modifiez si besoin, puis publiez votre site.'}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end w-full sm:w-auto">
                   <Button variant="outline" size="sm" onClick={() => setShowSitePreview(true)}>
-                    <Eye className="mr-1.5 h-4 w-4" /> Apercu du site
+                    <Eye className="mr-1.5 h-4 w-4" /> Aperçu du site
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => { setSiteContent(null); handleGenerate(); }} disabled={generating}>
-                    <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerer
+                    <RefreshCw className="mr-1.5 h-4 w-4" /> Régénérer
                   </Button>
                   {published ? (
                     <Button size="sm" onClick={handlePublish} disabled={publishing}>
                       {publishing ? (
-                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Enregistrement...</>
+                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Enregistrement…</>
                       ) : (
                         <><CheckCircle2 className="mr-1.5 h-4 w-4" /> Enregistrer les modifications</>
                       )}
@@ -948,7 +948,7 @@ export default function SiteWebPage() {
                   ) : (
                     <Button size="sm" onClick={handlePublish} disabled={publishing}>
                       {publishing ? (
-                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Publication...</>
+                        <><div className="h-4 w-4 mr-1.5 rounded-full border-2 border-white/30 animate-spin border-t-white" /> Publication…</>
                       ) : (
                         <><Globe className="mr-1.5 h-4 w-4" /> Publier mon site</>
                       )}
@@ -1004,7 +1004,7 @@ export default function SiteWebPage() {
               </EditableSection>
 
               {/* ── About ── */}
-              <EditableSection title="A propos" editing={editing} section="about" setEditing={setEditing}>
+              <EditableSection title="À propos" editing={editing} section="about" setEditing={setEditing}>
                 {editing === 'about' ? (
                   <div className="space-y-4 p-4">
                     <div>
@@ -1029,11 +1029,11 @@ export default function SiteWebPage() {
                       <Plus className="h-3 w-3 mr-1" /> Ajouter un paragraphe
                     </Button>
 
-                    {/* Chiffres cles editables */}
+                    {/* Chiffres clés éditables */}
                     <div className="pt-3 border-t border-border">
-                      <label className="text-xs font-medium text-muted-foreground">Chiffres cles</label>
+                      <label className="text-xs font-medium text-muted-foreground">Chiffres clés</label>
                       <p className="text-xs text-muted-foreground/80 mb-2">
-                        Affiches en gros sous le texte (ex: annees d&apos;experience, clients satisfaits, note Google).
+                        Affichés en gros sous le texte (ex : années d&apos;expérience, clients satisfaits, note Google).
                       </p>
                       <div className="space-y-2">
                         {(siteContent.about.highlights || []).map((h, i) => (
@@ -1056,7 +1056,7 @@ export default function SiteWebPage() {
                                 hs[i] = { ...hs[i], label: e.target.value };
                                 updateAbout('highlights', hs);
                               }}
-                              placeholder="annees d'experience"
+                              placeholder="années d'expérience"
                               className="flex-[2]"
                               maxLength={60}
                             />
@@ -1123,7 +1123,7 @@ export default function SiteWebPage() {
                           </Button>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1.5">Icone</p>
+                          <p className="text-xs text-muted-foreground mb-1.5">Icône</p>
                           <div className="flex flex-wrap gap-1.5 rounded-md border border-border bg-muted/30 p-2">
                             {SERVICE_ICONS.map(({ name, Icon, label }) => {
                               const selected = (s.icon || 'Wrench') === name;
@@ -1183,7 +1183,7 @@ export default function SiteWebPage() {
                       <div key={i} className="flex gap-2 items-start">
                         <div className="flex-1 space-y-1">
                           <Input value={f.question} onChange={e => updateFaq(i, 'question', e.target.value)} placeholder="Question" />
-                          <Textarea value={f.answer} onChange={e => updateFaq(i, 'answer', e.target.value)} placeholder="Reponse" className="min-h-[60px]" />
+                          <Textarea value={f.answer} onChange={e => updateFaq(i, 'answer', e.target.value)} placeholder="Réponse" className="min-h-[60px]" />
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => removeFaq(i)} className="text-red-500 mt-1">
                           <Trash2 className="h-4 w-4" />
@@ -1245,18 +1245,18 @@ export default function SiteWebPage() {
                 )}
               </EditableSection>
 
-              {/* ── Mentions legales ── */}
-              <EditableSection title="Mentions legales / CGV" editing={editing} section="legal" setEditing={setEditing}>
+              {/* ── Mentions légales ── */}
+              <EditableSection title="Mentions légales / CGV" editing={editing} section="legal" setEditing={setEditing}>
                 {editing === 'legal' ? (
                   <div className="p-4 space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      Ajoutez vos conditions generales, mentions legales ou tout autre texte juridique.
+                      Ajoutez vos conditions générales, mentions légales ou tout autre texte juridique.
                     </p>
                     <Textarea
                       value={legalText}
                       onChange={e => setLegalText(e.target.value)}
                       className="min-h-[200px] text-sm font-mono"
-                      placeholder={"Mentions legales\n\nRaison sociale : ...\nSIRET : ...\nAdresse : ...\n\nConditions generales\n\n..."}
+                      placeholder={"Mentions légales\n\nRaison sociale : …\nSIRET : …\nAdresse : …\n\nConditions générales\n\n…"}
                     />
                   </div>
                 ) : (
@@ -1264,7 +1264,7 @@ export default function SiteWebPage() {
                     {legalText ? (
                       <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-6">{legalText}</p>
                     ) : (
-                      <p className="text-sm text-muted-foreground italic">Aucune mention legale. Cliquez sur Modifier pour en ajouter.</p>
+                      <p className="text-sm text-muted-foreground italic">Aucune mention légale. Cliquez sur Modifier pour en ajouter.</p>
                     )}
                   </div>
                 )}
@@ -1313,9 +1313,9 @@ export default function SiteWebPage() {
           ) : (
             <div className="rounded-xl border border-border bg-card flex flex-col items-center justify-center py-20 text-center px-4">
               <Sparkles className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="font-semibold text-foreground">Pret a generer votre site</p>
-              <p className="mt-1 text-sm text-muted-foreground">Revenez a l&apos;etape 3 pour lancer la generation</p>
-              <Button className="mt-4" onClick={() => setStep(3)}>Retour a la generation</Button>
+              <p className="font-semibold text-foreground">Prêt à générer votre site</p>
+              <p className="mt-1 text-sm text-muted-foreground">Revenez à l&apos;étape 3 pour lancer la génération</p>
+              <Button className="mt-4" onClick={() => setStep(3)}>Retour à la génération</Button>
             </div>
           )}
         </div>
@@ -1407,12 +1407,12 @@ function HeroImagesEditor({ layout, onLayoutChange, images, onImagesChange }: He
     {
       value: 'grid',
       label: '3 photos',
-      description: 'Grille a cote du texte',
+      description: 'Grille à côté du texte',
     },
     {
       value: 'carousel',
       label: 'Carrousel',
-      description: '3 photos qui defilent',
+      description: '3 photos qui défilent',
     },
   ];
 
@@ -1420,7 +1420,7 @@ function HeroImagesEditor({ layout, onLayoutChange, images, onImagesChange }: He
     <div>
       <label className="text-sm font-medium block">Photos de la section d&apos;accueil</label>
       <p className="text-xs text-muted-foreground mb-3">
-        Photos de chantiers, equipe, realisations... Format paysage recommande.
+        Photos de chantiers, équipe, réalisations… Format paysage recommandé.
       </p>
 
       <div className="grid grid-cols-3 gap-2 mb-4">
@@ -1453,7 +1453,7 @@ function HeroImagesEditor({ layout, onLayoutChange, images, onImagesChange }: He
             <SiteImageUpload
               value={images[i] || ''}
               onChange={(url) => setImageAt(i, url)}
-              label="Photo de chantier, equipe..."
+              label="Photo de chantier, équipe…"
               hint="5 Mo max"
               aspectRatio="aspect-video"
             />

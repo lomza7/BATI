@@ -22,19 +22,19 @@ export function SiteHero({
   phone,
 }: SiteHeroProps) {
   // On construit la liste finale d'images utilisables :
-  // heroImages en priorite, fallback sur heroImageUrl (compat sites existants).
+  // heroImages en priorité, fallback sur heroImageUrl (compat sites existants).
   const cleanImages = heroImages.filter(Boolean);
   const allImages = cleanImages.length > 0 ? cleanImages : heroImageUrl ? [heroImageUrl] : [];
   const hasAnyImage = allImages.length > 0;
 
   // Si l'utilisateur a choisi grid/carousel mais n'a qu'une seule photo, on
-  // retombe sur le mode single pour eviter une grille a moitie vide.
+  // retombe sur le mode single pour éviter une grille à moitié vide.
   const effectiveLayout: 'single' | 'grid' | 'carousel' =
     (heroLayout === 'grid' || heroLayout === 'carousel') && allImages.length >= 2
       ? heroLayout
       : 'single';
 
-  // ── Grid layout : texte a gauche, 3 photos en collage a droite ──
+  // ── Grid layout : texte à gauche, 3 photos en collage à droite ──
   if (effectiveLayout === 'grid') {
     const gridImages = allImages.slice(0, 3);
     return (
@@ -123,7 +123,7 @@ export function SiteHero({
     );
   }
 
-  // ── Carousel layout : 3 photos qui defilent en fond plein ecran ──
+  // ── Carousel layout : 3 photos qui défilent en fond plein écran ──
   if (effectiveLayout === 'carousel') {
     const carouselImages = allImages.slice(0, 3);
     return (

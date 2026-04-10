@@ -4,11 +4,11 @@ import { useState, useRef, useEffect } from 'react';
 
 const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
   {
-    label: 'Batiment',
+    label: 'Bâtiment',
     emojis: ['🏠', '🏗️', '🧱', '🪵', '🔨', '🪚', '⚒️', '🛠️', '🔧', '🪛', '🏡', '🏢', '🏘️', '🏰', '🪟', '🚪', '🪑', '🛋️', '🛏️', '🚿', '🛁', '🚰', '💡', '🔌', '🪜'],
   },
   {
-    label: 'Materiaux',
+    label: 'Matériaux',
     emojis: ['🪨', '💎', '🪩', '🧊', '🔩', '⚙️', '🧲', '🪣', '🎨', '🖌️', '🪣', '📐', '📏', '🧰', '🔑', '🗝️', '🪝', '📎', '🧲', '🛡️'],
   },
   {

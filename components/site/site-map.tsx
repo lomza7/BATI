@@ -85,7 +85,7 @@ export function SiteMap({ projects, accentColor = '#3b82f6' }: SiteMapProps) {
           style={{ borderRadius: 'var(--site-radius)', zIndex: 10 }}
         />
         <p className="text-center text-xs sm:text-sm mt-4" style={{ color: 'var(--site-text-muted)' }}>
-          {projects.length} chantier{projects.length > 1 ? 's' : ''} realise{projects.length > 1 ? 's' : ''}
+          {projects.length} chantier{projects.length > 1 ? 's' : ''} réalisé{projects.length > 1 ? 's' : ''}
         </p>
       </div>
     </section>

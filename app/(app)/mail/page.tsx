@@ -260,8 +260,8 @@ export default function MailPage() {
   const starredCount = messages.filter(m => m.isStarred).length;
 
   const folders = [
-    { id: 'inbox' as const, label: 'Boite de reception', icon: Inbox, count: folder === 'inbox' ? unreadCount : 0 },
-    { id: 'sent' as const, label: 'Envoyes', icon: Send, count: 0 },
+    { id: 'inbox' as const, label: 'Boîte de réception', icon: Inbox, count: folder === 'inbox' ? unreadCount : 0 },
+    { id: 'sent' as const, label: 'Envoyés', icon: Send, count: 0 },
     { id: 'starred' as const, label: 'Favoris', icon: Star, count: folder === 'starred' ? starredCount : 0 },
   ];
 
@@ -277,12 +277,12 @@ export default function MailPage() {
   if (!gmailConnected) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Boite mail" description="Connectez votre Gmail pour gerer vos emails depuis Hellobat" />
+        <PageHeader title="Boîte mail" description="Connectez votre Gmail pour gérer vos emails depuis Hellobat" />
         <div className="flex flex-col items-center justify-center min-h-[400px] rounded-xl border border-dashed border-border bg-card p-8 text-center">
           <Mail className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground">Connectez votre boite mail</h3>
+          <h3 className="text-lg font-semibold text-foreground">Connectez votre boîte mail</h3>
           <p className="text-sm text-muted-foreground mt-2 max-w-md">
-            Recevez et envoyez vos emails directement depuis Hellobat. Vos emails restent sur Gmail — Hellobat les affiche et vous permet de repondre.
+            Recevez et envoyez vos emails directement depuis Hellobat. Vos emails restent sur Gmail — Hellobat les affiche et vous permet de répondre.
           </p>
           <Button
             className="mt-6 gap-2"
@@ -303,7 +303,7 @@ export default function MailPage() {
   // ─── Connected UI ─────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <PageHeader title="Boite mail" description={gmailEmail ? `Connecte a ${gmailEmail}` : 'Gerez vos emails depuis Hellobat'}>
+      <PageHeader title="Boîte mail" description={gmailEmail ? `Connecté à ${gmailEmail}` : 'Gérez vos emails depuis Hellobat'}>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => loadMessages()} className="gap-1.5">
             <RefreshCw className={cn('h-4 w-4', messagesLoading && 'animate-spin')} />
@@ -312,7 +312,7 @@ export default function MailPage() {
           <Button onClick={() => { setComposing(true); setReplyingTo(null); setComposeForm({ to: '', cc: '', subject: '', body: '' }); }} className="gap-2">
             <Plus className="h-4 w-4" /> Nouveau message
           </Button>
-          <Button variant="ghost" size="sm" onClick={disconnectGmail} className="text-muted-foreground" title="Deconnecter Gmail">
+          <Button variant="ghost" size="sm" onClick={disconnectGmail} className="text-muted-foreground" title="Déconnecter Gmail">
             <Unplug className="h-4 w-4" />
           </Button>
         </div>
@@ -345,13 +345,13 @@ export default function MailPage() {
             <div className="p-4 sm:p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">
-                  {replyingTo ? `Reponse a ${extractName(replyingTo.from)}` : 'Nouveau message'}
+                  {replyingTo ? `Réponse à ${extractName(replyingTo.from)}` : 'Nouveau message'}
                 </h3>
                 <Button variant="ghost" size="sm" onClick={() => { setComposing(false); setReplyingTo(null); }}>Annuler</Button>
               </div>
               <div>
                 <Input
-                  placeholder="A : email@client.com"
+                  placeholder="À : email@client.com"
                   value={composeForm.to}
                   onChange={e => setComposeForm({ ...composeForm, to: e.target.value })}
                 />
@@ -372,7 +372,7 @@ export default function MailPage() {
               </div>
               <textarea
                 className="w-full min-h-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Votre message..."
+                placeholder="Votre message…"
                 value={composeForm.body}
                 onChange={e => setComposeForm({ ...composeForm, body: e.target.value })}
               />
@@ -380,7 +380,7 @@ export default function MailPage() {
                 {replyingTo ? (
                   <Button variant="outline" onClick={() => generateAiReply(replyingTo)} disabled={aiGenerating} className="gap-2">
                     {aiGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {aiGenerating ? 'Generation...' : 'Generer avec l\'IA'}
+                    {aiGenerating ? 'Génération…' : 'Générer avec l\u2019IA'}
                   </Button>
                 ) : <div />}
                 <Button onClick={sendEmail} disabled={sending || !composeForm.to || !composeForm.subject} className="gap-2">
@@ -399,7 +399,7 @@ export default function MailPage() {
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-foreground">{selectedMessage.subject}</h2>
                   <p className="text-sm text-muted-foreground mt-1">De : {selectedMessage.from}</p>
-                  <p className="text-sm text-muted-foreground">A : {selectedMessage.to}</p>
+                  <p className="text-sm text-muted-foreground">À : {selectedMessage.to}</p>
                   {selectedMessage.cc && <p className="text-sm text-muted-foreground">Cc : {selectedMessage.cc}</p>}
                 </div>
                 <span className="text-xs text-muted-foreground flex-shrink-0">{formatEmailDate(selectedMessage.date)}</span>
@@ -410,11 +410,11 @@ export default function MailPage() {
               />
               <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
                 <Button variant="outline" onClick={() => startReply(selectedMessage)} className="gap-2">
-                  <ArrowLeft className="h-4 w-4" /> Repondre
+                  <ArrowLeft className="h-4 w-4" /> Répondre
                 </Button>
                 <Button variant="outline" onClick={() => generateAiReply(selectedMessage)} disabled={aiGenerating} className="gap-2">
                   {aiGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Reponse IA
+                  Réponse IA
                 </Button>
                 <Button variant="outline" onClick={() => archiveMessage(selectedMessage.id)} className="gap-2">
                   <Archive className="h-4 w-4" /> Archiver
@@ -435,7 +435,7 @@ export default function MailPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Rechercher dans les mails..."
+                    placeholder="Rechercher dans les mails…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="pl-10"

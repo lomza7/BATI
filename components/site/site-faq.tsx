@@ -14,7 +14,7 @@ export function SiteFaq({ faq }: SiteFaqProps) {
           className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
-          Questions frequentes
+          Questions fréquentes
         </h2>
 
         <div className="space-y-3 sm:space-y-4">

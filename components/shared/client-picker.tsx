@@ -163,7 +163,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
             value={search}
             onChange={e => { setSearch(e.target.value); setOpen(true); setShowCreate(false); }}
             onFocus={() => setOpen(true)}
-            placeholder="Rechercher ou créer un client..."
+            placeholder="Rechercher ou créer un client…"
             className="pl-10"
           />
         </div>
@@ -215,7 +215,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                   <label className="text-xs font-medium text-muted-foreground">Source</label>
                   <Select value={createForm.source || 'none'} onValueChange={v => setCreateForm({ ...createForm, source: v === 'none' ? '' : v })}>
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Source..." />
+                      <SelectValue placeholder="Source…" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Non renseigné</SelectItem>
@@ -247,7 +247,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                   value={addressQuery}
                   onChange={setAddressQuery}
                   onSelect={handleAddressSelect}
-                  placeholder="Tapez une adresse..."
+                  placeholder="Tapez une adresse…"
                 />
               </div>
 
@@ -269,7 +269,7 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
                 <textarea
                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                   rows={2}
-                  placeholder="Informations complémentaires..."
+                  placeholder="Informations complémentaires…"
                   value={createForm.notes}
                   onChange={e => setCreateForm({ ...createForm, notes: e.target.value })}
                 />

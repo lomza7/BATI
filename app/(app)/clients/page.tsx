@@ -153,7 +153,7 @@ export default function ClientsPage() {
 
   const selected = clients.find(c => c.id === selectedId);
 
-  // Stats du client selectionné
+  // Stats du client sélectionné
   const totalDevis = quotes.reduce((s, q) => s + (q.total_ttc || 0), 0);
   const totalFactures = invoices.reduce((s, inv) => s + (inv.total_ttc || 0), 0);
   const totalPaye = invoices.filter(inv => inv.status === 'payee').reduce((s, inv) => s + (inv.total_ttc || 0), 0);
@@ -195,7 +195,7 @@ export default function ClientsPage() {
         </div>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Rechercher un contact..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Rechercher un contact…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
       </div>
 
@@ -515,7 +515,7 @@ export default function ClientsPage() {
                 <label className="text-sm font-medium">Source</label>
                 <Select value={form.source || 'none'} onValueChange={(v) => setForm({ ...form, source: v === 'none' ? '' : v })}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Source..." />
+                    <SelectValue placeholder="Source…" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Non renseigné</SelectItem>
@@ -552,7 +552,7 @@ export default function ClientsPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Notes</label>
-              <Textarea className="mt-1" placeholder="Notes sur ce contact..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <Textarea className="mt-1" placeholder="Notes sur ce contact…" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Annuler</Button>

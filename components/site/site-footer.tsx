@@ -31,7 +31,7 @@ export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
           <div className="text-center sm:text-right text-xs space-y-1" style={{ color: 'var(--site-text-muted)' }}>
             {profile.siret && <p>SIRET : {profile.siret}</p>}
             {profile.tva_number && <p>TVA : {profile.tva_number}</p>}
-            <p>&copy; {year} {profile.company_name}. Tous droits reserves.</p>
+            <p>&copy; {year} {profile.company_name}. Tous droits réservés.</p>
           </div>
         </div>
 
@@ -43,7 +43,7 @@ export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
                 className="text-xs font-medium cursor-pointer hover:underline"
                 style={{ color: 'var(--site-text-muted)' }}
               >
-                Mentions legales et conditions generales
+                Mentions légales et conditions générales
               </summary>
               <div
                 className="mt-3 text-xs leading-relaxed whitespace-pre-line"
@@ -57,7 +57,7 @@ export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
 
         <div className="mt-6 pt-4 border-t text-center" style={{ borderColor: 'var(--site-border)' }}>
           <p className="text-xs" style={{ color: 'var(--site-text-muted)' }}>
-            Site propulse par{' '}
+            Site propulsé par{' '}
             <a
               href="https://hellobat.app"
               target="_blank"

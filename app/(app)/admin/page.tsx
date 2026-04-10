@@ -108,7 +108,7 @@ const periodLabels: Record<Period, string> = {
   day: "Aujourd'hui",
   week: 'Cette semaine',
   month: 'Ce mois',
-  year: "Cette annee",
+  year: 'Cette année',
 };
 
 const planConfig = {
@@ -269,7 +269,7 @@ export default function AdminPage() {
       setTimeout(() => setConfigSaved(false), 3000);
     } catch (error) {
       setConfigError(
-        error instanceof Error ? error.message : 'Impossible d enregistrer la configuration Stripe.'
+        error instanceof Error ? error.message : "Impossible d'enregistrer la configuration Stripe."
       );
     } finally {
       setConfigSaving(false);
@@ -445,14 +445,14 @@ export default function AdminPage() {
           action: 'toggle_block',
           user_id: userId,
           blocked: !currentlyBlocked,
-          reason: !currentlyBlocked ? 'Bloque par l\'administrateur' : '',
+          reason: !currentlyBlocked ? 'Bloqué par l\u2019administrateur' : '',
         }),
       });
       if (res.ok) {
         setAiUsageUsers(prev =>
           prev.map(u =>
             u.user_id === userId
-              ? { ...u, ai_blocked: !currentlyBlocked, ai_blocked_reason: !currentlyBlocked ? 'Bloque par l\'administrateur' : '' }
+              ? { ...u, ai_blocked: !currentlyBlocked, ai_blocked_reason: !currentlyBlocked ? 'Bloqué par l\u2019administrateur' : '' }
               : u
           )
         );
@@ -540,7 +540,7 @@ export default function AdminPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center text-muted-foreground">
           <Shield className="h-10 w-10 mx-auto mb-3 animate-pulse" />
-          <p className="text-sm">Verification des droits...</p>
+          <p className="text-sm">Vérification des droits…</p>
         </div>
       </div>
     );
@@ -555,7 +555,7 @@ export default function AdminPage() {
           <p className="text-sm text-destructive font-medium mb-1">Erreur de chargement</p>
           <p className="text-xs text-muted-foreground mb-4">{error}</p>
           <Button size="sm" onClick={loadData} className="gap-2">
-            <RefreshCw className="h-3.5 w-3.5" /> Reessayer
+            <RefreshCw className="h-3.5 w-3.5" /> Réessayer
           </Button>
         </div>
       </div>
@@ -592,13 +592,13 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Administration" description="Vue d'ensemble de la plateforme Hellobat">
+      <PageHeader title="Administration" description="Vue d&apos;ensemble de la plateforme Hellobat">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
             <Shield className="h-3.5 w-3.5" /> Admin
           </div>
           <Button size="sm" variant="outline" onClick={loadData} className="gap-1.5">
-            <RefreshCw className="h-3.5 w-3.5" /> Rafraichir
+            <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
           </Button>
         </div>
       </PageHeader>
@@ -609,7 +609,7 @@ export default function AdminPage() {
         </div>
       ) : stats && (
         <>
-          {/* Selecteur de periode */}
+          {/* Sélecteur de période */}
           <div className="flex gap-2 flex-wrap">
             {(Object.entries(periodLabels) as [Period, string][]).map(([key, label]) => (
               <Button
@@ -640,20 +640,20 @@ export default function AdminPage() {
             />
             <KpiCard
               icon={TrendingUp}
-              label="MRR estime"
+              label="MRR estimé"
               value={formatCurrency(mrr)}
               sub={`${stats.plan_pro} Pro + ${stats.plan_business} Business`}
               accent
             />
             <KpiCard
               icon={UserCheck}
-              label="Onboarding complete"
+              label="Onboarding complété"
               value={stats.onboarding_completed}
               sub={`${stats.total_users > 0 ? Math.round((stats.onboarding_completed / stats.total_users) * 100) : 0}% des inscrits`}
             />
           </div>
 
-          {/* Repartition par plan */}
+          {/* Répartition par plan */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {(Object.entries(planConfig) as [keyof typeof planConfig, typeof planConfig[keyof typeof planConfig]][]).map(([key, conf]) => {
               const count = key === 'starter' ? stats.plan_starter : key === 'pro' ? stats.plan_pro : stats.plan_business;
@@ -687,7 +687,7 @@ export default function AdminPage() {
             })}
           </div>
 
-          {/* Graphique inscriptions + KPIs activite */}
+          {/* Graphique inscriptions + KPIs activité */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Graphique */}
             <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
@@ -700,7 +700,7 @@ export default function AdminPage() {
               </div>
               {chart.length === 0 ? (
                 <div className="h-40 flex items-center justify-center text-sm text-muted-foreground">
-                  Aucune donnee pour cette periode
+                  Aucune donnée pour cette période
                 </div>
               ) : (
                 <div className="flex items-end gap-1.5 h-40">
@@ -718,15 +718,15 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* KPIs activite */}
+            {/* KPIs activité */}
             <div className="space-y-3">
-              <MiniKpi icon={FileText} label="Devis crees" value={stats.total_quotes} />
-              <MiniKpi icon={Receipt} label="Factures creees" value={stats.total_invoices} />
+              <MiniKpi icon={FileText} label="Devis créés" value={stats.total_quotes} />
+              <MiniKpi icon={Receipt} label="Factures créées" value={stats.total_invoices} />
               <MiniKpi icon={HardHat} label="Chantiers" value={stats.total_projects} />
               <MiniKpi icon={Contact} label="Contacts" value={stats.total_clients} />
               <MiniKpi icon={Target} label="Leads CRM" value={stats.total_leads} />
-              <MiniKpi icon={TrendingUp} label="CA devis acceptes" value={formatCurrency(stats.total_revenue_quotes)} accent />
-              <MiniKpi icon={CreditCard} label="CA factures payees" value={formatCurrency(stats.total_revenue_invoices)} accent />
+              <MiniKpi icon={TrendingUp} label="CA devis acceptés" value={formatCurrency(stats.total_revenue_quotes)} accent />
+              <MiniKpi icon={CreditCard} label="CA factures payées" value={formatCurrency(stats.total_revenue_invoices)} accent />
             </div>
           </div>
 
@@ -738,7 +738,7 @@ export default function AdminPage() {
                   <CreditCard className="h-4 w-4 text-primary" /> Configuration Stripe & Tarifs
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Modifiez ici les prix et les fonctionnalites affichees sur la landing pour chaque plan.
+                  Modifiez ici les prix et les fonctionnalités affichées sur la landing pour chaque plan.
                 </p>
               </div>
               <Button
@@ -754,7 +754,7 @@ export default function AdminPage() {
                 ) : (
                   <Save className="h-3.5 w-3.5" />
                 )}
-                {configSaved ? 'Enregistre !' : 'Enregistrer'}
+                {configSaved ? 'Enregistré !' : 'Enregistrer'}
               </Button>
             </div>
 
@@ -779,7 +779,7 @@ export default function AdminPage() {
                       <div>
                         <p className="text-sm font-semibold">{conf.label}</p>
                         <p className="text-xs text-muted-foreground">
-                          Prix affiche : {stripeConfig[amountKey]} EUR/mois
+                          Prix affiché : {stripeConfig[amountKey]} EUR/mois
                         </p>
                       </div>
                     </div>
@@ -811,7 +811,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">Prix affiche (EUR/mois)</label>
+                        <label className="text-xs font-medium text-muted-foreground">Prix affiché (EUR/mois)</label>
                         <Input
                           type="number"
                           className="mt-1"
@@ -824,11 +824,11 @@ export default function AdminPage() {
 
                     <div className="mt-3">
                       <label className="text-xs font-medium text-muted-foreground">
-                        Fonctionnalites affichees sur la landing
+                        Fonctionnalités affichées sur la landing
                       </label>
                       <Textarea
                         className="mt-1 min-h-[160px] text-sm"
-                        placeholder="Une fonctionnalite par ligne"
+                        placeholder="Une fonctionnalité par ligne"
                         value={planFeatures[plan]}
                         onChange={(event) =>
                           setPlanFeatures((prev) => ({
@@ -844,7 +844,7 @@ export default function AdminPage() {
 
                     {plan === 'starter' && (
                       <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                        Le plan Starter reste gratuit. Aucun produit Stripe ni carte bancaire n est necessaire.
+                        Le plan Starter reste gratuit. Aucun produit Stripe ni carte bancaire n&apos;est nécessaire.
                       </div>
                     )}
 
@@ -870,7 +870,7 @@ export default function AdminPage() {
               <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
                 <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
                 <p className="text-xs text-muted-foreground">
-                  Pour creer ou modifier un prix, rendez-vous sur{' '}
+                  Pour créer ou modifier un prix, rendez-vous sur{' '}
                   <a href="https://dashboard.stripe.com/products" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                     dashboard.stripe.com/products
                   </a>
@@ -888,7 +888,7 @@ export default function AdminPage() {
                   <Wand2 className="h-4 w-4 text-primary" /> Services IA externes
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Cles API pour la generation Avant/Apres (OpenAI/Gemini) et la dictee vocale de devis (Groq).
+                  Clés API pour la génération Avant/Après (OpenAI/Gemini) et la dictée vocale de devis (Groq).
                 </p>
               </div>
               <Button
@@ -904,7 +904,7 @@ export default function AdminPage() {
                 ) : (
                   <Save className="h-3.5 w-3.5" />
                 )}
-                {imageSecretsSaved ? 'Enregistre !' : 'Enregistrer'}
+                {imageSecretsSaved ? 'Enregistré !' : 'Enregistrer'}
               </Button>
             </div>
 
@@ -958,11 +958,11 @@ export default function AdminPage() {
                     rel="noopener noreferrer"
                     className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
                   >
-                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                    Obtenir une clé <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Cle API (sk-...)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Clé API (sk-…)</label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       type={showOpenaiKey ? 'text' : 'password'}
@@ -983,7 +983,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Modele</label>
+                  <label className="text-xs font-medium text-muted-foreground">Modèle</label>
                   <Input
                     className="mt-1 text-xs font-mono"
                     value={imageSecrets.openai_image_model}
@@ -1003,11 +1003,11 @@ export default function AdminPage() {
                     rel="noopener noreferrer"
                     className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline"
                   >
-                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                    Obtenir une clé <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Cle API</label>
+                  <label className="text-xs font-medium text-muted-foreground">Clé API</label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       type={showGeminiKey ? 'text' : 'password'}
@@ -1028,7 +1028,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Modele</label>
+                  <label className="text-xs font-medium text-muted-foreground">Modèle</label>
                   <Input
                     className="mt-1 text-xs font-mono"
                     value={imageSecrets.gemini_image_model}
@@ -1042,9 +1042,9 @@ export default function AdminPage() {
               <div className="rounded-lg border border-border p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold">Groq Whisper (dictee vocale)</p>
+                    <p className="text-sm font-semibold">Groq Whisper (dictée vocale)</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Utilise pour transcrire la voix des artisans dans l'assistant devis IA.
+                      Utilisé pour transcrire la voix des artisans dans l&apos;assistant devis IA.
                     </p>
                   </div>
                   <a
@@ -1053,11 +1053,11 @@ export default function AdminPage() {
                     rel="noopener noreferrer"
                     className="text-[11px] text-primary inline-flex items-center gap-1 hover:underline shrink-0"
                   >
-                    Obtenir une cle <ExternalLink className="h-3 w-3" />
+                    Obtenir une clé <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Cle API (gsk_...)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Clé API (gsk_…)</label>
                   <div className="flex gap-2 mt-1">
                     <Input
                       type={showGroqKey ? 'text' : 'password'}
@@ -1082,8 +1082,8 @@ export default function AdminPage() {
               <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border">
                 <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground">
-                  Les cles sont stockees dans une table protegee par RLS, accessible uniquement par toi.
-                  Elles ne sont jamais exposees aux autres utilisateurs ni cote client.
+                  Les clés sont stockées dans une table protégée par RLS, accessible uniquement par toi.
+                  Elles ne sont jamais exposées aux autres utilisateurs ni côté client.
                 </p>
               </div>
             </div>
@@ -1094,10 +1094,10 @@ export default function AdminPage() {
             <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-primary" /> Sites deployes
+                  <Globe className="h-4 w-4 text-primary" /> Sites déployés
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {adminSites.length} site{adminSites.length > 1 ? 's' : ''} — {adminSites.filter(s => s.status === 'published').length} publie{adminSites.filter(s => s.status === 'published').length > 1 ? 's' : ''}
+                  {adminSites.length} site{adminSites.length > 1 ? 's' : ''} — {adminSites.filter(s => s.status === 'published').length} publié{adminSites.filter(s => s.status === 'published').length > 1 ? 's' : ''}
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={loadSites} disabled={sitesLoading} className="gap-1.5">
@@ -1106,7 +1106,7 @@ export default function AdminPage() {
             </div>
             {adminSites.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                {sitesLoading ? 'Chargement...' : 'Aucun site cree pour le moment'}
+                {sitesLoading ? 'Chargement…' : 'Aucun site créé pour le moment'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1115,9 +1115,9 @@ export default function AdminPage() {
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Entreprise</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Slug</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Theme</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Thème</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Statut</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Publie le</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Publié le</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Lien</th>
                     </tr>
                   </thead>
@@ -1139,7 +1139,7 @@ export default function AdminPage() {
                             'text-[11px] px-2 py-0.5 rounded-full font-medium',
                             site.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
                           )}>
-                            {site.status === 'published' ? 'Publie' : 'Brouillon'}
+                            {site.status === 'published' ? 'Publié' : 'Brouillon'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -1196,7 +1196,7 @@ export default function AdminPage() {
             </div>
             {aiUsageUsers.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                {aiUsageLoading ? 'Chargement...' : 'Aucune utilisation IA ce mois'}
+                {aiUsageLoading ? 'Chargement…' : 'Aucune utilisation IA ce mois'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1268,7 +1268,7 @@ export default function AdminPage() {
                               {blockingUser === u.user_id ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : u.ai_blocked ? (
-                                <><ShieldCheck className="h-3 w-3" /> Debloquer</>
+                                <><ShieldCheck className="h-3 w-3" /> Débloquer</>
                               ) : (
                                 <><Ban className="h-3 w-3" /> Bloquer</>
                               )}
@@ -1291,7 +1291,7 @@ export default function AdminPage() {
                   <Gift className="h-4 w-4 text-primary" /> Parrainages
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Suivez l&apos;efficacite du programme de parrainage (2 mois offerts par filleul abonne).
+                  Suivez l&apos;efficacité du programme de parrainage (2 mois offerts par filleul abonné).
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={loadReferrals} disabled={referralLoading} className="gap-1.5">
@@ -1301,17 +1301,17 @@ export default function AdminPage() {
 
             {/* KPIs parrainage */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 p-4 sm:p-5 border-b border-border bg-muted/20">
-              <ReferralKpi label="Codes generes" value={referralStats?.codes_total || 0} icon={Gift} />
-              <ReferralKpi label="Emails envoyes" value={referralStats?.invites_total || 0} icon={Mail} />
+              <ReferralKpi label="Codes générés" value={referralStats?.codes_total || 0} icon={Gift} />
+              <ReferralKpi label="Emails envoyés" value={referralStats?.invites_total || 0} icon={Mail} />
               <ReferralKpi label="Emails ouverts" value={referralStats?.invites_opened || 0} icon={Eye} />
               <ReferralKpi label="Inscriptions" value={referralStats?.signups_total || 0} icon={UserCheck} />
-              <ReferralKpi label="Abonnes" value={referralStats?.subscribed_total || 0} icon={CreditCard} accent />
-              <ReferralKpi label="Mois credites" value={referralStats?.months_credited || 0} icon={Sparkles} accent />
+              <ReferralKpi label="Abonnés" value={referralStats?.subscribed_total || 0} icon={CreditCard} accent />
+              <ReferralKpi label="Mois crédités" value={referralStats?.months_credited || 0} icon={Sparkles} accent />
             </div>
 
             {referralUsers.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                {referralLoading ? 'Chargement...' : 'Aucun parrain pour le moment'}
+                {referralLoading ? 'Chargement…' : 'Aucun parrain pour le moment'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1320,11 +1320,11 @@ export default function AdminPage() {
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Parrain</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Code</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Envoyes</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Envoyés</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Ouverts</th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Inscrits</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Abonnes</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Mois gagnes</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Abonnés</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Mois gagnés</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1371,7 +1371,7 @@ export default function AdminPage() {
               <div className="relative w-full sm:w-64">
                 <input
                   type="text"
-                  placeholder="Rechercher..."
+                  placeholder="Rechercher…"
                   className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
@@ -1386,8 +1386,8 @@ export default function AdminPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Entreprise</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Plan</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Inscription</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Derniere connexion</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Activite</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Dernière connexion</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Activité</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Actions</th>
                   </tr>
                 </thead>
@@ -1447,7 +1447,7 @@ export default function AdminPage() {
                                 setDeleteConfirmEmail('');
                                 setDeleteError('');
                               }}
-                              title="Supprimer definitivement cet utilisateur"
+                              title="Supprimer définitivement cet utilisateur"
                               className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-border bg-white text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/5 transition-colors"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1460,7 +1460,7 @@ export default function AdminPage() {
                   {filteredUsers.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                        Aucun utilisateur trouve
+                        Aucun utilisateur trouvé
                       </td>
                     </tr>
                   )}
@@ -1481,9 +1481,9 @@ export default function AdminPage() {
                   <AlertTriangle className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Supprimer definitivement</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Supprimer définitivement</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Cette action est irreversible.
+                    Cette action est irréversible.
                   </p>
                 </div>
               </div>
@@ -1504,7 +1504,7 @@ export default function AdminPage() {
 
             <div className="p-5 space-y-4">
               <div className="rounded-lg border border-border bg-muted/20 p-3">
-                <p className="text-xs text-muted-foreground">Utilisateur cible</p>
+                <p className="text-xs text-muted-foreground">Utilisateur ciblé</p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">
                   {userToDelete.full_name || userToDelete.company_name || '—'}
                 </p>
@@ -1522,9 +1522,9 @@ export default function AdminPage() {
 
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="text-xs text-amber-900 leading-relaxed">
-                  Toutes les donnees metier (devis, factures, chantiers, contacts, documents,
-                  fichiers de stockage, abonnement, etc.) seront definitivement supprimees.
-                  L&apos;adresse email sera liberee et pourra etre reutilisee pour un nouveau compte.
+                  Toutes les données métier (devis, factures, chantiers, contacts, documents,
+                  fichiers de stockage, abonnement, etc.) seront définitivement supprimées.
+                  L&apos;adresse email sera libérée et pourra être réutilisée pour un nouveau compte.
                 </p>
               </div>
 
@@ -1577,12 +1577,12 @@ export default function AdminPage() {
                 {deletingUser ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Suppression...
+                    Suppression…
                   </>
                 ) : (
                   <>
                     <Trash2 className="h-3.5 w-3.5" />
-                    Supprimer definitivement
+                    Supprimer définitivement
                   </>
                 )}
               </Button>

@@ -54,10 +54,10 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-              Verifiez votre boite mail
+              Vérifiez votre boîte mail
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-              Si un compte existe avec cette adresse, vous recevrez un lien de reinitialisation dans quelques instants.
+              Si un compte existe avec cette adresse, vous recevrez un lien de réinitialisation dans quelques instants.
             </p>
 
             <div className="rounded-xl border border-border bg-white p-5 mb-6 text-left space-y-3">
@@ -65,13 +65,13 @@ export default function ForgotPasswordPage() {
                 <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs font-bold text-primary">1</span>
                 </div>
-                <p className="text-sm text-foreground">Ouvrez votre boite email</p>
+                <p className="text-sm text-foreground">Ouvrez votre boîte email</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs font-bold text-primary">2</span>
                 </div>
-                <p className="text-sm text-foreground">Cliquez sur le lien de reinitialisation</p>
+                <p className="text-sm text-foreground">Cliquez sur le lien de réinitialisation</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -82,16 +82,16 @@ export default function ForgotPasswordPage() {
             </div>
 
             <p className="text-xs text-muted-foreground mb-6">
-              Pensez a verifier vos spams si vous ne recevez rien
+              Pensez à vérifier vos spams si vous ne recevez rien
             </p>
           </>
         ) : (
           <>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-              Mot de passe oublie ?
+              Mot de passe oublié ?
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed mb-8">
-              Entrez votre adresse email et nous vous enverrons un lien pour reinitialiser votre mot de passe.
+              Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4 mb-6">
@@ -132,7 +132,7 @@ export default function ForgotPasswordPage() {
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Retour a la connexion
+          Retour à la connexion
         </Link>
       </div>
     </div>

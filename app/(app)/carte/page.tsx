@@ -160,19 +160,19 @@ export default function CartePage() {
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: email,
-          subject: `Decouvrez nos chantiers - ${companyName}`,
+          subject: `Découvrez nos chantiers — ${companyName}`,
           body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h2 style="color:#D35400;">Nos realisations</h2>
+            <h2 style="color:#D35400;">Nos réalisations</h2>
             <p>${greeting}</p>
-            <p>${companyName} vous partage la carte interactive de ses chantiers et realisations.</p>
+            <p>${companyName} vous partage la carte interactive de ses chantiers et réalisations.</p>
             <p style="margin:24px 0;">
               <a href="${link}" style="background:#D35400;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
                 Voir la carte des chantiers
               </a>
             </p>
-            <p style="color:#666;font-size:14px;">Vous pouvez consulter la localisation, l'avancement et les details de nos projets.</p>
+            <p style="color:#666;font-size:14px;">Vous pouvez consulter la localisation, l'avancement et les détails de nos projets.</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-            <p style="color:#999;font-size:12px;">Envoye depuis <a href="https://hellobat.app" style="color:#D35400;">Hellobat</a></p>
+            <p style="color:#999;font-size:12px;">Envoyé depuis <a href="https://hellobat.app" style="color:#D35400;">Hellobat</a></p>
           </div>`,
         }),
       });
@@ -274,7 +274,7 @@ export default function CartePage() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
@@ -309,7 +309,7 @@ export default function CartePage() {
                 <div className="h-[350px] sm:h-[500px] flex items-center justify-center bg-muted">
                   <div className="text-center text-muted-foreground">
                     <Navigation className="h-8 w-8 mx-auto animate-pulse" />
-                    <p className="mt-2 text-sm">Chargement de la carte...</p>
+                    <p className="mt-2 text-sm">Chargement de la carte…</p>
                   </div>
                 </div>
               }>
@@ -326,9 +326,9 @@ export default function CartePage() {
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 mx-auto">
                     <Navigation className="h-8 w-8 text-blue-600" />
                   </div>
-                  <p className="mt-4 text-base font-semibold text-foreground">Aucune coordonnee GPS</p>
+                  <p className="mt-4 text-base font-semibold text-foreground">Aucune coordonnée GPS</p>
                   <p className="mt-1 text-sm text-muted-foreground max-w-xs">
-                    Vos chantiers n&apos;ont pas de coordonnees. Ajoutez un chantier avec une adresse pour le voir sur la carte.
+                    Vos chantiers n&apos;ont pas de coordonnées. Ajoutez un chantier avec une adresse pour le voir sur la carte.
                   </p>
                 </div>
               </div>
@@ -381,7 +381,7 @@ export default function CartePage() {
                         onClick={(e) => { e.stopPropagation(); togglePublic(p.id, !p.is_public); }}
                       >
                         {p.is_public ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
-                        {p.is_public ? 'Public' : 'Prive'}
+                        {p.is_public ? 'Public' : 'Privé'}
                       </button>
                     </div>
                   </div>
@@ -398,7 +398,7 @@ export default function CartePage() {
           <DialogHeader>
             <DialogTitle>Partager la carte</DialogTitle>
             <DialogDescription>
-              Partagez un lien vers vos chantiers publics. Seuls les chantiers marques comme &quot;Public&quot; seront visibles.
+              Partagez un lien vers vos chantiers publics. Seuls les chantiers marqués comme &laquo;&nbsp;Public&nbsp;&raquo; seront visibles.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -408,7 +408,7 @@ export default function CartePage() {
               </div>
               <Button size="sm" onClick={copyShareLink} className="gap-2 shrink-0">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copie !' : 'Copier'}
+                {copied ? 'Copié !' : 'Copier'}
               </Button>
             </div>
 
@@ -437,7 +437,7 @@ export default function CartePage() {
                     value={shareEmailOverride}
                     onChange={e => { setShareEmailOverride(e.target.value); setShareSent(false); }}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Ce contact n&apos;a pas d&apos;email. Saisissez-le et il sera enregistre.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ce contact n&apos;a pas d&apos;email. Saisissez-le et il sera enregistré.</p>
                 </div>
               )}
               <Button
@@ -452,13 +452,13 @@ export default function CartePage() {
                 className="w-full gap-2"
               >
                 {shareSending ? <Loader2 className="h-4 w-4 animate-spin" /> : shareSent ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-                {shareSent ? 'Envoye !' : `Envoyer${shareClient ? ` a ${shareClient.name}` : ''}`}
+                {shareSent ? 'Envoyé !' : `Envoyer${shareClient ? ` à ${shareClient.name}` : ''}`}
               </Button>
             </div>
 
             <div className="space-y-1">
               <p className="text-sm font-medium">Chantiers publics ({projects.filter(p => p.is_public).length}/{projects.length})</p>
-              <p className="text-xs text-muted-foreground">Cliquez sur l&apos;icone oeil dans la liste pour rendre un chantier public ou prive.</p>
+              <p className="text-xs text-muted-foreground">Cliquez sur l&apos;icône œil dans la liste pour rendre un chantier public ou privé.</p>
             </div>
 
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
@@ -509,18 +509,18 @@ export default function CartePage() {
                     label={(PROJECT_STATUSES[selectedProject.status] || PROJECT_STATUSES.a_planifier).label}
                     color={(PROJECT_STATUSES[selectedProject.status] || PROJECT_STATUSES.a_planifier).color}
                   />
-                  <span className="text-sm text-muted-foreground">{selectedProject.progress}% d avancement</span>
+                  <span className="text-sm text-muted-foreground">{selectedProject.progress}% d&apos;avancement</span>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-border bg-muted/30 p-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Client</p>
-                    <p className="mt-1 text-sm font-medium text-foreground">{selectedProject.clients?.name || 'Non renseigne'}</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{selectedProject.clients?.name || 'Non renseigné'}</p>
                   </div>
                   <div className="rounded-lg border border-border bg-muted/30 p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilite</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Visibilité</p>
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-sm font-medium text-foreground">{selectedProject.is_public ? 'Public' : 'Prive'}</p>
+                      <p className="text-sm font-medium text-foreground">{selectedProject.is_public ? 'Public' : 'Privé'}</p>
                       <Switch
                         checked={selectedProject.is_public}
                         onCheckedChange={(checked) => togglePublic(selectedProject.id, checked)}
@@ -532,7 +532,7 @@ export default function CartePage() {
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Adresse</p>
                   <p className="mt-1 text-sm text-foreground">
-                    {[selectedProject.address, selectedProject.postal_code, selectedProject.city].filter(Boolean).join(', ') || 'Adresse non renseignee'}
+                    {[selectedProject.address, selectedProject.postal_code, selectedProject.city].filter(Boolean).join(', ') || 'Adresse non renseignée'}
                   </p>
                   {selectedProject.lat && selectedProject.lng && (
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -575,7 +575,7 @@ export default function CartePage() {
           <div className="space-y-4 mt-4">
             <div>
               <label className="text-sm font-medium">Nom du chantier</label>
-              <Input className="mt-1" placeholder="Ex: Renovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <Input className="mt-1" placeholder="Ex : Rénovation appartement Dupont" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div>
               <label className="text-sm font-medium">Client</label>
@@ -587,7 +587,7 @@ export default function CartePage() {
                 value={addressQuery}
                 onChange={setAddressQuery}
                 onSelect={handleAddressSelect}
-                placeholder="Tapez une adresse..."
+                placeholder="Tapez une adresse…"
                 className="mt-1"
               />
             </div>
@@ -609,7 +609,7 @@ export default function CartePage() {
                 Annuler
               </Button>
               <Button onClick={saveProject} disabled={!form.name.trim()}>
-                {editingProjectId ? 'Enregistrer' : 'Creer'}
+                {editingProjectId ? 'Enregistrer' : 'Créer'}
               </Button>
             </div>
           </div>

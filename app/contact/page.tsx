@@ -176,7 +176,7 @@ export default function ContactPage() {
                         rows={5}
                         value={form.message}
                         onChange={(e) => setForm({ ...form, message: e.target.value })}
-                        placeholder="Décrivez votre projet ou votre question..."
+                        placeholder="Décrivez votre projet ou votre question…"
                         className="w-full px-3 py-2.5 rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] text-sm text-[var(--landing-text)] placeholder:text-[var(--landing-muted)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--landing-accent)]/20 focus:border-[var(--landing-accent)] resize-none"
                       />
                     </div>

@@ -160,7 +160,7 @@ export function ProductsGrid({ collection, onBack }: Props) {
           </div>
           <h3 className="text-lg font-semibold text-foreground">Aucun produit</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Ajoutez des produits a cette collection avec leurs photos, prix et disponibilite.
+            Ajoutez des produits à cette collection avec leurs photos, prix et disponibilité.
           </p>
           <button
             onClick={addProduct}
@@ -264,7 +264,7 @@ function ProductCard({
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nom du produit..."
+              placeholder="Nom du produit…"
               className="flex-1 text-sm font-semibold text-foreground bg-transparent border-b border-primary/30 pb-0.5 outline-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') saveName();
@@ -286,7 +286,7 @@ function ProductCard({
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => onUpdate({ description: desc })}
-          placeholder="Description..."
+          placeholder="Description…"
           rows={2}
           className="w-full text-xs text-muted-foreground bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40 leading-relaxed"
         />

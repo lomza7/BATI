@@ -152,8 +152,8 @@ export function DemoBanner() {
             </div>
             <DialogTitle className="text-xl">Bienvenue sur Hellobat</DialogTitle>
             <DialogDescription className="text-sm leading-relaxed">
-              Pour vous aider a decouvrir la plateforme, nous avons prepare un jeu de
-              <strong> donnees de demonstration</strong> dans toutes les rubriques : contacts,
+              Pour vous aider à découvrir la plateforme, nous avons préparé un jeu de
+              <strong> données de démonstration</strong> dans toutes les rubriques : contacts,
               devis, factures, chantiers, planning, calendrier, documents...
             </DialogDescription>
           </DialogHeader>
@@ -170,37 +170,37 @@ export function DemoBanner() {
               <Receipt className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#D35400]" />
               <div>
                 <div className="font-medium text-neutral-900">Devis &amp; factures</div>
-                <div className="text-xs text-neutral-600">Exemples realistes chiffres</div>
+                <div className="text-xs text-neutral-600">Exemples réalistes chiffrés</div>
               </div>
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
               <FolderKanban className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#D35400]" />
               <div>
                 <div className="font-medium text-neutral-900">Chantiers &amp; planning</div>
-                <div className="text-xs text-neutral-600">Geolocalisation &amp; equipe</div>
+                <div className="text-xs text-neutral-600">Géolocalisation &amp; équipe</div>
               </div>
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
               <CalendarCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#D35400]" />
               <div>
-                <div className="font-medium text-neutral-900">Calendrier &amp; taches</div>
+                <div className="font-medium text-neutral-900">Calendrier &amp; tâches</div>
                 <div className="text-xs text-neutral-600">RDV et actions du mois</div>
               </div>
             </div>
           </div>
 
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
-            <strong>Bon a savoir :</strong> vous pouvez fermer la demo a tout moment depuis le
-            tableau de bord pour retrouver un espace vierge avec vos vraies donnees.
+            <strong>Bon à savoir :</strong> vous pouvez fermer la démo à tout moment depuis le
+            tableau de bord pour retrouver un espace vierge avec vos vraies données.
           </div>
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={handleClearDemo} disabled={closing}>
               {closing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Non merci, je demarre vierge
+              Non merci, je démarre vierge
             </Button>
             <Button onClick={handleCloseIntro} className="bg-[#D35400] hover:bg-[#B84700]">
-              Decouvrir la demo
+              Découvrir la démo
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -217,10 +217,10 @@ export function DemoBanner() {
         </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-neutral-900">
-            Vous visualisez un jeu de donnees de demonstration
+            Vous visualisez un jeu de données de démonstration
           </div>
           <div className="text-xs text-neutral-600">
-            Explorez chaque rubrique pour decouvrir Hellobat. Fermez la demo quand vous etes pret a demarrer avec vos vraies donnees.
+            Explorez chaque rubrique pour découvrir Hellobat. Fermez la démo quand vous êtes prêt à démarrer avec vos vraies données.
           </div>
         </div>
       </div>
@@ -236,7 +236,7 @@ export function DemoBanner() {
         ) : (
           <X className="mr-1.5 h-3.5 w-3.5" />
         )}
-        Fermer la demo
+        Fermer la démo
       </Button>
     </div>
   );

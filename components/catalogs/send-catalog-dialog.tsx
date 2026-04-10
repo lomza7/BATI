@@ -92,7 +92,7 @@ export function SendCatalogDialog({ catalog, onClose }: Props) {
                   <Check className="h-4 w-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-emerald-800">Lien cree avec succes</p>
+                  <p className="text-sm font-medium text-emerald-800">Lien créé avec succès</p>
                   <p className="text-xs text-emerald-600 mt-0.5">
                     Valide pendant {expiresIn} jour{parseInt(expiresIn) > 1 ? 's' : ''}
                   </p>
@@ -115,13 +115,13 @@ export function SendCatalogDialog({ catalog, onClose }: Props) {
                     }`}
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? 'Copie !' : 'Copier'}
+                    {copied ? 'Copié !' : 'Copier'}
                   </button>
                 </div>
               </div>
 
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Partagez ce lien avec <strong>{clientName}</strong>. Votre client pourra consulter le catalogue et selectionner les modeles qui l&apos;interessent.
+                Partagez ce lien avec <strong>{clientName}</strong>. Votre client pourra consulter le catalogue et sélectionner les modèles qui l&apos;intéressent.
               </p>
             </div>
           ) : (
@@ -195,7 +195,7 @@ export function SendCatalogDialog({ catalog, onClose }: Props) {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Generer le lien
+              Générer le lien
             </button>
           )}
         </div>

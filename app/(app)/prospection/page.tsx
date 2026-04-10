@@ -115,8 +115,8 @@ interface LeadForm {
 }
 
 const PROJECT_KINDS = [
-  { value: 'depannage', label: 'Depannage' },
-  { value: 'renovation', label: 'Renovation' },
+  { value: 'depannage', label: 'Dépannage' },
+  { value: 'renovation', label: 'Rénovation' },
   { value: 'installation', label: 'Installation' },
   { value: 'entretien', label: 'Entretien' },
   { value: 'neuf', label: 'Neuf' },
@@ -127,7 +127,7 @@ const URGENCY_OPTIONS = [
   { value: 'faible', label: 'Faible' },
   { value: 'normal', label: 'Normale' },
   { value: 'haute', label: 'Haute' },
-  { value: 'immediate', label: 'Immediate' },
+  { value: 'immediate', label: 'Immédiate' },
 ] as const;
 
 function createEmptyForm(): LeadForm {
@@ -511,7 +511,7 @@ export default function ProspectionPage() {
         .single();
 
       if (quoteError || !quote) {
-        throw new Error(quoteError?.message || 'Impossible de creer le devis.');
+        throw new Error(quoteError?.message || 'Impossible de créer le devis.');
       }
 
       const lineDescription = lead.work_details || lead.work_type || title;
@@ -670,7 +670,7 @@ export default function ProspectionPage() {
     <div className="space-y-6">
       <PageHeader
         title="Prospection & CRM"
-        description="Transformez chaque demande entrante en pre-chantier clair, qualifie et actionnable."
+        description="Transformez chaque demande entrante en pré-chantier clair, qualifié et actionnable."
       >
         <Button onClick={openCreateDialog} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -684,10 +684,10 @@ export default function ProspectionPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">CRM chantier</p>
               <h2 className="mt-3 text-2xl font-semibold text-foreground">
-                Un pipeline fait pour signer plus vite et preparer le terrain avant le devis.
+                Un pipeline fait pour signer plus vite et préparer le terrain avant le devis.
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Adresse chantier, nature des travaux, urgence et prochaine action au meme endroit. On reste simple, mais utile.
+                Adresse chantier, nature des travaux, urgence et prochaine action au même endroit. On reste simple, mais utile.
               </p>
             </div>
             <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
@@ -706,27 +706,27 @@ export default function ProspectionPage() {
             icon={Euro}
             label="Pipeline actif"
             value={formatCurrency(totalPipeline)}
-            hint="Montant en cours hors gagne/perdu"
+            hint="Montant en cours hors gagné/perdu"
           />
           <KpiCard
             icon={ArrowUpRight}
-            label="Signe"
+            label="Signé"
             value={formatCurrency(totalWon)}
-            hint="Opportunites gagnees"
+            hint="Opportunités gagnées"
             accent="emerald"
           />
           <KpiCard
             icon={CalendarClock}
             label="Relances 7 j"
             value={String(relancesThisWeek)}
-            hint="Actions a traiter rapidement"
+            hint="Actions à traiter rapidement"
             accent="amber"
           />
           <KpiCard
             icon={MapPin}
-            label="Chantiers qualifies"
+            label="Chantiers qualifiés"
             value={String(qualifiedSites)}
-            hint="Adresse + travaux renseignes"
+            hint="Adresse + travaux renseignés"
             accent="blue"
           />
         </div>
@@ -740,16 +740,16 @@ export default function ProspectionPage() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher un contact, une entreprise, une ville ou un type de travaux..."
+                placeholder="Rechercher un contact, une entreprise, une ville ou un type de travaux…"
                 className="pl-9"
               />
             </div>
             <Select value={stageFilter} onValueChange={setStageFilter}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Toutes les etapes" />
+                <SelectValue placeholder="Toutes les étapes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les etapes</SelectItem>
+                <SelectItem value="all">Toutes les étapes</SelectItem>
                 {pipelineStages.map((stage) => (
                   <SelectItem key={stage.slug} value={stage.slug}>
                     {stage.label}
@@ -796,13 +796,13 @@ export default function ProspectionPage() {
         </EmptyState>
       ) : filteredLeads.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-10 text-center">
-          <p className="text-sm font-medium text-foreground">Aucun lead ne correspond a ces filtres.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Elargissez la recherche ou creez un nouveau lead.</p>
+          <p className="text-sm font-medium text-foreground">Aucun lead ne correspond à ces filtres.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Élargissez la recherche ou créez un nouveau lead.</p>
         </div>
       ) : view === 'kanban' ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Glissez-deposez vos cartes d&apos;une colonne a l&apos;autre pour faire avancer le pipe plus vite.
+            Glissez-déposez vos cartes d&apos;une colonne à l&apos;autre pour faire avancer le pipe plus vite.
           </p>
           <div className="flex gap-4 overflow-x-auto pb-4">
           {pipelineStages.map((stage) => {
@@ -875,7 +875,7 @@ export default function ProspectionPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Chantier</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Travaux</th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Prochaine action</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Etape</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Étape</th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Valeur</th>
                 </tr>
               </thead>
@@ -892,7 +892,7 @@ export default function ProspectionPage() {
                       <td className="px-4 py-4">
                         <div className="space-y-1">
                           <p className="text-sm font-semibold text-foreground">{getLeadDisplayName(lead)}</p>
-                          <p className="text-xs text-muted-foreground">{lead.name || 'Contact a preciser'}</p>
+                          <p className="text-xs text-muted-foreground">{lead.name || 'Contact à préciser'}</p>
                           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                             {lead.phone && <span>{lead.phone}</span>}
                             {lead.email && <span>{lead.email}</span>}
@@ -901,8 +901,8 @@ export default function ProspectionPage() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="space-y-1">
-                          <p className="text-sm text-foreground">{lead.project_address || 'Adresse a qualifier'}</p>
-                          <p className="text-xs text-muted-foreground">{[lead.project_postal_code, lead.project_city].filter(Boolean).join(' ') || 'Ville non renseignee'}</p>
+                          <p className="text-sm text-foreground">{lead.project_address || 'Adresse à qualifier'}</p>
+                          <p className="text-xs text-muted-foreground">{[lead.project_postal_code, lead.project_city].filter(Boolean).join(' ') || 'Ville non renseignée'}</p>
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -913,7 +913,7 @@ export default function ProspectionPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-foreground">
-                        {lead.next_action_date ? formatDate(lead.next_action_date) : 'A programmer'}
+                        {lead.next_action_date ? formatDate(lead.next_action_date) : 'À programmer'}
                       </td>
                       <td className="px-4 py-4">
                         <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', stage.color)}>
@@ -955,10 +955,10 @@ export default function ProspectionPage() {
                 <Field label="Nom du contact">
                   <Input value={form.name} placeholder="Jean Martin" onChange={(e) => updateForm('name', e.target.value)} />
                 </Field>
-                <Field label="Nom de l'entreprise / chantier">
-                  <Input value={form.company_name} placeholder="Martin Renovation" onChange={(e) => updateForm('company_name', e.target.value)} />
+                <Field label="Nom de l&apos;entreprise / chantier">
+                  <Input value={form.company_name} placeholder="Martin Rénovation" onChange={(e) => updateForm('company_name', e.target.value)} />
                 </Field>
-                <Field label="Telephone">
+                <Field label="Téléphone">
                   <Input value={form.phone} placeholder="06 12 34 56 78" onChange={(e) => updateForm('phone', e.target.value)} />
                 </Field>
                 <Field label="Email">
@@ -974,12 +974,12 @@ export default function ProspectionPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_0.6fr_0.8fr] gap-4">
-                <Field label="Adresse recherchee">
+                <Field label="Adresse recherchée">
                   <AddressAutocomplete
                     value={form.project_address}
                     onChange={(value) => updateForm('project_address', value)}
                     onSelect={handleAddressSelect}
-                    placeholder="Rechercher l'adresse du chantier..."
+                    placeholder="Rechercher l&apos;adresse du chantier…"
                   />
                 </Field>
                 <Field label="Code postal">
@@ -998,7 +998,7 @@ export default function ProspectionPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Type d'intervention">
+                <Field label="Type d&apos;intervention">
                   <Select value={form.project_kind} onValueChange={(value) => updateForm('project_kind', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1008,11 +1008,11 @@ export default function ProspectionPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Specialite">
+                <Field label="Spécialité">
                   <Select value={form.work_type || 'none'} onValueChange={(value) => updateForm('work_type', value === 'none' ? '' : value)}>
-                    <SelectTrigger><SelectValue placeholder="Selectionner" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Non precisee</SelectItem>
+                      <SelectItem value="none">Non précisée</SelectItem>
                       {SPECIALTIES.map((item) => (
                         <SelectItem key={item} value={item}>{item}</SelectItem>
                       ))}
@@ -1035,7 +1035,7 @@ export default function ProspectionPage() {
                 <Textarea
                   rows={4}
                   value={form.work_details}
-                  placeholder="Ex: renovation complete salle de bain, remplacement chaudiere, fuite toiture..."
+                  placeholder="Ex : rénovation complète salle de bain, remplacement chaudière, fuite toiture…"
                   onChange={(e) => updateForm('work_details', e.target.value)}
                 />
               </Field>
@@ -1058,7 +1058,7 @@ export default function ProspectionPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Etape du pipeline">
+                <Field label="Étape du pipeline">
                   <Select value={form.stage} onValueChange={(value) => updateForm('stage', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1070,13 +1070,13 @@ export default function ProspectionPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Valeur estimee">
+                <Field label="Valeur estimée">
                   <Input type="number" value={form.value || ''} placeholder="0" onChange={(e) => updateForm('value', Number(e.target.value))} />
                 </Field>
                 <Field label="Prochaine action">
                   <Input type="date" value={form.next_action_date} onChange={(e) => updateForm('next_action_date', e.target.value)} />
                 </Field>
-                <Field label="Visite souhaitee">
+                <Field label="Visite souhaitée">
                   <Input type="date" value={form.preferred_visit_date} onChange={(e) => updateForm('preferred_visit_date', e.target.value)} />
                 </Field>
               </div>
@@ -1085,7 +1085,7 @@ export default function ProspectionPage() {
                 <Textarea
                   rows={3}
                   value={form.notes}
-                  placeholder="Contexte, objections, infos importantes avant rappel ou visite..."
+                  placeholder="Contexte, objections, infos importantes avant rappel ou visite…"
                   onChange={(e) => updateForm('notes', e.target.value)}
                 />
               </Field>
@@ -1101,7 +1101,7 @@ export default function ProspectionPage() {
                     className="gap-2"
                   >
                     <FileText className="h-4 w-4" />
-                    Creer un devis
+                    Créer un devis
                   </Button>
                   <Button
                     variant="outline"
@@ -1110,7 +1110,7 @@ export default function ProspectionPage() {
                     className="gap-2"
                   >
                     <HardHat className="h-4 w-4" />
-                    Creer un chantier
+                    Créer un chantier
                   </Button>
                   <Button
                     variant="outline"
@@ -1181,7 +1181,7 @@ function LeadCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{getLeadDisplayName(lead)}</p>
-          <p className="mt-1 text-xs text-muted-foreground truncate">{lead.name || 'Contact a preciser'}</p>
+          <p className="mt-1 text-xs text-muted-foreground truncate">{lead.name || 'Contact à préciser'}</p>
         </div>
 
         <DropdownMenu>
@@ -1197,11 +1197,11 @@ function LeadCard({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onConvertToQuote(lead)}>
               <FileText className="mr-2 h-4 w-4" />
-              Creer un devis
+              Créer un devis
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onConvertToProject(lead)}>
               <HardHat className="mr-2 h-4 w-4" />
-              Creer un chantier
+              Créer un chantier
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(lead.id)}>
               <Trash2 className="mr-2 h-4 w-4" />
@@ -1245,7 +1245,7 @@ function LeadCard({
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
-              {lead.next_action_date ? `A faire le ${formatDate(lead.next_action_date)}` : 'Prochaine action a definir'}
+              {lead.next_action_date ? `À faire le ${formatDate(lead.next_action_date)}` : 'Prochaine action à définir'}
             </div>
             {lead.value > 0 && <div className="text-xs font-semibold text-primary">{formatCurrency(Number(lead.value || 0))}</div>}
           </div>
@@ -1256,7 +1256,7 @@ function LeadCard({
         <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', stage.color)}>
           {stage.label}
         </span>
-        <span className="text-[11px] text-muted-foreground">Maj {formatDate(lead.updated_at || lead.created_at)}</span>
+        <span className="text-[11px] text-muted-foreground">Màj {formatDate(lead.updated_at || lead.created_at)}</span>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2" onClick={(event) => event.stopPropagation()}>

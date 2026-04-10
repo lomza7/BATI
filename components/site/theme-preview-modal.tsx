@@ -164,10 +164,10 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                 className="text-3xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6"
                 style={{ color: s.heading, fontFamily: s.fontFamily }}
               >
-                Votre artisan plombier de confiance a Lyon
+                Votre artisan plombier de confiance à Lyon
               </h1>
               <p className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8" style={{ color: s.textMuted }}>
-                Depannage, installation, renovation. Une equipe experimentee a votre ecoute pour tous vos projets.
+                Dépannage, installation, rénovation. Une équipe expérimentée à votre écoute pour tous vos projets.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <a
@@ -190,7 +190,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                     borderRadius: s.radius,
                   }}
                 >
-                  Voir nos realisations
+                  Voir nos réalisations
                 </a>
               </div>
               <p className="mt-6 text-sm" style={{ color: s.textMuted }}>
@@ -206,10 +206,10 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                 Une entreprise familiale au service des Lyonnais
               </h2>
               <p className="mb-4 leading-relaxed" style={{ color: s.text }}>
-                Depuis plus de 15 ans, Dupont Plomberie accompagne les particuliers et les professionnels de la metropole lyonnaise. Notre equipe de 6 artisans qualifies intervient avec rigueur, ponctualite et un souci constant de la satisfaction client.
+                Depuis plus de 15 ans, Dupont Plomberie accompagne les particuliers et les professionnels de la métropole lyonnaise. Notre équipe de 6 artisans qualifiés intervient avec rigueur, ponctualité et un souci constant de la satisfaction client.
               </p>
               <p className="mb-4 leading-relaxed" style={{ color: s.text }}>
-                Specialises dans la plomberie, le chauffage et la renovation de salles de bain, nous mettons notre expertise au service de vos projets les plus ambitieux comme des depannages d&apos;urgence.
+                Spécialisés dans la plomberie, le chauffage et la rénovation de salles de bain, nous mettons notre expertise au service de vos projets les plus ambitieux comme des dépannages d&apos;urgence.
               </p>
 
               <div className="flex flex-wrap justify-center gap-8 mt-10">
@@ -231,7 +231,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                   Nos services
                 </h2>
                 <p style={{ color: s.textMuted }}>
-                  Une expertise complete pour tous vos besoins en plomberie et chauffage
+                  Une expertise complète pour tous vos besoins en plomberie et chauffage
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -274,17 +274,17 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-12">
                 <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ color: s.heading }}>
-                  Nos realisations
+                  Nos réalisations
                 </h2>
                 <p style={{ color: s.textMuted }}>
-                  Quelques chantiers recents qui illustrent notre savoir-faire
+                  Quelques chantiers récents qui illustrent notre savoir-faire
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
-                  { title: 'Renovation salle de bain', city: 'Lyon 6e' },
-                  { title: 'Installation pompe a chaleur', city: 'Villeurbanne' },
-                  { title: 'Remplacement chaudiere', city: 'Caluire' },
+                  { title: 'Rénovation salle de bain', city: 'Lyon 6e' },
+                  { title: 'Installation pompe à chaleur', city: 'Villeurbanne' },
+                  { title: 'Remplacement chaudière', city: 'Caluire' },
                 ].map((p, i) => (
                   <div
                     key={i}
@@ -328,7 +328,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                 <h2 className="text-2xl sm:text-3xl font-bold mb-2" style={{ color: s.heading }}>
                   Ils nous ont fait confiance
                 </h2>
-                <p style={{ color: s.textMuted }}>Plus de 120 avis Google verifies</p>
+                <p style={{ color: s.textMuted }}>Plus de 120 avis Google vérifiés</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {DUMMY_REVIEWS.map((r) => (
@@ -360,7 +360,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
           <section className="px-4 sm:px-6 py-16 sm:py-20" style={{ backgroundColor: s.bg }}>
             <div className="max-w-3xl mx-auto">
               <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10" style={{ color: s.heading }}>
-                Questions frequentes
+                Questions fréquentes
               </h2>
               <div className="space-y-3">
                 {DUMMY_FAQ.map((f, i) => (
@@ -404,11 +404,11 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                 Parlons de votre projet
               </h2>
               <p className="mb-10" style={{ color: s.textMuted }}>
-                Une question, un devis ? Notre equipe vous repond sous 24h.
+                Une question, un devis ? Notre équipe vous répond sous 24h.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { icon: Phone, label: 'Telephone', value: '04 78 00 00 00' },
+                  { icon: Phone, label: 'Téléphone', value: '04 78 00 00 00' },
                   { icon: Mail, label: 'Email', value: 'contact@dupont-plomberie.fr' },
                   { icon: Clock, label: 'Horaires', value: 'Lun-Ven : 8h-18h' },
                 ].map((c) => {
@@ -459,10 +459,10 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
                 <p className="font-bold" style={{ color: s.heading }}>Dupont Plomberie</p>
               </div>
               <p className="text-sm mb-4" style={{ color: s.textMuted }}>
-                Votre confort, notre priorite depuis 2010
+                Votre confort, notre priorité depuis 2010
               </p>
               <p className="text-xs" style={{ color: s.textMuted }}>
-                © 2026 Dupont Plomberie — Tous droits reserves
+                © 2026 Dupont Plomberie — Tous droits réservés
               </p>
             </div>
           </footer>
@@ -476,7 +476,7 @@ export function ThemePreviewModal({ open, theme, onClose, onConfirm, isCurrentSe
       >
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground hidden sm:block">
-            Apercu avec un contenu d&apos;exemple. Votre site sera personnalise avec vos vraies informations.
+            Aperçu avec un contenu d&apos;exemple. Votre site sera personnalisé avec vos vraies informations.
           </p>
           <div className="flex gap-2 ml-auto">
             <Button variant="outline" size="sm" onClick={onClose}>

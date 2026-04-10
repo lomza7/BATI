@@ -208,8 +208,8 @@ export default function DevisPage() {
     setQuoteSends(sendsMap);
     setLoading(false);
 
-    // Verifie si l'utilisateur a deja au moins un RIB (pour la modale
-    // de premier devis). Separe du load principal pour ne pas bloquer
+    // Vérifie si l'utilisateur a déjà au moins un RIB (pour la modale
+    // de premier devis). Séparé du load principal pour ne pas bloquer
     // l'affichage de la liste.
     const { data: bankRows } = await supabase
       .from('bank_accounts')
@@ -630,7 +630,7 @@ export default function DevisPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Rechercher un devis..."
+            placeholder="Rechercher un devis…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-10"
@@ -1071,7 +1071,7 @@ export default function DevisPage() {
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 rows={2}
-                placeholder="Détails supplémentaires..."
+                placeholder="Détails supplémentaires…"
                 value={newQuote.description}
                 onChange={e => setNewQuote({ ...newQuote, description: e.target.value })}
               />

@@ -57,12 +57,12 @@ type HalfDay = 'full' | 'am' | 'pm';
 
 // ─── Helpers ──────��──────────────────────────────────────────────────
 const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-const MONTHS = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
+const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 const HALF_DAY_LABELS: Record<HalfDay, string> = {
-  full: 'Journee',
+  full: 'Journée',
   am: 'Matin',
-  pm: 'Apres-midi',
+  pm: 'Après-midi',
 };
 
 function toDateStr(d: Date) {
@@ -106,7 +106,7 @@ function daysBetween(start: string, end: string): number {
 const EVENT_TYPE_CONFIG: Record<string, { label: string; icon: typeof HardHat; bg: string; border: string; text: string }> = {
   chantier: { label: 'Chantier', icon: HardHat, bg: 'bg-primary/15', border: 'border-primary/30', text: 'text-primary' },
   conge: { label: 'Absence', icon: Umbrella, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
-  reunion: { label: 'Reunion', icon: Coffee, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+  reunion: { label: 'Réunion', icon: Coffee, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
   autre: { label: 'Autre', icon: Briefcase, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600' },
 };
 
@@ -295,7 +295,7 @@ export default function PlanningPage() {
     if (!user || !absenceForm.memberId || !absenceForm.startDate) return;
     const member = members.find(m => m.id === absenceForm.memberId);
     const isSousTrait = member?.type === 'sous_traitant';
-    const halfLabel = absenceForm.halfDay === 'am' ? ' (matin)' : absenceForm.halfDay === 'pm' ? ' (apres-midi)' : '';
+    const halfLabel = absenceForm.halfDay === 'am' ? ' (matin)' : absenceForm.halfDay === 'pm' ? ' (après-midi)' : '';
     await supabase.from('planning_events').insert({
       user_id: user.id,
       title: isSousTrait ? `Indispo.${halfLabel} — ${member?.name || ''}` : `Absence${halfLabel} — ${member?.name || 'Membre'}`,
@@ -519,13 +519,13 @@ export default function PlanningPage() {
   // ─── Render ─────────────────��─────────────────────────────���────────
   return (
     <div className="space-y-4">
-      <PageHeader title="Planning" description="Planification de votre equipe et chantiers">
+      <PageHeader title="Planning" description="Planification de votre équipe et chantiers">
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowAbsence(true)} className="gap-2 hidden sm:flex">
             <Umbrella className="h-4 w-4" /> Absence
           </Button>
           <Button onClick={() => setShowCreate(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Evenement
+            <Plus className="h-4 w-4" /> Événement
           </Button>
         </div>
       </PageHeader>
@@ -561,7 +561,7 @@ export default function PlanningPage() {
           {/* Unassigned events */}
           {events.filter(e => !e.team_member_id).length > 0 && (
             <div className="rounded-xl border border-border bg-card p-3 mt-3">
-              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Non affectes</h3>
+              <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Non affectés</h3>
               <div className="space-y-1.5">
                 {events.filter(e => !e.team_member_id).map(e => {
                   const cfg = EVENT_TYPE_CONFIG[e.event_type] || EVENT_TYPE_CONFIG.autre;
@@ -607,7 +607,7 @@ export default function PlanningPage() {
           ) : members.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center">
               <Users className="h-10 w-10 mx-auto text-muted-foreground" />
-              <p className="mt-3 text-sm text-muted-foreground">Ajoutez des membres dans la page Equipe pour commencer a planifier.</p>
+              <p className="mt-3 text-sm text-muted-foreground">Ajoutez des membres dans la page Équipe pour commencer à planifier.</p>
             </div>
           ) : view === 'week' ? (
             /* ─── VUE SEMAINE (AM / PM split) ─���─ */
@@ -616,7 +616,7 @@ export default function PlanningPage() {
                 <thead>
                   <tr>
                     <th className="sticky left-0 z-10 bg-muted/50 border-b border-r border-border p-2 text-left w-40">
-                      <span className="text-xs font-medium text-muted-foreground uppercase">Equipe</span>
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Équipe</span>
                     </th>
                     {weekDays.map(day => {
                       const ds = toDateStr(day);
@@ -808,7 +808,7 @@ export default function PlanningPage() {
             ))}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2 border-l border-border pl-3">
               <Sunrise className="h-3 w-3 opacity-60" /> Matin
-              <Sunset className="h-3 w-3 opacity-60 ml-2" /> Apres-midi
+              <Sunset className="h-3 w-3 opacity-60 ml-2" /> Après-midi
             </div>
           </div>
         </div>
@@ -818,13 +818,13 @@ export default function PlanningPage() {
       <Dialog open={showCreate} onOpenChange={(open) => { if (!open) closeForm(); else setShowCreate(true); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingEvent ? 'Modifier' : 'Nouvel'} evenement</DialogTitle>
+            <DialogTitle>{editingEvent ? 'Modifier' : 'Nouvel'} évènement</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Titre *</label>
-                <Input className="mt-1" placeholder="Ex: Chantier Dupont" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                <Input className="mt-1" placeholder="Ex : Chantier Dupont" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
               </div>
               <div>
                 <label className="text-sm font-medium">Type</label>
@@ -833,7 +833,7 @@ export default function PlanningPage() {
                   <SelectContent>
                     <SelectItem value="chantier">Chantier</SelectItem>
                     <SelectItem value="conge">Absence</SelectItem>
-                    <SelectItem value="reunion">Reunion</SelectItem>
+                    <SelectItem value="reunion">Réunion</SelectItem>
                     <SelectItem value="autre">Autre</SelectItem>
                   </SelectContent>
                 </Select>
@@ -844,7 +844,7 @@ export default function PlanningPage() {
             <div>
               <label className="text-sm font-medium mb-1.5 block">
                 {editingEvent ? 'Membre' : 'Membres'}
-                {!editingEvent && <span className="text-muted-foreground font-normal text-xs ml-1">(selection multiple)</span>}
+                {!editingEvent && <span className="text-muted-foreground font-normal text-xs ml-1">(sélection multiple)</span>}
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-[140px] overflow-y-auto">
                 {members.map(m => {
@@ -868,7 +868,7 @@ export default function PlanningPage() {
                 })}
               </div>
               {!editingEvent && form.memberIds.length > 1 && (
-                <p className="text-xs text-muted-foreground mt-1">{form.memberIds.length} membres selectionnes</p>
+                <p className="text-xs text-muted-foreground mt-1">{form.memberIds.length} membres sélectionnés</p>
               )}
             </div>
 
@@ -879,7 +879,7 @@ export default function PlanningPage() {
                   const proj = projects.find(p => p.id === v);
                   setForm({ ...form, projectId: v, title: form.title || proj?.name || '' });
                 }}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Lier un chantier..." /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Lier un chantier…" /></SelectTrigger>
                   <SelectContent>
                     {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                   </SelectContent>
@@ -889,7 +889,7 @@ export default function PlanningPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Debut *</label>
+                <label className="text-sm font-medium">Début *</label>
                 <Input className="mt-1" type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
               </div>
               <div>
@@ -900,7 +900,7 @@ export default function PlanningPage() {
 
             {/* Half-day toggle */}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Creneau</label>
+              <label className="text-sm font-medium mb-1.5 block">Créneau</label>
               <div className="flex rounded-lg border border-border overflow-hidden">
                 {(['full', 'am', 'pm'] as HalfDay[]).map(h => (
                   <button
@@ -923,7 +923,7 @@ export default function PlanningPage() {
 
             <div>
               <label className="text-sm font-medium">Notes</label>
-              <Input className="mt-1" placeholder="Notes optionnelles..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <Input className="mt-1" placeholder="Notes optionnelles…" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
 
             <div className="flex items-center justify-between pt-2">
@@ -937,7 +937,7 @@ export default function PlanningPage() {
               <div className="flex gap-2">
                 <Button variant="outline" onClick={closeForm}>Annuler</Button>
                 <Button onClick={saveEvent} disabled={!form.title.trim() || !form.startDate}>
-                  {editingEvent ? 'Enregistrer' : 'Creer'}
+                  {editingEvent ? 'Enregistrer' : 'Créer'}
                 </Button>
               </div>
             </div>
@@ -953,7 +953,7 @@ export default function PlanningPage() {
               <div className="flex items-center justify-center h-9 w-9 rounded-full bg-emerald-100">
                 <Umbrella className="h-4 w-4 text-emerald-600" />
               </div>
-              Declarer une absence
+              Déclarer une absence
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5 mt-4">
@@ -963,7 +963,7 @@ export default function PlanningPage() {
               {/* Salaries */}
               {members.filter(m => m.type !== 'sous_traitant').length > 0 && (
                 <>
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Salaries</p>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Salariés</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                     {members.filter(m => m.type !== 'sous_traitant').map(m => (
                       <button
@@ -987,7 +987,7 @@ export default function PlanningPage() {
               {/* Sous-traitants */}
               {members.filter(m => m.type === 'sous_traitant').length > 0 && (
                 <>
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Sous-traitants <span className="normal-case tracking-normal font-normal">{'\u2014'} a titre informatif</span></p>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Sous-traitants <span className="normal-case tracking-normal font-normal">{'\u2014'} à titre informatif</span></p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {members.filter(m => m.type === 'sous_traitant').map(m => (
                       <button
@@ -1040,7 +1040,7 @@ export default function PlanningPage() {
 
             {/* Half-day toggle for absence */}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Creneau</label>
+              <label className="text-sm font-medium mb-1.5 block">Créneau</label>
               <div className="flex rounded-lg border border-border overflow-hidden">
                 {(['full', 'am', 'pm'] as HalfDay[]).map(h => (
                   <button
@@ -1072,7 +1072,7 @@ export default function PlanningPage() {
             {absenceForm.memberId && members.find(m => m.id === absenceForm.memberId)?.type === 'sous_traitant' && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                Sous-traitant {'\u2014'} indisponible sur cette periode (a titre informatif)
+                Sous-traitant {'\u2014'} indisponible sur cette période (à titre informatif)
               </div>
             )}
 
@@ -1080,7 +1080,7 @@ export default function PlanningPage() {
             <div>
               <label className="text-sm font-medium mb-1 block">Motif <span className="text-muted-foreground font-normal">(optionnel)</span></label>
               <Input
-                placeholder="Ex: Vacances, maladie, formation..."
+                placeholder="Ex : Vacances, maladie, formation…"
                 value={absenceForm.notes}
                 onChange={e => setAbsenceForm({ ...absenceForm, notes: e.target.value })}
               />

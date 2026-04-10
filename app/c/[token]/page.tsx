@@ -426,7 +426,7 @@ export default function ClientCatalogPage() {
               autoFocus
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Ex: Je prefere en blanc, ou une taille XL..."
+              placeholder="Ex : Je préfère en blanc, ou une taille XL…"
               rows={3}
               className="w-full rounded-xl border border-[#e5e1da] p-3 text-sm text-[#1a1a1a] placeholder:text-[#6b6560]/40 outline-none focus:ring-2 focus:ring-[#d35400]/20 focus:border-[#d35400] resize-none"
             />

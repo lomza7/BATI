@@ -257,20 +257,20 @@ const legalFormOptions = [
 
 const taxRegimeOptions = [
   { value: '', label: 'Choisir un regime' },
-  { value: 'is', label: 'Impot sur les societes (IS)' },
-  { value: 'ir', label: 'Impot sur le revenu (IR)' },
-  { value: 'micro', label: 'Regime micro' },
+  { value: 'is', label: 'Impôt sur les sociétés (IS)' },
+  { value: 'ir', label: 'Impôt sur le revenu (IR)' },
+  { value: 'micro', label: 'Régime micro' },
 ];
 
 const vatRegimeOptions = [
-  { value: '', label: 'Choisir un regime TVA' },
+  { value: '', label: 'Choisir un régime TVA' },
   { value: 'franchise_en_base', label: 'Franchise en base' },
-  { value: 'reel_normal', label: 'Reel normal' },
-  { value: 'reel_simplifie', label: 'Reel simplifie' },
+  { value: 'reel_normal', label: 'Réel normal' },
+  { value: 'reel_simplifie', label: 'Réel simplifié' },
 ];
 
 const vatFrequencyOptions = [
-  { value: '', label: 'Frequence a definir' },
+  { value: '', label: 'Fréquence à définir' },
   { value: 'mensuelle', label: 'Mensuelle' },
   { value: 'trimestrielle', label: 'Trimestrielle' },
   { value: 'annuelle', label: 'Annuelle' },
@@ -278,17 +278,17 @@ const vatFrequencyOptions = [
 
 const monthOptions = [
   { value: 1, label: 'Janvier' },
-  { value: 2, label: 'Fevrier' },
+  { value: 2, label: 'Février' },
   { value: 3, label: 'Mars' },
   { value: 4, label: 'Avril' },
   { value: 5, label: 'Mai' },
   { value: 6, label: 'Juin' },
   { value: 7, label: 'Juillet' },
-  { value: 8, label: 'Aout' },
+  { value: 8, label: 'Août' },
   { value: 9, label: 'Septembre' },
   { value: 10, label: 'Octobre' },
   { value: 11, label: 'Novembre' },
-  { value: 12, label: 'Decembre' },
+  { value: 12, label: 'Décembre' },
 ];
 
 function mapPappersLegalFormToSetting(legalForm: string) {
@@ -647,7 +647,7 @@ export default function ParametresPage() {
       const company: PappersCompanyPayload & { error?: string } = await response.json();
 
       if (!response.ok || company.error || !company.siren) {
-        throw new Error(company.error || 'Impossible de recuperer les donnees Pappers.');
+        throw new Error(company.error || 'Impossible de récupérer les données Pappers.');
       }
 
       const nextCompanyActivity = form.company_activity || company.naf_label || '';
@@ -868,13 +868,13 @@ export default function ParametresPage() {
 
     const slug = normalizeLeadStageSlug(newLeadStage.label);
     if (!slug) {
-      setError("Le nom de l'etape est invalide.");
+      setError("Le nom de l'étape est invalide.");
       setCreatingStage(false);
       return;
     }
 
     if (leadStages.some((stage) => stage.slug === slug)) {
-      setError('Une etape avec ce nom existe deja.');
+      setError('Une étape avec ce nom existe déjà.');
       setCreatingStage(false);
       return;
     }
@@ -1187,16 +1187,16 @@ export default function ParametresPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Parametres"
-        description="Mettez a jour votre profil, votre entreprise et votre abonnement depuis un seul endroit."
+        title="Paramètres"
+        description="Mettez à jour votre profil, votre entreprise et votre abonnement depuis un seul endroit."
       />
 
       {checkoutStatus === 'success' && (
         <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800 [&>svg]:text-emerald-700">
           <Check className="h-4 w-4" />
-          <AlertTitle>Abonnement mis a jour</AlertTitle>
+          <AlertTitle>Abonnement mis à jour</AlertTitle>
           <AlertDescription>
-            Stripe a bien confirme votre passage de plan. Les informations peuvent prendre quelques instants a se synchroniser.
+            Stripe a bien confirmé votre passage de plan. Les informations peuvent prendre quelques instants à se synchroniser.
           </AlertDescription>
         </Alert>
       )}
@@ -1204,9 +1204,9 @@ export default function ParametresPage() {
       {checkoutStatus === 'cancel' && (
         <Alert>
           <CreditCard className="h-4 w-4" />
-          <AlertTitle>Modification annulee</AlertTitle>
+          <AlertTitle>Modification annulée</AlertTitle>
           <AlertDescription>
-            Aucun changement n a ete applique a votre abonnement.
+            Aucun changement n&apos;a été appliqué à votre abonnement.
           </AlertDescription>
         </Alert>
       )}
@@ -1214,14 +1214,14 @@ export default function ParametresPage() {
       {error && (
         <Alert variant="destructive">
           <Shield className="h-4 w-4" />
-          <AlertTitle>Un point bloque</AlertTitle>
+          <AlertTitle>Un point bloqué</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as SettingsTab)} className="space-y-6">
         <TabsList className="grid h-auto grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 rounded-xl bg-muted/60 p-1">
-          <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Parametres</TabsTrigger>
+          <TabsTrigger value="parametres" className="rounded-lg py-2.5 text-xs sm:text-sm">Paramètres</TabsTrigger>
           <TabsTrigger value="import" className="rounded-lg py-2.5 text-xs sm:text-sm relative">
             <span className="flex items-center gap-1.5">
               <Sparkles className="h-3 w-3 text-primary" />
@@ -1234,9 +1234,9 @@ export default function ParametresPage() {
           <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
           <TabsTrigger value="banque" className="rounded-lg py-2.5 text-xs sm:text-sm">Banque</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
-          <TabsTrigger value="equipe" className="rounded-lg py-2.5 text-xs sm:text-sm">Equipe</TabsTrigger>
+          <TabsTrigger value="equipe" className="rounded-lg py-2.5 text-xs sm:text-sm">Équipe</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
-          <TabsTrigger value="securite" className="rounded-lg py-2.5 text-xs sm:text-sm">Securite</TabsTrigger>
+          <TabsTrigger value="securite" className="rounded-lg py-2.5 text-xs sm:text-sm">Sécurité</TabsTrigger>
         </TabsList>
 
         <TabsContent value="parametres" className="space-y-6">
@@ -1282,12 +1282,12 @@ export default function ParametresPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_activity">Activite</Label>
+                    <Label htmlFor="company_activity">Activité</Label>
                     <Input
                       id="company_activity"
                       value={form.company_activity}
                       onChange={(e) => setForm((prev) => ({ ...prev, company_activity: e.target.value }))}
-                      placeholder="Plomberie, renovation, electricite..."
+                      placeholder="Plomberie, rénovation, électricité…"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1327,7 +1327,7 @@ export default function ParametresPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="company_phone">Telephone</Label>
+                    <Label htmlFor="company_phone">Téléphone</Label>
                     <Input
                       id="company_phone"
                       value={form.company_phone}
@@ -1336,7 +1336,7 @@ export default function ParametresPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="tva_number">Numero de TVA</Label>
+                    <Label htmlFor="tva_number">Numéro de TVA</Label>
                     <Input
                       id="tva_number"
                       value={form.tva_number}
@@ -1364,7 +1364,7 @@ export default function ParametresPage() {
                         id="insurance_company"
                         value={form.insurance_company}
                         onChange={(e) => setForm((prev) => ({ ...prev, insurance_company: e.target.value }))}
-                        placeholder="MAAF Pro, AXA, Allianz..."
+                        placeholder="MAAF Pro, AXA, Allianz…"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1421,7 +1421,7 @@ export default function ParametresPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="team_size">Taille d equipe</Label>
+                    <Label htmlFor="team_size">Taille d&apos;équipe</Label>
                     <select
                       id="team_size"
                       value={form.team_size}
@@ -1441,7 +1441,7 @@ export default function ParametresPage() {
                       id="referral_source"
                       value={form.referral_source}
                       onChange={(e) => setForm((prev) => ({ ...prev, referral_source: e.target.value }))}
-                      placeholder="Google, bouche a oreille, partenaire..."
+                      placeholder="Google, bouche à oreille, partenaire…"
                     />
                   </div>
                 </div>
@@ -1454,7 +1454,7 @@ export default function ParametresPage() {
                   {saveSuccess && (
                     <span className="inline-flex items-center gap-2 text-sm text-emerald-700">
                       <Check className="h-4 w-4" />
-                      Modifications enregistrees
+                      Modifications enregistrées
                     </span>
                   )}
                 </div>
@@ -1473,8 +1473,8 @@ export default function ParametresPage() {
                   <div className="flex items-start gap-3">
                     <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-foreground">{form.company_name || 'Entreprise non renseignee'}</p>
-                      <p className="text-muted-foreground">{form.company_activity || 'Activite a definir'}</p>
+                      <p className="font-medium text-foreground">{form.company_name || 'Entreprise non renseignée'}</p>
+                      <p className="text-muted-foreground">{form.company_activity || 'Activité à définir'}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -1487,25 +1487,25 @@ export default function ParametresPage() {
                   <div className="flex items-start gap-3">
                     <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-foreground">{form.company_phone || 'Telephone non renseigne'}</p>
-                      <p className="text-muted-foreground">Numero de contact entreprise</p>
+                      <p className="font-medium text-foreground">{form.company_phone || 'Téléphone non renseigné'}</p>
+                      <p className="text-muted-foreground">Numéro de contact entreprise</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="font-medium text-foreground">
-                        {[form.company_address, form.company_postal_code, form.company_city].filter(Boolean).join(', ') || 'Adresse non renseignee'}
+                        {[form.company_address, form.company_postal_code, form.company_city].filter(Boolean).join(', ') || 'Adresse non renseignée'}
                       </p>
-                      <p className="text-muted-foreground">Adresse principale de l entreprise</p>
+                      <p className="text-muted-foreground">Adresse principale de l&apos;entreprise</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <Building2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-foreground">{profile?.siren || 'SIREN non renseigne'}</p>
+                      <p className="font-medium text-foreground">{profile?.siren || 'SIREN non renseigné'}</p>
                       <p className="text-muted-foreground">
-                        {form.tva_number || 'Numero de TVA non renseigne'}
+                        {form.tva_number || 'Numéro de TVA non renseigné'}
                       </p>
                     </div>
                   </div>
@@ -1528,11 +1528,11 @@ export default function ParametresPage() {
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {currentPlan.key === 'starter'
-                      ? 'Vous etes actuellement sur le plan gratuit.'
+                      ? 'Vous êtes actuellement sur le plan gratuit.'
                       : `Plan actif depuis ${profile?.plan_started_at ? formatDate(profile.plan_started_at) : 'peu'}.`}
                   </p>
                   <Button variant="outline" onClick={() => setActiveTab('abonnement')}>
-                    Gerer mon abonnement
+                    Gérer mon abonnement
                   </Button>
                 </CardContent>
               </Card>
@@ -1541,9 +1541,9 @@ export default function ParametresPage() {
 
           <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl">Rappels chef d entreprise</CardTitle>
+              <CardTitle className="text-xl">Rappels chef d&apos;entreprise</CardTitle>
               <CardDescription>
-                Personnalisez ici les informations qui permettent a Hellobat de vous rappeler la TVA, la paie, la DSN, la cloture comptable et les grandes echeances.
+                Personnalisez ici les informations qui permettent à Hellobat de vous rappeler la TVA, la paie, la DSN, la clôture comptable et les grandes échéances.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1552,7 +1552,7 @@ export default function ParametresPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Configuration des rappels administratifs</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Plus ces informations sont precises, plus le dashboard pourra vous remonter les bonnes alertes au bon moment.
+                      Plus ces informations sont précises, plus le dashboard pourra vous remonter les bonnes alertes au bon moment.
                     </p>
                   </div>
                   <div className="min-w-40">
@@ -1573,9 +1573,9 @@ export default function ParametresPage() {
               <div className="grid gap-6 xl:grid-cols-3">
                 <div className="space-y-4 rounded-2xl border border-border bg-muted/10 p-4">
                   <div>
-                    <h3 className="font-semibold text-foreground">TVA et fiscalite</h3>
+                    <h3 className="font-semibold text-foreground">TVA et fiscalité</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Pour afficher les bons rappels de TVA, d IS ou de regime micro.
+                      Pour afficher les bons rappels de TVA, d&apos;IS ou de régime micro.
                     </p>
                   </div>
 
@@ -1596,7 +1596,7 @@ export default function ParametresPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="benefit_tax_regime">Regime d imposition</Label>
+                    <Label htmlFor="benefit_tax_regime">Régime d&apos;imposition</Label>
                     <select
                       id="benefit_tax_regime"
                       value={reminderSettings.benefit_tax_regime}
@@ -1614,7 +1614,7 @@ export default function ParametresPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="vat_regime">Regime de TVA</Label>
+                    <Label htmlFor="vat_regime">Régime de TVA</Label>
                     <select
                       id="vat_regime"
                       value={reminderSettings.vat_regime}
@@ -1630,7 +1630,7 @@ export default function ParametresPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="vat_frequency">Frequence de declaration TVA</Label>
+                    <Label htmlFor="vat_frequency">Fréquence de déclaration TVA</Label>
                     <select
                       id="vat_frequency"
                       value={reminderSettings.vat_frequency}
@@ -1659,7 +1659,7 @@ export default function ParametresPage() {
                           vat_reminder_day: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      placeholder="Ex: 19"
+                      placeholder="Ex : 19"
                     />
                     <p className="text-xs text-muted-foreground">
                       Si votre expert-comptable vous donne une date fixe, notez-la ici.
@@ -1669,7 +1669,7 @@ export default function ParametresPage() {
 
                 <div className="space-y-4 rounded-2xl border border-border bg-muted/10 p-4">
                   <div>
-                    <h3 className="font-semibold text-foreground">Paie et equipe</h3>
+                    <h3 className="font-semibold text-foreground">Paie et équipe</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Pour les rappels salaires, DSN et autres obligations employeur.
                     </p>
@@ -1677,9 +1677,9 @@ export default function ParametresPage() {
 
                   <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-foreground">J ai des salaries</p>
+                      <p className="text-sm font-medium text-foreground">J&apos;ai des salariés</p>
                       <p className="text-xs text-muted-foreground">
-                        Activez cette option si vous gerez de la paie dans l entreprise.
+                        Activez cette option si vous gérez de la paie dans l&apos;entreprise.
                       </p>
                     </div>
                     <Switch
@@ -1696,7 +1696,7 @@ export default function ParametresPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="employee_count">Nombre de salaries</Label>
+                    <Label htmlFor="employee_count">Nombre de salariés</Label>
                     <Input
                       id="employee_count"
                       type="number"
@@ -1708,7 +1708,7 @@ export default function ParametresPage() {
                           employee_count: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      placeholder="Ex: 4"
+                      placeholder="Ex : 4"
                       disabled={!reminderSettings.has_employees}
                     />
                   </div>
@@ -1727,7 +1727,7 @@ export default function ParametresPage() {
                           payroll_day: e.target.value ? Number(e.target.value) : null,
                         }))
                       }
-                      placeholder="Ex: 28"
+                      placeholder="Ex : 28"
                       disabled={!reminderSettings.has_employees}
                     />
                   </div>
@@ -1750,7 +1750,7 @@ export default function ParametresPage() {
                       disabled={!reminderSettings.has_employees}
                     />
                     <p className="text-xs text-muted-foreground">
-                      En general 5 ou 15 selon votre situation.
+                      En général 5 ou 15 selon votre situation.
                     </p>
                   </div>
 
@@ -1775,15 +1775,15 @@ export default function ParametresPage() {
 
                 <div className="space-y-4 rounded-2xl border border-border bg-muted/10 p-4">
                   <div>
-                    <h3 className="font-semibold text-foreground">Cloture et obligations</h3>
+                    <h3 className="font-semibold text-foreground">Clôture et obligations</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Pour la cloture comptable, la liasse fiscale, la CFE et les rappels annuels.
+                      Pour la clôture comptable, la liasse fiscale, la CFE et les rappels annuels.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-[1fr_1fr] gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="fiscal_year_end_day">Jour de cloture</Label>
+                      <Label htmlFor="fiscal_year_end_day">Jour de clôture</Label>
                       <Input
                         id="fiscal_year_end_day"
                         type="number"
@@ -1799,7 +1799,7 @@ export default function ParametresPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fiscal_year_end_month">Mois de cloture</Label>
+                      <Label htmlFor="fiscal_year_end_month">Mois de clôture</Label>
                       <select
                         id="fiscal_year_end_month"
                         value={reminderSettings.fiscal_year_end_month}
@@ -1822,9 +1822,9 @@ export default function ParametresPage() {
 
                   <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Soumis a la CFE</p>
+                      <p className="text-sm font-medium text-foreground">Soumis à la CFE</p>
                       <p className="text-xs text-muted-foreground">
-                        Activez si vous souhaitez des rappels CFE en juin et en decembre.
+                        Activez si vous souhaitez des rappels CFE en juin et en décembre.
                       </p>
                     </div>
                     <Switch
@@ -1837,9 +1837,9 @@ export default function ParametresPage() {
 
                   <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Taxe d apprentissage</p>
+                      <p className="text-sm font-medium text-foreground">Taxe d&apos;apprentissage</p>
                       <p className="text-xs text-muted-foreground">
-                        Utile si vous avez des salaries et souhaitez etre rappele pour la DSN d avril/mai.
+                        Utile si vous avez des salariés et souhaitez être rappelé pour la DSN d&apos;avril/mai.
                       </p>
                     </div>
                     <Switch
@@ -1854,14 +1854,14 @@ export default function ParametresPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="accountant_notes">Notes ou consignes de l expert-comptable</Label>
+                    <Label htmlFor="accountant_notes">Notes ou consignes de l&apos;expert-comptable</Label>
                     <Textarea
                       id="accountant_notes"
                       value={reminderSettings.accountant_notes}
                       onChange={(e) =>
                         setReminderSettings((prev) => ({ ...prev, accountant_notes: e.target.value }))
                       }
-                      placeholder="Ex: TVA le 19, cloture au 30/06, paie le 27..."
+                      placeholder="Ex : TVA le 19, clôture au 30/06, paie le 27…"
                     />
                   </div>
                 </div>
@@ -1902,12 +1902,12 @@ export default function ParametresPage() {
                     )}
                     {profile?.naf_label && (
                       <InfoTile
-                        label="Activite detectee"
+                        label="Activité détectée"
                         value={profile.naf_code ? `${profile.naf_code} - ${profile.naf_label}` : profile.naf_label}
                       />
                     )}
                     {profile?.tva_number && (
-                      <InfoTile label="Numero de TVA" value={profile.tva_number} />
+                      <InfoTile label="Numéro de TVA" value={profile.tva_number} />
                     )}
                     {profile?.company_address && (
                       <InfoTile
@@ -1926,7 +1926,7 @@ export default function ParametresPage() {
                     )}
                   </div>
                   <p className="mt-3 text-xs text-emerald-700">
-                    Ces informations sont reutilisees pour pre-remplir les rappels chef d entreprise quand elles sont fiables.
+                    Ces informations sont réutilisées pour pré-remplir les rappels chef d&apos;entreprise quand elles sont fiables.
                   </p>
                 </div>
               )}
@@ -1943,7 +1943,7 @@ export default function ParametresPage() {
                 {saveReminderSuccess && (
                   <span className="inline-flex items-center gap-2 text-sm text-emerald-700">
                     <Check className="h-4 w-4" />
-                    Reglages des rappels enregistres
+                    Réglages des rappels enregistrés
                   </span>
                 )}
               </div>
@@ -1954,7 +1954,7 @@ export default function ParametresPage() {
             <CardHeader>
               <CardTitle className="text-xl">Sources de leads et partenaires</CardTitle>
               <CardDescription>
-                Creez ici vos canaux d acquisition et vos apporteurs d affaires pour les reutiliser dans le CRM et mesurer leur performance dans le dashboard.
+                Créez ici vos canaux d&apos;acquisition et vos apporteurs d&apos;affaires pour les réutiliser dans le CRM et mesurer leur performance dans le dashboard.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1971,7 +1971,7 @@ export default function ParametresPage() {
                         id="lead-source-name"
                         value={newLeadSource.name}
                         onChange={(e) => setNewLeadSource((prev) => ({ ...prev, name: e.target.value }))}
-                        placeholder="Ex: Architecte Martin, Google Ads, Salon local"
+                        placeholder="Ex : Architecte Martin, Google Ads, Salon local"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1987,8 +1987,8 @@ export default function ParametresPage() {
                         }
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
-                        <option value="channel">Canal d acquisition</option>
-                        <option value="partner">Apporteur d affaires</option>
+                        <option value="channel">Canal d&apos;acquisition</option>
+                        <option value="partner">Apporteur d&apos;affaires</option>
                       </select>
                     </div>
                     <div className="space-y-2">
@@ -1997,16 +1997,16 @@ export default function ParametresPage() {
                         id="lead-source-contact"
                         value={newLeadSource.contact_name}
                         onChange={(e) => setNewLeadSource((prev) => ({ ...prev, contact_name: e.target.value }))}
-                        placeholder="Nom du partenaire ou referent"
+                        placeholder="Nom du partenaire ou référent"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lead-source-reward">Idee de recompense</Label>
+                      <Label htmlFor="lead-source-reward">Idée de récompense</Label>
                       <Input
                         id="lead-source-reward"
                         value={newLeadSource.reward_note}
                         onChange={(e) => setNewLeadSource((prev) => ({ ...prev, reward_note: e.target.value }))}
-                        placeholder="Ex: cadeau de fin d annee, commission, dejeuner"
+                        placeholder="Ex : cadeau de fin d&apos;année, commission, déjeuner"
                       />
                     </div>
                   </div>
@@ -2032,7 +2032,7 @@ export default function ParametresPage() {
                     <div className="rounded-xl border border-border bg-card p-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Usage CRM</p>
                       <p className="mt-2 text-sm font-medium text-foreground">
-                        Chaque lead pourra etre rattache a la bonne source pour mesurer vos canaux qui signent vraiment.
+                        Chaque lead pourra être rattaché à la bonne source pour mesurer vos canaux qui signent vraiment.
                       </p>
                     </div>
                   </div>
@@ -2070,11 +2070,11 @@ export default function ParametresPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Recompense / geste</Label>
+                        <Label>Récompense / geste</Label>
                         <Input
                           value={source.reward_note}
                           onChange={(e) => updateLeadSource(source.id, { reward_note: e.target.value })}
-                          placeholder="Bon cadeau, commission, dejeuner..."
+                          placeholder="Bon cadeau, commission, déjeuner…"
                         />
                       </div>
                       <div className="flex items-center gap-3 pb-2 lg:justify-end">
@@ -2112,7 +2112,7 @@ export default function ParametresPage() {
 
           <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl">Etapes de votre pipe CRM</CardTitle>
+              <CardTitle className="text-xl">Étapes de votre pipe CRM</CardTitle>
               <CardDescription>
                 Renommez les etapes de votre pipeline, changez leur ordre et donnez-leur une couleur. Les slugs metier restent stables pour ne pas casser les automatisations de devis et de chantiers.
               </CardDescription>
@@ -2125,7 +2125,7 @@ export default function ParametresPage() {
                     <Input
                       value={newLeadStage.label}
                       onChange={(e) => setNewLeadStage((prev) => ({ ...prev, label: e.target.value }))}
-                      placeholder="Ex: Visite technique, Relance chaude, Accord oral"
+                      placeholder="Ex : Visite technique, Relance chaude, Accord oral"
                     />
                   </div>
                   <div className="space-y-2">
@@ -2216,13 +2216,13 @@ export default function ParametresPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Role</Label>
+                      <Label>Rôle</Label>
                       <div className="flex h-10 items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
                         {stage.is_terminal
-                          ? 'Etape terminale'
+                          ? 'Étape terminale'
                           : CORE_LEAD_STAGE_SLUGS.has(stage.slug)
-                            ? 'Etape active du pipe'
-                            : 'Etape intermediaire personnalisee'}
+                            ? 'Étape active du pipe'
+                            : 'Étape intermédiaire personnalisée'}
                       </div>
                     </div>
                     <div className="flex justify-end">
@@ -2233,13 +2233,13 @@ export default function ParametresPage() {
                     </div>
                     <div className="lg:col-span-5">
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-xs text-muted-foreground">Apercu :</span>
+                        <span className="text-xs text-muted-foreground">Aperçu :</span>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${stage.color}`}>
                           {stage.label}
                         </span>
                         {!CORE_LEAD_STAGE_SLUGS.has(stage.slug) && !stage.is_terminal && (
                           <span className="text-xs text-muted-foreground">
-                            Cette etape sert de palier personnalise dans votre pipe.
+                            Cette étape sert de palier personnalisé dans votre pipe.
                           </span>
                         )}
                       </div>
@@ -2285,10 +2285,10 @@ export default function ParametresPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Users className="h-5 w-5 text-primary" />
-                    Comptes d equipe
+                    Comptes d&apos;équipe
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Invitez les personnes qui doivent vraiment se connecter a Hellobat: chefs d equipe, commerciaux, assistantes ou conducteurs de travaux. Les salaries et sous-traitants terrain restent geres dans l onglet Equipe.
+                    Invitez les personnes qui doivent vraiment se connecter à Hellobat : chefs d&apos;équipe, commerciaux, assistantes ou conducteurs de travaux. Les salariés et sous-traitants terrain restent gérés dans l&apos;onglet Équipe.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -2310,26 +2310,26 @@ export default function ParametresPage() {
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {isWorkspaceOwner
-                      ? 'Vous pilotez ici les acces applicatifs de votre entreprise.'
-                      : "Vous travaillez dans l espace d un autre dirigeant."}
+                      ? 'Vous pilotez ici les accès applicatifs de votre entreprise.'
+                      : "Vous travaillez dans l'espace d'un autre dirigeant."}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/20 p-4">
-                  <p className="text-sm text-muted-foreground">Votre role</p>
+                  <p className="text-sm text-muted-foreground">Votre rôle</p>
                   <p className="mt-1 font-medium text-foreground">
                     {workspaceRole === 'owner' ? 'Dirigeant' : WORKSPACE_ROLE_LABELS[workspaceRole]}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {canManageWorkspaceAccounts
-                      ? 'Vous pouvez inviter et gerer les comptes de connexion.'
-                      : 'Vous avez un acces operationnel, sans gestion des invitations.'}
+                      ? 'Vous pouvez inviter et gérer les comptes de connexion.'
+                      : 'Vous avez un accès opérationnel, sans gestion des invitations.'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border bg-muted/20 p-4">
-                  <p className="text-sm text-muted-foreground">Suivi d activite</p>
-                  <p className="mt-1 font-medium text-foreground">Derniere presence</p>
+                  <p className="text-sm text-muted-foreground">Suivi d&apos;activité</p>
+                  <p className="mt-1 font-medium text-foreground">Dernière présence</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Hellobat note la derniere page ouverte et la derniere presence de chaque compte actif.
+                    Hellobat note la dernière page ouverte et la dernière présence de chaque compte actif.
                   </p>
                 </div>
               </div>
@@ -2337,9 +2337,9 @@ export default function ParametresPage() {
               {!teamFeatureUnlocked && (
                 <Alert className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-700">
                   <Users className="h-4 w-4" />
-                  <AlertTitle>Comptes d equipe reserves aux plans payants</AlertTitle>
+                  <AlertTitle>Comptes d&apos;équipe réservés aux plans payants</AlertTitle>
                   <AlertDescription>
-                    Vous pouvez preparer votre invitation ci-dessous, mais l envoi sera bloque tant que vous restez sur l offre gratuite.
+                    Vous pouvez préparer votre invitation ci-dessous, mais l&apos;envoi sera bloqué tant que vous restez sur l&apos;offre gratuite.
                   </AlertDescription>
                 </Alert>
               )}
@@ -2348,7 +2348,7 @@ export default function ParametresPage() {
                 <div className="flex flex-col gap-2">
                   <h3 className="text-base font-semibold text-foreground">Inviter une personne</h3>
                   <p className="text-sm text-muted-foreground">
-                    Ajoutez simplement son email, choisissez son role, et Hellobat lui enverra un acces pour rejoindre votre equipe.
+                    Ajoutez simplement son email, choisissez son rôle, et Hellobat lui enverra un accès pour rejoindre votre équipe.
                   </p>
                 </div>
 
@@ -2365,7 +2365,7 @@ export default function ParametresPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="team_invite_role">Role</Label>
+                      <Label htmlFor="team_invite_role">Rôle</Label>
                       <select
                         id="team_invite_role"
                         value={teamInviteForm.role}
@@ -2395,14 +2395,14 @@ export default function ParametresPage() {
                     ) : (
                       <Plus className="mr-2 h-4 w-4" />
                     )}
-                    Envoyer l invitation
+                    Envoyer l&apos;invitation
                   </Button>
                 </div>
 
                 {!teamFeatureUnlocked && isWorkspaceOwner && (
                   <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <div className="flex-1 text-sm text-amber-900">
-                      Au moment d envoyer l invitation, Hellobat bloquera l acces tant que vous restez sur Starter et vous proposera de passer au plan Pro.
+                      Au moment d&apos;envoyer l&apos;invitation, Hellobat bloquera l&apos;accès tant que vous restez sur Starter et vous proposera de passer au plan Pro.
                     </div>
                     <Button variant="outline" onClick={() => setActiveTab('abonnement')}>
                       Voir le plan Pro
@@ -2433,16 +2433,16 @@ export default function ParametresPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-semibold text-foreground">Acces deja en place</h3>
+                    <h3 className="text-base font-semibold text-foreground">Accès déjà en place</h3>
                     <p className="text-sm text-muted-foreground">
-                      Suivez qui est invite, qui est actif, et sur quelle page chaque personne a travaille en dernier.
+                      Suivez qui est invité, qui est actif, et sur quelle page chaque personne a travaillé en dernier.
                     </p>
                   </div>
                 </div>
 
                 {workspaceMemberships.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-5 text-sm text-muted-foreground">
-                    Aucun compte d equipe n a encore ete ajoute.
+                    Aucun compte d&apos;équipe n&apos;a encore été ajouté.
                   </div>
                 ) : (
                   workspaceMemberships.map((membership) => {
@@ -2466,8 +2466,8 @@ export default function ParametresPage() {
                               {membership.status === 'active' && membership.accepted_at
                                 ? `Actif depuis le ${formatDate(membership.accepted_at)}`
                                 : membership.status === 'pending'
-                                  ? 'Invitation envoyee, en attente de connexion.'
-                                  : 'Acces retire pour ce compte.'}
+                                  ? 'Invitation envoyée, en attente de connexion.'
+                                  : 'Accès retiré pour ce compte.'}
                             </p>
                             {membership.note && (
                               <p className="text-sm text-muted-foreground">{membership.note}</p>
@@ -2476,7 +2476,7 @@ export default function ParametresPage() {
 
                           <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
                             <div className="space-y-1">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Role</p>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Rôle</p>
                               {isEditable ? (
                                 <select
                                   value={membership.role}
@@ -2497,9 +2497,9 @@ export default function ParametresPage() {
                               )}
                             </div>
                             <div className="space-y-1">
-                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Derniere activite</p>
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Dernière activité</p>
                               <p className="text-sm font-medium text-foreground">
-                                {membership.last_seen_at ? formatDate(membership.last_seen_at) : 'Aucune presence recente'}
+                                {membership.last_seen_at ? formatDate(membership.last_seen_at) : 'Aucune présence récente'}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {formatWorkspacePathLabel(membership.last_active_path)}
@@ -2539,7 +2539,7 @@ export default function ParametresPage() {
                                 const origin = window.location.origin;
                                 const loginUrl = `${origin}/login?email=${encodeURIComponent(membership.invited_email)}&team=1`;
                                 void navigator.clipboard.writeText(loginUrl);
-                                setInviteSuccess(`Lien de connexion copie pour ${membership.invited_email}.`);
+                                setInviteSuccess(`Lien de connexion copié pour ${membership.invited_email}.`);
                               }}
                             >
                               Copier le lien
@@ -2551,7 +2551,7 @@ export default function ParametresPage() {
                               disabled={isUpdating}
                             >
                               {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
-                              Retirer l acces
+                              Retirer l&apos;accès
                             </Button>
                           </div>
                         )}
@@ -2560,7 +2560,7 @@ export default function ParametresPage() {
                           <div className="mt-4 rounded-xl border border-border bg-muted/10 p-4">
                             <div className="flex items-center justify-between mb-3">
                               <p className="text-sm font-medium text-foreground">
-                                Acces aux sections
+                                Accès aux sections
                               </p>
                               <div className="flex gap-2">
                                 <Button
@@ -2575,7 +2575,7 @@ export default function ParametresPage() {
                                   size="sm"
                                   onClick={() => toggleAllPermissions(membership.id, false)}
                                 >
-                                  Tout desactiver
+                                  Tout désactiver
                                 </Button>
                               </div>
                             </div>
@@ -2622,7 +2622,7 @@ export default function ParametresPage() {
             <CardHeader>
               <CardTitle className="text-xl">Mon abonnement</CardTitle>
               <CardDescription>
-                Retrouvez votre plan actuel, comparez les offres et gerez votre abonnement Stripe.
+                Retrouvez votre plan actuel, comparez les offres et gérez votre abonnement Stripe.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -2639,7 +2639,7 @@ export default function ParametresPage() {
                   </div>
                   {profile?.plan_started_at && (
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Active depuis le {formatDate(profile.plan_started_at)}
+                      Actif depuis le {formatDate(profile.plan_started_at)}
                     </p>
                   )}
                 </div>
@@ -2656,12 +2656,12 @@ export default function ParametresPage() {
                       ) : (
                         <ExternalLink className="mr-2 h-4 w-4" />
                       )}
-                      Gerer ou resilier dans Stripe
+                      Gérer ou résilier dans Stripe
                     </Button>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Vous pouvez passer a un plan payant quand vous voulez.
+                    Vous pouvez passer à un plan payant quand vous voulez.
                   </p>
                 )}
               </div>
@@ -2669,9 +2669,9 @@ export default function ParametresPage() {
               {profile?.plan !== 'starter' && !profile?.stripe_customer_id && (
                 <Alert>
                   <CreditCard className="h-4 w-4" />
-                  <AlertTitle>Gestion automatique bientot disponible</AlertTitle>
+                  <AlertTitle>Gestion automatique bientôt disponible</AlertTitle>
                   <AlertDescription>
-                    Votre plan est actif, mais nous n avons pas encore de client Stripe relie a ce compte. Le portail de gestion sera disponible des que la liaison Stripe sera terminee.
+                    Votre plan est actif, mais nous n&apos;avons pas encore de client Stripe relié à ce compte. Le portail de gestion sera disponible dès que la liaison Stripe sera terminée.
                   </AlertDescription>
                 </Alert>
               )}
@@ -2752,7 +2752,7 @@ export default function ParametresPage() {
 
                     {isPaidPlan && !canCheckout && (
                       <p className="text-xs text-muted-foreground">
-                        Ce plan n est pas encore configure dans Stripe.
+                        Ce plan n&apos;est pas encore configuré dans Stripe.
                       </p>
                     )}
                   </CardContent>
@@ -2765,9 +2765,9 @@ export default function ParametresPage() {
         <TabsContent value="securite" className="space-y-6">
           <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl">Securite du compte</CardTitle>
+              <CardTitle className="text-xl">Sécurité du compte</CardTitle>
               <CardDescription>
-                Gardez une vue simple sur votre acces et deconnectez-vous proprement si besoin.
+                Gardez une vue simple sur votre accès et déconnectez-vous proprement si besoin.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -2779,7 +2779,7 @@ export default function ParametresPage() {
                 <div className="rounded-xl border border-border bg-muted/20 p-4">
                   <p className="text-sm text-muted-foreground">Onboarding</p>
                   <p className="mt-1 font-medium text-foreground">
-                    {profile?.onboarding_completed ? 'Termine' : 'Encore en cours'}
+                    {profile?.onboarding_completed ? 'Terminé' : 'Encore en cours'}
                   </p>
                 </div>
               </div>
@@ -2788,7 +2788,7 @@ export default function ParametresPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button variant="outline" asChild>
-                  <Link href="/aide">Ouvrir l aide</Link>
+                  <Link href="/aide">Ouvrir l&apos;aide</Link>
                 </Button>
                 <Button
                   variant="destructive"
@@ -2797,7 +2797,7 @@ export default function ParametresPage() {
                   }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Se deconnecter
+                  Se déconnecter
                 </Button>
               </div>
             </CardContent>

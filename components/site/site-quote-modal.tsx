@@ -287,7 +287,7 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
                 required
                 value={project}
                 onChange={e => setProject(e.target.value)}
-                placeholder="Ex: Rénovation complète de ma salle de bain de 6 m² : dépose de l'existant, nouvelle plomberie, carrelage, douche italienne..."
+                placeholder="Ex : Rénovation complète de ma salle de bain de 6 m² : dépose de l'existant, nouvelle plomberie, carrelage, douche italienne…"
                 maxLength={4000}
                 rows={4}
                 className="w-full px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 transition-shadow"

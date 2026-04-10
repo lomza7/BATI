@@ -75,7 +75,7 @@ export function SendsHistory({ onBack }: Props) {
             Historique des envois
           </h1>
           <p className="text-sm text-muted-foreground">
-            Suivez les catalogues envoyes a vos clients
+            Suivez les catalogues envoyés à vos clients
           </p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export function SendsHistory({ onBack }: Props) {
           </div>
           <h3 className="text-lg font-semibold text-foreground">Aucun envoi</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Les catalogues envoyes a vos clients apparaitront ici.
+            Les catalogues envoyés à vos clients apparaîtront ici.
           </p>
         </div>
       ) : (
@@ -121,21 +121,21 @@ export function SendsHistory({ onBack }: Props) {
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-foreground">{send.client_name}</h3>
                       {expired && (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Expire</span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Expiré</span>
                       )}
                       {send.viewed_at && !expired && (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Consulte</span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Consulté</span>
                       )}
                       {!send.viewed_at && !expired && (
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">En attente</span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {(send.catalogs as any)?.name || 'Catalogue'} - Envoye le {formatDate(send.created_at)}
+                      {(send.catalogs as any)?.name || 'Catalogue'} — Envoyé le {formatDate(send.created_at)}
                     </p>
                     {send.selections_count > 0 && (
                       <p className="text-xs font-medium text-primary mt-1">
-                        {send.selections_count} produit{send.selections_count > 1 ? 's' : ''} selectionne{send.selections_count > 1 ? 's' : ''}
+                        {send.selections_count} produit{send.selections_count > 1 ? 's' : ''} sélectionné{send.selections_count > 1 ? 's' : ''}
                       </p>
                     )}
                   </div>
@@ -150,7 +150,7 @@ export function SendsHistory({ onBack }: Props) {
                         }`}
                       >
                         {copiedId === send.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                        {copiedId === send.id ? 'Copie' : 'Lien'}
+                        {copiedId === send.id ? 'Copié' : 'Lien'}
                       </button>
                     )}
                   </div>

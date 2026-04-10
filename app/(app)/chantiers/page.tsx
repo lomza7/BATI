@@ -207,7 +207,7 @@ function computeDurationDays(startDate: string | null, endDate: string | null) {
 
 function formatDurationLabel(startDate: string | null, endDate: string | null) {
   const days = computeDurationDays(startDate, endDate);
-  if (!days) return 'Aucune duree renseignee';
+  if (!days) return 'Aucune durée renseignée';
   if (endDate) return `${days} jour${days > 1 ? 's' : ''} au total`;
   return `En cours depuis ${days} jour${days > 1 ? 's' : ''}`;
 }
@@ -510,7 +510,7 @@ export default function ChantiersPage() {
       setProjectInvoices((invoices as ProjectInvoice[]) || []);
     }
 
-    // Agréger les affectations par membre (team_assignments = heures pointees)
+    // Agréger les affectations par membre (team_assignments = heures pointées)
     const memberMap = new Map<string, ProjectAssignment>();
     ((assignmentRows as any[]) || []).forEach(row => {
       const memberId = row.team_member_id as string;
@@ -536,7 +536,7 @@ export default function ChantiersPage() {
       if (date && !entry.dates.includes(date)) entry.dates.push(date);
     });
 
-    // Fusionner les planning_events (heures planifiees) dans le meme memberMap
+    // Fusionner les planning_events (heures planifiées) dans le même memberMap
     ((planningRows as any[]) || []).forEach(pe => {
       if (!pe.team_member_id) return;
       const memberId = pe.team_member_id as string;
@@ -765,12 +765,12 @@ export default function ChantiersPage() {
     }
 
     if (editorMode === 'create' && !user) {
-      setFormError("La session utilisateur est requise pour creer un chantier.");
+      setFormError("La session utilisateur est requise pour créer un chantier.");
       return;
     }
 
     if (!ownerId) {
-      setFormError("Le workspace actif n'a pas pu etre determine.");
+      setFormError("Le workspace actif n'a pas pu être déterminé.");
       return;
     }
 
@@ -812,13 +812,13 @@ export default function ChantiersPage() {
           .single();
 
         if (error || !data) {
-          throw new Error(error?.message || 'Impossible de creer le chantier.');
+          throw new Error(error?.message || 'Impossible de créer le chantier.');
         }
 
         projectId = data.id;
       } else {
         if (!selectedProject) {
-          throw new Error('Aucun chantier selectionne.');
+          throw new Error('Aucun chantier sélectionné.');
         }
 
         const { error } = await supabase
@@ -986,7 +986,7 @@ export default function ChantiersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Mes chantiers"
-        description="Suivez vos photos, vos durees et l'avancement de chaque chantier au meme endroit."
+        description="Suivez vos photos, vos durées et l'avancement de chaque chantier au même endroit."
       >
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => router.push('/corbeille')} className="gap-2">
@@ -1018,7 +1018,7 @@ export default function ChantiersPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Rechercher un chantier..."
+            placeholder="Rechercher un chantier…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="pl-10"
@@ -1096,7 +1096,7 @@ export default function ChantiersPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-semibold">{project.name}</h3>
-                        <p className="text-sm text-white/80">{project.clients?.name || 'Sans client lie'}</p>
+                        <p className="text-sm text-white/80">{project.clients?.name || 'Sans client lié'}</p>
                       </div>
 
                       <DropdownMenu>
@@ -1136,13 +1136,13 @@ export default function ChantiersPage() {
                             }}
                           >
                             <Globe2 className="mr-2 h-4 w-4" />
-                            {project.is_public ? 'Gerer la publication' : 'Publier sur mon site'}
+                            {project.is_public ? 'Gérer la publication' : 'Publier sur mon site'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatus(project.id, 'en_cours')}>
                             Passer en cours
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatus(project.id, 'termine')}>
-                            Marquer termine
+                            Marquer terminé
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatus(project.id, 'en_pause')}>
                             Mettre en pause
@@ -1209,7 +1209,7 @@ export default function ChantiersPage() {
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2 text-sm">
                     <span className="text-muted-foreground">Budget chantier</span>
                     <span className="font-semibold text-foreground">
-                      {project.budget > 0 ? formatCurrency(project.budget) : 'Non renseigne'}
+                      {project.budget > 0 ? formatCurrency(project.budget) : 'Non renseigné'}
                     </span>
                   </div>
                 </div>
@@ -1323,7 +1323,7 @@ export default function ChantiersPage() {
               {editorMode === 'create' ? 'Nouveau chantier' : `Modifier ${selectedProject?.name || 'le chantier'}`}
             </DialogTitle>
             <DialogDescription>
-              Renseignez le chantier, glissez quelques photos et gardez une trace claire du temps passe.
+              Renseignez le chantier, glissez quelques photos et gardez une trace claire du temps passé.
             </DialogDescription>
           </DialogHeader>
 
@@ -1334,7 +1334,7 @@ export default function ChantiersPage() {
                   <label className="text-sm font-medium text-foreground">Nom du chantier *</label>
                   <Input
                     className="mt-1"
-                    placeholder="Ex: Renovation appartement Dupont"
+                    placeholder="Ex : Rénovation appartement Dupont"
                     value={form.name}
                     onChange={(event) => setForm({ ...form, name: event.target.value })}
                   />
@@ -1355,7 +1355,7 @@ export default function ChantiersPage() {
                     value={addressQuery}
                     onChange={setAddressQuery}
                     onSelect={handleAddressSelect}
-                    placeholder="Tapez une adresse..."
+                    placeholder="Tapez une adresse…"
                     className="mt-1"
                   />
                   {form.lat && form.lng ? (
@@ -1388,7 +1388,7 @@ export default function ChantiersPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-foreground">Date de debut</label>
+                  <label className="text-sm font-medium text-foreground">Date de début</label>
                   <Input
                     className="mt-1"
                     type="date"
@@ -1413,7 +1413,7 @@ export default function ChantiersPage() {
                     {formatDurationLabel(form.start_date || null, form.end_date || null)}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    La duree se met a jour automatiquement selon vos dates.
+                    La durée se met à jour automatiquement selon vos dates.
                   </p>
                 </div>
 
@@ -1425,7 +1425,7 @@ export default function ChantiersPage() {
                       : selectedProject ? formatTrackedHours(selectedProject.trackedHours) : '0 h'}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Base sur les heures renseignees par membre sur ce chantier.
+                    Basé sur les heures renseignées par membre sur ce chantier.
                   </p>
                 </div>
 
@@ -1433,7 +1433,7 @@ export default function ChantiersPage() {
                   <label className="text-sm font-medium text-foreground">Notes chantier</label>
                   <Textarea
                     className="mt-1 min-h-[120px]"
-                    placeholder="Contexte, acces, remarques client, points a surveiller..."
+                    placeholder="Contexte, accès, remarques client, points à surveiller…"
                     value={form.notes}
                     onChange={(event) => setForm({ ...form, notes: event.target.value })}
                   />
@@ -1597,9 +1597,9 @@ export default function ChantiersPage() {
               <div className="rounded-2xl border border-border bg-card p-4">
                 <p className="text-sm font-semibold text-foreground">Ce que cette modal apporte</p>
                 <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  <p>1. Les photos sont rangees directement avec le chantier.</p>
-                  <p>2. La duree chantier reste visible en un coup d&apos;oeil.</p>
-                  <p>3. Le temps equipe saisi donne enfin un vrai contexte sur le suivi.</p>
+                  <p>1. Les photos sont rangées directement avec le chantier.</p>
+                  <p>2. La durée chantier reste visible en un coup d&apos;œil.</p>
+                  <p>3. Le temps équipe saisi donne enfin un vrai contexte sur le suivi.</p>
                 </div>
               </div>
             </div>
@@ -1617,7 +1617,7 @@ export default function ChantiersPage() {
             </Button>
             <Button onClick={saveProject} disabled={!form.name.trim() || !form.lat || !form.lng || saving} className="gap-2">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {editorMode === 'create' ? 'Creer le chantier' : 'Enregistrer'}
+              {editorMode === 'create' ? 'Créer le chantier' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1632,7 +1632,7 @@ export default function ChantiersPage() {
                   <div>
                     <DialogTitle>{activeProject.name}</DialogTitle>
                     <DialogDescription>
-                      {activeProject.clients?.name || 'Sans client lie'}{activeProject.city ? ` - ${activeProject.city}` : ''}
+                      {activeProject.clients?.name || 'Sans client lié'}{activeProject.city ? ` — ${activeProject.city}` : ''}
                     </DialogDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1671,7 +1671,7 @@ export default function ChantiersPage() {
                       }}
                     >
                       <Globe2 className="h-4 w-4" />
-                      {activeProject.is_public ? 'Publie sur le site' : 'Publier sur le site'}
+                      {activeProject.is_public ? 'Publié sur le site' : 'Publier sur le site'}
                     </Button>
                     <Button
                       variant="outline"
@@ -1699,7 +1699,7 @@ export default function ChantiersPage() {
                 </div>
               </DialogHeader>
 
-              {/* Boussole de marge — visible immediatement a l'ouverture */}
+              {/* Boussole de marge — visible immédiatement à l'ouverture */}
               {(() => {
                 const { caHT, coutRevient, margeBrute, margePct, totalMainOeuvre, totalDepensesHT } = projectFinance;
                 const margeColor = margePct === null
@@ -1723,7 +1723,7 @@ export default function ChantiersPage() {
                   : margePct < 0
                     ? 'Chantier en perte'
                     : margePct < 15
-                      ? 'Rentabilite faible'
+                      ? 'Rentabilité faible'
                       : margePct < 30
                         ? 'Marge correcte'
                         : 'Excellente marge';
@@ -1762,7 +1762,7 @@ export default function ChantiersPage() {
                         ) : (
                           <div className="text-right">
                             <p className="text-sm font-medium text-muted-foreground">Aucune facture émise</p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">La marge apparaitra dès la première facture</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">La marge apparaîtra dès la première facture</p>
                           </div>
                         )}
                       </div>
@@ -1795,7 +1795,7 @@ export default function ChantiersPage() {
                       </div>
                     </div>
 
-                    {/* Detail */}
+                    {/* Détail */}
                     <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                       <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
                         <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">CA facturé HT</p>
@@ -1977,12 +1977,12 @@ export default function ChantiersPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        Jours travailles
+                        Jours travaillés
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
                         {activeProject.plannedDays > 0 ? (
                           <>{activeProject.plannedDays} jour{activeProject.plannedDays > 1 ? 's' : ''}</>
-                        ) : 'Non planifie'}
+                        ) : 'Non planifié'}
                       </p>
                       {activeProject.start_date && (
                         <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1992,7 +1992,7 @@ export default function ChantiersPage() {
                     </div>
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
                       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                        Heures main-d&apos;oeuvre
+                        Heures main-d&apos;œuvre
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
                         {activeProject.plannedHours > 0 ? (
@@ -2010,7 +2010,7 @@ export default function ChantiersPage() {
                         Budget
                       </p>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {activeProject.budget > 0 ? formatCurrency(activeProject.budget) : 'Non renseigne'}
+                        {activeProject.budget > 0 ? formatCurrency(activeProject.budget) : 'Non renseigné'}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-border bg-muted/25 p-4">
@@ -2022,11 +2022,11 @@ export default function ChantiersPage() {
                   </div>
 
                   <div className="rounded-2xl border border-border bg-card p-4">
-                    <p className="text-sm font-semibold text-foreground">Repere rapide</p>
+                    <p className="text-sm font-semibold text-foreground">Repère rapide</p>
                     <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                       <p className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        Debut : {activeProject.start_date ? formatDate(activeProject.start_date) : 'Non renseigne'}
+                        Début : {activeProject.start_date ? formatDate(activeProject.start_date) : 'Non renseigné'}
                       </p>
                       <p className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
@@ -2034,7 +2034,7 @@ export default function ChantiersPage() {
                       </p>
                       <p className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        {activeProject.address || 'Adresse non renseignee'}
+                        {activeProject.address || 'Adresse non renseignée'}
                       </p>
                     </div>
                   </div>
@@ -2288,7 +2288,7 @@ export default function ChantiersPage() {
                         )}
                       </div>
                       {projectAssignments.length === 0 ? (
-                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation. Planifiez ce chantier dans le Planning pour voir la main-d&apos;oeuvre ici.</p>
+                        <p className="px-4 py-4 text-sm text-muted-foreground">Aucune affectation. Planifiez ce chantier dans le Planning pour voir la main-d&apos;œuvre ici.</p>
                       ) : (
                         <>
                           {/* Mobile : cartes */}

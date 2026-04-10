@@ -52,7 +52,7 @@ const EVENT_CATEGORIES: Record<string, { label: string; color: string }> = {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 const DAYS_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-const MONTHS = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
+const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 const COLOR_OPTIONS = [
   { value: '#3b82f6', label: 'Bleu' },
@@ -417,7 +417,7 @@ export default function CalendrierPage() {
                 <RefreshCw className={cn('h-4 w-4', gcalPulling && 'animate-spin')} />
                 <span className="hidden sm:inline">Synchroniser</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={disconnectGcal} className="gap-1.5 text-muted-foreground" title="Deconnecter Google Calendar">
+              <Button variant="ghost" size="sm" onClick={disconnectGcal} className="gap-1.5 text-muted-foreground" title="Déconnecter Google Calendar">
                 <Unplug className="h-4 w-4" />
               </Button>
             </>
@@ -432,7 +432,7 @@ export default function CalendrierPage() {
             </Button>
           )}
           <Button onClick={() => { setForm({ title: '', description: '', category: 'rdv_client', startDate: todayStr, endDate: todayStr, startTime: '', endTime: '', color: EVENT_CATEGORIES.rdv_client.color, clientId: null }); setShowCreate(true); }} className="gap-2">
-            <Plus className="h-4 w-4" /> Evenement
+            <Plus className="h-4 w-4" /> Événement
           </Button>
         </div>
       </PageHeader>
@@ -441,7 +441,7 @@ export default function CalendrierPage() {
       {gcalConnected && (
         <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
           <CalendarCheck className="h-3.5 w-3.5" />
-          Google Calendar connecte — vos evenements sont synchronises
+          Google Calendar connecté — vos événements sont synchronisés
         </div>
       )}
 
@@ -654,13 +654,13 @@ export default function CalendrierPage() {
         )}
       </div>
 
-      {/* ─── Dialog evenement ─── */}
+      {/* ─── Dialog événement ─── */}
       <Dialog open={showCreate} onOpenChange={(open) => { if (!open) closeForm(); else setShowCreate(true); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingEvent ? <Edit2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {editingEvent ? 'Modifier' : 'Nouvel'} evenement
+              {editingEvent ? 'Modifier' : 'Nouvel'} événement
               {editingEvent?.source === 'google_calendar' && (
                 <span className="inline-flex items-center gap-1 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full ml-2">
                   <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-blue-500 text-white text-[7px] font-bold">G</span>
@@ -673,10 +673,10 @@ export default function CalendrierPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Titre *</label>
-                <Input className="mt-1" placeholder="Ex: Reunion client..." value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                <Input className="mt-1" placeholder="Ex : Réunion client…" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
               </div>
               <div>
-                <label className="text-sm font-medium">Categorie</label>
+                <label className="text-sm font-medium">Catégorie</label>
                 <Select value={form.category} onValueChange={v => setForm({ ...form, category: v, color: EVENT_CATEGORIES[v]?.color || form.color })}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
@@ -706,7 +706,7 @@ export default function CalendrierPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Debut *</label>
+                <label className="text-sm font-medium">Début *</label>
                 <Input className="mt-1" type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
               </div>
               <div>
@@ -717,7 +717,7 @@ export default function CalendrierPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Heure debut</label>
+                <label className="text-sm font-medium">Heure début</label>
                 <Input className="mt-1" type="time" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} />
               </div>
               <div>
@@ -750,7 +750,7 @@ export default function CalendrierPage() {
               <label className="text-sm font-medium">Description</label>
               <Textarea
                 className="mt-1"
-                placeholder="Details de l'evenement..."
+                placeholder="Détails de l'événement…"
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
                 rows={3}
@@ -776,7 +776,7 @@ export default function CalendrierPage() {
               <div className="flex gap-2">
                 <Button variant="outline" onClick={closeForm}>Annuler</Button>
                 <Button onClick={saveEvent} disabled={!form.title.trim() || !form.startDate}>
-                  {editingEvent ? 'Enregistrer' : 'Creer'}
+                  {editingEvent ? 'Enregistrer' : 'Créer'}
                 </Button>
               </div>
             </div>

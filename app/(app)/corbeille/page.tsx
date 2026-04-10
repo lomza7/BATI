@@ -299,11 +299,11 @@ export default function CorbeillePage() {
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-muted/40 p-3 text-sm">
-                    <p className="text-muted-foreground">Supprime le</p>
+                    <p className="text-muted-foreground">Supprimé le</p>
                     <p className="mt-1 font-medium text-foreground">{formatDate(item.deleted_at)}</p>
                   </div>
                   <div className="rounded-xl bg-muted/40 p-3 text-sm">
-                    <p className="text-muted-foreground">Suppression definitive</p>
+                    <p className="text-muted-foreground">Suppression définitive</p>
                     <p className="mt-1 font-medium text-foreground">{formatDate(expiresAt.toISOString())}</p>
                   </div>
                   {item.meta ? (

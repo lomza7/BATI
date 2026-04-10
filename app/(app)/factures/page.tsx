@@ -281,7 +281,7 @@ export default function FacturesPage() {
     setQuotes(nextQuotes);
     setLoading(false);
 
-    // Verifie la presence d'un RIB pour la modale de premiere facture.
+    // Vérifie la présence d'un RIB pour la modale de première facture.
     const { data: bankRows } = await supabase
       .from('bank_accounts')
       .select('id')
@@ -310,7 +310,7 @@ export default function FacturesPage() {
   }
 
   function handleConvertQuote(quote: QuoteCandidate) {
-    // Si le devis a deja son propre RIB, on ouvre directement la carte de facturation
+    // Si le devis a déjà son propre RIB, on ouvre directement la carte de facturation
     if (quote.bank_account_id || hasBankAccount) {
       setBillingQuote(quote);
       return;
@@ -694,7 +694,7 @@ export default function FacturesPage() {
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Rechercher un devis ou une facture..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+              <Input placeholder="Rechercher un devis ou une facture…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
             </div>
             <select
               value={quoteSort}
@@ -732,7 +732,7 @@ export default function FacturesPage() {
                           {alreadyHasInvoices ? (
                             <Badge className="bg-[#fff7f0] text-[#d35400] hover:bg-[#fff7f0]">En facturation</Badge>
                           ) : (
-                            <Badge className="bg-[#fff1e8] text-[#a34700] hover:bg-[#fff1e8]">A facturer</Badge>
+                            <Badge className="bg-[#fff1e8] text-[#a34700] hover:bg-[#fff1e8]">À facturer</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -927,15 +927,15 @@ export default function FacturesPage() {
         onSaved={(account) => {
           setHasBankAccount(true);
           setShowFirstRibDialog(false);
-          // Si on etait en train de facturer un devis, on ouvre directement la carte
-          // de facturation avec ce RIB fraichement cree.
+          // Si on était en train de facturer un devis, on ouvre directement la carte
+          // de facturation avec ce RIB fraîchement créé.
           if (pendingQuoteForInvoice) {
             const quoteWithBank = { ...pendingQuoteForInvoice, bank_account_id: account.id };
             setPendingQuoteForInvoice(null);
             setBillingQuote(quoteWithBank);
             return;
           }
-          // Sinon on ouvre le formulaire de facture manuelle avec ce RIB selectionne
+          // Sinon on ouvre le formulaire de facture manuelle avec ce RIB sélectionné
           setSelectedBankAccountId(account.id);
           setShowCreate(true);
         }}

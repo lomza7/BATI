@@ -185,12 +185,12 @@ export default function AvisPage() {
       const data = (await response.json()) as GoogleStatusPayload;
 
       if (!response.ok) {
-        throw new Error(data.error || 'Impossible de recuperer Google Business Profile');
+        throw new Error(data.error || 'Impossible de récupérer Google Business Profile');
       }
 
       setStatus(data);
 
-      // Si Google est connecte, on sync vers la table locale pour les toggles publish/hide.
+      // Si Google est connecté, on sync vers la table locale pour les toggles publish/hide.
       if (data.connected && data.reviews.length > 0) {
         await syncGoogleReviews();
       }
@@ -214,7 +214,7 @@ export default function AvisPage() {
     try {
       const existing = localReviewsMap.get(review.name);
       if (!existing) {
-        // Pas encore synchronise : on force un sync puis on reouvre
+        // Pas encore synchronisé : on force un sync puis on réouvre
         await syncGoogleReviews();
         setTogglingReview(null);
         return;
@@ -226,12 +226,12 @@ export default function AvisPage() {
         .eq('id', existing.id);
       if (updateError) throw updateError;
 
-      // Mise a jour locale optimiste
+      // Mise à jour locale optimiste
       const nextMap = new Map(localReviewsMap);
       nextMap.set(review.name, { ...existing, is_published_on_site: nextValue });
       setLocalReviewsMap(nextMap);
 
-      // Revalidate le site publie (ISR) pour que le changement apparaisse en ligne
+      // Revalidate le site publié (ISR) pour que le changement apparaisse en ligne
       if (siteSlug) {
         try {
           const {
@@ -248,7 +248,7 @@ export default function AvisPage() {
             });
           }
         } catch {
-          // silencieux : le toggle en DB est deja fait, ISR regenerera dans l'heure
+          // silencieux : le toggle en DB est déjà fait, ISR régénérera dans l'heure
         }
       }
     } catch (toggleError) {
@@ -317,13 +317,13 @@ export default function AvisPage() {
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(data.error || 'Impossible de publier la reponse');
+        throw new Error(data.error || 'Impossible de publier la réponse');
       }
       setShowRespond(null);
       setResponseText('');
       await loadGoogleData();
     } catch (replyError) {
-      setError(replyError instanceof Error ? replyError.message : 'Impossible de publier la reponse');
+      setError(replyError instanceof Error ? replyError.message : 'Impossible de publier la réponse');
     } finally {
       setReplyLoading(false);
     }
@@ -356,7 +356,7 @@ export default function AvisPage() {
     <div className="space-y-6">
       <PageHeader
         title="Avis Google"
-        description="Connectez votre fiche Google, gerez les avis reels et partagez le lien officiel en un clic."
+        description="Connectez votre fiche Google, gérez les avis réels et partagez le lien officiel en un clic."
       >
         {isConnected ? (
           <>
@@ -381,15 +381,15 @@ export default function AvisPage() {
       {error && (
         googleAccessPending ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
-            <p className="text-sm font-semibold text-amber-900">Connexion Google reussie</p>
+            <p className="text-sm font-semibold text-amber-900">Connexion Google réussie</p>
             <p className="mt-1 text-sm text-amber-800">
-              Votre compte Google est bien connecte a Hellobat.
+              Votre compte Google est bien connecté à Hellobat.
             </p>
             <p className="mt-1 text-sm text-amber-800">
-              Nous attendons maintenant l autorisation officielle de Google pour importer et gerer votre fiche et vos avis depuis l application.
+              Nous attendons maintenant l&apos;autorisation officielle de Google pour importer et gérer votre fiche et vos avis depuis l&apos;application.
             </p>
             <p className="mt-1 text-sm text-amber-800">
-              Des que Google valide cet acces, votre fiche apparaitra ici automatiquement.
+              Dès que Google valide cet accès, votre fiche apparaîtra ici automatiquement.
             </p>
             <div className="mt-4 rounded-xl border border-amber-200 bg-white/90 px-4 py-3">
               <div className="flex items-center justify-between gap-3">
@@ -403,13 +403,13 @@ export default function AvisPage() {
                 />
               </div>
               <p className="mt-3 text-xs text-amber-700">
-                Votre connexion est terminee. Il ne reste plus que l autorisation officielle de Google.
+                Votre connexion est terminée. Il ne reste plus que l&apos;autorisation officielle de Google.
               </p>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-amber-700">Connexion Google</p>
-                <p className="mt-1 text-sm font-medium text-foreground">Reussie</p>
+                <p className="mt-1 text-sm font-medium text-foreground">Réussie</p>
               </div>
               <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-amber-700">Autorisation Google</p>
@@ -421,7 +421,7 @@ export default function AvisPage() {
               </div>
             </div>
             <p className="mt-4 text-xs text-amber-700">
-              Vous n avez rien d autre a faire pour le moment. Nous finaliserons automatiquement l acces des que Google aura valide notre demande.
+              Vous n&apos;avez rien d&apos;autre à faire pour le moment. Nous finaliserons automatiquement l&apos;accès dès que Google aura validé notre demande.
             </p>
           </div>
         ) : (
@@ -439,17 +439,17 @@ export default function AvisPage() {
             </div>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
               {googleAccessPending
-                ? 'Votre compte Google est bien relie. Nous attendons maintenant la validation de Google.'
+                ? 'Votre compte Google est bien relié. Nous attendons maintenant la validation de Google.'
                 : status.connected
-                  ? 'Votre compte Google est bien relie, mais aucune fiche n a encore ete trouvee.'
-                  : 'Connectez votre fiche Google pour envoyer votre lien d avis en un clic.'}
+                  ? 'Votre compte Google est bien relié, mais aucune fiche n\u2019a encore été trouvée.'
+                  : 'Connectez votre fiche Google pour envoyer votre lien d\u2019avis en un clic.'}
               </h2>
               <p className="mt-3 text-sm text-muted-foreground">
               {googleAccessPending
-                ? 'Des que Google nous autorise officiellement a importer et gerer votre fiche, elle apparaitra automatiquement ici.'
+                ? 'Dès que Google nous autorise officiellement à importer et gérer votre fiche, elle apparaîtra automatiquement ici.'
                 : status.connected
-                  ? 'Si votre fiche vient juste d etre creee, reconnectez Google dans quelques minutes.'
-                  : 'Une fois connecte, vous pourrez copier votre lien d avis, voir les avis clients et y repondre depuis Hellobat.'}
+                  ? 'Si votre fiche vient juste d\u2019être créée, reconnectez Google dans quelques minutes.'
+                  : 'Une fois connecté, vous pourrez copier votre lien d\u2019avis, voir les avis clients et y répondre depuis Hellobat.'}
               </p>
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -459,7 +459,7 @@ export default function AvisPage() {
                 </Button>
               )}
               <Button variant="outline" className="gap-2" onClick={() => window.open(GOOGLE_CREATE_PROFILE_URL, '_blank')}>
-                <ExternalLink className="h-4 w-4" /> Creer ma fiche Google
+                <ExternalLink className="h-4 w-4" /> Créer ma fiche Google
               </Button>
             </div>
           </div>
@@ -475,17 +475,17 @@ export default function AvisPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">{selectedLocation.title}</p>
-                    <p className="text-xs text-muted-foreground">Fiche Google connectee</p>
+                    <p className="text-xs text-muted-foreground">Fiche Google connectée</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" className="gap-1.5" onClick={disconnectGoogle} disabled={syncing}>
-                  <Unplug className="h-3.5 w-3.5" /> Deconnecter
+                  <Unplug className="h-3.5 w-3.5" /> Déconnecter
                 </Button>
               </div>
 
               {status.locations.length > 1 && (
                 <div className="mt-4">
-                  <label className="text-xs font-medium text-muted-foreground">Fiche selectionnee</label>
+                  <label className="text-xs font-medium text-muted-foreground">Fiche sélectionnée</label>
                   <select
                     className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={selectedLocation.locationName}
@@ -507,7 +507,7 @@ export default function AvisPage() {
                   <span className="font-medium text-foreground">{status.totalReviewCount}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Reponses a faire</span>
+                  <span className="text-muted-foreground">Réponses à faire</span>
                   <span className="font-medium text-foreground">{pendingReplies}</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -518,12 +518,12 @@ export default function AvisPage() {
             </div>
 
             <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-sm font-semibold text-foreground">Lien officiel d avis</p>
+              <p className="text-sm font-semibold text-foreground">Lien officiel d&apos;avis</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Google fournit ce lien pour demander un avis sur la fiche selectionnee.
+                Google fournit ce lien pour demander un avis sur la fiche sélectionnée.
               </p>
               <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground break-all">
-                {selectedLocation.newReviewUri || 'Aucun lien d avis fourni par Google pour cette fiche'}
+                {selectedLocation.newReviewUri || 'Aucun lien d\u2019avis fourni par Google pour cette fiche'}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -532,7 +532,7 @@ export default function AvisPage() {
                   onClick={() => copyText(selectedLocation.newReviewUri, 'link')}
                   disabled={!selectedLocation.newReviewUri}
                 >
-                  <Copy className="h-3.5 w-3.5" /> {copiedState === 'link' ? 'Lien copie' : 'Copier le lien'}
+                  <Copy className="h-3.5 w-3.5" /> {copiedState === 'link' ? 'Lien copié' : 'Copier le lien'}
                 </Button>
                 <Button
                   variant="outline"
@@ -546,9 +546,9 @@ export default function AvisPage() {
             </div>
 
             <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-sm font-semibold text-foreground">Demande d avis rapide</p>
+              <p className="text-sm font-semibold text-foreground">Demande d&apos;avis rapide</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Prepare un message client pre-rempli avec le vrai lien Google de la fiche selectionnee.
+                Prépare un message client pré-rempli avec le vrai lien Google de la fiche sélectionnée.
               </p>
               <Button onClick={() => setShowRequest(true)} className="mt-4 w-full gap-2">
                 <Send className="h-4 w-4" /> Ouvrir la demande client
@@ -582,9 +582,9 @@ export default function AvisPage() {
             <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">Avis reels remontes depuis Google</h2>
+                  <h2 className="text-base font-semibold text-foreground">Avis réels remontés depuis Google</h2>
                   <p className="text-sm text-muted-foreground">
-                    Repondez depuis Hellobat sans sortir du logiciel.
+                    Répondez depuis Hellobat sans sortir du logiciel.
                   </p>
                 </div>
                 <Button variant="outline" size="sm" className="gap-2" onClick={loadGoogleData} disabled={syncing}>
@@ -603,7 +603,7 @@ export default function AvisPage() {
                   <EmptyState
                     icon={Star}
                     title="Aucun avis pour l'instant"
-                    description="La connexion Google est active. Des qu un avis remonte sur cette fiche, il apparaitra ici."
+                    description="La connexion Google est active. Dès qu&apos;un avis remonte sur cette fiche, il apparaîtra ici."
                   >
                     <Button onClick={() => setShowRequest(true)} className="gap-2">
                       <Send className="h-4 w-4" /> Demander un avis
@@ -638,11 +638,11 @@ export default function AvisPage() {
                             )}
                             title={
                               isPublishedOnSite
-                                ? 'Cet avis est affiche sur votre site vitrine'
-                                : 'Cet avis est masque de votre site vitrine'
+                                ? 'Cet avis est affiché sur votre site vitrine'
+                                : 'Cet avis est masqué de votre site vitrine'
                             }
                           >
-                            {isPublishedOnSite ? 'Sur le site' : 'Masque'}
+                            {isPublishedOnSite ? 'Sur le site' : 'Masqué'}
                           </span>
                           <span
                             className={cn(
@@ -650,7 +650,7 @@ export default function AvisPage() {
                               review.reviewReplyComment ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                             )}
                           >
-                            {review.reviewReplyComment ? 'Repondu' : 'En attente'}
+                            {review.reviewReplyComment ? 'Répondu' : 'En attente'}
                           </span>
                         </div>
                       </div>
@@ -659,7 +659,7 @@ export default function AvisPage() {
 
                       {review.reviewReplyComment && (
                         <div className="mt-3 rounded-lg bg-muted/50 p-3">
-                          <p className="mb-1 text-xs font-medium text-muted-foreground">Votre reponse</p>
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">Votre réponse</p>
                           <p className="text-sm text-foreground">{review.reviewReplyComment}</p>
                         </div>
                       )}
@@ -676,10 +676,10 @@ export default function AvisPage() {
                                 setResponseText('');
                               }}
                             >
-                              <MessageSquare className="h-3 w-3" /> Repondre
+                              <MessageSquare className="h-3 w-3" /> Répondre
                             </Button>
                             <Button variant="outline" size="sm" className="gap-1">
-                              <Sparkles className="h-3 w-3" /> Reponse IA
+                              <Sparkles className="h-3 w-3" /> Réponse IA
                             </Button>
                           </>
                         )}
@@ -691,19 +691,19 @@ export default function AvisPage() {
                           disabled={isToggling || !siteSlug}
                           title={
                             !siteSlug
-                              ? 'Publiez d abord votre site vitrine pour gerer la visibilite des avis'
+                              ? 'Publiez d\u2019abord votre site vitrine pour gérer la visibilité des avis'
                               : undefined
                           }
                         >
                           {isPublishedOnSite ? (
                             <>
                               <EyeOff className="h-3 w-3" />{' '}
-                              {isToggling ? 'Masquage...' : 'Masquer du site'}
+                              {isToggling ? 'Masquage…' : 'Masquer du site'}
                             </>
                           ) : (
                             <>
                               <Eye className="h-3 w-3" />{' '}
-                              {isToggling ? 'Publication...' : 'Afficher sur le site'}
+                              {isToggling ? 'Publication…' : 'Afficher sur le site'}
                             </>
                           )}
                         </Button>
@@ -721,7 +721,7 @@ export default function AvisPage() {
       <Dialog open={showRequest} onOpenChange={setShowRequest}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Preparer une demande d avis</DialogTitle>
+            <DialogTitle>Préparer une demande d&apos;avis</DialogTitle>
             <DialogDescription>
               Remplissez juste le nom du client, puis copiez le message.
             </DialogDescription>
@@ -748,7 +748,7 @@ export default function AvisPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-sm font-medium">Telephone / WhatsApp (optionnel)</label>
+              <label className="text-sm font-medium">Téléphone / WhatsApp (optionnel)</label>
               <Input
                 className="mt-1"
                 placeholder="06 12 34 56 78"
@@ -757,14 +757,14 @@ export default function AvisPage() {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-sm font-medium">Message pret a envoyer</label>
+              <label className="text-sm font-medium">Message prêt à envoyer</label>
               <Textarea className="mt-1 min-h-[160px]" value={requestMessage} readOnly />
             </div>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Button onClick={() => copyText(requestMessage, 'message')} disabled={!requestMessage} className="gap-2">
-              <Copy className="h-4 w-4" /> {copiedState === 'message' ? 'Message copie' : 'Copier le message'}
+              <Copy className="h-4 w-4" /> {copiedState === 'message' ? 'Message copié' : 'Copier le message'}
             </Button>
             <Button
               variant="outline"
@@ -776,7 +776,7 @@ export default function AvisPage() {
                 window.open(`mailto:${requestForm.email}?subject=${subject}&body=${body}`, '_blank');
               }}
             >
-              <Mail className="h-4 w-4" /> Ouvrir l email
+              <Mail className="h-4 w-4" /> Ouvrir l&apos;email
             </Button>
             <Button
               variant="outline"
@@ -797,7 +797,7 @@ export default function AvisPage() {
       <Dialog open={!!showRespond} onOpenChange={() => setShowRespond(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Repondre a {showRespond?.reviewerName}</DialogTitle>
+            <DialogTitle>Répondre à {showRespond?.reviewerName}</DialogTitle>
           </DialogHeader>
           <div className="mt-4 space-y-4">
             {showRespond && (
@@ -808,20 +808,20 @@ export default function AvisPage() {
             )}
             <Textarea
               className="min-h-[140px]"
-              placeholder="Votre reponse..."
+              placeholder="Votre réponse…"
               value={responseText}
               onChange={(event) => setResponseText(event.target.value)}
             />
             <div className="flex items-center justify-between">
               <Button variant="outline" className="gap-2">
-                <Sparkles className="h-4 w-4" /> Generer avec l IA
+                <Sparkles className="h-4 w-4" /> Générer avec l&apos;IA
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setShowRespond(null)}>
                   Annuler
                 </Button>
                 <Button onClick={publishReply} disabled={!responseText.trim() || replyLoading}>
-                  {replyLoading ? 'Publication...' : 'Publier'}
+                  {replyLoading ? 'Publication…' : 'Publier'}
                 </Button>
               </div>
             </div>

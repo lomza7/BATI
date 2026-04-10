@@ -10,7 +10,7 @@ import { Turnstile } from '@/components/shared/turnstile';
 const benefits = [
   'Devis et factures en quelques clics',
   'Gestion de chantiers sur carte',
-  'Planning equipe integre',
+  'Planning équipe intégré',
   'Site web professionnel automatique',
 ];
 
@@ -58,7 +58,7 @@ function SignupContent() {
     setError('');
 
     if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caracteres');
+      setError('Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
 
@@ -116,8 +116,8 @@ function SignupContent() {
           <div className="space-y-8">
             <h2 className="text-3xl font-semibold text-white leading-tight">
               Tout ce dont vous avez<br />
-              besoin pour gerer<br />
-              votre activite.
+              besoin pour gérer<br />
+              votre activité.
             </h2>
             <ul className="space-y-4">
               {benefits.map((benefit) => (
@@ -149,13 +149,13 @@ function SignupContent() {
               Créez votre compte
             </h1>
             <p className="text-muted-foreground">
-              Commencez a gérer vos chantiers en quelques minutes
+              Commencez à gérer vos chantiers en quelques minutes
             </p>
           </div>
 
           {teamInvite && (
             <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Vous avez ete invite a rejoindre un espace equipe Hellobat. Creez votre acces avec cet email et nous activerons automatiquement votre place dans l equipe.
+              Vous avez été invité à rejoindre un espace équipe Hellobat. Créez votre accès avec cet email et nous activerons automatiquement votre place dans l&apos;équipe.
             </div>
           )}
 
@@ -165,7 +165,7 @@ function SignupContent() {
               <div className="text-foreground">
                 <p className="font-semibold">2 mois offerts</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Vous beneficiez de 2 mois gratuits grace au parrainage <span className="font-mono font-semibold text-foreground">{referralCode.toUpperCase()}</span>.
+                  Vous bénéficiez de 2 mois gratuits grâce au parrainage <span className="font-mono font-semibold text-foreground">{referralCode.toUpperCase()}</span>.
                 </p>
               </div>
             </div>
@@ -206,7 +206,7 @@ function SignupContent() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 6 caracteres"
+                  placeholder="Minimum 6 caractères"
                   className="flex h-11 w-full rounded-lg border border-border bg-white px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 />
                 <button
@@ -247,7 +247,7 @@ function SignupContent() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  Creer mon compte
+                  Créer mon compte
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -255,11 +255,11 @@ function SignupContent() {
           </form>
 
           <p className="mt-3 text-xs text-center text-muted-foreground/70">
-            En creant un compte, vous acceptez nos conditions d&apos;utilisation
+            En créant un compte, vous acceptez nos conditions d&apos;utilisation
           </p>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            Deja un compte ?{' '}
+            Déjà un compte ?{' '}
             <Link
               href="/login"
               className="font-medium text-primary hover:text-primary/80 transition-colors"

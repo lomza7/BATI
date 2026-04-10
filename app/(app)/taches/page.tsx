@@ -39,10 +39,10 @@ import { cn } from '@/lib/utils';
 type FilterView = 'toutes' | 'actives' | 'terminees' | 'en_retard' | 'aujourdhui';
 
 const QUICK_TASKS = [
-  'Commander materiaux',
+  'Commander matériaux',
   'Appeler le client',
   'Faire le devis',
-  'Verifier le chantier',
+  'Vérifier le chantier',
   'Relancer la facture',
 ];
 
@@ -208,16 +208,16 @@ export default function TachesPage() {
   const filters: { key: FilterView; label: string; count: number; icon: React.ElementType }[] = [
     { key: 'toutes', label: 'Toutes', count: stats.total, icon: ListTodo },
     { key: 'actives', label: 'Actives', count: stats.actives, icon: Circle },
-    { key: 'terminees', label: 'Terminees', count: stats.terminees, icon: CheckCircle2 },
+    { key: 'terminees', label: 'Terminées', count: stats.terminees, icon: CheckCircle2 },
     { key: 'en_retard', label: 'En retard', count: stats.enRetard, icon: Clock },
     { key: 'aujourdhui', label: "Aujourd'hui", count: stats.aujourdhui, icon: CalendarDays },
   ];
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <PageHeader title="Mes taches" description="Organisez votre quotidien d'artisan">
+      <PageHeader title="Mes tâches" description="Organisez votre quotidien d&apos;artisan">
         <Button onClick={() => { resetForm(); setShowCreate(true); }} className="gap-2">
-          <Plus className="h-4 w-4" /> Nouvelle tache
+          <Plus className="h-4 w-4" /> Nouvelle tâche
         </Button>
       </PageHeader>
 
@@ -233,19 +233,19 @@ export default function TachesPage() {
           </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground">A faire</p>
+          <p className="text-xs font-medium text-muted-foreground">À faire</p>
           <p className="mt-1 text-2xl font-semibold text-foreground">{stats.actives}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">taches actives</p>
+          <p className="text-xs text-muted-foreground mt-0.5">tâches actives</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground">Terminees</p>
+          <p className="text-xs font-medium text-muted-foreground">Terminées</p>
           <p className="mt-1 text-2xl font-semibold text-emerald-600">{stats.terminees}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">completees</p>
+          <p className="text-xs text-muted-foreground mt-0.5">complétées</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs font-medium text-muted-foreground">En retard</p>
           <p className={cn('mt-1 text-2xl font-semibold', stats.enRetard > 0 ? 'text-red-600' : 'text-foreground')}>{stats.enRetard}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">a traiter</p>
+          <p className="text-xs text-muted-foreground mt-0.5">à traiter</p>
         </div>
       </div>
 
@@ -253,7 +253,7 @@ export default function TachesPage() {
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
           <Input
-            placeholder="Ajouter rapidement une tache..."
+            placeholder="Ajouter rapidement une tâche…"
             value={quickAdd}
             onChange={e => setQuickAdd(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') quickCreateTodo(quickAdd); }}
@@ -309,7 +309,7 @@ export default function TachesPage() {
           <div className="relative flex-1 sm:w-48 sm:flex-initial">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Rechercher..."
+              placeholder="Rechercher…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 h-8 text-xs"
@@ -339,15 +339,15 @@ export default function TachesPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={CheckSquare}
-          title={filterView === 'actives' ? 'Tout est fait !' : 'Aucune tache'}
+          title={filterView === 'actives' ? 'Tout est fait !' : 'Aucune tâche'}
           description={
             filterView === 'actives'
-              ? 'Felicitations, toutes vos taches sont terminees.'
-              : 'Ajoutez votre premiere tache pour organiser votre journee.'
+              ? 'Félicitations, toutes vos tâches sont terminées.'
+              : 'Ajoutez votre première tâche pour organiser votre journée.'
           }
         >
           <Button onClick={() => { resetForm(); setShowCreate(true); }} className="gap-2">
-            <Plus className="h-4 w-4" /> Ajouter une tache
+            <Plus className="h-4 w-4" /> Ajouter une tâche
           </Button>
         </EmptyState>
       ) : (
@@ -370,7 +370,7 @@ export default function TachesPage() {
             onClick={clearCompleted}
             className="text-xs text-muted-foreground hover:text-destructive transition-colors"
           >
-            Supprimer les {stats.terminees} tache{stats.terminees > 1 ? 's' : ''} terminee{stats.terminees > 1 ? 's' : ''}
+            Supprimer les {stats.terminees} tâche{stats.terminees > 1 ? 's' : ''} terminée{stats.terminees > 1 ? 's' : ''}
           </button>
         </div>
       )}
@@ -378,14 +378,14 @@ export default function TachesPage() {
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nouvelle tache</DialogTitle>
+            <DialogTitle>Nouvelle tâche</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
               <label className="text-sm font-medium">Titre</label>
               <Input
                 className="mt-1"
-                placeholder="Ex: Commander carrelage salle de bain"
+                placeholder="Ex : Commander carrelage salle de bain"
                 value={form.title}
                 onChange={e => setForm({ ...form, title: e.target.value })}
               />
@@ -395,14 +395,14 @@ export default function TachesPage() {
               <Textarea
                 className="mt-1 resize-none"
                 rows={2}
-                placeholder="Details supplementaires..."
+                placeholder="Détails supplémentaires…"
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Priorite</label>
+                <label className="text-sm font-medium">Priorité</label>
                 <Select value={form.priority} onValueChange={(v: TodoPriority) => setForm({ ...form, priority: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -413,7 +413,7 @@ export default function TachesPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Categorie</label>
+                <label className="text-sm font-medium">Catégorie</label>
                 <Select value={form.category} onValueChange={(v: TodoCategory) => setForm({ ...form, category: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -441,7 +441,7 @@ export default function TachesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Temps passe (min)</label>
+                <label className="text-sm font-medium">Temps passé (min)</label>
                 <Input
                   className="mt-1"
                   type="number"
@@ -454,7 +454,7 @@ export default function TachesPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button onClick={createTodo} disabled={!form.title.trim()}>Creer</Button>
+              <Button onClick={createTodo} disabled={!form.title.trim()}>Créer</Button>
             </div>
           </div>
         </DialogContent>
@@ -463,7 +463,7 @@ export default function TachesPage() {
       <Dialog open={!!editingTodo} onOpenChange={open => { if (!open) setEditingTodo(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modifier la tache</DialogTitle>
+            <DialogTitle>Modifier la tâche</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
@@ -485,7 +485,7 @@ export default function TachesPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Priorite</label>
+                <label className="text-sm font-medium">Priorité</label>
                 <Select value={form.priority} onValueChange={(v: TodoPriority) => setForm({ ...form, priority: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -496,7 +496,7 @@ export default function TachesPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Categorie</label>
+                <label className="text-sm font-medium">Catégorie</label>
                 <Select value={form.category} onValueChange={(v: TodoCategory) => setForm({ ...form, category: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -524,7 +524,7 @@ export default function TachesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Temps passe (min)</label>
+                <label className="text-sm font-medium">Temps passé (min)</label>
                 <Input
                   className="mt-1"
                   type="number"

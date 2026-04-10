@@ -17,14 +17,14 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Supabase ecoute le hash fragment (#access_token=...) et restaure la session
+    // Supabase écoute le hash fragment (#access_token=...) et restaure la session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setReady(true);
       }
     });
 
-    // Verifier si on a deja une session recovery
+    // Vérifier si on a déjà une session recovery
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setReady(true);
     });
@@ -37,7 +37,7 @@ export default function ResetPasswordPage() {
     setError('');
 
     if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caracteres');
+      setError('Le mot de passe doit contenir au moins 6 caractères');
       return;
     }
 
@@ -74,7 +74,7 @@ export default function ResetPasswordPage() {
               <Lock className="h-7 w-7 text-primary animate-pulse" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm">Verification en cours...</p>
+          <p className="text-muted-foreground text-sm">Vérification en cours...</p>
         </div>
       </div>
     );
@@ -97,10 +97,10 @@ export default function ResetPasswordPage() {
         {success ? (
           <>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
-              Mot de passe modifie
+              Mot de passe modifié
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-              Votre mot de passe a ete mis a jour. Redirection vers votre espace...
+              Votre mot de passe a été mis à jour. Redirection vers votre espace...
             </p>
             <div className="h-1 w-32 mx-auto rounded-full bg-emerald-200 overflow-hidden">
               <div className="h-full bg-emerald-500 rounded-full animate-[progress_2s_ease-in-out]" style={{ width: '100%' }} />
@@ -133,7 +133,7 @@ export default function ResetPasswordPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 6 caracteres"
+                    placeholder="Minimum 6 caractères"
                     className="flex h-11 w-full rounded-lg border border-border bg-white px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   />
                   <button
@@ -172,7 +172,7 @@ export default function ResetPasswordPage() {
                 {loading ? (
                   <Lock className="h-4 w-4 animate-pulse" />
                 ) : (
-                  'Mettre a jour le mot de passe'
+                  'Mettre à jour le mot de passe'
                 )}
               </button>
             </form>
@@ -182,7 +182,7 @@ export default function ResetPasswordPage() {
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Retour a la connexion
+              Retour à la connexion
             </Link>
           </>
         )}

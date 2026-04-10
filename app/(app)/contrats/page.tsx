@@ -116,7 +116,7 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  chaudiere: 'Chaudiere',
+  chaudiere: 'Chaudière',
   clim: 'Climatisation',
   piscine: 'Piscine',
   autre: 'Autre',
@@ -129,7 +129,7 @@ const FREQ_LABELS: Record<string, string> = {
 };
 
 const mrrChartConfig = {
-  mrr: { label: 'MRR collecte', color: 'hsl(var(--chart-1))' },
+  mrr: { label: 'MRR collecté', color: 'hsl(var(--chart-1))' },
 } satisfies ChartConfig;
 
 const TVA_OPTIONS = [
@@ -470,7 +470,7 @@ export default function ContratsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Contrats recurrents" description="Abonnements et contrats d'entretien">
+      <PageHeader title="Contrats récurrents" description="Abonnements et contrats d&apos;entretien">
         <Button onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }} className="gap-2">
           <Plus className="h-4 w-4" /> Nouveau contrat
         </Button>
@@ -487,7 +487,7 @@ export default function ContratsPage() {
         <KpiCard
           title="MRR"
           value={formatCurrency(mrr)}
-          subtitle="Revenu mensuel recurrent"
+          subtitle="Revenu mensuel récurrent"
           icon={TrendingUp}
           sparkline={mrrChartData.map(d => ({ value: d.mrr }))}
           sparklineColor="hsl(var(--chart-1))"
@@ -495,19 +495,19 @@ export default function ContratsPage() {
         <KpiCard
           title="ARR"
           value={formatCurrency(mrr * 12)}
-          subtitle="Revenu annuel recurrent"
+          subtitle="Revenu annuel récurrent"
           icon={Euro}
         />
         <KpiCard
-          title="Prochaines echeances"
+          title="Prochaines échéances"
           value={String(upcomingBillings.length)}
-          subtitle="A facturer dans les 7 jours"
+          subtitle="À facturer dans les 7 jours"
           icon={Calendar}
         />
         <KpiCard
           title="Taux d'encaissement"
           value={`${collectionRate}%`}
-          subtitle={`${paidInvoices.length}/${allContractInvoices.length} factures payees`}
+          subtitle={`${paidInvoices.length}/${allContractInvoices.length} factures payées`}
           icon={Percent}
         />
         <KpiCard
@@ -521,7 +521,7 @@ export default function ContratsPage() {
       {/* MRR Chart */}
       {mrrChartData.some(d => d.mrr > 0) && (
         <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-foreground">Revenus recurrents collectes</h2>
+          <h2 className="text-base font-semibold text-foreground">Revenus récurrents collectés</h2>
           <p className="text-sm text-muted-foreground mt-1">Encaissements des contrats sur les 12 derniers mois</p>
           <div className="mt-4 h-[200px]">
             <ChartContainer config={mrrChartConfig} className="h-full w-full">
@@ -548,7 +548,7 @@ export default function ContratsPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Rechercher un contrat..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder="Rechercher un contrat…" value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
         <select
           value={filterStatus}
@@ -559,7 +559,7 @@ export default function ContratsPage() {
           <option value="en_attente">En attente</option>
           <option value="actif">Actif</option>
           <option value="suspendu">Suspendu</option>
-          <option value="resilie">Resilie</option>
+          <option value="resilie">Résilié</option>
         </select>
         <select
           value={filterType}
@@ -567,7 +567,7 @@ export default function ContratsPage() {
           className="h-10 rounded-md border border-input bg-background px-3 text-sm"
         >
           <option value="tous">Tous les types</option>
-          <option value="chaudiere">Chaudiere</option>
+          <option value="chaudiere">Chaudière</option>
           <option value="clim">Climatisation</option>
           <option value="piscine">Piscine</option>
           <option value="autre">Autre</option>
@@ -579,8 +579,8 @@ export default function ContratsPage() {
         <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />)}</div>
       ) : filtered.length === 0 ? (
         contracts.length === 0 ? (
-          <EmptyState icon={RefreshCw} title="Aucun contrat" description="Creez des contrats d'entretien recurrents pour generer du revenu previsible.">
-            <Button onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }} className="gap-2"><Plus className="h-4 w-4" /> Creer un contrat</Button>
+          <EmptyState icon={RefreshCw} title="Aucun contrat" description="Créez des contrats d&apos;entretien récurrents pour générer du revenu prévisible.">
+            <Button onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }} className="gap-2"><Plus className="h-4 w-4" /> Créer un contrat</Button>
           </EmptyState>
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
@@ -610,7 +610,7 @@ export default function ContratsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium text-foreground">{c.title}</p>
                         {isBillingDue && (
-                          <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50">A facturer</Badge>
+                          <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50">À facturer</Badge>
                         )}
                         {c.quotes && (() => {
                           const qst = QUOTE_STATUSES[c.quotes.status as keyof typeof QUOTE_STATUSES];
@@ -648,7 +648,7 @@ export default function ContratsPage() {
                       c.status === 'actif' ? 'bg-emerald-50 text-emerald-700' :
                       c.status === 'suspendu' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
                     )}>
-                      {c.status === 'en_attente' ? 'En attente' : c.status === 'actif' ? 'Actif' : c.status === 'suspendu' ? 'Suspendu' : 'Resilie'}
+                      {c.status === 'en_attente' ? 'En attente' : c.status === 'actif' ? 'Actif' : c.status === 'suspendu' ? 'Suspendu' : 'Résilié'}
                     </span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
@@ -658,12 +658,12 @@ export default function ContratsPage() {
                         {c.status === 'actif' && (
                           <DropdownMenuItem onClick={() => generateInvoice(c)} disabled={billingContractId === c.id}>
                             <Receipt className="mr-2 h-4 w-4" />
-                            {billingContractId === c.id ? 'Generation...' : 'Facturer maintenant'}
+                            {billingContractId === c.id ? 'Génération…' : 'Facturer maintenant'}
                           </DropdownMenuItem>
                         )}
                         {!c.quote_id && (
                           <DropdownMenuItem onClick={() => generateQuote(c)}>
-                            <FileText className="mr-2 h-4 w-4" /> Generer un devis
+                            <FileText className="mr-2 h-4 w-4" /> Générer un devis
                           </DropdownMenuItem>
                         )}
                         {c.quotes && (
@@ -676,13 +676,13 @@ export default function ContratsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {c.status !== 'actif' && (
-                          <DropdownMenuItem onClick={() => updateStatus(c.id, 'actif')}>Reactiver</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => updateStatus(c.id, 'actif')}>Réactiver</DropdownMenuItem>
                         )}
                         {c.status === 'actif' && (
                           <DropdownMenuItem onClick={() => updateStatus(c.id, 'suspendu')}>Suspendre</DropdownMenuItem>
                         )}
                         {c.status !== 'resilie' && (
-                          <DropdownMenuItem onClick={() => updateStatus(c.id, 'resilie')} className="text-red-600">Resilier</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => updateStatus(c.id, 'resilie')} className="text-red-600">Résilier</DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -696,15 +696,15 @@ export default function ContratsPage() {
                     {/* Contract details */}
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-muted-foreground">Debut</p>
+                        <p className="text-xs text-muted-foreground">Début</p>
                         <p className="font-medium text-foreground">{c.start_date ? formatDate(c.start_date) : '-'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Fin</p>
-                        <p className="font-medium text-foreground">{c.end_date ? formatDate(c.end_date) : 'Indeterminee'}</p>
+                        <p className="font-medium text-foreground">{c.end_date ? formatDate(c.end_date) : 'Indéterminée'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Derniere facturation</p>
+                        <p className="text-xs text-muted-foreground">Dernière facturation</p>
                         <p className="font-medium text-foreground">{c.last_billed_at ? formatDate(c.last_billed_at) : 'Jamais'}</p>
                       </div>
                       <div>
@@ -715,7 +715,7 @@ export default function ContratsPage() {
                           </a>
                         ) : (
                           <button onClick={() => generateQuote(c)} className="font-medium text-primary hover:underline">
-                            Generer un devis
+                            Générer un devis
                           </button>
                         )}
                       </div>
@@ -730,7 +730,7 @@ export default function ContratsPage() {
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="rounded-lg border border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2">
-                            <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Encaisse</p>
+                            <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Encaissé</p>
                             <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatCurrency(totalPaid)}</p>
                           </div>
                           <div className="rounded-lg border border-border bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2">
@@ -760,7 +760,7 @@ export default function ContratsPage() {
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Historique de facturation</p>
                       {invoices.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Aucune facture generee pour ce contrat.</p>
+                        <p className="text-sm text-muted-foreground">Aucune facture générée pour ce contrat.</p>
                       ) : (
                         <div className="space-y-2">
                           {invoices.map(ci => {
@@ -804,7 +804,7 @@ export default function ContratsPage() {
                                   {inv.status === 'payee' && (
                                     <span className="flex items-center gap-1 text-xs text-emerald-600">
                                       <CheckCircle className="h-3 w-3" />
-                                      {inv.paid_at ? formatDate(inv.paid_at) : 'Payee'}
+                                      {inv.paid_at ? formatDate(inv.paid_at) : 'Payée'}
                                     </span>
                                   )}
                                 </div>
@@ -840,7 +840,7 @@ export default function ContratsPage() {
           <div className="space-y-4 mt-2">
             <div>
               <label className="text-sm font-medium">Titre *</label>
-              <Input className="mt-1" placeholder="Ex: Entretien chaudiere annuel" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+              <Input className="mt-1" placeholder="Ex : Entretien chaudière annuel" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             </div>
 
             <div>
@@ -856,7 +856,7 @@ export default function ContratsPage() {
                 <Select value={form.contractType} onValueChange={v => setForm({ ...form, contractType: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="chaudiere">Chaudiere</SelectItem>
+                    <SelectItem value="chaudiere">Chaudière</SelectItem>
                     <SelectItem value="clim">Climatisation</SelectItem>
                     <SelectItem value="piscine">Piscine</SelectItem>
                     <SelectItem value="autre">Autre</SelectItem>
@@ -864,7 +864,7 @@ export default function ContratsPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Frequence</label>
+                <label className="text-sm font-medium">Fréquence</label>
                 <Select value={form.frequency} onValueChange={v => setForm({ ...form, frequency: v })}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -901,7 +901,7 @@ export default function ContratsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Date de debut</label>
+                <label className="text-sm font-medium">Date de début</label>
                 <Input className="mt-1" type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} />
               </div>
               <div>
@@ -914,7 +914,7 @@ export default function ContratsPage() {
               <label className="text-sm font-medium">Description</label>
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px]"
-                placeholder="Scope du contrat..."
+                placeholder="Scope du contrat…"
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
               />
@@ -922,7 +922,7 @@ export default function ContratsPage() {
 
             <div>
               <label className="text-sm font-medium">Notes internes</label>
-              <Input className="mt-1" placeholder="Notes..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <Input className="mt-1" placeholder="Notes…" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer">
@@ -938,7 +938,7 @@ export default function ContratsPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); }}>Annuler</Button>
               <Button onClick={saveContract} disabled={!form.title.trim()}>
-                {editingId ? 'Enregistrer' : 'Creer'}
+                {editingId ? 'Enregistrer' : 'Créer'}
               </Button>
             </div>
           </div>

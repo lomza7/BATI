@@ -30,13 +30,13 @@ export function SiteProjects({ projects, siteSlug }: SiteProjectsProps) {
           className="text-2xl sm:text-3xl font-bold text-center mb-3 sm:mb-4"
           style={{ color: 'var(--site-heading)', fontFamily: 'var(--site-font)' }}
         >
-          Nos realisations
+          Nos réalisations
         </h2>
         <p
           className="text-center text-sm sm:text-base max-w-2xl mx-auto mb-8 sm:mb-12 px-2"
           style={{ color: 'var(--site-text-muted)' }}
         >
-          Decouvrez nos derniers chantiers : photos avant/apres, descriptif des travaux et resultats obtenus.
+          Découvrez nos derniers chantiers : photos avant/après, descriptif des travaux et résultats obtenus.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

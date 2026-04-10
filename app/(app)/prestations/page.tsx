@@ -198,7 +198,7 @@ export default function PrestationsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Rechercher une prestation..."
+            placeholder="Rechercher une prestation…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-10"
@@ -347,7 +347,7 @@ export default function PrestationsPage() {
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                 rows={2}
-                placeholder="Détails, références, marque..."
+                placeholder="Détails, références, marque…"
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
               />
@@ -383,7 +383,7 @@ export default function PrestationsPage() {
                 <label className="text-sm font-medium">Catégorie</label>
                 <Select value={form.category || 'none'} onValueChange={v => setForm({ ...form, category: v === 'none' ? '' : v })}>
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Catégorie..." />
+                    <SelectValue placeholder="Catégorie…" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sans catégorie</SelectItem>

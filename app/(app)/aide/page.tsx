@@ -48,21 +48,21 @@ interface FaqCategory {
 const FAQ: FaqCategory[] = [
   {
     id: 'demarrage',
-    title: 'Demarrage',
+    title: 'Démarrage',
     icon: Sparkles,
     color: 'from-amber-500/15 to-orange-500/5 text-amber-600',
     items: [
       {
-        q: 'Comment configurer mon compte la premiere fois ?',
-        a: "A la creation de votre compte, un onboarding en plusieurs etapes vous guide : informations entreprise, activite, premiers clients. Vous pouvez tout modifier ensuite depuis Parametres.",
+        q: 'Comment configurer mon compte la première fois ?',
+        a: "À la création de votre compte, un onboarding en plusieurs étapes vous guide : informations entreprise, activité, premiers clients. Vous pouvez tout modifier ensuite depuis Paramètres.",
       },
       {
         q: 'Est-ce que Hellobat fonctionne sur mobile ?',
-        a: "Oui, l'application est entierement optimisee pour mobile. Vous pouvez creer des devis a la voix, prendre des photos de chantiers et gerer votre planning depuis votre telephone.",
+        a: "Oui, l'application est entièrement optimisée pour mobile. Vous pouvez créer des devis à la voix, prendre des photos de chantiers et gérer votre planning depuis votre téléphone.",
       },
       {
-        q: 'Mes donnees sont-elles sauvegardees ?',
-        a: "Oui, toutes vos donnees sont stockees sur Supabase (PostgreSQL) avec des sauvegardes automatiques. Vos fichiers (devis PDF, photos chantiers) sont stockes en toute securite.",
+        q: 'Mes données sont-elles sauvegardées ?',
+        a: "Oui, toutes vos données sont stockées sur Supabase (PostgreSQL) avec des sauvegardes automatiques. Vos fichiers (devis PDF, photos chantiers) sont stockés en toute sécurité.",
       },
     ],
   },
@@ -73,20 +73,20 @@ const FAQ: FaqCategory[] = [
     color: 'from-blue-500/15 to-sky-500/5 text-blue-600',
     items: [
       {
-        q: 'Comment creer un devis avec l\'assistant IA vocal ?',
-        a: "Allez dans Devis > Nouveau devis > onglet Assistant IA. Cliquez sur le micro et decrivez le chantier. L'IA remplit automatiquement les lignes du devis. Disponible sur Chrome et Edge.",
+        q: 'Comment créer un devis avec l\'assistant IA vocal ?',
+        a: "Allez dans Devis > Nouveau devis > onglet Assistant IA. Cliquez sur le micro et décrivez le chantier. L'IA remplit automatiquement les lignes du devis. Disponible sur Chrome et Edge.",
       },
       {
-        q: 'Comment faire signer un devis a un client ?',
-        a: "Sur la page d'un devis, cliquez sur 'Envoyer pour signature'. Hellobat utilise DocuSeal : votre client recoit un email avec un lien de signature electronique. Vous etes notifie quand c'est signe.",
+        q: 'Comment faire signer un devis à un client ?',
+        a: "Sur la page d'un devis, cliquez sur « Envoyer pour signature ». Hellobat utilise DocuSeal : votre client reçoit un email avec un lien de signature électronique. Vous êtes notifié quand c'est signé.",
       },
       {
         q: 'Puis-je personnaliser mes templates de documents ?',
-        a: "Oui, dans Parametres > Templates documents vous pouvez personnaliser le rendu des devis et factures (logo, couleurs, mentions legales).",
+        a: "Oui, dans Paramètres > Templates documents vous pouvez personnaliser le rendu des devis et factures (logo, couleurs, mentions légales).",
       },
       {
-        q: 'Comment numeroter mes devis ?',
-        a: "La numerotation est automatique au format D-YYYY-XXX (devis) et F-YYYY-XXX (factures). Le compteur se reinitialise chaque annee.",
+        q: 'Comment numéroter mes devis ?',
+        a: "La numérotation est automatique au format D-YYYY-XXX (devis) et F-YYYY-XXX (factures). Le compteur se réinitialise chaque année.",
       },
     ],
   },
@@ -98,15 +98,15 @@ const FAQ: FaqCategory[] = [
     items: [
       {
         q: 'Comment ajouter un client ?',
-        a: "Depuis Contacts > Nouveau contact. Vous pouvez aussi rechercher une entreprise par nom ou SIRET grace a notre integration Pappers : les informations se remplissent automatiquement.",
+        a: "Depuis Contacts > Nouveau contact. Vous pouvez aussi rechercher une entreprise par nom ou SIRET grâce à notre intégration Pappers : les informations se remplissent automatiquement.",
       },
       {
         q: 'Comment voir mes chantiers sur une carte ?',
-        a: "Allez dans Carte (menu Chantiers). Tous vos chantiers geolocalises s'affichent sur une carte interactive. Vous pouvez aussi rendre certains chantiers publics pour les afficher sur votre site web.",
+        a: "Allez dans Carte (menu Chantiers). Tous vos chantiers géolocalisés s'affichent sur une carte interactive. Vous pouvez aussi rendre certains chantiers publics pour les afficher sur votre site web.",
       },
       {
-        q: 'Comment partager un chantier avec mon equipe ?',
-        a: "Depuis le chantier, ajoutez des membres d'equipe. Ils verront ensuite le chantier dans leur planning. Le drag and drop dans Planning permet d'attribuer rapidement.",
+        q: 'Comment partager un chantier avec mon équipe ?',
+        a: "Depuis le chantier, ajoutez des membres d'équipe. Ils verront ensuite le chantier dans leur planning. Le drag and drop dans Planning permet d'attribuer rapidement.",
       },
     ],
   },
@@ -118,43 +118,43 @@ const FAQ: FaqCategory[] = [
     items: [
       {
         q: 'Puis-je synchroniser avec Google Calendar ?',
-        a: "Oui, dans Calendrier cliquez sur 'Connecter Google Calendar'. La sync est bidirectionnelle : vos evenements Hellobat apparaissent dans Google et inversement.",
+        a: "Oui, dans Calendrier cliquez sur « Connecter Google Calendar ». La sync est bidirectionnelle : vos événements Hellobat apparaissent dans Google et inversement.",
       },
       {
-        q: 'Comment fonctionne le planning equipe ?',
-        a: "Dans Planning, vue semaine ou mois. Glissez-deposez des creneaux pour assigner des chantiers, conges ou reunions a vos membres d'equipe. Vous-meme apparaissez comme dirigeant.",
+        q: 'Comment fonctionne le planning équipe ?',
+        a: "Dans Planning, vue semaine ou mois. Glissez-déposez des créneaux pour assigner des chantiers, congés ou réunions à vos membres d'équipe. Vous-même apparaissez comme dirigeant.",
       },
     ],
   },
   {
     id: 'comptabilite',
-    title: 'Comptabilite IA',
+    title: 'Comptabilité IA',
     icon: Calculator,
     color: 'from-rose-500/15 to-pink-500/5 text-rose-600',
     items: [
       {
         q: 'Comment fonctionne l\'OCR Maurice ?',
-        a: "Prenez en photo ou importez un recu/facture fournisseur. Maurice (notre OCR IA) extrait automatiquement le montant, la date, le fournisseur et la categorie. Vous validez en un clic.",
+        a: "Prenez en photo ou importez un reçu/facture fournisseur. Maurice (notre OCR IA) extrait automatiquement le montant, la date, le fournisseur et la catégorie. Vous validez en un clic.",
       },
       {
-        q: 'Puis-je faire la reconciliation bancaire ?',
-        a: "Oui, dans Comptabilite > Flux. Importez votre releve bancaire et l'IA propose les rapprochements avec vos depenses et factures.",
+        q: 'Puis-je faire la réconciliation bancaire ?',
+        a: "Oui, dans Comptabilité > Flux. Importez votre relevé bancaire et l'IA propose les rapprochements avec vos dépenses et factures.",
       },
     ],
   },
   {
     id: 'communication',
-    title: 'Boite mail & Avis',
+    title: 'Boîte mail & Avis',
     icon: Mail,
     color: 'from-cyan-500/15 to-teal-500/5 text-cyan-600',
     items: [
       {
-        q: 'Comment connecter ma boite Gmail ?',
-        a: "Dans Boite mail, cliquez sur 'Connecter Gmail'. Apres autorisation, vos emails s'affichent directement dans Hellobat. L'IA peut generer des reponses contextualisees avec l'historique du client.",
+        q: 'Comment connecter ma boîte Gmail ?',
+        a: "Dans Boîte mail, cliquez sur « Connecter Gmail ». Après autorisation, vos emails s'affichent directement dans Hellobat. L'IA peut générer des réponses contextualisées avec l'historique du client.",
       },
       {
-        q: 'Comment gerer mes avis Google ?',
-        a: "Dans Avis Google, connectez votre Google Business Profile. Vous voyez tous vos avis et pouvez y repondre directement, avec assistance IA pour les reponses.",
+        q: 'Comment gérer mes avis Google ?',
+        a: "Dans Avis Google, connectez votre Google Business Profile. Vous voyez tous vos avis et pouvez y répondre directement, avec assistance IA pour les réponses.",
       },
     ],
   },
@@ -166,11 +166,11 @@ const FAQ: FaqCategory[] = [
     items: [
       {
         q: 'Comment publier mon site vitrine ?',
-        a: "Dans Site web IA, choisissez un theme, l'IA genere automatiquement le contenu (services, presentation) base sur votre activite. Vos chantiers publics y apparaissent. Publication en un clic.",
+        a: "Dans Site web IA, choisissez un thème, l'IA génère automatiquement le contenu (services, présentation) basé sur votre activité. Vos chantiers publics y apparaissent. Publication en un clic.",
       },
       {
         q: "Quelle est l'URL de mon site ?",
-        a: "Votre site est publie sur hellobat.app/site/votre-slug. Vous pouvez aussi le brancher sur votre nom de domaine personnalise.",
+        a: "Votre site est publié sur hellobat.app/site/votre-slug. Vous pouvez aussi le brancher sur votre nom de domaine personnalisé.",
       },
     ],
   },
@@ -182,21 +182,21 @@ const FAQ: FaqCategory[] = [
     items: [
       {
         q: 'Comment changer de plan ?',
-        a: "Dans Parametres > Abonnement, cliquez sur 'Gerer mon abonnement'. Vous arrivez sur le portail Stripe ou vous pouvez passer en Pro ou Business, ou annuler.",
+        a: "Dans Paramètres > Abonnement, cliquez sur « Gérer mon abonnement ». Vous arrivez sur le portail Stripe où vous pouvez passer en Pro ou Business, ou annuler.",
       },
       {
-        q: 'Comment beneficier des 2 mois offerts du parrainage ?',
-        a: "Allez dans Lien de parrainage (au-dessus de Parametres). Partagez votre lien personnel : pour chaque artisan qui souscrit grace a vous, vous gagnez 2 mois offerts et lui aussi.",
+        q: 'Comment bénéficier des 2 mois offerts du parrainage ?',
+        a: "Allez dans Lien de parrainage (au-dessus de Paramètres). Partagez votre lien personnel : pour chaque artisan qui souscrit grâce à vous, vous gagnez 2 mois offerts et lui aussi.",
       },
     ],
   },
 ];
 
 const SUGGESTIONS = [
-  'Comment creer un devis ?',
+  'Comment créer un devis ?',
   'Comment ajouter un chantier ?',
   'Je veux signaler un bug',
-  'J\'ai une idee de fonctionnalite',
+  'J\'ai une idée de fonctionnalité',
 ];
 
 export default function AidePage() {
@@ -205,7 +205,7 @@ export default function AidePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: "Bonjour ! Je suis l'assistant Hellobat. Je peux repondre a vos questions, vous guider dans l'utilisation, signaler un bug ou transmettre une demande de fonctionnalite a l'equipe. Comment puis-je vous aider ?",
+      content: "Bonjour ! Je suis l'assistant Hellobat. Je peux répondre à vos questions, vous guider dans l'utilisation, signaler un bug ou transmettre une demande de fonctionnalité à l'équipe. Comment puis-je vous aider ?",
     },
   ]);
   const [input, setInput] = useState('');
@@ -236,7 +236,7 @@ export default function AidePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error('Session expiree');
+        throw new Error('Session expirée');
       }
 
       const res = await fetch('/api/support/chat', {
@@ -264,7 +264,7 @@ export default function AidePage() {
         ...prev,
         {
           role: 'assistant',
-          content: "Desole, je n'ai pas pu repondre. Reessayez dans un instant ou contactez-nous directement.",
+          content: "Désolé, je n'ai pas pu répondre. Réessayez dans un instant ou contactez-nous directement.",
         },
       ]);
     } finally {
@@ -281,7 +281,7 @@ export default function AidePage() {
     <div className="space-y-6">
       <PageHeader
         title="Centre d'aide"
-        description="Consultez nos guides ou posez votre question a notre assistant"
+        description="Consultez nos guides ou posez votre question à notre assistant"
       >
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
           <Bot className="h-3.5 w-3.5" /> Assistant IA disponible
@@ -299,7 +299,7 @@ export default function AidePage() {
               Comment pouvons-nous vous aider ?
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Parcourez nos guides organises par theme ci-dessous, ou discutez en direct avec notre assistant IA pour obtenir une reponse personnalisee, signaler un bug, ou suggerer une nouvelle fonctionnalite.
+              Parcourez nos guides organisés par thème ci-dessous, ou discutez en direct avec notre assistant IA pour obtenir une réponse personnalisée, signaler un bug, ou suggérer une nouvelle fonctionnalité.
             </p>
           </div>
         </div>
@@ -319,7 +319,7 @@ export default function AidePage() {
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher dans l'aide..."
+              placeholder="Rechercher dans l'aide…"
               className="pl-9"
             />
           </div>
@@ -328,7 +328,7 @@ export default function AidePage() {
             <div className="rounded-xl border border-border bg-card p-8 text-center">
               <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                Aucun resultat pour &laquo; {search} &raquo;. Posez votre question a l&apos;assistant ci-contre.
+                Aucun résultat pour &laquo; {search} &raquo;. Posez votre question à l&apos;assistant ci-contre.
               </p>
             </div>
           ) : (
@@ -369,7 +369,7 @@ export default function AidePage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-foreground leading-tight">Assistant Hellobat</h3>
-                  <p className="text-[11px] text-muted-foreground">En ligne · Reponse instantanee</p>
+                  <p className="text-[11px] text-muted-foreground">En ligne · Réponse instantanée</p>
                 </div>
               </div>
             </div>
@@ -399,7 +399,7 @@ export default function AidePage() {
                 <div className="flex justify-start">
                   <div className="bg-muted text-muted-foreground rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm flex items-center gap-2">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    L&apos;assistant ecrit...
+                    L&apos;assistant écrit…
                   </div>
                 </div>
               )}
@@ -429,7 +429,7 @@ export default function AidePage() {
               <Input
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Posez votre question..."
+                placeholder="Posez votre question…"
                 disabled={sending}
                 className="flex-1"
               />
@@ -447,9 +447,9 @@ export default function AidePage() {
           <MessageCircle className="h-5 w-5 text-muted-foreground" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground">Besoin de parler a quelqu&apos;un ?</p>
+          <p className="text-sm font-medium text-foreground">Besoin de parler à quelqu&apos;un ?</p>
           <p className="text-xs text-muted-foreground">
-            L&apos;assistant ci-contre transmet automatiquement les bugs et suggestions a notre equipe. Vous pouvez aussi nous ecrire a contact@hellobat.app.
+            L&apos;assistant ci-contre transmet automatiquement les bugs et suggestions à notre équipe. Vous pouvez aussi nous écrire à contact@hellobat.app.
           </p>
         </div>
       </div>
