@@ -33,11 +33,6 @@ export function Hero() {
             <Highlight delay={3.1}>suivi des chantiers &amp; de l&apos;équipe</Highlight> — tout dans une seule app.
           </p>
 
-          <TypewriterTagline
-            text="Passer moins de temps devant un écran, plus de temps chez vos clients."
-            startDelay={4000}
-          />
-
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/signup"
@@ -411,56 +406,3 @@ function Highlight({ delay, children }: { delay: number; children: React.ReactNo
   );
 }
 
-/**
- * Typewriter tagline — characters appear one by one with a blinking
- * caret (as if someone was typing on a keyboard). Once the full line
- * is written, the caret blinks a couple of times and then an "Enter"
- * press is simulated: a brief glow + bounce on the whole line, and
- * the caret disappears.
- *
- * startDelay (ms) lets us chain it after the highlight cascade above.
- */
-function TypewriterTagline({ text, startDelay }: { text: string; startDelay: number }) {
-  const [phase, setPhase] = useState<'waiting' | 'typing' | 'done' | 'submitted'>('waiting');
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    const t = setTimeout(() => setPhase('typing'), startDelay);
-    return () => clearTimeout(t);
-  }, [startDelay]);
-
-  useEffect(() => {
-    if (phase !== 'typing') return;
-    if (count >= text.length) {
-      setPhase('done');
-      return;
-    }
-    // Slightly slower after punctuation to feel human.
-    const prev = text[count - 1];
-    const delay = prev === ',' ? 220 : prev === '.' ? 320 : 38 + Math.random() * 35;
-    const t = setTimeout(() => setCount(count + 1), delay);
-    return () => clearTimeout(t);
-  }, [phase, count, text]);
-
-  useEffect(() => {
-    if (phase !== 'done') return;
-    // Pause on the finished sentence, then "press Enter".
-    const t = setTimeout(() => setPhase('submitted'), 700);
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  const typed = text.slice(0, count);
-  const showCaret = phase === 'typing' || phase === 'done';
-
-  return (
-    <p
-      className="text-base sm:text-lg font-serif italic text-[var(--landing-text)]/90 max-w-xl mx-auto mb-8 sm:mb-10 leading-relaxed min-h-[1.75em]"
-      aria-label={text}
-    >
-      <span className={phase === 'submitted' ? 'tagline-submit inline-block' : 'inline-block'}>
-        <span aria-hidden>{typed}</span>
-        {showCaret && <span className="typewriter-caret" aria-hidden />}
-      </span>
-    </p>
-  );
-}
