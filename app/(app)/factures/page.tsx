@@ -218,7 +218,7 @@ export default function FacturesPage() {
           bank_account_id,
           client_id,
           project_id,
-          clients(name, deleted_at),
+          clients(name, email, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position),
           invoices(id)
         `)
@@ -919,7 +919,7 @@ export default function FacturesPage() {
                   total_ttc: Number(inv.total_ttc),
                   status: inv.status,
                   clients: billingQuote.clients
-                    ? { name: billingQuote.clients.name, email: null }
+                    ? { name: billingQuote.clients.name, email: (billingQuote.clients as { name: string; email?: string | null }).email || null }
                     : null,
                 } as Invoice);
                 setBillingQuote(null);

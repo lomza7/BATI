@@ -196,7 +196,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                 onChange={e => setClientEmail(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Si renseigné, un email avec le lien sera envoyé automatiquement via Gmail
+                Si renseigné, un email avec le lien sera envoyé automatiquement
               </p>
             </div>
 
