@@ -1150,7 +1150,7 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-right">
                           {site.status === 'published' ? (
                             <a
-                              href={`https://hellobat.app/site/${site.slug}`}
+                              href={`https://${site.slug}.hellobat.app`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-primary hover:underline inline-flex items-center gap-1"

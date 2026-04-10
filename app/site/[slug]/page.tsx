@@ -9,6 +9,7 @@ import type {
   SiteService,
   SiteContent,
 } from '@/lib/site-utils';
+import { getSiteUrl } from '@/lib/site-utils';
 import { SiteHeader } from '@/components/site/site-header';
 import { SiteHero } from '@/components/site/site-hero';
 import { SiteServices } from '@/components/site/site-services';
@@ -103,7 +104,7 @@ export async function generateMetadata({
 
   const content = data.site.site_content as SiteContent;
   const seo = content.seo;
-  const siteUrl = `https://hellobat.app/site/${slug}`;
+  const siteUrl = getSiteUrl(slug);
   const companyName = data.profile?.company_name || 'Artisan du batiment';
   const city = data.profile?.company_city || '';
   const activity = data.profile?.company_activity || 'Batiment';
@@ -189,7 +190,7 @@ export default async function SitePage({
 
   const { site, profile, projects, reviews, services } = data;
   const content = site.site_content as SiteContent;
-  const siteUrl = `https://hellobat.app/site/${slug}`;
+  const siteUrl = getSiteUrl(slug);
 
   // Projects with coordinates for the map
   const mapProjects = projects

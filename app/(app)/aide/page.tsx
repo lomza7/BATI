@@ -170,7 +170,7 @@ const FAQ: FaqCategory[] = [
       },
       {
         q: "Quelle est l'URL de mon site ?",
-        a: "Votre site est publié sur hellobat.app/site/votre-slug. Vous pouvez aussi le brancher sur votre nom de domaine personnalisé.",
+        a: "Votre site est publié sur votre-slug.hellobat.app. Vous pouvez aussi le brancher sur votre nom de domaine personnalisé.",
       },
     ],
   },

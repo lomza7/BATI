@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { Metadata } from 'next';
 import { ArrowLeft, Calendar, MapPin, CheckCircle2 } from 'lucide-react';
 import type { ArtisanSite, SiteContent, SiteProfile } from '@/lib/site-utils';
+import { getSiteUrl } from '@/lib/site-utils';
 import { SiteHeader } from '@/components/site/site-header';
 import { SiteFooter } from '@/components/site/site-footer';
 import { SiteContact } from '@/components/site/site-contact';
@@ -139,7 +140,7 @@ export async function generateMetadata({
     .replace(/\s+/g, ' ')
     .slice(0, 155);
 
-  const canonicalUrl = `https://hellobat.app/site/${slug}/realisations/${projectSlug}`;
+  const canonicalUrl = `${getSiteUrl(slug)}/realisations/${projectSlug}`;
   const firstPhoto = project.project_photos.find((p) => p.category === 'presentation')
     || project.project_photos.find((p) => p.category === 'apres')
     || project.project_photos[0];
@@ -194,7 +195,7 @@ export default async function ProjectDetailPage({
 
   const { site, project, profile, relatedProjects, hasReviews, hasServices } = data;
   const content = site.site_content as SiteContent;
-  const siteUrl = `https://hellobat.app/site/${slug}`;
+  const siteUrl = getSiteUrl(slug);
   const canonicalUrl = `${siteUrl}/realisations/${projectSlug}`;
 
   const sortedPhotos = [...project.project_photos].sort((a, b) => {

@@ -207,7 +207,7 @@ export function PublishSiteDialog({
   if (!project) return null;
 
   const siteUrl = siteSlug
-    ? `https://hellobat.app/site/${siteSlug}/realisations/${slug}`
+    ? `https://${siteSlug}.hellobat.app/realisations/${slug}`
     : null;
 
   return (
@@ -354,7 +354,7 @@ export function PublishSiteDialog({
             <label className="text-sm font-medium text-foreground">URL de la page</label>
             <div className="mt-1 flex items-center rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               <span className="whitespace-nowrap">
-                hellobat.app/site/{siteSlug || '...'}/realisations/
+                {siteSlug || '...'}.hellobat.app/realisations/
               </span>
               <input
                 className="flex-1 bg-transparent outline-none font-medium text-foreground"

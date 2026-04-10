@@ -165,7 +165,7 @@ export default function SiteWebPage() {
       if (site.slug) setSlug(site.slug);
       if (site.status === 'published') {
         setPublished(true);
-        setSiteUrl(`https://hellobat.app/site/${site.slug}`);
+        setSiteUrl(`https://${site.slug}.hellobat.app`);
         setStep(4);
       }
     }
@@ -341,7 +341,7 @@ export default function SiteWebPage() {
 
       setExistingSite(result.data as ArtisanSite);
       setPublished(true);
-      const url = `https://hellobat.app/site/${finalSlug}`;
+      const url = `https://${finalSlug}.hellobat.app`;
       setSiteUrl(url);
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -554,8 +554,8 @@ export default function SiteWebPage() {
                       : 'border-input focus-within:ring-2 focus-within:ring-ring/30'
                   )}
                 >
-                  <span className="flex items-center px-3 text-sm text-muted-foreground bg-muted/40 border-r border-input select-none">
-                    hellobat.app/site/
+                  <span className="flex items-center px-3 text-sm text-muted-foreground bg-muted/40 border-r border-input select-none whitespace-nowrap">
+                    https://
                   </span>
                   <input
                     type="text"
@@ -571,6 +571,9 @@ export default function SiteWebPage() {
                     autoComplete="off"
                     spellCheck={false}
                   />
+                  <span className="flex items-center px-2 text-sm text-muted-foreground bg-muted/40 border-l border-input select-none whitespace-nowrap">
+                    .hellobat.app
+                  </span>
                   <span className="flex items-center pr-3 text-xs font-medium">
                     {slugStatus === 'checking' && (
                       <RefreshCw className="w-3.5 h-3.5 text-muted-foreground animate-spin" />

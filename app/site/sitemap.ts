@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { MetadataRoute } from 'next';
+import { getSiteUrl } from '@/lib/site-utils';
 
 // Revalidation reguliere du sitemap pour que Google decouvre
 // les nouveaux chantiers publies.
@@ -52,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Pages d'accueil des sites
   for (const site of siteList) {
     entries.push({
-      url: `https://hellobat.app/site/${site.slug}`,
+      url: getSiteUrl(site.slug),
       lastModified: site.updated_at,
       changeFrequency: 'weekly',
       priority: 0.8,
@@ -64,7 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const siteSlug = userToSlug.get(project.user_id);
     if (!siteSlug || !project.public_slug) continue;
     entries.push({
-      url: `https://hellobat.app/site/${siteSlug}/realisations/${project.public_slug}`,
+      url: `${getSiteUrl(siteSlug)}/realisations/${project.public_slug}`,
       lastModified: project.published_at || project.updated_at,
       changeFrequency: 'monthly',
       priority: 0.7,

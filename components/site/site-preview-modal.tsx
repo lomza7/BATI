@@ -182,7 +182,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
           <p className="ml-3 text-sm font-medium truncate">
             Aperçu &mdash;{' '}
             <span className="text-white/60 font-mono">
-              hellobat.app/site/{previewSlug}
+              {previewSlug}.hellobat.app
             </span>
           </p>
         </div>

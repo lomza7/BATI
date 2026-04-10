@@ -364,7 +364,7 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
       },
       {
         title: 'Publication instantanée',
-        content: 'Votre site est hébergé sur hellobat.app/site/votre-slug. Il est accessible publiquement et indexé par les moteurs de recherche. Aucune configuration technique, aucun hébergement à gérer.',
+        content: 'Votre site est hébergé sur votre-slug.hellobat.app. Il est accessible publiquement et indexé par les moteurs de recherche. Aucune configuration technique, aucun hébergement à gérer.',
       },
     ],
     highlights: [

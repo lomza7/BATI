@@ -123,6 +123,18 @@ export interface SiteService {
   unit_price: number | null;
 }
 
+// ── Site URL ──
+
+const SITE_BASE_DOMAIN = 'hellobat.app';
+
+/** Returns the public URL of an artisan site (subdomain in prod, path in dev). */
+export function getSiteUrl(slug: string): string {
+  if (process.env.NODE_ENV === 'development') {
+    return `http://localhost:3000/site/${slug}`;
+  }
+  return `https://${slug}.${SITE_BASE_DOMAIN}`;
+}
+
 // ── Slug ──
 
 export function generateSlug(companyName: string, city?: string | null): string {
