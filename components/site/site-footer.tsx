@@ -4,10 +4,33 @@ interface SiteFooterProps {
   profile: SiteProfile;
   footer: SiteContentFooter;
   legalText?: string;
+  activity?: string;
+  city?: string;
 }
 
-export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
+/** Variantes d'ancres pour un profil de liens naturel aux yeux de Google. */
+function getAnchor(activity?: string, city?: string): { text: string; title: string } {
+  if (activity && city) {
+    return {
+      text: 'Hellobat — logiciel pour artisans du bâtiment',
+      title: `Créer un site web ${activity.toLowerCase()} à ${city} avec Hellobat`,
+    };
+  }
+  if (activity) {
+    return {
+      text: 'Hellobat — logiciel pour artisans du bâtiment',
+      title: `Créer un site web pour artisan ${activity.toLowerCase()} avec Hellobat`,
+    };
+  }
+  return {
+    text: 'Hellobat',
+    title: 'Hellobat — logiciel tout-en-un pour artisans du bâtiment',
+  };
+}
+
+export function SiteFooter({ profile, footer, legalText, activity, city }: SiteFooterProps) {
   const year = new Date().getFullYear();
+  const anchor = getAnchor(activity, city);
 
   return (
     <footer
@@ -57,15 +80,16 @@ export function SiteFooter({ profile, footer, legalText }: SiteFooterProps) {
 
         <div className="mt-6 pt-4 border-t text-center" style={{ borderColor: 'var(--site-border)' }}>
           <p className="text-xs" style={{ color: 'var(--site-text-muted)' }}>
-            Site propulsé par{' '}
+            Site créé avec{' '}
             <a
               href="https://hellobat.app"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
+              title={anchor.title}
               className="font-medium hover:underline"
               style={{ color: 'var(--site-accent)' }}
             >
-              Hellobat
+              {anchor.text}
             </a>
           </p>
         </div>

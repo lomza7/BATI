@@ -6,6 +6,8 @@ const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 
+const teamQuery = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : '';
+
 /**
  * Ajoute slug.hellobat.app comme domaine du projet Vercel.
  * Idempotent — Vercel renvoie 409 si le domaine existe déjà, on l'ignore.
@@ -14,7 +16,7 @@ async function registerVercelDomain(slug: string) {
   if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) return;
 
   const domain = `${slug}.hellobat.app`;
-  const url = `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains${VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : ''}`;
+  const url = `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains${teamQuery}`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -28,6 +30,25 @@ async function registerVercelDomain(slug: string) {
   if (res.ok || res.status === 409) return; // 409 = already exists
   const body = await res.text();
   console.warn(`[vercel-domain] ${res.status} for ${domain}: ${body}`);
+}
+
+/**
+ * Supprime un ancien sous-domaine du projet Vercel quand l'artisan change de slug.
+ */
+async function removeVercelDomain(slug: string) {
+  if (!VERCEL_TOKEN || !VERCEL_PROJECT_ID) return;
+
+  const domain = `${slug}.hellobat.app`;
+  const url = `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains/${domain}${teamQuery}`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
+  });
+
+  if (res.ok || res.status === 404) return; // 404 = already gone
+  const body = await res.text();
+  console.warn(`[vercel-domain] DELETE ${res.status} for ${domain}: ${body}`);
 }
 
 export async function POST(request: Request) {
@@ -48,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { slug } = await request.json();
+    const { slug, oldSlug } = await request.json();
     if (!slug) {
       return NextResponse.json({ error: 'slug requis' }, { status: 400 });
     }
@@ -70,6 +91,13 @@ export async function POST(request: Request) {
     revalidatePath(`/site/${slug}/realisations/[projectSlug]`, 'page');
     // Revalide aussi le sitemap pour les nouveaux chantiers/avis publies.
     revalidatePath('/site/sitemap.xml');
+
+    // Supprime l'ancien sous-domaine si le slug a changé
+    if (oldSlug && oldSlug !== slug) {
+      await removeVercelDomain(oldSlug).catch((err) => {
+        console.warn('[revalidate] Vercel domain removal failed:', err);
+      });
+    }
 
     // Enregistre le sous-domaine slug.hellobat.app dans Vercel (idempotent)
     await registerVercelDomain(slug).catch((err) => {

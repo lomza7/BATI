@@ -559,7 +559,7 @@ export default async function ProjectDetailPage({
         />
       )}
 
-      <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} />
+      <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} activity={profile.company_activity || undefined} city={profile.company_city || undefined} />
     </div>
   );
 }

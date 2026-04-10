@@ -396,6 +396,8 @@ function SiteContentRenderer({
         profile={previewProfile}
         footer={siteContent.footer}
         legalText={legalText || undefined}
+        activity={previewProfile.company_activity || undefined}
+        city={previewProfile.company_city || undefined}
       />
     </div>
   );

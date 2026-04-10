@@ -116,6 +116,13 @@ export function SiteJsonLd({
     ...(description && { description }),
     inLanguage: 'fr-FR',
     publisher: { '@id': `${siteUrl}#business` },
+    isPartOf: {
+      '@type': 'WebApplication',
+      name: 'Hellobat',
+      url: 'https://hellobat.app',
+      description: 'Logiciel tout-en-un pour artisans du bâtiment : devis, factures, chantiers, site web et plus.',
+      applicationCategory: 'BusinessApplication',
+    },
   };
 
   // Breadcrumb racine

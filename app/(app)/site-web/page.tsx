@@ -352,7 +352,10 @@ export default function SiteWebPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ slug: finalSlug }),
+          body: JSON.stringify({
+            slug: finalSlug,
+            oldSlug: existingSite?.slug !== finalSlug ? existingSite?.slug : undefined,
+          }),
         }).catch(() => {});
       }
     } catch (err: unknown) {
