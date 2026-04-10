@@ -67,10 +67,31 @@ export default function FeatureDetailPage({ params }: { params: { slug: string }
 
       <section className="py-12 sm:py-20 bg-[var(--landing-off)]">
         <div className="max-w-4xl mx-auto px-6 mb-16">
-          <p className="text-center text-sm font-medium uppercase tracking-wider text-[var(--landing-muted)] mb-6">
-            Aperçu de l&apos;application
-          </p>
-          <FeatureDemo slug={params.slug} />
+          {feature.videoUrl ? (
+            <>
+              <p className="text-center text-sm font-medium uppercase tracking-wider text-[var(--landing-muted)] mb-6">
+                Découvrez en vidéo
+              </p>
+              <div className="rounded-xl sm:rounded-2xl border border-[var(--landing-border)] bg-white shadow-2xl shadow-black/10 overflow-hidden">
+                <video
+                  src={feature.videoUrl}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  className="w-full block"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-center text-sm font-medium uppercase tracking-wider text-[var(--landing-muted)] mb-6">
+                Aperçu de l&apos;application
+              </p>
+              <FeatureDemo slug={params.slug} />
+            </>
+          )}
         </div>
 
         <div className="max-w-3xl mx-auto px-6">

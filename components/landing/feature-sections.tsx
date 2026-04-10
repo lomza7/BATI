@@ -33,6 +33,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { LandingMap } from './landing-map';
+import { DevisInteractiveDemo } from './devis-demo';
 
 interface FeatureSectionProps {
   id: string;
@@ -158,58 +159,7 @@ export function DevisSection() {
       ]}
       visual={
         <MockBrowser url="hellobat.app/devis">
-          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-4">
-              <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
-                <Mic className="h-3.5 w-3.5" />
-                Demande vocale
-              </div>
-              <div className="mt-3 rounded-lg bg-white p-3 text-xs text-[var(--landing-text)] shadow-sm">
-                Bonjour, salle de bain à refaire complètement, environ 6 m2, dépose, plomberie douche, carrelage mural et meuble vasque.
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
-                <Camera className="h-3.5 w-3.5" />
-                Photos du chantier
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {[1, 2, 3].map((photo) => (
-                  <div key={photo} className="aspect-[4/3] rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)]" />
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-[var(--landing-border)] bg-white p-4">
-              <div className="flex items-center gap-2 text-xs font-medium text-[var(--landing-accent)]">
-                <Wand2 className="h-3.5 w-3.5" />
-                Analyse IA
-                <span className="ml-auto text-[9px] font-medium text-[#D97706] bg-[#D97706]/10 px-1.5 py-0.5 rounded-full">Claude Sonnet</span>
-              </div>
-              <div className="mt-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold text-[var(--landing-text)]">Rénovation salle de bain</div>
-                    <div className="text-[10px] text-[var(--landing-muted)]">Mme Petit</div>
-                  </div>
-                  <span className="rounded-full bg-[var(--landing-accent-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--landing-accent)]">
-                    86%
-                  </span>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {[
-                    'Dépose des équipements existants',
-                    'Reprise plomberie douche / vasque',
-                    'Pose receveur, paroi et meuble vasque',
-                  ].map((line) => (
-                    <div key={line} className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
-                      <span className="text-[11px] text-[var(--landing-text)]">{line}</span>
-                      <FileText className="h-3.5 w-3.5 text-[var(--landing-muted)]" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <DevisInteractiveDemo />
         </MockBrowser>
       }
     />

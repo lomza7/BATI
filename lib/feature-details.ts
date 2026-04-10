@@ -9,71 +9,83 @@ export interface FeatureDetail {
   }[];
   highlights: string[];
   plan: 'starter' | 'pro' | 'business';
+  videoUrl?: string;
 }
 
 export const FEATURE_DETAILS: FeatureDetail[] = [
   {
     slug: 'devis-ia',
     title: 'Devis IA vocal',
-    subtitle: 'Propulsé par Claude Sonnet d\'Anthropic',
-    heroDescription: 'Dictez votre devis à voix haute depuis le chantier, ajoutez des photos, et l\'IA génère un chiffrage précis en quelques secondes. Fini les soirées à retaper des devis sur l\'ordinateur.',
+    subtitle: 'Votre assistant devis intelligent',
+    heroDescription: 'Dictez votre devis à voix haute depuis le chantier et l\'IA génère un chiffrage précis en quelques secondes, basé sur vos propres tarifs. Si la demande est trop vague, elle vous pose les bonnes questions — à la voix. Fini les soirées à retaper des devis sur l\'ordinateur.',
     sections: [
       {
         title: 'Comment ça marche ?',
-        content: 'Ouvrez l\'assistant IA depuis la page Devis, appuyez sur le micro et décrivez les travaux à réaliser. Ajoutez des photos du chantier si nécessaire. Claude Sonnet analyse votre description vocale et les images pour identifier les prestations, estimer les quantités et proposer un chiffrage cohérent. Vous n\'avez plus qu\'à valider et envoyer.',
+        content: 'Ouvrez l\'assistant IA depuis la page Devis, sélectionnez le client, puis appuyez sur le micro et décrivez les travaux à réaliser. L\'IA analyse votre description vocale pour identifier les prestations, estimer les quantités et proposer un chiffrage cohérent basé sur votre catalogue. Si elle a besoin de précisions, elle vous pose des questions ciblées auxquelles vous répondez à la voix. En deux échanges maximum, le brouillon est prêt.',
       },
       {
-        title: 'Reconnaissance vocale en temps réel',
-        content: 'L\'assistant utilise la Web Speech Recognition de votre navigateur (Chrome, Edge) pour transcrire votre voix en temps réel. Parlez naturellement : "Il faut refaire l\'enduit sur 45 mètres carrés de façade, poser 3 fenêtres double vitrage et remplacer la gouttière zinc sur 12 mètres." L\'IA comprend le contexte métier du bâtiment.',
+        title: 'Dictée vocale intuitive',
+        content: 'L\'assistant enregistre votre voix et transcrit automatiquement. Parlez naturellement : "Il faut refaire l\'enduit sur 45 mètres carrés de façade, poser 3 fenêtres double vitrage et remplacer la gouttière zinc sur 12 mètres." L\'IA comprend le contexte métier du bâtiment et adapte le chiffrage à votre zone d\'intervention.',
       },
       {
-        title: 'Analyse photo intelligente',
-        content: 'Prenez des photos directement depuis votre téléphone. L\'IA identifie les matériaux, les surfaces, l\'état général et en déduit les travaux nécessaires. Combinée avec votre description vocale, cette analyse permet un chiffrage beaucoup plus précis.',
+        title: 'Votre catalogue, votre historique',
+        content: 'L\'IA s\'appuie sur votre bibliothèque de prestations : vos tarifs, vos unités, vos marges habituelles. Elle consulte aussi vos devis récemment acceptés et l\'historique avec ce client en particulier pour garder une cohérence tarifaire. Plus vous utilisez Hellobat, plus les devis sont précis.',
       },
       {
-        title: 'Votre bibliothèque de prestations',
-        content: 'L\'IA s\'appuie sur votre bibliothèque de prestations personnalisée : vos tarifs, vos unités, vos marges habituelles. Le devis généré respecte vos prix et vos habitudes de chiffrage. Plus vous utilisez Hellobat, plus les devis sont précis.',
+        title: 'Relisez et enrichissez votre catalogue',
+        content: 'Le brouillon est entièrement modifiable. Ajoutez, supprimez ou ajustez les lignes avant de valider. Si l\'IA propose une prestation qui n\'est pas encore dans votre catalogue, enregistrez-la en un clic — elle sera réutilisée dans vos prochains devis automatiquement.',
       },
     ],
     highlights: [
       'Dictée vocale depuis le chantier',
-      'Analyse photo par IA',
-      'Chiffrage automatique basé sur vos tarifs',
-      'Propulsé par Claude Sonnet (Anthropic)',
-      'Fonctionne sur Chrome et Edge',
+      'Questions de clarification IA par la voix',
+      'Chiffrage basé sur votre catalogue et votre historique',
+      'Cohérence tarifaire par client',
+      'Enrichissement du catalogue en 1 clic',
     ],
     plan: 'pro',
   },
   {
     slug: 'devis-factures',
-    title: 'Devis & Factures',
-    subtitle: 'Création, envoi et suivi en quelques clics',
-    heroDescription: 'Gérez l\'intégralité de votre cycle commercial : créez des devis professionnels, transformez-les en factures d\'un clic, et suivez les paiements en temps réel. Numérotation automatique, TVA, mentions légales — tout est conforme.',
+    title: 'Devis',
+    subtitle: 'Un devis en une minute au lieu d\'une heure',
+    heroDescription: 'Décrivez les travaux en quelques mots ou à la voix, et l\'IA génère un devis complet — chiffré avec vos propres tarifs. Elle connaît votre catalogue, elle apprend de chaque devis que vous faites, et elle s\'améliore au fil du temps. En quelques clics, c\'est bouclé.',
+    videoUrl: 'https://ijdscgzpswlskwaozbuh.supabase.co/storage/v1/object/public/Video%20prez/DEVIS%20.mp4',
     sections: [
       {
-        title: 'Devis professionnels',
-        content: 'Créez des devis structurés avec vos lignes de prestations, TVA par taux, conditions de règlement et mentions légales obligatoires. La numérotation suit le format D-YYYY-XXX et s\'incrémente automatiquement. Ajoutez votre logo, vos coordonnées et vos conditions générales.',
+        title: 'Vous parlez, l\'IA chiffre',
+        content: 'Oubliez les soirées passées à retaper des devis sur l\'ordinateur. Depuis le chantier, appuyez sur le micro et décrivez les travaux à voix haute — ou tapez quelques mots si vous préférez. L\'IA analyse votre description, consulte votre bibliothèque de prestations et vos tarifs habituels. En quelques secondes, vous avez un devis structuré, ligne par ligne, avec les bonnes quantités et les bons prix. Les vôtres.',
       },
       {
-        title: 'Transformation devis → facture',
-        content: 'Quand un devis est accepté, transformez-le en facture en un clic. Toutes les lignes, montants et informations client sont repris automatiquement. La facture reçoit son propre numéro (F-YYYY-XXX) et peut être envoyée immédiatement.',
+        title: 'L\'IA vous pose les bonnes questions',
+        content: 'Si votre description est trop vague pour établir un chiffrage précis, l\'IA ne devine pas : elle vous pose 1 à 3 questions ciblées — surface, gamme de matériaux, état de l\'existant. Vous répondez à la voix, directement depuis le micro. En deux échanges maximum, le devis est prêt. Pas de formulaire à remplir, pas de case à cocher.',
       },
       {
-        title: 'Envoi et suivi',
-        content: 'Envoyez vos devis et factures par email directement depuis Hellobat. Suivez les statuts : brouillon, envoyé, accepté, refusé, payé, en retard. Le tableau de bord vous donne une vue d\'ensemble de votre chiffre d\'affaires et des montants en attente.',
+        title: 'Vos prix, votre façon de travailler',
+        content: 'L\'IA ne sort pas des prix au hasard. Elle s\'appuie sur votre catalogue de prestations : vos tarifs réels, vos unités, vos marges habituelles. Elle s\'ancre aussi sur vos devis récemment acceptés et sur l\'historique de ce client en particulier. Plus vous utilisez Hellobat, plus les devis sont fidèles à votre façon de chiffrer.',
       },
       {
-        title: 'Templates personnalisables',
-        content: 'Personnalisez l\'apparence de vos documents dans les paramètres : couleurs, disposition, mentions spécifiques à votre corps de métier. Vos devis et factures reflètent votre identité professionnelle.',
+        title: 'Relisez, ajustez, enrichissez votre catalogue',
+        content: 'Le brouillon généré est entièrement modifiable : ajoutez, supprimez ou corrigez des lignes, ajustez les quantités et les prix. Si l\'IA propose une prestation qui n\'est pas encore dans votre catalogue, vous pouvez l\'y enregistrer en un clic — elle sera réutilisée automatiquement dans vos prochains devis.',
+      },
+      {
+        title: 'Signature électronique instantanée',
+        content: 'Le devis est prêt ? Envoyez-le en un clic. Votre client reçoit un lien sur son téléphone, consulte le document et signe électroniquement — sans créer de compte, sans installer d\'application. La signature a valeur juridique (eIDAS). Vous êtes notifié dès que c\'est signé.',
+      },
+      {
+        title: 'Du devis à la facture, tout est connecté',
+        content: 'Quand le client accepte, transformez le devis en facture instantanément — toutes les lignes et montants sont repris. Chaque devis crée aussi automatiquement un lead dans votre pipeline commercial. Numérotation conforme, TVA multi-taux, mentions légales : tout est géré.',
       },
     ],
     highlights: [
-      'Numérotation automatique (D-YYYY-XXX / F-YYYY-XXX)',
-      'TVA multi-taux',
+      'Devis généré par dictée vocale en quelques secondes',
+      'Questions de clarification IA — répondez à la voix',
+      'Chiffrage basé sur votre catalogue et votre historique',
+      'Historique client pour des prix cohérents',
+      'Signature électronique intégrée (eIDAS)',
+      'Enrichissement automatique de votre catalogue',
       'Transformation devis → facture en 1 clic',
-      'Envoi par email intégré',
-      'Suivi des statuts en temps réel',
-      'Templates personnalisables',
+      'Pipeline commercial alimenté automatiquement',
     ],
     plan: 'starter',
   },
