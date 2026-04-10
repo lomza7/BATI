@@ -435,7 +435,7 @@ export default function FacturesPage() {
           quote.clients?.name?.toLowerCase().includes(quoteSearchTerm);
 
         if (!matchesSearch) return false;
-        if (quoteFilter === 'to_invoice') return !quote.has_linked_invoice;
+        if (quoteFilter === 'to_invoice') return !quote.has_linked_invoice && quote.status !== 'refuse';
         return quote.has_linked_invoice;
       })
       .sort((a, b) => {
@@ -460,7 +460,7 @@ export default function FacturesPage() {
   const totalUnpaid = activeInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
   const totalPaid = activeInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
   const totalLate = activeInvoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
-  const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice);
+  const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice && quote.status !== 'refuse');
 
   function handleInvoiceClick(inv: Invoice) {
     if (inv.quote_id) {
