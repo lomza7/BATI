@@ -2,6 +2,9 @@
 
 import { Hexagon } from 'lucide-react';
 import { DemoViewContent } from './demo-app';
+import { SiteWebInteractiveDemo } from './site-web-demo';
+import { ProspectionInteractiveDemo } from './prospection-demo';
+import { RendusInteractiveDemo } from './rendus-demo';
 
 const SLUG_TO_VIEW: Record<string, string> = {
   'devis-ia': 'devis',
@@ -51,9 +54,16 @@ const SLUG_TO_PATH: Record<string, string> = {
   'rendus-ia': 'hellobat.app/rendus',
 };
 
+const INTERACTIVE_DEMOS: Record<string, React.ComponentType> = {
+  'site-vitrine': SiteWebInteractiveDemo,
+  'prospection-crm': ProspectionInteractiveDemo,
+  'rendus-ia': RendusInteractiveDemo,
+};
+
 export function FeatureDemo({ slug }: { slug: string }) {
+  const InteractiveDemo = INTERACTIVE_DEMOS[slug];
   const viewId = SLUG_TO_VIEW[slug];
-  if (!viewId) return null;
+  if (!InteractiveDemo && !viewId) return null;
 
   const urlPath = SLUG_TO_PATH[slug] || 'hellobat.app';
 
@@ -73,7 +83,7 @@ export function FeatureDemo({ slug }: { slug: string }) {
         </div>
       </div>
       <div className="p-4 sm:p-6 min-h-[350px]">
-        <DemoViewContent view={viewId} />
+        {InteractiveDemo ? <InteractiveDemo /> : <DemoViewContent view={viewId!} />}
       </div>
     </div>
   );

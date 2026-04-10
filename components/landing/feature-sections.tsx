@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Camera,
-  FileImage,
   FileText,
   Mic,
   Repeat,
@@ -34,6 +33,9 @@ import {
 } from 'lucide-react';
 import { LandingMap } from './landing-map';
 import { DevisInteractiveDemo } from './devis-demo';
+import { SiteWebInteractiveDemo } from './site-web-demo';
+import { ProspectionInteractiveDemo } from './prospection-demo';
+import { RendusInteractiveDemo } from './rendus-demo';
 
 interface FeatureSectionProps {
   id: string;
@@ -117,25 +119,8 @@ export function SiteWebSection() {
         'Optimisé pour le référencement (SEO)',
       ]}
       visual={
-        <MockBrowser url="www.martin-plomberie.fr">
-          <div className="space-y-4">
-            <div className="h-32 rounded-xl bg-gradient-to-br from-[var(--landing-stone)] to-[var(--landing-border)] flex items-center justify-center">
-              <span className="text-2xl font-serif text-[var(--landing-text)]">Martin Plomberie</span>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="h-20 rounded-lg bg-[var(--landing-stone)]" />
-              <div className="h-20 rounded-lg bg-[var(--landing-stone)]" />
-              <div className="h-20 rounded-lg bg-[var(--landing-stone)]" />
-            </div>
-            <div className="flex gap-3">
-              <div className="h-8 flex-1 rounded-lg bg-[var(--landing-accent)] flex items-center justify-center">
-                <span className="text-xs text-white font-medium">Demander un devis</span>
-              </div>
-              <div className="h-8 flex-1 rounded-lg border border-[var(--landing-border)] flex items-center justify-center">
-                <span className="text-xs text-[var(--landing-text)]">Nos réalisations</span>
-              </div>
-            </div>
-          </div>
+        <MockBrowser url="hellobat.app/site-web">
+          <SiteWebInteractiveDemo />
         </MockBrowser>
       }
     />
@@ -251,20 +236,8 @@ export function ProspectionSection() {
       ]}
       reversed
       visual={
-        <MockBrowser>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {['Nouveau', 'Contacté', 'Devis envoyé', 'Gagné'].map((col) => (
-              <div key={col} className="min-w-[100px] flex-1 space-y-2">
-                <div className="text-[10px] font-medium text-[var(--landing-muted)] uppercase tracking-wider whitespace-nowrap">{col}</div>
-                {[1, 2].map((i) => (
-                  <div key={i} className="p-2 sm:p-2.5 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
-                    <div className="h-2 w-12 sm:w-16 rounded bg-[var(--landing-border)] mb-1.5" />
-                    <div className="h-1.5 w-8 sm:w-10 rounded bg-[var(--landing-stone)]" />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+        <MockBrowser url="hellobat.app/prospection">
+          <ProspectionInteractiveDemo />
         </MockBrowser>
       }
     />
@@ -513,26 +486,17 @@ export function PlansSection() {
       badge="Avant/Après IA"
       title="Vos avant/après,"
       titleAccent="générés par IA"
-      description="Transformez la photo d'une pièce ou d'une façade en projection photoréaliste après travaux. Vos clients voient le résultat avant même de signer."
+      description="Envoyez un lien personnalisé à vos prospects : ils uploadent une photo, l'IA génère le rendu après travaux, et vous récupérez automatiquement leurs coordonnées."
       bulletPoints={[
-        'Avant/après photoréalistes en quelques secondes',
-        'Génération depuis une simple photo',
-        'Partage client par lien sécurisé',
-        'Plusieurs styles disponibles',
+        'Lien white-label à votre image (logo, nom, couleurs)',
+        'Avant/après photoréalistes par IA en quelques secondes',
+        '6 styles disponibles (moderne, classique, zen…)',
+        'Capture automatique des leads (email obligatoire)',
       ]}
       reversed
       visual={
-        <MockBrowser>
-          <div className="grid grid-cols-3 gap-2">
-            {['Facade — avant.jpg', 'Facade — après.jpg', 'Salon — avant.jpg', 'Salon — après.jpg', 'Cuisine — avant.jpg', 'Cuisine — après.jpg'].map((file) => (
-              <div key={file} className="aspect-square rounded-lg bg-[var(--landing-stone)] border border-[var(--landing-border)] flex items-center justify-center p-2">
-                <div className="text-center">
-                  <FileImage className="w-5 h-5 text-[var(--landing-muted)] mx-auto mb-1" />
-                  <span className="text-[8px] text-[var(--landing-muted)] leading-tight block">{file}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <MockBrowser url="hellobat.app/rendus">
+          <RendusInteractiveDemo />
         </MockBrowser>
       }
     />
