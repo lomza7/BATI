@@ -13,7 +13,7 @@
   --site-card-bg: #1e293b;
   --site-card-border: #334155;
   --site-border: #334155;
-  --site-hero-overlay: rgba(15, 23, 42, 0.85);
+  --site-hero-overlay: rgba(15, 23, 42, 0.65);
   --site-radius: 0.75rem;
   --site-font: 'Inter', 'Helvetica Neue', sans-serif;
 }
@@ -31,7 +31,7 @@
   --site-card-bg: #ffffff;
   --site-card-border: #e7e5e4;
   --site-border: #e7e5e4;
-  --site-hero-overlay: rgba(41, 37, 36, 0.75);
+  --site-hero-overlay: rgba(41, 37, 36, 0.6);
   --site-radius: 1rem;
   --site-font: 'Georgia', serif;
 }
@@ -49,7 +49,7 @@
   --site-card-bg: #ffffff;
   --site-card-border: #e5e7eb;
   --site-border: #e5e7eb;
-  --site-hero-overlay: rgba(17, 24, 39, 0.7);
+  --site-hero-overlay: rgba(17, 24, 39, 0.55);
   --site-radius: 0.5rem;
   --site-font: 'Inter', 'Helvetica Neue', sans-serif;
 }
@@ -67,7 +67,7 @@
   --site-card-bg: #27272a;
   --site-card-border: #3f3f46;
   --site-border: #3f3f46;
-  --site-hero-overlay: rgba(24, 24, 27, 0.85);
+  --site-hero-overlay: rgba(24, 24, 27, 0.65);
   --site-radius: 0.75rem;
   --site-font: 'Inter', 'Helvetica Neue', sans-serif;
 }
