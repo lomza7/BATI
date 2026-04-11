@@ -31,7 +31,10 @@ export function SitePreviewFrame({ children, className, style }: SitePreviewFram
       doc.body.style.padding = '0';
       doc.body.style.overflow = 'auto';
       doc.body.style.height = '100%';
+      doc.body.style.background = 'transparent';
       doc.documentElement.style.height = '100%';
+      doc.documentElement.style.margin = '0';
+      doc.documentElement.style.padding = '0';
 
       // Copy all stylesheets from parent into the iframe
       const parentStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
@@ -39,6 +42,14 @@ export function SitePreviewFrame({ children, className, style }: SitePreviewFram
         const clone = node.cloneNode(true) as HTMLElement;
         doc.head.appendChild(clone);
       });
+
+      // Override app styles that leak into the iframe
+      const overrideStyle = doc.createElement('style');
+      overrideStyle.textContent = `
+        html, body { margin: 0; padding: 0; background: transparent !important; height: 100%; }
+        body > #preview-root { height: 100%; }
+      `;
+      doc.head.appendChild(overrideStyle);
 
       // Create a mount div inside the iframe body
       const mount = doc.createElement('div');
