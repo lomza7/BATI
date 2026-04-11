@@ -213,36 +213,65 @@ export async function POST(request: Request) {
       // 2. Geocode address
       const geo = await geocodeAddress(item.client_address, item.client_city, item.client_postal_code);
 
-      // 3. Create project
+      // 3. Create project (skip for deposits — they belong to an existing project)
       const projectName = item.description || 'Chantier importé';
-      const { data: project, error: projectErr } = await supabaseAdmin
-        .from('projects')
-        .insert({
-          user_id: ownerId,
-          name: projectName,
-          client_id: clientId,
-          address: item.client_address,
-          city: geo.city || item.client_city,
-          postal_code: geo.postcode || item.client_postal_code,
-          lat: geo.lat,
-          lng: geo.lng,
-          status: 'termine',
-          progress: 100,
-          budget: item.amount_ttc || 0,
-          start_date: item.invoice_date || null,
-          end_date: item.invoice_date || null,
-          notes: item.invoice_number ? 'Importé depuis facture ' + item.invoice_number : 'Importé depuis facture',
-          is_public: true,
-          published_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+      const isDeposit = /acompte|accompte/i.test(projectName);
 
-      if (projectErr || !project) {
-        errors.push({ index: i, reason: 'Erreur création chantier : ' + (projectErr?.message || 'inconnu') });
+      let project: { id: string } | null = null;
+
+      // For deposits, try to find an existing project for the same client
+      if (isDeposit && clientId) {
+        const { data: existingProject } = await supabaseAdmin
+          .from('projects')
+          .select('id')
+          .eq('user_id', ownerId)
+          .eq('client_id', clientId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingProject) {
+          project = existingProject;
+        }
+      }
+
+      if (!project) {
+        const { data: newProject, error: projectErr } = await supabaseAdmin
+          .from('projects')
+          .insert({
+            user_id: ownerId,
+            name: projectName,
+            client_id: clientId,
+            address: item.client_address,
+            city: geo.city || item.client_city,
+            postal_code: geo.postcode || item.client_postal_code,
+            lat: geo.lat,
+            lng: geo.lng,
+            status: 'termine',
+            progress: 100,
+            budget: item.amount_ttc || 0,
+            start_date: item.invoice_date || null,
+            end_date: item.invoice_date || null,
+            notes: item.invoice_number ? 'Importé depuis facture ' + item.invoice_number : 'Importé depuis facture',
+            is_public: true,
+            published_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (projectErr || !newProject) {
+          errors.push({ index: i, reason: 'Erreur création chantier : ' + (projectErr?.message || 'inconnu') });
+          continue;
+        }
+        project = newProject;
+        created.projects++;
+      }
+
+      if (!project) {
+        errors.push({ index: i, reason: 'Erreur création chantier' });
         continue;
       }
-      created.projects++;
 
       // 4. Optionally create invoice
       if (item.create_invoice) {
