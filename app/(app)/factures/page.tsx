@@ -704,7 +704,7 @@ export default function FacturesPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_1.4fr]">
+      <div className="space-y-6">
         <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
