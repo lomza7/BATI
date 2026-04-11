@@ -125,7 +125,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto p-0 gap-0 border-0 shadow-2xl overflow-hidden bg-white rounded-2xl">
+      <DialogContent className="sm:max-w-[480px] p-0 gap-0 border-0 shadow-2xl bg-white rounded-2xl max-h-[90dvh] overflow-y-auto">
         <DialogTitle className="sr-only">Envoyer pour signature</DialogTitle>
 
         <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border">
