@@ -2,21 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download, BookmarkPlus, Receipt } from 'lucide-react';
+import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Trash2, Mail, RefreshCw, Download, Receipt } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
-import { QUOTE_STATUSES, QUOTE_UNITS, formatCurrency, formatDate } from '@/lib/constants';
-import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
-import { getNextQuoteNumber } from '@/lib/document-numbers';
+import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
-import { ServicePicker } from '@/components/devis/service-picker';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
-import { ClientPicker } from '@/components/shared/client-picker';
-import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,13 +29,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 
 interface QuoteSend {
@@ -67,48 +55,17 @@ interface Quote {
   recurring_contract_id: string | null;
 }
 
-interface QuoteLine {
-  description: string;
-  quantity: number;
-  unit: string;
-  unit_price: number;
-  tva_rate: number;
-  is_recurring?: boolean;
-  frequency?: string;
-  _savedAsPrestation?: boolean;
-  _savingAsPrestation?: boolean;
-}
-
-// Default expiration: 30 days from today, returned as YYYY-MM-DD (local time)
-function getDefaultValidUntil(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
   const { user } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
-  const draftId = useRef<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [showAiIntro, setShowAiIntro] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newQuote, setNewQuote] = useState({ title: '', description: '' });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
-  const [validUntil, setValidUntil] = useState<string>(getDefaultValidUntil());
-  const [lines, setLines] = useState<QuoteLine[]>([
-    { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 },
-  ]);
-  const [showServicePicker, setShowServicePicker] = useState(false);
   const [sendQuote, setSendQuote] = useState<Quote | null>(null);
   const [quoteSends, setQuoteSends] = useState<Record<string, QuoteSend>>({}); // quote_id -> latest send
   const [trackingQuote, setTrackingQuote] = useState<Quote | null>(null);
@@ -116,7 +73,6 @@ export default function DevisPage() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [resendingQuoteId, setResendingQuoteId] = useState<string | null>(null);
   const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
   const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null);
   // Set when returning from /devis/ai after a successful creation — drives
   // the confirmation banner at the top of the list. Cleared automatically
@@ -136,9 +92,13 @@ export default function DevisPage() {
     const aiCreated = params.get('ai_created');
 
     if (paramClientId || paramProjectId) {
-      if (paramProjectId) prefillProjectId.current = paramProjectId;
-      if (paramClientId) setSelectedClientId(paramClientId);
+      const forwardParams = new URLSearchParams();
+      if (paramClientId) forwardParams.set('client_id', paramClientId);
+      if (paramProjectId) forwardParams.set('project_id', paramProjectId);
       setShowCreateOptions(true);
+      // Store params so openManualCreate can forward them
+      prefillProjectId.current = paramProjectId;
+      setSelectedClientId(paramClientId);
       router.replace('/devis', { scroll: false });
     }
 
@@ -219,216 +179,6 @@ export default function DevisPage() {
     setHasBankAccount((bankRows?.length || 0) > 0);
   }
 
-  // Auto-save: create a brouillon draft as soon as a client is selected
-  async function autosaveDraft(clientId: string) {
-    if (!user || draftId.current) return;
-
-    const quoteNumber = await getNextQuoteNumber(supabase, user.id);
-
-    const { data } = await supabase
-      .from('quotes')
-      .insert({
-        user_id: user.id,
-        quote_number: quoteNumber,
-        client_id: clientId,
-        project_id: prefillProjectId.current || null,
-        bank_account_id: selectedBankAccountId,
-        title: newQuote.title || '',
-        description: newQuote.description || '',
-        status: 'brouillon',
-        total_ht: 0,
-        total_ttc: 0,
-        valid_until: validUntil,
-      })
-      .select('id')
-      .single();
-
-    if (data) {
-      draftId.current = data.id;
-    }
-  }
-
-  function handleClientSelect(clientId: string | null) {
-    setSelectedClientId(clientId);
-    if (clientId && !draftId.current) {
-      autosaveDraft(clientId);
-    }
-  }
-
-  async function saveQuote() {
-    if (!user) return;
-
-    const validLines = lines.filter(l => l.description.trim());
-    const tva = computeTvaBreakdown(validLines);
-    const totalHt = tva.total_ht;
-    const totalTva = tva.total_tva;
-    const totalTtc = tva.total_ttc;
-    let savedQuoteId: string | null = null;
-
-    if (draftId.current) {
-      // Update existing draft
-      await supabase
-        .from('quotes')
-        .update({
-          client_id: selectedClientId,
-          project_id: prefillProjectId.current || null,
-          bank_account_id: selectedBankAccountId,
-          title: newQuote.title,
-          description: newQuote.description,
-          total_ht: totalHt,
-          total_tva: totalTva,
-          total_ttc: totalTtc,
-          tva_rate: tva.primary_rate,
-          tva_breakdown: tva.tva_breakdown,
-          valid_until: validUntil,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', draftId.current);
-
-      // Replace lines: delete old, insert new
-      await supabase.from('quote_lines').delete().eq('quote_id', draftId.current);
-      if (validLines.length > 0) {
-        await supabase.from('quote_lines').insert(
-          validLines.map((l, i) => ({
-            user_id: user.id,
-            quote_id: draftId.current!,
-            description: l.description,
-            quantity: l.quantity,
-            unit: l.unit,
-            unit_price: l.unit_price,
-            tva_rate: l.tva_rate,
-            total: l.quantity * l.unit_price,
-            position: i,
-          }))
-        );
-      }
-
-      savedQuoteId = draftId.current;
-
-      // Create lead if none exists yet for this quote
-      const { data: existingLead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('quote_id', draftId.current)
-        .maybeSingle();
-
-      if (!existingLead) {
-        // Reuse the real quote_number from the existing draft so the lead
-        // label stays consistent with what the user sees in the list.
-        const { data: draftRow } = await supabase
-          .from('quotes')
-          .select('quote_number')
-          .eq('id', draftId.current)
-          .single();
-        const draftQuoteNumber = draftRow?.quote_number || '';
-        await supabase.from('leads').insert({
-          user_id: user.id,
-          name: newQuote.title || `Devis ${draftQuoteNumber}`,
-          client_id: selectedClientId || null,
-          quote_id: draftId.current,
-          stage: 'devis_envoye',
-          source: 'devis',
-          value: totalTtc,
-          notes: newQuote.description || '',
-        });
-      }
-    } else {
-      // No draft yet — create everything from scratch
-      const quoteNumber = await getNextQuoteNumber(supabase, user.id);
-
-      const { data: quote } = await supabase
-        .from('quotes')
-        .insert({
-          user_id: user.id,
-          quote_number: quoteNumber,
-          client_id: selectedClientId,
-          project_id: prefillProjectId.current || null,
-          bank_account_id: selectedBankAccountId,
-          title: newQuote.title,
-          description: newQuote.description,
-          total_ht: totalHt,
-          total_tva: totalTva,
-          total_ttc: totalTtc,
-          tva_rate: tva.primary_rate,
-          tva_breakdown: tva.tva_breakdown,
-          valid_until: validUntil,
-        })
-        .select('id')
-        .single();
-
-      if (quote) savedQuoteId = quote.id;
-
-      if (quote && validLines.length > 0) {
-        await supabase.from('quote_lines').insert(
-          validLines.map((l, i) => ({
-            user_id: user.id,
-            quote_id: quote.id,
-            description: l.description,
-            quantity: l.quantity,
-            unit: l.unit,
-            unit_price: l.unit_price,
-            tva_rate: l.tva_rate,
-            total: l.quantity * l.unit_price,
-            position: i,
-          }))
-        );
-      }
-
-      if (quote) {
-        await supabase.from('leads').insert({
-          user_id: user.id,
-          name: newQuote.title || `Devis ${quoteNumber}`,
-          client_id: selectedClientId || null,
-          quote_id: quote.id,
-          stage: 'devis_envoye',
-          source: 'devis',
-          value: totalTtc,
-          notes: newQuote.description || '',
-        });
-      }
-    }
-
-    // Auto-create recurring contracts from recurring service lines
-    const recurringLines = validLines.filter(l => l.is_recurring);
-    if (recurringLines.length > 0 && savedQuoteId && user) {
-      // Check if contract already exists for this quote
-      const { data: existingContract } = await supabase
-        .from('recurring_contracts')
-        .select('id')
-        .eq('quote_id', savedQuoteId)
-        .maybeSingle();
-
-      if (!existingContract) {
-        const startDate = new Date().toISOString().split('T')[0];
-        for (const line of recurringLines) {
-          await supabase.from('recurring_contracts').insert({
-            user_id: user.id,
-            client_id: selectedClientId || null,
-            quote_id: savedQuoteId,
-            title: line.description,
-            contract_type: 'autre',
-            amount: line.quantity * line.unit_price,
-            frequency: line.frequency || 'mensuel',
-            tva_rate: 20,
-            status: 'en_attente',
-            start_date: startDate,
-            next_billing: startDate,
-            auto_send: false,
-          });
-        }
-      }
-    }
-
-    setShowCreate(false);
-    setNewQuote({ title: '', description: '' });
-    setSelectedClientId(null);
-    setSelectedBankAccountId(null);
-    setValidUntil(getDefaultValidUntil());
-    setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
-    draftId.current = null;
-    prefillProjectId.current = null;
-    loadQuotes();
-  }
 
   async function deleteQuote(id: string) {
     if (!user) return;
@@ -517,52 +267,6 @@ export default function DevisPage() {
     q.clients?.name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  function addLine() {
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
-  }
-
-  function updateLine(index: number, field: keyof QuoteLine, value: string | number) {
-    const updated = [...lines];
-    (updated[index] as unknown as Record<string, string | number>)[field] = value;
-    setLines(updated);
-  }
-
-  function removeLine(index: number) {
-    if (lines.length > 1) {
-      setLines(lines.filter((_, i) => i !== index));
-    }
-  }
-
-  async function saveLineAsPrestation(index: number) {
-    if (!user) return;
-    const line = lines[index];
-    if (!line.description.trim() || line.unit_price <= 0 || line._savedAsPrestation || line._savingAsPrestation) return;
-
-    // Mark as saving
-    setLines(prev => prev.map((l, i) => i === index ? { ...l, _savingAsPrestation: true } : l));
-
-    const desc = line.description.trim();
-    // On utilise les 80 premiers caracteres comme nom (titre court) et la description complete comme detail
-    const name = desc.length > 80 ? desc.slice(0, 80) : desc;
-    const description = desc.length > 80 ? desc : '';
-
-    const { error } = await supabase.from('services').insert({
-      user_id: user.id,
-      name,
-      description,
-      unit: line.unit || 'u',
-      unit_price: line.unit_price,
-      category: '',
-      tva_rate: 20,
-      is_recurring: false,
-      is_active: true,
-    });
-
-    setLines(prev => prev.map((l, i) => i === index
-      ? { ...l, _savingAsPrestation: false, _savedAsPrestation: !error }
-      : l
-    ));
-  }
 
   function openCreateOptions() {
     // Premier devis : on force l'ajout d'un RIB avant tout
@@ -575,8 +279,10 @@ export default function DevisPage() {
 
   function openManualCreate() {
     setShowCreateOptions(false);
-    draftId.current = null;
-    setShowCreate(true);
+    const params = new URLSearchParams();
+    if (selectedClientId) params.set('client_id', selectedClientId);
+    if (prefillProjectId.current) params.set('project_id', prefillProjectId.current);
+    router.push(`/devis/nouveau${params.toString() ? `?${params}` : ''}`);
   }
 
   function openAiCreate() {
@@ -595,8 +301,6 @@ export default function DevisPage() {
     setShowAiIntro(false);
     router.push('/devis/ai');
   }
-
-  const linesTotals = computeTvaBreakdown(lines.filter(l => l.description.trim()));
 
   return (
     <div className="space-y-6">
@@ -922,9 +626,8 @@ export default function DevisPage() {
         open={showFirstRibDialog}
         onOpenChange={setShowFirstRibDialog}
         context="devis"
-        onSaved={(account) => {
+        onSaved={() => {
           setHasBankAccount(true);
-          setSelectedBankAccountId(account.id);
           setShowFirstRibDialog(false);
           setShowCreateOptions(true);
         }}
@@ -1016,249 +719,6 @@ export default function DevisPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCreate} onOpenChange={(open) => {
-        setShowCreate(open);
-        if (open) {
-          // Refresh the default expiration each time the dialog opens, so the
-          // "+30 days" is computed from "today" rather than from when the page
-          // was first mounted.
-          setValidUntil(getDefaultValidUntil());
-        } else {
-          // Reload list to show any auto-saved draft
-          if (draftId.current) {
-            loadQuotes();
-            draftId.current = null;
-          }
-          setNewQuote({ title: '', description: '' });
-          setSelectedClientId(null);
-          setSelectedBankAccountId(null);
-          setValidUntil(getDefaultValidUntil());
-          setLines([{ description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
-        }
-      }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nouveau devis</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-foreground">Titre du devis</label>
-                <Input
-                  className="mt-1"
-                  placeholder="Ex: Rénovation salle de bain"
-                  value={newQuote.title}
-                  onChange={e => setNewQuote({ ...newQuote, title: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-foreground">Client</label>
-                <ClientPicker
-                  className="mt-1"
-                  value={selectedClientId}
-                  onChange={(id) => handleClientSelect(id)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <label htmlFor="quote-valid-until" className="text-sm font-medium text-foreground">
-                Valable jusqu&apos;au
-              </label>
-              <Input
-                id="quote-valid-until"
-                type="date"
-                className="h-9 w-auto max-w-[180px]"
-                value={validUntil}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={e => setValidUntil(e.target.value || getDefaultValidUntil())}
-              />
-              <span className="text-xs text-muted-foreground">30 jours par défaut</span>
-            </div>
-            <BankAccountPicker
-              value={selectedBankAccountId}
-              onChange={setSelectedBankAccountId}
-            />
-            <div>
-              <label className="text-sm font-medium text-foreground">Description</label>
-              <textarea
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                rows={2}
-                placeholder="Détails supplémentaires…"
-                value={newQuote.description}
-                onChange={e => setNewQuote({ ...newQuote, description: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-3 gap-2">
-                <label className="text-sm font-medium text-foreground">Lignes du devis</label>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setShowServicePicker(!showServicePicker)} className="gap-1">
-                    <Package className="h-3 w-3" /> Mes prestations
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={addLine} className="gap-1">
-                    <Plus className="h-3 w-3" /> Ligne vide
-                  </Button>
-                </div>
-              </div>
-              {showServicePicker && (
-                <div className="mb-4 rounded-lg border bg-muted/30 p-3">
-                  <ServicePicker
-                    onSelect={(svc) => {
-                      setLines(prev => [...prev, { ...svc, _savedAsPrestation: true }]);
-                    }}
-                    onClose={() => setShowServicePicker(false)}
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                {lines.map((line, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                    <div className="col-span-12 sm:col-span-4">
-                      <Input
-                        placeholder="Description"
-                        value={line.description}
-                        onChange={e => updateLine(i, 'description', e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <Input
-                        type="number"
-                        placeholder="Qté"
-                        value={line.quantity || ''}
-                        onChange={e => updateLine(i, 'quantity', Number(e.target.value))}
-                      />
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <Select
-                        value={line.unit || 'u'}
-                        onValueChange={(val) => updateLine(i, 'unit', val)}
-                      >
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder="Unité" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {QUOTE_UNITS.map((u) => (
-                            <SelectItem key={u.value} value={u.value}>
-                              {u.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <Input
-                        type="number"
-                        placeholder="Prix HT"
-                        value={line.unit_price || ''}
-                        onChange={e => updateLine(i, 'unit_price', Number(e.target.value))}
-                      />
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <Select
-                        value={String(line.tva_rate ?? 20)}
-                        onValueChange={(val) => updateLine(i, 'tva_rate', Number(val))}
-                      >
-                        <SelectTrigger className="h-10" title="Taux de TVA">
-                          <SelectValue placeholder="TVA" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LINE_TVA_RATES.map((r) => (
-                            <SelectItem key={r} value={String(r)}>
-                              TVA {formatTvaRate(r)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-1 flex flex-col items-center gap-1.5 pt-2">
-                      {line._savedAsPrestation ? (
-                        <span title="Enregistrée dans vos prestations" className="text-emerald-600">
-                          <Check className="h-4 w-4" />
-                        </span>
-                      ) : line.description.trim() && line.unit_price > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => saveLineAsPrestation(i)}
-                          disabled={line._savingAsPrestation}
-                          title="Enregistrer dans mes prestations"
-                          className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                        >
-                          {line._savingAsPrestation ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <BookmarkPlus className="h-4 w-4" />
-                          )}
-                        </button>
-                      ) : null}
-                      <button onClick={() => removeLine(i)} className="text-muted-foreground hover:text-destructive transition-colors">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-start justify-between gap-4 rounded-lg bg-muted/50 p-4">
-              <div className="text-sm text-muted-foreground space-y-1 flex-1 min-w-0">
-                <p>Total HT : <span className="text-foreground font-medium">{formatCurrency(linesTotals.total_ht)}</span></p>
-                {linesTotals.tva_breakdown.length === 0 ? (
-                  <p>TVA : <span className="text-foreground font-medium">{formatCurrency(0)}</span></p>
-                ) : linesTotals.tva_breakdown.length === 1 ? (
-                  <p>
-                    TVA {formatTvaRate(linesTotals.tva_breakdown[0].rate)} :{' '}
-                    <span className="text-foreground font-medium">{formatCurrency(linesTotals.tva_breakdown[0].tva_amount)}</span>
-                  </p>
-                ) : (
-                  <div className="space-y-0.5">
-                    {linesTotals.tva_breakdown.map((b) => (
-                      <p key={b.rate} className="text-xs">
-                        TVA {formatTvaRate(b.rate)} sur {formatCurrency(b.base_ht)} :{' '}
-                        <span className="text-foreground font-medium">{formatCurrency(b.tva_amount)}</span>
-                      </p>
-                    ))}
-                    <p className="text-xs pt-0.5 border-t border-border/50 mt-1">
-                      Total TVA : <span className="text-foreground font-medium">{formatCurrency(linesTotals.total_tva)}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs text-muted-foreground">Total TTC</p>
-                <p className="text-2xl font-semibold text-foreground">{formatCurrency(linesTotals.total_ttc)}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowPreview(true)}
-                disabled={!newQuote.title.trim() && lines.every(l => !l.description.trim())}
-                className="gap-2"
-              >
-                <Eye className="h-4 w-4" />
-                Aperçu
-              </Button>
-              <Button onClick={saveQuote} disabled={!newQuote.title.trim()}>
-                {draftId.current ? 'Enregistrer le devis' : 'Créer le devis'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <DocumentPreviewDialog
-        mode="quote"
-        open={showPreview}
-        onClose={() => setShowPreview(false)}
-        title={newQuote.title}
-        description={newQuote.description}
-        lines={lines}
-        clientId={selectedClientId}
-        bankAccountId={selectedBankAccountId}
-      />
 
       <DocumentPreviewDialog
         mode="quote"
