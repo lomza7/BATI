@@ -391,7 +391,8 @@ export default function ContratsPage() {
     await supabase.from('quote_lines').insert({
       user_id: user.id,
       quote_id: quote.id,
-      description: contract.title + (contract.description ? ` — ${contract.description}` : ''),
+      description: contract.title,
+      detail: contract.description || null,
       quantity: 1,
       unit: 'forfait',
       unit_price: totalHt,

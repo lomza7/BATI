@@ -36,6 +36,7 @@ import type { ClarifyQuestion, QuoteTurn } from '@/lib/ai/quote-schema';
 
 export interface AiQuoteDraftLine {
   description: string;
+  detail?: string;
   quantity: number;
   unit: string;
   unit_price: number;

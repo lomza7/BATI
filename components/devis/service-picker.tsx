@@ -23,6 +23,7 @@ interface Service {
 
 export interface PickedService {
   description: string;
+  detail?: string;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -76,7 +77,8 @@ export function ServicePicker({ onSelect, onClose }: ServicePickerProps) {
 
   function pickService(s: Service) {
     onSelect({
-      description: s.description ? `${s.name} — ${s.description}` : s.name,
+      description: s.name,
+      detail: s.description || '',
       quantity: 1,
       unit: s.unit,
       unit_price: s.unit_price,

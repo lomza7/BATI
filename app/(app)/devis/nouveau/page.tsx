@@ -35,6 +35,7 @@ import {
 
 interface QuoteLine {
   description: string;
+  detail?: string;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -164,7 +165,8 @@ export default function NouveauDevisPage() {
 
   function pickService(s: Service) {
     const newLine: QuoteLine = {
-      description: s.description ? `${s.name} — ${s.description}` : s.name,
+      description: s.name,
+      detail: s.description || '',
       quantity: 1,
       unit: s.unit,
       unit_price: s.unit_price,
@@ -184,9 +186,8 @@ export default function NouveauDevisPage() {
 
     setLines(prev => prev.map((l, i) => i === index ? { ...l, _savingAsPrestation: true } : l));
 
-    const desc = line.description.trim();
-    const name = desc.length > 80 ? desc.slice(0, 80) : desc;
-    const svcDescription = desc.length > 80 ? desc : '';
+    const name = line.description.trim().slice(0, 80);
+    const svcDescription = line.detail?.trim() || '';
 
     const { error } = await supabase.from('services').insert({
       user_id: user.id,
@@ -246,6 +247,7 @@ export default function NouveauDevisPage() {
               user_id: user.id,
               quote_id: draftId.current!,
               description: l.description,
+              detail: l.detail || null,
               quantity: l.quantity,
               unit: l.unit,
               unit_price: l.unit_price,
@@ -313,6 +315,7 @@ export default function NouveauDevisPage() {
               user_id: user.id,
               quote_id: quote.id,
               description: l.description,
+              detail: l.detail || null,
               quantity: l.quantity,
               unit: l.unit,
               unit_price: l.unit_price,
@@ -512,12 +515,19 @@ export default function NouveauDevisPage() {
                     {/* Mobile: stacked layout */}
                     <div className="sm:hidden space-y-2">
                       <div className="flex items-start gap-2">
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-1.5">
                           <Input
-                            placeholder="Description"
+                            placeholder="Nom de la prestation"
                             value={line.description}
                             onChange={e => updateLine(i, 'description', e.target.value)}
                             className="text-sm"
+                          />
+                          <textarea
+                            placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
+                            value={line.detail || ''}
+                            onChange={e => updateLine(i, 'detail', e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                            rows={1}
                           />
                         </div>
                         <div className="flex items-center gap-1 pt-1.5 shrink-0">
@@ -569,8 +579,15 @@ export default function NouveauDevisPage() {
                     {/* Desktop: grid layout */}
                     <div className="hidden sm:block">
                       <div className="grid grid-cols-12 gap-2 items-start">
-                        <div className="col-span-5">
-                          <Input placeholder="Description de la prestation" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} />
+                        <div className="col-span-5 space-y-1">
+                          <Input placeholder="Nom de la prestation" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} />
+                          <textarea
+                            placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
+                            value={line.detail || ''}
+                            onChange={e => updateLine(i, 'detail', e.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                            rows={1}
+                          />
                         </div>
                         <div className="col-span-1">
                           <Input type="number" placeholder="Qte" value={line.quantity || ''} onChange={e => updateLine(i, 'quantity', Number(e.target.value))} />

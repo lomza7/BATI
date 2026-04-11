@@ -84,6 +84,7 @@ interface BankAccountData {
 interface InvoiceLine {
   id: string;
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -568,7 +569,10 @@ export default function PublicInvoicePage() {
               <tbody className="divide-y divide-[#e5e1da]">
                 {lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>{line.description}</td>
+                    <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>
+                      {line.description}
+                      {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                    </td>
                     <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
                     <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
                     <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
@@ -585,6 +589,7 @@ export default function PublicInvoicePage() {
             {lines.map((line) => (
               <div key={line.id} className="px-5 py-4">
                 <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
+                {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-[#6b6560]">
                     {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? legacyRate)}

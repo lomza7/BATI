@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Send, Copy, Check, Link2, Loader as Loader2, PenLine, Mail, TriangleAlert as AlertTriangle, Paperclip, FileText } from 'lucide-react';
+import { fireConfetti } from '@/lib/confetti';
 import {
   Dialog,
   DialogContent,
@@ -107,6 +108,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
       setMagicLink(data.magic_link);
       setEmailStatus((data.email_status as EmailStatus) || null);
       setEmailErrorMsg(data.email_error || null);
+      fireConfetti();
       onSent?.();
     } catch {
       setSendError('Erreur réseau, veuillez réessayer');
@@ -123,26 +125,26 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0 border-0 shadow-2xl overflow-hidden bg-white rounded-2xl">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto p-0 gap-0 border-0 shadow-2xl overflow-hidden bg-white rounded-2xl">
         <DialogTitle className="sr-only">Envoyer pour signature</DialogTitle>
 
-        <div className="px-6 py-5 border-b border-border">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
               <PenLine className="h-5 w-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-base font-semibold text-foreground">Envoyer pour signature</h2>
-              <p className="text-xs text-muted-foreground">{quote.quote_number} — {quote.title}</p>
+              <p className="text-xs text-muted-foreground truncate">{quote.quote_number} — {quote.title}</p>
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
           {magicLink ? (
             <div className="space-y-4 animate-fade-up">
               {emailStatus === 'sent' && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                <div className="flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                   <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                     <Mail className="h-4 w-4 text-emerald-600" />
                   </div>
@@ -150,35 +152,35 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                     <p className="text-sm font-medium text-emerald-800">Devis envoyé par email</p>
                     <p className="text-xs text-emerald-600 mt-0.5 break-words">
                       Un email de signature a été envoyé à <strong className="break-all">{clientEmail}</strong>.
-                      S&apos;il ne le reçoit pas, demandez-lui de vérifier ses spams ou envoyez-lui le lien de secours ci-dessous.
+                      S&apos;il ne le reçoit pas, demandez-lui de vérifier ses spams ou envoyez-lui le lien ci-dessous.
                     </p>
                   </div>
                 </div>
               )}
 
               {emailStatus === 'failed' && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100">
+                <div className="flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-red-50 border border-red-100">
                   <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-red-800">L&apos;email n&apos;a pas pu être envoyé</p>
                     <p className="text-xs text-red-600 mt-0.5 break-words">
-                      {emailErrorMsg || 'Erreur inconnue.'} Le devis est enregistré — utilisez le lien de secours ci-dessous pour le transmettre par SMS, WhatsApp ou copier-coller.
+                      {emailErrorMsg || 'Erreur inconnue.'} Utilisez le lien ci-dessous pour transmettre le devis par SMS ou WhatsApp.
                     </p>
                   </div>
                 </div>
               )}
 
               {emailStatus === 'skipped' && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+                <div className="flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-amber-50 border border-amber-100">
                   <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-amber-800">Email non envoyé</p>
                     <p className="text-xs text-amber-700 mt-0.5 break-words">
-                      {emailErrorMsg || 'Aucune adresse email fournie.'} Utilisez le lien de secours ci-dessous.
+                      {emailErrorMsg || 'Aucune adresse email fournie.'} Utilisez le lien ci-dessous.
                     </p>
                   </div>
                 </div>
@@ -188,24 +190,22 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   {emailStatus === 'sent' ? 'Lien de secours (si le client ne reçoit pas l\u2019email)' : 'Lien de signature du devis'}
                 </label>
-                <div className="flex gap-2">
-                  <div className="flex-1 min-w-0 flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">
-                    <Link2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm text-foreground truncate">{magicLink}</span>
-                  </div>
-                  <button
-                    onClick={copyLink}
-                    className={`h-10 px-4 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
-                      copied
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    }`}
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? 'Copié !' : 'Copier'}
-                  </button>
+                <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-border bg-muted/20">
+                  <Link2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-foreground truncate flex-1 min-w-0">{magicLink}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                <button
+                  onClick={copyLink}
+                  className={`mt-2 w-full h-10 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                    copied
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'Copié !' : 'Copier le lien'}
+                </button>
+                <p className="text-xs text-muted-foreground mt-2.5 leading-relaxed text-center">
                   Vous pouvez aussi envoyer ce lien par SMS ou WhatsApp à <strong>{clientName}</strong>.
                 </p>
               </div>
@@ -279,17 +279,17 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Expiration du lien</label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                   {[
-                    { value: '7', label: '7 jours' },
-                    { value: '14', label: '14 jours' },
-                    { value: '30', label: '30 jours' },
-                    { value: '60', label: '60 jours' },
+                    { value: '7', label: '7j' },
+                    { value: '14', label: '14j' },
+                    { value: '30', label: '30j' },
+                    { value: '60', label: '60j' },
                   ].map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => setExpiresIn(opt.value)}
-                      className={`flex-1 h-9 rounded-lg border text-xs font-medium transition-all ${
+                      className={`h-9 rounded-lg border text-xs font-medium transition-all ${
                         expiresIn === opt.value
                           ? 'border-primary bg-primary/5 text-primary'
                           : 'border-border bg-white text-foreground hover:border-primary/30'
@@ -308,7 +308,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <button
             onClick={onClose}
             className="h-10 px-4 rounded-lg border border-border bg-white text-sm font-medium text-foreground hover:bg-muted/50 transition-all"
@@ -319,7 +319,7 @@ export function SendQuoteDialog({ quote, onClose, onSent }: Props) {
             <button
               onClick={handleSend}
               disabled={!clientName.trim() || !clientEmail.trim() || sending}
-              className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 disabled:opacity-40 transition-all"
+              className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-40 transition-all"
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

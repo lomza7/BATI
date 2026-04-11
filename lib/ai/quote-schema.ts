@@ -4,6 +4,7 @@ export const AI_QUOTE_UNITS = ['u', 'forfait', 'm2', 'ml', 'm3', 'h', 'jour', 'k
 
 export const aiQuoteLineSchema = z.object({
   description: z.string().min(1),
+  detail: z.string().optional(),
   quantity: z.number().positive(),
   unit: z.enum(AI_QUOTE_UNITS),
   unit_price: z.number().min(0),

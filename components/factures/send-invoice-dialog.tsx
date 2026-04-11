@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Send, Copy, Check, Link2, Loader as Loader2, Mail, CreditCard, Paperclip, FileText } from 'lucide-react';
+import { fireConfetti } from '@/lib/confetti';
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
 
       setMagicLink(data.magic_link);
       setEmailSent(data.email_status === 'sent');
+      fireConfetti();
       onSent?.();
     } catch {
       setSendError('Erreur réseau, veuillez réessayer');

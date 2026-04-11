@@ -34,6 +34,7 @@ export default function DevisAiPage() {
       const validLines = draft.lines
         .map((line) => ({
           description: (line.description || '').trim(),
+          detail: (line.detail || '').trim() || null,
           quantity: Number(line.quantity) || 0,
           unit: line.unit || 'u',
           unit_price: Number(line.unit_price) || 0,
@@ -116,6 +117,7 @@ export default function DevisAiPage() {
           user_id: user.id,
           quote_id: quoteId,
           description: line.description,
+          detail: line.detail || null,
           quantity: line.quantity,
           unit: line.unit,
           unit_price: line.unit_price,

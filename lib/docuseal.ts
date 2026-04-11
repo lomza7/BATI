@@ -47,6 +47,7 @@ interface QuoteData {
 
 interface QuoteLine {
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -179,7 +180,7 @@ export function buildQuoteHtml(
         const lineTvaRate = Number(l.tva_rate ?? legacyRate);
         return `
           <tr>
-            <td style="padding:10px 12px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};vertical-align:top;word-wrap:break-word">${escMultiline(l.description)}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};vertical-align:top;word-wrap:break-word">${escMultiline(l.description)}${l.detail ? `<div style="font-size:10px;color:${muted};margin-top:2px;line-height:1.4">${escMultiline(l.detail)}</div>` : ''}</td>
             <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:center;vertical-align:top">${esc(String(l.quantity))}</td>
             <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${muted};text-align:center;vertical-align:top">${esc(UNIT_LABELS[l.unit] || l.unit || '')}</td>
             <td style="padding:10px 6px;border-bottom:1px solid ${border};font-size:12px;color:${textColor};text-align:right;vertical-align:top;white-space:nowrap">${esc(fmtCurrency(Number(l.unit_price) || 0))}</td>

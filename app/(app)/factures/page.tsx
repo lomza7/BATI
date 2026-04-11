@@ -82,6 +82,7 @@ interface Invoice {
 interface QuoteLine {
   id: string;
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -103,7 +104,7 @@ interface QuoteCandidate {
   bank_account_id: string | null;
   client_id: string | null;
   project_id: string | null;
-  clients: { name: string } | null;
+  clients: { name: string; email?: string | null } | null;
   /** Indique s'il existe au moins une facture liée (tous types confondus) */
   has_linked_invoice: boolean;
   quote_lines: QuoteLine[];
@@ -262,7 +263,7 @@ export default function FacturesPage() {
         client_id: quote.client_id ? String(quote.client_id) : null,
         project_id: quote.project_id ? String(quote.project_id) : null,
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
-          ? { name: String((clientValue as { name?: string }).name || '') }
+          ? { name: String((clientValue as { name?: string }).name || ''), email: (clientValue as { email?: string | null }).email || null }
           : null,
         has_linked_invoice: linkedInvoices.length > 0,
         quote_lines: Array.isArray(quote.quote_lines)

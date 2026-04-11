@@ -37,6 +37,7 @@ import type { QuoteBillingSummary } from '@/lib/invoices/deposits';
 interface QuoteLine {
   id: string;
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -151,6 +152,7 @@ export function CreateFinalInvoiceDialog({
             user_id: user.id,
             invoice_id: invoice.id,
             description: line.description,
+            detail: line.detail || null,
             quantity: line.quantity,
             unit: line.unit,
             unit_price: line.unit_price,

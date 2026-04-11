@@ -20,6 +20,7 @@ interface PreviewBankAccount {
 
 interface PreviewLine {
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -199,7 +200,7 @@ export function DocumentPreviewDialog({
 
             const { data: linesData } = await supabase
               .from('quote_lines')
-              .select('description, quantity, unit, unit_price, tva_rate, position')
+              .select('description, detail, quantity, unit, unit_price, tva_rate, position')
               .eq('quote_id', documentId)
               .order('position', { ascending: true });
             if (!cancelled && linesData) {
@@ -585,7 +586,10 @@ export function DocumentPreviewDialog({
                   ) : (
                     validLines.map((line, idx) => (
                       <tr key={idx}>
-                        <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>{line.description}</td>
+                        <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>
+                          {line.description}
+                          {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                        </td>
                         <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
                         <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
                         <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
@@ -608,6 +612,7 @@ export function DocumentPreviewDialog({
                 validLines.map((line, idx) => (
                   <div key={idx} className="px-5 py-4">
                     <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
+                    {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs text-[#6b6560]">
                         {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? 20)}

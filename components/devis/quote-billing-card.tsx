@@ -38,6 +38,7 @@ import { CreateFinalInvoiceDialog } from '@/components/factures/create-final-inv
 interface QuoteLine {
   id: string;
   description: string;
+  detail?: string | null;
   quantity: number;
   unit: string;
   unit_price: number;
@@ -156,6 +157,7 @@ export function QuoteBillingCard({
             user_id: user.id,
             invoice_id: invoice.id,
             description: line.description,
+            detail: line.detail || null,
             quantity: line.quantity,
             unit: line.unit,
             unit_price: line.unit_price,
