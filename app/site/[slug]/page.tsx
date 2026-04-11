@@ -56,7 +56,7 @@ async function getSiteData(slug: string) {
     sb.from('profiles').select('*').eq('id', typedSite.user_id).maybeSingle(),
     sb
       .from('projects')
-      .select('id, name, description, public_description, public_category, public_slug, public_completion_date, published_at, address, city, status, lat, lng, project_photos(id, url, caption, category)')
+      .select('id, name, notes, public_description, public_category, public_slug, public_completion_date, published_at, address, city, status, lat, lng, project_photos(id, url, caption, category)')
       .eq('user_id', typedSite.user_id)
       .eq('is_public', true)
       .not('published_at', 'is', null)

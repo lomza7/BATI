@@ -28,7 +28,7 @@ interface ProjectPhoto {
 interface ProjectRow {
   id: string;
   name: string;
-  description: string | null;
+  notes: string | null;
   public_description: string | null;
   public_category: string | null;
   public_slug: string | null;
@@ -60,7 +60,7 @@ async function getProjectData(siteSlug: string, projectSlug: string) {
   const [projectRes, profileRes, otherProjectsRes, reviewsRes, servicesRes] = await Promise.all([
     sb
       .from('projects')
-      .select('id, name, description, public_description, public_category, public_slug, public_completion_date, published_at, address, city, lat, lng, status, start_date, end_date, project_photos(id, url, caption, category)')
+      .select('id, name, notes, public_description, public_category, public_slug, public_completion_date, published_at, address, city, lat, lng, status, start_date, end_date, project_photos(id, url, caption, category)')
       .eq('user_id', typedSite.user_id)
       .eq('public_slug', projectSlug)
       .eq('is_public', true)
@@ -136,7 +136,7 @@ export async function generateMetadata({
     .join(' ')
     .slice(0, 60);
 
-  const description = (project.public_description || project.description || '')
+  const description = (project.public_description || project.notes || '')
     .replace(/\s+/g, ' ')
     .slice(0, 155);
 
@@ -219,7 +219,7 @@ export default async function ProjectDetailPage({
       headline: project.public_category
         ? `${project.public_category}${city ? ` a ${city}` : ''}`
         : project.name,
-      description: project.public_description || project.description || undefined,
+      description: project.public_description || project.notes || undefined,
       image: sortedPhotos.map((p) => p.url).slice(0, 6),
       datePublished: project.published_at || undefined,
       dateModified: project.published_at || undefined,
@@ -397,9 +397,9 @@ export default async function ProjectDetailPage({
         )}
 
         {/* Description */}
-        {(project.public_description || project.description) && (
+        {(project.public_description || project.notes) && (
           <div className="prose max-w-none mb-8 sm:mb-12">
-            {(project.public_description || project.description || '')
+            {(project.public_description || project.notes || '')
               .split('\n')
               .filter((p) => p.trim())
               .map((paragraph, i) => (

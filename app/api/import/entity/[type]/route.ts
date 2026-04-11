@@ -335,13 +335,14 @@ async function importInvoices(
 
   const { data: existingClients } = await sb
     .from('clients')
-    .select('id, name')
+    .select('id, name, address, city, postal_code')
     .eq('user_id', userId);
-  const clientMap = new Map<string, string>();
+  const clientMap = new Map<string, { id: string; address: string; city: string; postal_code: string }>();
   for (const c of existingClients || []) {
+    const client = c as { id: string; name: string; address?: string; city?: string; postal_code?: string };
     clientMap.set(
-      normalizeName((c as { name: string }).name),
-      (c as { id: string }).id,
+      normalizeName(client.name),
+      { id: client.id, address: client.address || '', city: client.city || '', postal_code: client.postal_code || '' },
     );
   }
 
@@ -353,8 +354,8 @@ async function importInvoices(
   let skipped = mapped.errors.length;
 
   for (const row of mapped.rows) {
-    const clientId = clientMap.get(normalizeName(row.client_name));
-    if (!clientId) {
+    const client = clientMap.get(normalizeName(row.client_name));
+    if (!client) {
       skipped++;
       errors.push({
         line: parseInt(row.externalId, 10) || 0,
@@ -362,6 +363,36 @@ async function importInvoices(
         hint: 'Importez d\'abord vos contacts depuis l\'onglet Contacts, ou créez ce client manuellement.',
       });
       continue;
+    }
+
+    // Create a project (chantier) for this invoice
+    let projectId: string | null = null;
+    const projectName = row.title || 'Chantier importé';
+    const isCompleted = row.status === 'payee';
+    const { data: project } = await sb
+      .from('projects')
+      .insert({
+        user_id: userId,
+        name: projectName,
+        client_id: client.id,
+        address: client.address,
+        city: client.city,
+        postal_code: client.postal_code,
+        status: isCompleted ? 'termine' : 'en_cours',
+        progress: isCompleted ? 100 : 0,
+        budget: row.total_ttc || 0,
+        start_date: row.issued_at || null,
+        end_date: isCompleted ? (row.paid_at || row.issued_at || null) : null,
+        notes: row.source_number
+          ? `Importé depuis facture ${row.source_number}`
+          : 'Importé depuis facture',
+        is_public: isCompleted,
+        published_at: isCompleted ? new Date().toISOString() : null,
+      })
+      .select('id')
+      .single();
+    if (project) {
+      projectId = project.id;
     }
 
     let success = false;
@@ -372,7 +403,8 @@ async function importInvoices(
 
       const payload = {
         invoice_number: invoiceNumber,
-        client_id: clientId,
+        client_id: client.id,
+        project_id: projectId,
         quote_id: null,
         title: row.title,
         status: row.status,

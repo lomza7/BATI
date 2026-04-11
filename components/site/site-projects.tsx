@@ -95,12 +95,12 @@ export function SiteProjects({ projects, siteSlug }: SiteProjectsProps) {
                       {project.city}
                     </p>
                   )}
-                  {(project.public_description || project.description) && (
+                  {(project.public_description || project.notes) && (
                     <p
                       className="text-sm leading-relaxed line-clamp-3"
                       style={{ color: 'var(--site-text)' }}
                     >
-                      {project.public_description || project.description}
+                      {project.public_description || project.notes}
                     </p>
                   )}
                   {href && (

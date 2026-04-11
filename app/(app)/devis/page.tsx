@@ -770,6 +770,11 @@ export default function DevisPage() {
                                   <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                                 </DropdownMenuItem>
                               )}
+                              {q.status !== 'accepte' && (
+                                <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>
+                                  <Check className="mr-2 h-4 w-4" /> Marquer accepté
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>
                                 <X className="mr-2 h-4 w-4" /> Marquer refusé
                               </DropdownMenuItem>
@@ -844,7 +849,14 @@ export default function DevisPage() {
                             <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>Marquer refusé</DropdownMenuItem>
+                        {q.status !== 'accepte' && (
+                          <DropdownMenuItem onClick={() => updateStatus(q.id, 'accepte')}>
+                            <Check className="mr-2 h-4 w-4" /> Marquer accepté
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => updateStatus(q.id, 'refuse')}>
+                          <X className="mr-2 h-4 w-4" /> Marquer refusé
+                        </DropdownMenuItem>
                         {q.status === 'brouillon' && (
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteQuote(q.id)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Supprimer

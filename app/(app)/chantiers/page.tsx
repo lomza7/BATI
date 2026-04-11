@@ -63,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PublishSiteDialog } from '@/components/chantiers/publish-site-dialog';
+import { InvoiceImportDialog } from '@/components/chantiers/invoice-import-dialog';
 
 type PhotoCategory = 'presentation' | 'avant' | 'pendant' | 'apres';
 
@@ -260,7 +261,10 @@ export default function ChantiersPage() {
   const [projectActionId, setProjectActionId] = useState<string | null>(null);
   const [siteSlug, setSiteSlug] = useState<string | null>(null);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [publishProject, setPublishProject] = useState<Project | null>(null);
+  const [orphanCount, setOrphanCount] = useState(0);
+  const [backfilling, setBackfilling] = useState(false);
 
   // Synthese financiere du chantier ouvert (boussole de marge)
   const projectFinance = useMemo(() => {
@@ -391,6 +395,33 @@ export default function ChantiersPage() {
 
     setProjects(mappedProjects);
     setLoading(false);
+
+    // Check for orphan invoices (no project linked)
+    supabase
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .is('project_id', null)
+      .then(({ count }) => setOrphanCount(count || 0));
+  }
+
+  async function runBackfill() {
+    setBackfilling(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/import/backfill-projects', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrphanCount(0);
+        loadProjects();
+        alert(`${data.created} chantier${data.created > 1 ? 's' : ''} créé${data.created > 1 ? 's' : ''} !`);
+      }
+    } finally {
+      setBackfilling(false);
+    }
   }
 
   function clearPendingPhotos() {
@@ -907,13 +938,16 @@ export default function ChantiersPage() {
       newStatus = 'en_cours';
     }
 
+    const now = new Date().toISOString();
     await supabase
       .from('projects')
       .update({
         completed_phases: updated,
         progress: completedWeight,
         ...(newStatus ? { status: newStatus } : {}),
-        updated_at: new Date().toISOString(),
+        // Auto-publish when all phases complete
+        ...(newStatus === 'termine' ? { is_public: true, published_at: now } : {}),
+        updated_at: now,
       })
       .eq('id', projectId);
 
@@ -922,12 +956,15 @@ export default function ChantiersPage() {
 
   async function updateStatus(id: string, status: keyof typeof PROJECT_STATUSES) {
     const progress = status === 'termine' ? 100 : status === 'a_planifier' ? 0 : undefined;
+    const now = new Date().toISOString();
     await supabase
       .from('projects')
       .update({
         status,
         ...(progress !== undefined ? { progress } : {}),
-        updated_at: new Date().toISOString(),
+        // Auto-publish when completed
+        ...(status === 'termine' ? { is_public: true, published_at: now } : {}),
+        updated_at: now,
       })
       .eq('id', id);
 
@@ -993,12 +1030,45 @@ export default function ChantiersPage() {
             <Trash2 className="h-4 w-4" />
             Corbeille
           </Button>
+          <Button variant="outline" onClick={() => setShowImportDialog(true)} className="gap-2">
+            <UploadCloud className="h-4 w-4" />
+            Importer
+          </Button>
           <Button onClick={openCreateEditor} className="gap-2">
             <Plus className="h-4 w-4" />
             Nouveau chantier
           </Button>
         </div>
       </PageHeader>
+
+      {orphanCount > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Receipt className="h-5 w-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                {orphanCount} facture{orphanCount > 1 ? 's' : ''} sans chantier associé
+              </p>
+              <p className="text-xs text-amber-700">
+                Créez automatiquement les chantiers correspondants pour les voir ici et sur la carte.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-300 text-amber-800 hover:bg-amber-100 flex-shrink-0"
+            disabled={backfilling}
+            onClick={runBackfill}
+          >
+            {backfilling ? (
+              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Création...</>
+            ) : (
+              <><Plus className="h-3.5 w-3.5 mr-1.5" /> Créer les chantiers</>
+            )}
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {(['a_planifier', 'en_cours', 'termine', 'en_pause'] as const).map((status) => {
@@ -2515,6 +2585,12 @@ export default function ChantiersPage() {
         project={publishProject}
         siteSlug={siteSlug}
         onPublished={() => void loadProjects()}
+      />
+
+      <InvoiceImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onComplete={loadProjects}
       />
     </div>
   );

@@ -95,7 +95,7 @@ export interface SiteProfile {
 export interface SiteProject {
   id: string;
   name: string;
-  description: string | null;
+  notes: string | null;
   public_description?: string | null;
   public_category?: string | null;
   public_slug?: string | null;
