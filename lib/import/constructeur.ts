@@ -298,10 +298,10 @@ function mapInvoiceStatus(value: string): InvoiceStatus {
   if (!s) return 'brouillon';
   if (s.includes('brouillon') || s.includes('draft')) return 'brouillon';
   if (s.includes('annul') || s.includes('avoir') || s.includes('cancel')) return 'annulee';
-  if (s.includes('paye') || s.includes('paid') || s.includes('regle')) return 'payee';
+  if (s.includes('paye') || s.includes('paid') || s.includes('regle') || s.includes('réglé')) return 'payee';
   if (s.includes('retard') || s.includes('overdue')) return 'en_retard';
   if (s.includes('envoy') || s.includes('sent') || s.includes('final')) return 'envoyee';
-  if (s.includes('cree') || s.includes('issued')) return 'creee';
+  if (s.includes('cree') || s.includes('créé') || s.includes('issued') || s.includes('import')) return 'creee';
   return 'creee';
 }
 
