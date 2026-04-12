@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Trash2, Mail, RefreshCw, Download, Receipt } from 'lucide-react';
+import { Plus, FileText, Search, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Trash2, Mail, RefreshCw, Download, Receipt } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
@@ -66,6 +66,8 @@ export default function DevisPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('en_cours');
+  const EN_COURS_STATUSES = ['brouillon', 'envoye'];
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [showAiIntro, setShowAiIntro] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -288,11 +290,19 @@ export default function DevisPage() {
     return { label: 'Envoyé', color: 'bg-violet-50 text-violet-700', icon: Send };
   }
 
-  const filteredQuotes = quotes.filter(q =>
-    q.title.toLowerCase().includes(search.toLowerCase()) ||
-    q.quote_number.toLowerCase().includes(search.toLowerCase()) ||
-    q.clients?.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredQuotes = quotes.filter(q => {
+    // Filtre par statut
+    if (statusFilter === 'en_cours' && !EN_COURS_STATUSES.includes(q.status)) return false;
+    if (statusFilter !== 'en_cours' && statusFilter !== 'tous' && q.status !== statusFilter) return false;
+    // Filtre par recherche
+    if (search) {
+      const s = search.toLowerCase();
+      return q.title.toLowerCase().includes(s) ||
+        q.quote_number.toLowerCase().includes(s) ||
+        q.clients?.name?.toLowerCase().includes(s);
+    }
+    return true;
+  });
 
 
   function openCreateOptions() {
@@ -357,8 +367,36 @@ export default function DevisPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: 'en_cours', label: 'En cours' },
+            { key: 'accepte', label: 'Acceptés' },
+            { key: 'refuse', label: 'Refusés' },
+            { key: 'expire', label: 'Expirés' },
+            { key: 'tous', label: 'Tous' },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {f.label}
+              {f.key !== 'tous' && (
+                <span className="ml-1.5 text-xs opacity-70">
+                  {f.key === 'en_cours'
+                    ? quotes.filter(q => EN_COURS_STATUSES.includes(q.status)).length
+                    : quotes.filter(q => q.status === f.key).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Rechercher un devis…"
@@ -367,9 +405,6 @@ export default function DevisPage() {
             className="pl-10"
           />
         </div>
-        <Button variant="outline" size="icon">
-          <Filter className="h-4 w-4" />
-        </Button>
       </div>
 
       {loading ? (
