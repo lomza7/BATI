@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { expenseOcrSchema } from '@/lib/ai/expense-ocr-schema';
-import { extractPdfText } from '@/lib/ai/pdf-extract';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
@@ -71,6 +70,7 @@ function extractJsonFromText(content: string): string {
 }
 
 export async function POST(request: Request) {
+  try {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
@@ -145,6 +145,7 @@ export async function POST(request: Request) {
 
   if (isPdf) {
     try {
+      const { extractPdfText } = await import('@/lib/ai/pdf-extract');
       const { text, pageCount } = await extractPdfText(buffer);
       if (!text.trim()) {
         return NextResponse.json(
@@ -286,5 +287,14 @@ export async function POST(request: Request) {
       cause: error,
       context: { route: 'ai/expense-ocr', user_id: user.id },
     });
+  }
+
+  } catch (topError) {
+    // Global catch — ensures we always return JSON, never Vercel's HTML 500 page
+    console.error('[expense-ocr] Unhandled error:', topError);
+    return NextResponse.json(
+      { error: topError instanceof Error ? topError.message : 'Erreur serveur inattendue' },
+      { status: 500 },
+    );
   }
 }
