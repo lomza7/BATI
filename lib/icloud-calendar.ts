@@ -272,28 +272,32 @@ export function parseICSToEvent(ics: string, userId: string) {
 export async function fetchCalDAVEvents(conn: ICloudCalendarConnection): Promise<DAVObject[]> {
   const client = await createDAVClient(conn);
 
-  if (!conn.calendar_url) {
-    const calendars = await client.fetchCalendars();
-    if (calendars.length === 0) throw new Error('Aucun calendrier trouve sur iCloud');
-    // Use the first calendar by default
-    conn.calendar_url = calendars[0].url;
-  }
-
-  // Fetch events from the last 3 months
+  // Fetch events from the last 3 months to 1 year ahead
   const timeMin = new Date();
   timeMin.setMonth(timeMin.getMonth() - 3);
+  const timeRange = {
+    start: timeMin.toISOString(),
+    end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+  };
 
-  const objects = await client.fetchCalendarObjects({
-    calendar: {
-      url: conn.calendar_url,
-    } as DAVCalendar,
-    timeRange: {
-      start: timeMin.toISOString(),
-      end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  });
+  // Pull from ALL calendars to capture all events
+  const calendars = await client.fetchCalendars();
+  if (calendars.length === 0) throw new Error('Aucun calendrier trouve sur iCloud');
 
-  return objects;
+  const allObjects: DAVObject[] = [];
+  for (const cal of calendars) {
+    try {
+      const objects = await client.fetchCalendarObjects({
+        calendar: cal,
+        timeRange,
+      });
+      allObjects.push(...objects);
+    } catch {
+      // Skip calendars that fail (e.g. shared calendars with no read access)
+    }
+  }
+
+  return allObjects;
 }
 
 // ---------------------------------------------------------------------------
