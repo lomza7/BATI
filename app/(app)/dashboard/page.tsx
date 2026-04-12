@@ -1417,7 +1417,8 @@ export default function DashboardPage() {
     projectFinanceMap.forEach((p) => {
       p.coutTotal = p.mainOeuvreHT + p.depensesHT;
       p.margeBrute = p.caHT - p.coutTotal;
-      p.margePct = p.caHT > 0 ? (p.margeBrute / p.caHT) * 100 : null;
+      // Marge uniquement pertinente si des coûts sont renseignés
+      p.margePct = p.caHT > 0 && p.coutTotal > 0 ? (p.margeBrute / p.caHT) * 100 : null;
     });
 
     const projectMargins = Array.from(projectFinanceMap.values())
@@ -1427,7 +1428,7 @@ export default function DashboardPage() {
     const totalCA = projectMargins.reduce((s, p) => s + p.caHT, 0);
     const totalCost = projectMargins.reduce((s, p) => s + p.coutTotal, 0);
     const totalMargeBrute = totalCA - totalCost;
-    const avgMargePct = totalCA > 0 ? (totalMargeBrute / totalCA) * 100 : null;
+    const avgMargePct = totalCA > 0 && totalCost > 0 ? (totalMargeBrute / totalCA) * 100 : null;
 
     // Average margin % among individual chantiers (simple mean of margePct, only those with caHT > 0)
     const billedProjects = projectMargins.filter((p) => p.margePct !== null);
@@ -1462,7 +1463,7 @@ export default function DashboardPage() {
       yearCost += (a.hours || 0) * rate;
     });
     const yearMarge = yearCA - yearCost;
-    const yearMargePct = yearCA > 0 ? (yearMarge / yearCA) * 100 : null;
+    const yearMargePct = yearCA > 0 && yearCost > 0 ? (yearMarge / yearCA) * 100 : null;
 
     // Monthly margin chart — last 12 months
     const marginChartData: { month: string; ca: number; cout: number; marge: number; margePct: number | null }[] = [];
@@ -1495,7 +1496,7 @@ export default function DashboardPage() {
         ca: Math.round(ca),
         cout: Math.round(cout),
         marge: Math.round(marge),
-        margePct: ca > 0 ? Math.round((marge / ca) * 100) : null,
+        margePct: ca > 0 && cout > 0 ? Math.round((marge / ca) * 100) : null,
       });
     }
 

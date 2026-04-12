@@ -365,34 +365,38 @@ async function importInvoices(
       continue;
     }
 
-    // Create a project (chantier) for this invoice
+    // Create a project (chantier) for this invoice — skip for deposits
     let projectId: string | null = null;
     const projectName = row.title || 'Chantier importé';
+    const isDeposit = /\b(acompte|accompte|solde)\b/i.test(projectName);
     const isCompleted = row.status === 'payee';
-    const { data: project } = await sb
-      .from('projects')
-      .insert({
-        user_id: userId,
-        name: projectName,
-        client_id: client.id,
-        address: client.address,
-        city: client.city,
-        postal_code: client.postal_code,
-        status: isCompleted ? 'termine' : 'en_cours',
-        progress: isCompleted ? 100 : 0,
-        budget: row.total_ttc || 0,
-        start_date: row.issued_at || null,
-        end_date: isCompleted ? (row.paid_at || row.issued_at || null) : null,
-        notes: row.source_number
-          ? `Importé depuis facture ${row.source_number}`
-          : 'Importé depuis facture',
-        is_public: isCompleted,
-        published_at: isCompleted ? new Date().toISOString() : null,
-      })
-      .select('id')
-      .single();
-    if (project) {
-      projectId = project.id;
+
+    if (!isDeposit) {
+      const { data: project } = await sb
+        .from('projects')
+        .insert({
+          user_id: userId,
+          name: projectName,
+          client_id: client.id,
+          address: client.address,
+          city: client.city,
+          postal_code: client.postal_code,
+          status: isCompleted ? 'termine' : 'en_cours',
+          progress: isCompleted ? 100 : 0,
+          budget: row.total_ttc || 0,
+          start_date: row.issued_at || null,
+          end_date: isCompleted ? (row.paid_at || row.issued_at || null) : null,
+          notes: row.source_number
+            ? `Importé depuis facture ${row.source_number}`
+            : 'Importé depuis facture',
+          is_public: isCompleted,
+          published_at: isCompleted ? new Date().toISOString() : null,
+        })
+        .select('id')
+        .single();
+      if (project) {
+        projectId = project.id;
+      }
     }
 
     let success = false;

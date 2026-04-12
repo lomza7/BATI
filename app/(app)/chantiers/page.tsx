@@ -282,7 +282,8 @@ export default function ChantiersPage() {
     const coutRevient = totalMainOeuvre + totalDepensesHT;
     const caHT = projectInvoices.reduce((s, i) => s + i.total_ht, 0);
     const margeBrute = caHT - coutRevient;
-    const margePct = caHT > 0 ? (margeBrute / caHT) * 100 : null;
+    // Marge uniquement pertinente si des coûts sont renseignés
+    const margePct = caHT > 0 && coutRevient > 0 ? (margeBrute / caHT) * 100 : null;
     return {
       totalDevis,
       totalFacture,
@@ -396,11 +397,13 @@ export default function ChantiersPage() {
     setProjects(mappedProjects);
     setLoading(false);
 
-    // Check for orphan invoices (no project linked)
+    // Check for orphan invoices (no project linked) — exclude acompte/solde
+    // which legitimately have no project (they belong to a quote's project)
     supabase
       .from('invoices')
       .select('id', { count: 'exact', head: true })
       .is('project_id', null)
+      .or('invoice_type.eq.standard,invoice_type.is.null')
       .then(({ count }) => setOrphanCount(count || 0));
   }
 
@@ -1789,7 +1792,7 @@ export default function ChantiersPage() {
                 // Indicator position on a [-30%, +70%] scale
                 const indicatorLeft = margePct === null ? 30 : Math.max(0, Math.min(100, margePct + 30));
                 const margeLabel = margePct === null
-                  ? 'En attente'
+                  ? (caHT > 0 ? 'En attente de coûts' : 'En attente')
                   : margePct < 0
                     ? 'Chantier en perte'
                     : margePct < 15
@@ -1831,8 +1834,14 @@ export default function ChantiersPage() {
                           </>
                         ) : (
                           <div className="text-right">
-                            <p className="text-sm font-medium text-muted-foreground">Aucune facture émise</p>
-                            <p className="mt-0.5 text-[11px] text-muted-foreground">La marge apparaîtra dès la première facture</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {caHT > 0 ? 'Aucun coût renseigné' : 'Aucune facture émise'}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {caHT > 0
+                                ? 'Ajoutez des dépenses ou de la main d\'œuvre pour calculer la marge'
+                                : 'La marge apparaîtra dès la première facture'}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -2232,14 +2241,19 @@ export default function ChantiersPage() {
                           <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Coût total</p>
                           <p className="mt-1 text-base font-bold text-[#D35400]">{coutRevient > 0 ? formatCurrency(coutRevient) : '—'}</p>
                         </div>
-                        <div className={`rounded-xl border p-3 ${margeBrute >= 0 && caHT > 0 ? 'border-emerald-300/50 bg-emerald-50/40' : margeBrute < 0 ? 'border-red-300/50 bg-red-50/40' : 'border-border bg-muted/25'}`}>
+                        <div className={`rounded-xl border p-3 ${margePct != null && margePct >= 0 ? 'border-emerald-300/50 bg-emerald-50/40' : margePct != null && margePct < 0 ? 'border-red-300/50 bg-red-50/40' : 'border-border bg-muted/25'}`}>
                           <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Marge brute</p>
-                          <p className={`mt-1 text-base font-bold ${margeBrute >= 0 && caHT > 0 ? 'text-emerald-700' : margeBrute < 0 ? 'text-red-700' : 'text-foreground'}`}>
-                            {caHT > 0 ? formatCurrency(margeBrute) : '—'}
+                          <p className={`mt-1 text-base font-bold ${margePct != null && margePct >= 0 ? 'text-emerald-700' : margePct != null && margePct < 0 ? 'text-red-700' : 'text-foreground'}`}>
+                            {margePct != null ? formatCurrency(margeBrute) : '—'}
                             {margePct != null && (
                               <span className="ml-1 text-[11px] font-medium">({margePct.toFixed(0)}%)</span>
                             )}
                           </p>
+                          {caHT > 0 && coutRevient === 0 && (
+                            <p className="mt-1 text-[10px] text-muted-foreground">
+                              Ajoutez des coûts pour calculer la marge
+                            </p>
+                          )}
                         </div>
                       </div>
                       {activeProject.budget > 0 && (

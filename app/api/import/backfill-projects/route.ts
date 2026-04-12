@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   // Find all invoices without a project
   const { data: orphanInvoices, error: fetchErr } = await sb
     .from('invoices')
-    .select('id, title, client_id, status, total_ttc, issued_at, paid_at, invoice_number, clients(name, address, city, postal_code)')
+    .select('id, title, client_id, status, total_ttc, issued_at, paid_at, invoice_number, invoice_type, quote_id, clients(name, address, city, postal_code)')
     .eq('user_id', user.id)
     .is('project_id', null);
 
@@ -40,13 +40,38 @@ export async function POST(request: Request) {
   }
 
   if (!orphanInvoices || orphanInvoices.length === 0) {
-    return NextResponse.json({ message: 'Aucune facture orpheline trouvée', created: 0 });
+    return NextResponse.json({ message: 'Aucune facture orpheline trouvée', created: 0, linked: 0 });
   }
 
   let created = 0;
+  let linked = 0;
   const errors: string[] = [];
 
   for (const inv of orphanInvoices) {
+    const invoiceType = (inv as { invoice_type?: string }).invoice_type || 'standard';
+    const quoteId = (inv as { quote_id?: string }).quote_id || null;
+
+    // Acompte/solde invoices belong to their quote's project — never create a new chantier
+    if (invoiceType === 'acompte' || invoiceType === 'solde') {
+      if (quoteId) {
+        const { data: quote } = await sb
+          .from('quotes')
+          .select('project_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+
+        if (quote?.project_id) {
+          await sb
+            .from('invoices')
+            .update({ project_id: quote.project_id })
+            .eq('id', inv.id);
+          linked++;
+        }
+      }
+      // If no quote or quote has no project, skip — don't create a chantier
+      continue;
+    }
+
     const client = inv.clients as { name?: string; address?: string; city?: string; postal_code?: string } | null;
     const isCompleted = inv.status === 'payee';
     const projectName = inv.title || `Chantier — ${client?.name || 'Client'}`;
@@ -88,10 +113,16 @@ export async function POST(request: Request) {
     created++;
   }
 
+  const standardCount = orphanInvoices.filter((i) => {
+    const t = (i as { invoice_type?: string }).invoice_type || 'standard';
+    return t === 'standard';
+  }).length;
+
   return NextResponse.json({
-    message: `${created} chantier${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''} à partir de ${orphanInvoices.length} facture${orphanInvoices.length > 1 ? 's' : ''} orpheline${orphanInvoices.length > 1 ? 's' : ''}.`,
+    message: `${created} chantier${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}, ${linked} facture${linked > 1 ? 's' : ''} d'acompte rattachée${linked > 1 ? 's' : ''}.`,
     created,
-    total: orphanInvoices.length,
+    linked,
+    total: standardCount,
     errors: errors.length > 0 ? errors : undefined,
   });
 }

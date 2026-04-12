@@ -215,7 +215,7 @@ export async function POST(request: Request) {
 
       // 3. Create project (skip for deposits — they belong to an existing project)
       const projectName = item.description || 'Chantier importé';
-      const isDeposit = /acompte|accompte/i.test(projectName);
+      const isDeposit = /\b(acompte|accompte|solde)\b/i.test(projectName);
 
       let project: { id: string } | null = null;
 
@@ -234,9 +234,11 @@ export async function POST(request: Request) {
         if (existingProject) {
           project = existingProject;
         }
+        // If no existing project found for a deposit, leave project_id null
+        // — never create a chantier for a deposit invoice
       }
 
-      if (!project) {
+      if (!project && !isDeposit) {
         const { data: newProject, error: projectErr } = await supabaseAdmin
           .from('projects')
           .insert({
@@ -268,7 +270,7 @@ export async function POST(request: Request) {
         created.projects++;
       }
 
-      if (!project) {
+      if (!project && !isDeposit) {
         errors.push({ index: i, reason: 'Erreur création chantier' });
         continue;
       }
@@ -298,7 +300,7 @@ export async function POST(request: Request) {
             user_id: ownerId,
             invoice_number: invoiceNumber,
             client_id: clientId,
-            project_id: project.id,
+            project_id: project?.id || null,
             title: item.description || 'Facture importée',
             status: 'payee',
             total_ht: item.amount_ht || 0,
