@@ -3,12 +3,27 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar/sidebar';
+import { SidebarProvider, useSidebar } from '@/lib/sidebar-context';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
 import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
+
+function AppShell({ children }: { children: React.ReactNode }) {
+  const { collapsed } = useSidebar();
+  return (
+    <div className="min-h-screen bg-background">
+      <Sidebar />
+      <main className={`pt-[60px] lg:pt-0 transition-[padding-left] duration-300 ease-in-out ${collapsed ? 'lg:pl-[60px]' : 'lg:pl-[240px]'}`}>
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, session, profile, loading, showOnboarding, completeOnboarding } = useAuth();
@@ -95,24 +110,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="pt-[60px] lg:pt-0 lg:pl-[240px]">
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </div>
-      </main>
-
-      {showOnboarding && (
-        <OnboardingModal
-          open={showOnboarding}
-          userId={user.id}
-          onComplete={completeOnboarding}
-        />
-      )}
-
-      <SonnerToaster />
-      <ShadcnToaster />
-    </div>
+    <SidebarProvider>
+      <AppShell>
+        {children}
+        {showOnboarding && (
+          <OnboardingModal
+            open={showOnboarding}
+            userId={user.id}
+            onComplete={completeOnboarding}
+          />
+        )}
+        <SonnerToaster />
+        <ShadcnToaster />
+      </AppShell>
+    </SidebarProvider>
   );
 }

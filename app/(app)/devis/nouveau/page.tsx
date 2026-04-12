@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Search,
   Save,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -92,6 +94,7 @@ export default function NouveauDevisPage() {
   const [serviceSearch, setServiceSearch] = useState('');
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
+  const [showDesktopPanel, setShowDesktopPanel] = useState(true);
   const [isRecurringQuote, setIsRecurringQuote] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState('annuel');
   const serviceSearchRef = useRef<HTMLInputElement>(null);
@@ -456,6 +459,16 @@ export default function NouveauDevisPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setShowDesktopPanel(p => !p)}
+            className="gap-1.5 hidden sm:flex"
+            title={showDesktopPanel ? 'Masquer les prestations' : 'Afficher les prestations'}
+          >
+            {showDesktopPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+            Prestations
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowPreview(true)}
             disabled={!title.trim() && lines.every(l => !l.description.trim())}
             className="gap-1.5 hidden sm:flex"
@@ -787,7 +800,7 @@ export default function NouveauDevisPage() {
 
         {/* Service catalog sidebar — desktop: side panel, mobile: bottom sheet overlay */}
         {/* Desktop sidebar */}
-        <div className="hidden sm:flex flex-col w-[340px] lg:w-[380px] border-l border-border bg-card shrink-0 overflow-hidden">
+        {showDesktopPanel && <div className="hidden sm:flex flex-col w-[340px] lg:w-[380px] border-l border-border bg-card shrink-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
               <Package className="h-4 w-4 text-primary" />
@@ -812,7 +825,7 @@ export default function NouveauDevisPage() {
             addedServiceIds={addedServiceIds}
             onPick={pickService}
           />
-        </div>
+        </div>}
 
         {/* Mobile: bottom sheet overlay */}
         {showServicePanel && (
