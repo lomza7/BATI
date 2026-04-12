@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_UNITS, formatCurrency } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { QUOTE_SECTIONS } from '@/lib/quote-sections';
 import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
@@ -41,6 +42,7 @@ interface QuoteLine {
   unit: string;
   unit_price: number;
   tva_rate: number;
+  section?: string;
   is_recurring?: boolean;
   frequency?: string;
   _savedAsPrestation?: boolean;
@@ -80,7 +82,7 @@ export default function NouveauDevisPage() {
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
   const [validUntil, setValidUntil] = useState(getDefaultValidUntil());
   const [lines, setLines] = useState<QuoteLine[]>([
-    { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 },
+    { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: 'materiel' },
   ]);
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -151,7 +153,7 @@ export default function NouveauDevisPage() {
   }
 
   function addLine() {
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
+    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: 'materiel' }]);
   }
 
   function updateLine(index: number, field: keyof QuoteLine, value: string | number) {
@@ -167,6 +169,8 @@ export default function NouveauDevisPage() {
   }
 
   function pickService(s: Service) {
+    // Heuristic: services with unit 'forfait' or 'h' or 'jour' are likely labor
+    const isLabor = ['forfait', 'h', 'jour'].includes(s.unit);
     const newLine: QuoteLine = {
       description: s.name,
       detail: s.description || '',
@@ -174,6 +178,7 @@ export default function NouveauDevisPage() {
       unit: s.unit,
       unit_price: s.unit_price,
       tva_rate: s.tva_rate ?? 20,
+      section: isLabor ? 'main_oeuvre' : 'materiel',
       is_recurring: s.is_recurring,
       frequency: s.frequency,
       _savedAsPrestation: true,
@@ -257,6 +262,7 @@ export default function NouveauDevisPage() {
               unit: l.unit,
               unit_price: l.unit_price,
               tva_rate: l.tva_rate,
+              section: l.section || null,
               total: l.quantity * l.unit_price,
               position: i,
             }))
@@ -327,6 +333,7 @@ export default function NouveauDevisPage() {
               unit: l.unit,
               unit_price: l.unit_price,
               tva_rate: l.tva_rate,
+              section: l.section || null,
               total: l.quantity * l.unit_price,
               position: i,
             }))
@@ -642,6 +649,15 @@ export default function NouveauDevisPage() {
                           </Select>
                         </div>
                       </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Section</label>
+                        <Select value={line.section || 'materiel'} onValueChange={(val) => updateLine(i, 'section', val)}>
+                          <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {QUOTE_SECTIONS.map((s) => (<SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       {line.description.trim() && line.unit_price > 0 && (
                         <p className="text-right text-xs text-muted-foreground">{formatCurrency(line.quantity * line.unit_price)} HT</p>
                       )}
@@ -649,8 +665,8 @@ export default function NouveauDevisPage() {
 
                     {/* Desktop: grid layout */}
                     <div className="hidden sm:block">
-                      <div className="grid grid-cols-12 gap-2 items-start">
-                        <div className="col-span-5 space-y-1">
+                      <div className="grid grid-cols-[1fr_60px_90px_100px_70px_110px_auto] gap-2 items-start">
+                        <div className="space-y-1">
                           <Input placeholder="Nom de la prestation" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} />
                           <textarea
                             placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
@@ -660,10 +676,10 @@ export default function NouveauDevisPage() {
                             rows={1}
                           />
                         </div>
-                        <div className="col-span-1">
+                        <div>
                           <Input type="number" placeholder="Qte" value={line.quantity || ''} onChange={e => updateLine(i, 'quantity', Number(e.target.value))} />
                         </div>
-                        <div className="col-span-2">
+                        <div>
                           <Select value={line.unit || 'u'} onValueChange={(val) => updateLine(i, 'unit', val)}>
                             <SelectTrigger className="h-10"><SelectValue placeholder="Unite" /></SelectTrigger>
                             <SelectContent>
@@ -671,10 +687,10 @@ export default function NouveauDevisPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="col-span-2">
+                        <div>
                           <Input type="number" placeholder="Prix HT" value={line.unit_price || ''} onChange={e => updateLine(i, 'unit_price', Number(e.target.value))} />
                         </div>
-                        <div className="col-span-1">
+                        <div>
                           <Select value={String(line.tva_rate ?? 20)} onValueChange={(val) => updateLine(i, 'tva_rate', Number(val))}>
                             <SelectTrigger className="h-10" title="Taux de TVA"><SelectValue placeholder="TVA" /></SelectTrigger>
                             <SelectContent>
@@ -682,7 +698,15 @@ export default function NouveauDevisPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="col-span-1 flex items-center gap-1 pt-2 justify-end">
+                        <div>
+                          <Select value={line.section || 'materiel'} onValueChange={(val) => updateLine(i, 'section', val)}>
+                            <SelectTrigger className="h-10" title="Section"><SelectValue placeholder="Section" /></SelectTrigger>
+                            <SelectContent>
+                              {QUOTE_SECTIONS.map((s) => (<SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-1 pt-2 justify-end">
                           {line._savedAsPrestation ? (
                             <span title="Enregistree dans vos prestations" className="text-emerald-600"><Check className="h-4 w-4" /></span>
                           ) : line.description.trim() && line.unit_price > 0 ? (

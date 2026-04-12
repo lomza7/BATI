@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ClientPicker } from '@/components/shared/client-picker';
 import type { ClarifyQuestion, QuoteTurn } from '@/lib/ai/quote-schema';
+import { SECTION_LABELS, QUOTE_SECTIONS } from '@/lib/quote-sections';
 
 // ---------- Public types ------------------------------------------------
 
@@ -41,6 +42,7 @@ export interface AiQuoteDraftLine {
   unit: string;
   unit_price: number;
   tva_rate?: number;
+  section?: string;
   service_id?: string;
 }
 
@@ -1161,6 +1163,16 @@ export function QuoteAiAssistant({ onUseDraft, saving = false, presetRequest = n
                               <Plus className="h-2.5 w-2.5" /> Nouvelle prestation
                             </Badge>
                           )}
+                          <Select value={line.section || 'materiel'} onValueChange={(value) => updateLine(index, { section: value })}>
+                            <SelectTrigger className="h-6 w-auto gap-1 border-dashed text-[10px] px-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {QUOTE_SECTIONS.map((s) => (
+                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <Textarea
                           className="min-h-[48px] bg-white text-sm"

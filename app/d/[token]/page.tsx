@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import React, { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -22,6 +22,7 @@ import { DocusealSigning } from '@/components/devis/docuseal-signing';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 import { formatIban } from '@/lib/banks';
+import { hasSections, groupLinesBySection } from '@/lib/quote-sections';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -84,6 +85,7 @@ interface QuoteLine {
   tva_rate: number;
   total: number;
   position: number;
+  section?: string | null;
 }
 
 interface ArtisanProfile {
@@ -233,7 +235,7 @@ export default function PublicQuotePage() {
       // 3. Fetch quote lines
       const { data: linesData } = await anonClient
         .from('quote_lines')
-        .select('id, description, quantity, unit, unit_price, tva_rate, total, position')
+        .select('id, description, detail, quantity, unit, unit_price, tva_rate, total, position, section')
         .eq('quote_id', send.quote_id)
         .order('position');
 
@@ -679,37 +681,88 @@ export default function PublicQuotePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e5e1da]">
-                {lines.map((line) => (
-                  <tr key={line.id}>
-                    <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>
-                      {line.description}
-                      {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
-                    </td>
-                    <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
-                    <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
-                    <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
-                    <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? legacyRate)}</td>
-                    <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.total)}</td>
-                  </tr>
-                ))}
+                {hasSections(lines) ? (
+                  groupLinesBySection(lines).map((group) => (
+                    <React.Fragment key={group.sectionKey ?? '_flat'}>
+                      <tr style={{ backgroundColor: accent + '0a' }}>
+                        <td colSpan={5} className="px-8 py-2.5 text-sm font-semibold" style={{ color: accent }}>
+                          {group.label}
+                        </td>
+                        <td className="px-8 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
+                          {formatCurrency(group.subtotalHt)}
+                        </td>
+                      </tr>
+                      {group.lines.map((line) => (
+                        <tr key={line.id}>
+                          <td className="px-8 py-3.5 text-sm pl-10" style={{ color: textColor }}>
+                            {line.description}
+                            {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                          </td>
+                          <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
+                          <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
+                          <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                          <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? legacyRate)}</td>
+                          <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.total)}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  lines.map((line) => (
+                    <tr key={line.id}>
+                      <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>
+                        {line.description}
+                        {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                      </td>
+                      <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
+                      <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{UNIT_LABELS[line.unit] || line.unit}</td>
+                      <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                      <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? legacyRate)}</td>
+                      <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.total)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Lines — Mobile cards */}
           <div className="sm:hidden divide-y divide-[#e5e1da]">
-            {lines.map((line) => (
-              <div key={line.id} className="px-5 py-4">
-                <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
-                {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-[#6b6560]">
-                    {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? legacyRate)}
-                  </span>
-                  <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.total)}</span>
+            {hasSections(lines) ? (
+              groupLinesBySection(lines).map((group) => (
+                <React.Fragment key={group.sectionKey ?? '_flat'}>
+                  <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: accent + '0a' }}>
+                    <span className="text-sm font-semibold" style={{ color: accent }}>{group.label}</span>
+                    <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(group.subtotalHt)}</span>
+                  </div>
+                  {group.lines.map((line) => (
+                    <div key={line.id} className="px-5 py-4">
+                      <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
+                      {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-[#6b6560]">
+                          {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? legacyRate)}
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.total)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))
+            ) : (
+              lines.map((line) => (
+                <div key={line.id} className="px-5 py-4">
+                  <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
+                  {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-[#6b6560]">
+                      {line.quantity} {UNIT_LABELS[line.unit] || line.unit} x {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? legacyRate)}
+                    </span>
+                    <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.total)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Totals */}

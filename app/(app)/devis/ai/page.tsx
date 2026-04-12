@@ -39,6 +39,7 @@ export default function DevisAiPage() {
           unit: line.unit || 'u',
           unit_price: Number(line.unit_price) || 0,
           tva_rate: typeof line.tva_rate === 'number' ? line.tva_rate : 20,
+          section: line.section || null,
         }))
         .filter((line) => line.description.length > 0);
 
@@ -122,6 +123,7 @@ export default function DevisAiPage() {
           unit: line.unit,
           unit_price: line.unit_price,
           tva_rate: line.tva_rate,
+          section: line.section || null,
           total: line.quantity * line.unit_price,
           position: i,
         })),

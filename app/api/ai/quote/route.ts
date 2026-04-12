@@ -4,6 +4,7 @@ import {
   aiQuoteResponseSchema,
   quoteTurnSchema,
   AI_QUOTE_UNITS,
+  AI_QUOTE_SECTIONS,
   type QuoteTurn,
 } from '@/lib/ai/quote-schema';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
@@ -119,6 +120,10 @@ function normalizeAnalysisRaw(raw: unknown): unknown {
       if (!line || typeof line !== 'object') return line;
       const l = { ...(line as Record<string, unknown>) };
       l.unit = normalizeUnit(l.unit);
+      // Normalize section to a valid value or default to 'materiel'
+      if (typeof l.section !== 'string' || !(AI_QUOTE_SECTIONS as readonly string[]).includes(l.section)) {
+        l.section = 'materiel';
+      }
       // Strip any non-UUID service_id (null, "", "none", hallucinated names)
       // so the optional Zod validator stays happy and the client can treat
       // the line as a new proposition rather than a catalog match.
@@ -371,6 +376,7 @@ export async function POST(request: Request) {
                 quantity: 1,
                 unit: 'forfait',
                 unit_price: 0,
+                section: 'materiel',
                 service_id: 'uuid-optionnel-si-issu-du-catalogue',
               },
             ],
@@ -389,6 +395,7 @@ export async function POST(request: Request) {
       '- lines doit contenir des lignes concretes de devis avec quantites et prix unitaires plausibles.',
       '- Si un prix est incertain, propose une estimation raisonnable pour un brouillon.',
       `- unit doit etre STRICTEMENT l une de ces valeurs: ${AI_QUOTE_UNITS.join(', ')}. N en invente pas d autres.`,
+      '- section doit etre "materiel" (fournitures, produits, equipements, materiaux) ou "main_oeuvre" (pose, installation, main d oeuvre, deplacement, mise en service). Separe toujours le materiel de la main d oeuvre en lignes distinctes.',
       ...(mustFinalize
         ? [
             '',

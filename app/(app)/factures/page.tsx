@@ -89,6 +89,7 @@ interface QuoteLine {
   tva_rate: number;
   total: number;
   position: number;
+  section?: string | null;
 }
 
 interface QuoteCandidate {
@@ -220,7 +221,7 @@ export default function FacturesPage() {
           client_id,
           project_id,
           clients(name, email, deleted_at),
-          quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position),
+          quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position, section),
           invoices(id)
         `)
         .is('deleted_at', null)

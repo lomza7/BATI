@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const AI_QUOTE_UNITS = ['u', 'forfait', 'm2', 'ml', 'm3', 'h', 'jour', 'kg', 'l', 't'] as const;
 
+export const AI_QUOTE_SECTIONS = ['materiel', 'main_oeuvre'] as const;
+
 export const aiQuoteLineSchema = z.object({
   description: z.string().min(1),
   detail: z.string().optional(),
@@ -9,6 +11,7 @@ export const aiQuoteLineSchema = z.object({
   unit: z.enum(AI_QUOTE_UNITS),
   unit_price: z.number().min(0),
   tva_rate: z.number().min(0).max(100).optional(),
+  section: z.enum(AI_QUOTE_SECTIONS).optional().default('materiel'),
   service_id: z.string().uuid().optional(),
 });
 

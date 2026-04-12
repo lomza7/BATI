@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Hexagon, Building2, User, PenLine, Shield, X, Landmark } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { QUOTE_UNIT_LABELS } from '@/lib/constants';
 import { computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { hasSections, groupLinesBySection } from '@/lib/quote-sections';
 import { formatIban } from '@/lib/banks';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
 
@@ -25,6 +26,7 @@ interface PreviewLine {
   unit: string;
   unit_price: number;
   tva_rate?: number;
+  section?: string | null;
 }
 
 interface PreviewClient {
@@ -200,7 +202,7 @@ export function DocumentPreviewDialog({
 
             const { data: linesData } = await supabase
               .from('quote_lines')
-              .select('description, detail, quantity, unit, unit_price, tva_rate, position')
+              .select('description, detail, quantity, unit, unit_price, tva_rate, position, section')
               .eq('quote_id', documentId)
               .order('position', { ascending: true });
             if (!cancelled && linesData) {
@@ -242,7 +244,7 @@ export function DocumentPreviewDialog({
 
             const { data: linesData } = await supabase
               .from('invoice_lines')
-              .select('description, quantity, unit, unit_price, tva_rate, position')
+              .select('description, quantity, unit, unit_price, tva_rate, position, section')
               .eq('invoice_id', documentId)
               .order('position', { ascending: true });
             if (!cancelled && linesData) {
@@ -344,6 +346,8 @@ export function DocumentPreviewDialog({
   const totalTtc = tvaTotals.total_ttc;
   const tvaBreakdown = tvaTotals.tva_breakdown;
   const singleRate = tvaBreakdown.length === 1 ? tvaBreakdown[0].rate : null;
+  const showSections = hasSections(validLines);
+  const sectionGroups = showSections ? groupLinesBySection(validLines) : null;
 
   const dc = artisan?.document_config || {};
   const accent = dc.primary_color || '#d35400';
@@ -583,6 +587,32 @@ export function DocumentPreviewDialog({
                         Aucune ligne saisie
                       </td>
                     </tr>
+                  ) : sectionGroups ? (
+                    sectionGroups.map((group) => (
+                      <React.Fragment key={group.sectionKey ?? '_flat'}>
+                        <tr style={{ backgroundColor: accent + '0a' }}>
+                          <td colSpan={5} className="px-8 py-2.5 text-sm font-semibold" style={{ color: accent }}>
+                            {group.label}
+                          </td>
+                          <td className="px-8 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
+                            {formatCurrency(group.subtotalHt)}
+                          </td>
+                        </tr>
+                        {group.lines.map((line, idx) => (
+                          <tr key={idx}>
+                            <td className="px-8 py-3.5 text-sm pl-10" style={{ color: textColor }}>
+                              {line.description}
+                              {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                            </td>
+                            <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
+                            <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
+                            <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
+                            <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? 20)}</td>
+                            <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    ))
                   ) : (
                     validLines.map((line, idx) => (
                       <tr key={idx}>
@@ -608,6 +638,27 @@ export function DocumentPreviewDialog({
                 <div className="px-5 py-8 text-center text-sm text-[#6b6560] italic">
                   Aucune ligne saisie
                 </div>
+              ) : sectionGroups ? (
+                sectionGroups.map((group) => (
+                  <React.Fragment key={group.sectionKey ?? '_flat'}>
+                    <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: accent + '0a' }}>
+                      <span className="text-sm font-semibold" style={{ color: accent }}>{group.label}</span>
+                      <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(group.subtotalHt)}</span>
+                    </div>
+                    {group.lines.map((line, idx) => (
+                      <div key={idx} className="px-5 py-4">
+                        <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
+                        {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-[#6b6560]">
+                            {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? 20)}
+                          </span>
+                          <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                ))
               ) : (
                 validLines.map((line, idx) => (
                   <div key={idx} className="px-5 py-4">

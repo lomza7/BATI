@@ -44,6 +44,7 @@ interface QuoteLine {
   tva_rate: number;
   total: number;
   position: number;
+  section?: string | null;
 }
 
 interface DialogQuote {
@@ -158,6 +159,7 @@ export function CreateFinalInvoiceDialog({
             unit: line.unit,
             unit_price: line.unit_price,
             tva_rate: line.tva_rate ?? 20,
+            section: line.section || null,
             total: line.total || line.quantity * line.unit_price,
             position: typeof line.position === 'number' ? line.position : idx,
           })),
