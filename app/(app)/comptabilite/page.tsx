@@ -123,6 +123,7 @@ interface ExpenseRow {
   ocr_confidence: number | null;
   receipt_storage_path: string | null;
   bank_transaction_id: string | null;
+  lines: OcrLineItem[] | null;
 }
 
 interface CategoryRow {
@@ -428,7 +429,7 @@ export default function ComptabilitePage() {
           .select(
             `id, date, description, supplier, amount_ht, tva_rate, tva_amount, amount,
              expense_category_id, payment_method, is_autoliquidation, project_id,
-             source, ocr_confidence, receipt_storage_path, bank_transaction_id`,
+             source, ocr_confidence, receipt_storage_path, bank_transaction_id, lines`,
           )
           .order('date', { ascending: false }),
         supabase.from('expense_categories').select('id, slug, name').order('sort_order'),
@@ -622,43 +623,57 @@ export default function ComptabilitePage() {
 
   // ───────────────────── OCR multi-lignes ─────────────────────
 
-  async function handleOcrConfirm(selectedLines: OcrLineItem[], projectId: string | null) {
+  async function handleOcrConfirm(lines: OcrLineItem[], projectId: string | null) {
     if (!user || !ocrReviewData) return;
 
     setShowOcrReview(false);
-    let count = 0;
 
-    for (const line of selectedLines) {
-      const cat = categories.find((c) => c.slug === line.category_slug);
-      const ht = Number(line.amount_ht || 0);
-      const rate = Number(line.tva_rate || 0);
-      const isAutoLiq = ocrReviewData.is_autoliquidation;
-      const tva = isAutoLiq ? 0 : +(ht * (rate / 100)).toFixed(2);
+    const isAutoLiq = ocrReviewData.is_autoliquidation;
+    const totalHt = Number(ocrReviewData.amount_ht || 0);
+    const totalTva = isAutoLiq ? 0 : Number(ocrReviewData.tva_total || 0);
+    const totalTtc = Number(ocrReviewData.amount_ttc || 0) || +(totalHt + totalTva).toFixed(2);
 
-      const payload = {
-        user_id: user.id,
-        description: line.description,
-        supplier: ocrReviewData.supplier,
-        date: ocrReviewData.date,
-        amount_ht: ht,
-        tva_rate: rate,
-        tva_amount: tva,
-        amount: +(ht + tva).toFixed(2),
-        expense_category_id: cat?.id || null,
-        category: line.category_slug || 'autres',
-        payment_method: ocrReviewData.payment_method,
-        is_autoliquidation: isAutoLiq,
-        project_id: projectId,
-        source: 'ocr',
-        ocr_confidence: ocrReviewData.confidence,
-        receipt_storage_path: ocrReviewData.receipt_storage_path,
-      };
+    // Use the main category from the first line, or 'autres'
+    const mainCatSlug = lines[0]?.category_slug || 'autres';
+    const cat = categories.find((c) => c.slug === mainCatSlug);
 
-      const { error } = await supabase.from('expenses').insert(payload);
-      if (!error) count++;
+    // Dominant TVA rate (from the totals)
+    const mainRate = totalHt > 0 ? +((totalTva / totalHt) * 100).toFixed(1) : 20;
+    // Find the closest standard rate
+    const standardRates = [0, 2.1, 5.5, 10, 20];
+    const tvaRate = standardRates.reduce((prev, curr) =>
+      Math.abs(curr - mainRate) < Math.abs(prev - mainRate) ? curr : prev,
+    );
+
+    // Build description from supplier
+    const description = `${ocrReviewData.supplier} — ${lines.length} article${lines.length > 1 ? 's' : ''}`;
+
+    const payload = {
+      user_id: user.id,
+      description,
+      supplier: ocrReviewData.supplier,
+      date: ocrReviewData.date,
+      amount_ht: totalHt,
+      tva_rate: tvaRate,
+      tva_amount: totalTva,
+      amount: totalTtc,
+      expense_category_id: cat?.id || null,
+      category: mainCatSlug,
+      payment_method: ocrReviewData.payment_method,
+      is_autoliquidation: isAutoLiq,
+      project_id: projectId,
+      source: 'ocr',
+      ocr_confidence: ocrReviewData.confidence,
+      receipt_storage_path: ocrReviewData.receipt_storage_path,
+      lines: lines as unknown as Record<string, unknown>[],
+    };
+
+    const { error } = await supabase.from('expenses').insert(payload);
+    if (error) {
+      toast({ title: 'Erreur lors de l\'import', variant: 'destructive' });
+    } else {
+      toast({ title: 'Dépense importée' });
     }
-
-    toast({ title: `${count} dépense${count > 1 ? 's' : ''} importée${count > 1 ? 's' : ''}` });
     await loadAll();
   }
 
@@ -686,6 +701,7 @@ export default function ComptabilitePage() {
       source: (e.source as 'manual' | 'ocr' | 'recurring') || 'manual',
       ocr_confidence: e.ocr_confidence,
       receipt_storage_path: e.receipt_storage_path,
+      lines: e.lines || null,
     });
     setShowExpenseForm(true);
   }

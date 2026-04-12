@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Check, Trash2, HardHat } from 'lucide-react';
+import { Sparkles, Check, HardHat } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -44,7 +43,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   data: OcrReviewData;
   projects: Project[];
-  onConfirm: (selectedLines: OcrLineItem[], projectId: string | null) => void;
+  onConfirm: (lines: OcrLineItem[], projectId: string | null) => void;
 }
 
 function formatEur(n: number) {
@@ -52,30 +51,7 @@ function formatEur(n: number) {
 }
 
 export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm }: Props) {
-  const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(data.lines.map((_, i) => i)),
-  );
   const [projectId, setProjectId] = useState<string | null>(null);
-
-  function toggle(idx: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    if (selected.size === data.lines.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(data.lines.map((_, i) => i)));
-    }
-  }
-
-  const selectedLines = data.lines.filter((_, i) => selected.has(i));
-  const selectedHT = selectedLines.reduce((s, l) => s + l.amount_ht, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,7 +59,7 @@ export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#D35400]" />
-            Ticket analysé — {data.lines.length} ligne{data.lines.length > 1 ? 's' : ''}
+            Ticket analysé — {data.lines.length} article{data.lines.length > 1 ? 's' : ''}
           </DialogTitle>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{data.supplier}</span>
@@ -118,26 +94,15 @@ export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm 
 
         <div className="space-y-1">
           <div className="flex items-center justify-between px-2 py-1.5 text-xs font-medium text-muted-foreground border-b">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={selected.size === data.lines.length}
-                onCheckedChange={toggleAll}
-              />
-              Tout sélectionner
-            </label>
+            <span>Détail des articles</span>
             <span>Montant HT</span>
           </div>
 
           {data.lines.map((line, i) => (
-            <label
+            <div
               key={i}
-              className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
+              className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-muted/50 transition-colors"
             >
-              <Checkbox
-                checked={selected.has(i)}
-                onCheckedChange={() => toggle(i)}
-                className="mt-0.5"
-              />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium leading-tight">{line.description}</p>
                 <p className="text-xs text-muted-foreground">
@@ -148,15 +113,20 @@ export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm 
               <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
                 {formatEur(line.amount_ht)}
               </span>
-            </label>
+            </div>
           ))}
         </div>
 
         <div className="flex items-center justify-between border-t pt-3 text-sm">
           <span className="text-muted-foreground">
-            {selected.size} ligne{selected.size > 1 ? 's' : ''} sélectionnée{selected.size > 1 ? 's' : ''}
+            Total ({data.lines.length} article{data.lines.length > 1 ? 's' : ''})
           </span>
-          <span className="font-bold">{formatEur(selectedHT)} HT</span>
+          <div className="text-right">
+            <span className="font-bold">{formatEur(data.amount_ht)} HT</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              ({formatEur(data.amount_ttc)} TTC)
+            </span>
+          </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
@@ -164,12 +134,11 @@ export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm 
             Annuler
           </Button>
           <Button
-            disabled={selected.size === 0}
-            onClick={() => onConfirm(selectedLines, projectId)}
+            onClick={() => onConfirm(data.lines, projectId)}
             className="gap-2 bg-[#D35400] text-white hover:bg-[#b8470a]"
           >
             <Check className="h-4 w-4" />
-            Importer {selected.size} dépense{selected.size > 1 ? 's' : ''}
+            Importer la dépense
           </Button>
         </DialogFooter>
       </DialogContent>

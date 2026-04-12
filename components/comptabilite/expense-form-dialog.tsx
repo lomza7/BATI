@@ -23,6 +23,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { SupplierPicker } from '@/components/comptabilite/supplier-picker';
+import type { OcrLineItem } from '@/lib/ai/expense-ocr-schema';
 
 export interface ExpenseFormValues {
   id?: string;
@@ -40,6 +41,7 @@ export interface ExpenseFormValues {
   source: 'manual' | 'ocr' | 'recurring';
   ocr_confidence?: number | null;
   receipt_storage_path?: string | null;
+  lines?: OcrLineItem[] | null;
 }
 
 interface Category {
@@ -214,6 +216,27 @@ export function ExpenseFormDialog({ open, onOpenChange, initialValues, categorie
               rows={2}
             />
           </div>
+
+          {values.lines && values.lines.length > 0 && (
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                Détail du ticket ({values.lines.length} article{values.lines.length > 1 ? 's' : ''})
+              </p>
+              {values.lines.map((line, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="truncate mr-2">
+                    {line.description}
+                    {line.quantity > 1 && (
+                      <span className="text-xs text-muted-foreground ml-1">×{line.quantity}</span>
+                    )}
+                  </span>
+                  <span className="tabular-nums whitespace-nowrap font-medium">
+                    {line.amount_ht.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div>
             <Label>Catégorie</Label>
