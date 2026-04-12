@@ -622,7 +622,7 @@ export default function ComptabilitePage() {
 
   // ───────────────────── OCR multi-lignes ─────────────────────
 
-  async function handleOcrConfirm(selectedLines: OcrLineItem[]) {
+  async function handleOcrConfirm(selectedLines: OcrLineItem[], projectId: string | null) {
     if (!user || !ocrReviewData) return;
 
     setShowOcrReview(false);
@@ -648,7 +648,7 @@ export default function ComptabilitePage() {
         category: line.category_slug || 'autres',
         payment_method: ocrReviewData.payment_method,
         is_autoliquidation: isAutoLiq,
-        project_id: null,
+        project_id: projectId,
         source: 'ocr',
         ocr_confidence: ocrReviewData.confidence,
         receipt_storage_path: ocrReviewData.receipt_storage_path,
@@ -2952,6 +2952,7 @@ export default function ComptabilitePage() {
           open={showOcrReview}
           onOpenChange={setShowOcrReview}
           data={ocrReviewData}
+          projects={projects}
           onConfirm={handleOcrConfirm}
         />
       )}

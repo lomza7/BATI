@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Check, Trash2 } from 'lucide-react';
+import { Sparkles, Check, Trash2, HardHat } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { OcrLineItem } from '@/lib/ai/expense-ocr-schema';
 
 interface OcrReviewData {
@@ -27,21 +34,28 @@ interface OcrReviewData {
   lines: OcrLineItem[];
 }
 
+interface Project {
+  id: string;
+  name: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: OcrReviewData;
-  onConfirm: (selectedLines: OcrLineItem[]) => void;
+  projects: Project[];
+  onConfirm: (selectedLines: OcrLineItem[], projectId: string | null) => void;
 }
 
 function formatEur(n: number) {
   return n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 }
 
-export function OcrReviewDialog({ open, onOpenChange, data, onConfirm }: Props) {
+export function OcrReviewDialog({ open, onOpenChange, data, projects, onConfirm }: Props) {
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(data.lines.map((_, i) => i)),
   );
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   function toggle(idx: number) {
     setSelected((prev) => {
@@ -79,6 +93,28 @@ export function OcrReviewDialog({ open, onOpenChange, data, onConfirm }: Props) 
             </Badge>
           </div>
         </DialogHeader>
+
+        {projects.length > 0 && (
+          <div className="flex items-center gap-2">
+            <HardHat className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Select
+              value={projectId || 'none'}
+              onValueChange={(v) => setProjectId(v === 'none' ? null : v)}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Attribuer à un chantier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Aucun chantier</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-1">
           <div className="flex items-center justify-between px-2 py-1.5 text-xs font-medium text-muted-foreground border-b">
@@ -129,7 +165,7 @@ export function OcrReviewDialog({ open, onOpenChange, data, onConfirm }: Props) 
           </Button>
           <Button
             disabled={selected.size === 0}
-            onClick={() => onConfirm(selectedLines)}
+            onClick={() => onConfirm(selectedLines, projectId)}
             className="gap-2 bg-[#D35400] text-white hover:bg-[#b8470a]"
           >
             <Check className="h-4 w-4" />
