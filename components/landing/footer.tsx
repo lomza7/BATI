@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Hexagon } from 'lucide-react';
 
 const footerLinks = {
   Produit: [
@@ -31,11 +30,10 @@ export function Footer() {
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-[var(--landing-accent)] rounded-lg flex items-center justify-center">
-                <Hexagon className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-semibold text-[var(--landing-text)] text-lg">Hellobat</span>
+            <Link href="/" className="flex items-center gap-2.5 mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
+              <span className="font-serif font-medium text-[var(--landing-text)] text-lg">Hellobat</span>
             </Link>
             <p className="text-xs text-[var(--landing-muted)] leading-relaxed">
               La plateforme tout-en-un pour les artisans du bâtiment.
