@@ -369,6 +369,7 @@ export default function ComptabilitePage() {
 
   // OCR state
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
   // Expense form state
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -520,9 +521,11 @@ export default function ComptabilitePage() {
   async function handleOcrFile(file: File) {
     if (!user) return;
     setOcrBusy(true);
+    setOcrError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        setOcrError('Session expirée — reconnectez-vous');
         toast({ title: 'Session expirée', variant: 'destructive' });
         return;
       }
@@ -535,9 +538,11 @@ export default function ComptabilitePage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        const msg = data.error || 'Erreur OCR';
+        setOcrError(msg);
         toast({
           title: 'Échec de l\'analyse',
-          description: data.error || 'Erreur OCR',
+          description: msg,
           variant: 'destructive',
         });
         return;
@@ -565,9 +570,11 @@ export default function ComptabilitePage() {
       setExpenseInitial(initial);
       setShowExpenseForm(true);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erreur inconnue';
+      setOcrError(msg);
       toast({
         title: "Erreur lors de l'analyse",
-        description: e instanceof Error ? e.message : 'Erreur inconnue',
+        description: msg,
         variant: 'destructive',
       });
     } finally {
@@ -1641,7 +1648,7 @@ export default function ComptabilitePage() {
         {/* ─────── DÉPENSES ─────── */}
         <TabsContent value="expenses" className="mt-4 space-y-4">
           <div id="expense-ocr-zone" className="scroll-mt-20">
-            <ExpenseOcrDropzone onFileSelected={handleOcrFile} busy={ocrBusy} />
+            <ExpenseOcrDropzone onFileSelected={handleOcrFile} busy={ocrBusy} error={ocrError} />
           </div>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">

@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
 import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
+import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, session, profile, loading, showOnboarding, completeOnboarding } = useAuth();
@@ -108,6 +110,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           onComplete={completeOnboarding}
         />
       )}
+
+      <SonnerToaster />
+      <ShadcnToaster />
     </div>
   );
 }

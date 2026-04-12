@@ -1,16 +1,17 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Camera, Upload, Loader2, Sparkles } from 'lucide-react';
+import { Camera, Upload, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface Props {
   onFileSelected: (file: File) => Promise<void> | void;
   busy?: boolean;
+  error?: string | null;
 }
 
-export function ExpenseOcrDropzone({ onFileSelected, busy = false }: Props) {
+export function ExpenseOcrDropzone({ onFileSelected, busy = false, error = null }: Props) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -68,6 +69,24 @@ export function ExpenseOcrDropzone({ onFileSelected, busy = false }: Props) {
               </p>
             </div>
           </>
+        ) : error ? (
+          <>
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-red-600">Erreur d'analyse</p>
+              <p className="text-xs text-red-500/80">{error}</p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="gap-2 bg-[#D35400] text-white hover:bg-[#b8470a]"
+            >
+              <Camera className="h-4 w-4" />
+              Réessayer
+            </Button>
+          </>
         ) : (
           <>
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-[#D35400]">
@@ -112,7 +131,7 @@ export function ExpenseOcrDropzone({ onFileSelected, busy = false }: Props) {
         <input
           ref={cameraInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept="image/*"
           capture="environment"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
