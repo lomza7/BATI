@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 interface QuoteLine {
   description: string;
@@ -89,6 +90,8 @@ export default function NouveauDevisPage() {
   const [serviceSearch, setServiceSearch] = useState('');
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
+  const [isRecurringQuote, setIsRecurringQuote] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState('annuel');
   const serviceSearchRef = useRef<HTMLInputElement>(null);
 
   // Prefill from URL params
@@ -236,6 +239,8 @@ export default function NouveauDevisPage() {
             tva_rate: tva.primary_rate,
             tva_breakdown: tva.tva_breakdown,
             valid_until: validUntil,
+            is_recurring: isRecurringQuote,
+            recurring_frequency: recurringFrequency,
             updated_at: new Date().toISOString(),
           })
           .eq('id', draftId.current);
@@ -303,6 +308,8 @@ export default function NouveauDevisPage() {
             tva_rate: tva.primary_rate,
             tva_breakdown: tva.tva_breakdown,
             valid_until: validUntil,
+            is_recurring: isRecurringQuote,
+            recurring_frequency: recurringFrequency,
           })
           .select('id')
           .single();
@@ -340,9 +347,8 @@ export default function NouveauDevisPage() {
         }
       }
 
-      // Auto-create recurring contracts from recurring service lines
-      const recurringLines = validLines.filter(l => l.is_recurring);
-      if (recurringLines.length > 0 && savedQuoteId && user) {
+      // Auto-create recurring contract
+      if (savedQuoteId && user) {
         const { data: existingContract } = await supabase
           .from('recurring_contracts')
           .select('id')
@@ -351,21 +357,53 @@ export default function NouveauDevisPage() {
 
         if (!existingContract) {
           const startDate = new Date().toISOString().split('T')[0];
-          for (const line of recurringLines) {
+
+          if (isRecurringQuote) {
+            // Whole-quote recurring contract with line items
+            const lineItems = validLines.map(l => ({
+              description: l.description,
+              detail: l.detail || '',
+              quantity: l.quantity,
+              unit: l.unit,
+              unit_price: l.unit_price,
+              tva_rate: l.tva_rate,
+            }));
+
             await supabase.from('recurring_contracts').insert({
               user_id: user.id,
               client_id: selectedClientId || null,
               quote_id: savedQuoteId,
-              title: line.description,
+              title,
               contract_type: 'autre',
-              amount: line.quantity * line.unit_price,
-              frequency: line.frequency || 'mensuel',
-              tva_rate: 20,
+              amount: tva.total_ht,
+              frequency: recurringFrequency,
+              tva_rate: tva.primary_rate,
               status: 'en_attente',
               start_date: startDate,
               next_billing: startDate,
               auto_send: false,
+              description,
+              line_items: lineItems,
             });
+          } else {
+            // Legacy: per-line contracts for individual recurring services
+            const recurringLines = validLines.filter(l => l.is_recurring);
+            for (const line of recurringLines) {
+              await supabase.from('recurring_contracts').insert({
+                user_id: user.id,
+                client_id: selectedClientId || null,
+                quote_id: savedQuoteId,
+                title: line.description,
+                contract_type: 'autre',
+                amount: line.quantity * line.unit_price,
+                frequency: line.frequency || 'mensuel',
+                tva_rate: 20,
+                status: 'en_attente',
+                start_date: startDate,
+                next_billing: startDate,
+                auto_send: false,
+              });
+            }
           }
         }
       }
@@ -485,6 +523,39 @@ export default function NouveauDevisPage() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
               />
+            </div>
+
+            {/* Recurring contract toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                <div className="flex items-center gap-2.5">
+                  <RefreshCw className="h-4 w-4 text-[#d35400]" />
+                  <div>
+                    <p className="text-sm font-medium">Contrat récurrent</p>
+                    <p className="text-xs text-muted-foreground">Ce devis créera un contrat avec facturation automatique</p>
+                  </div>
+                </div>
+                <Switch checked={isRecurringQuote} onCheckedChange={setIsRecurringQuote} />
+              </div>
+              {isRecurringQuote && (
+                <div className="rounded-lg bg-orange-50/70 border border-orange-200/60 p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-medium text-orange-800 whitespace-nowrap">Fréquence :</label>
+                    <select
+                      value={recurringFrequency}
+                      onChange={e => setRecurringFrequency(e.target.value)}
+                      className="h-8 rounded-md border border-orange-200 bg-white px-2 text-xs text-orange-900"
+                    >
+                      <option value="mensuel">Mensuel</option>
+                      <option value="trimestriel">Trimestriel</option>
+                      <option value="annuel">Annuel</option>
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-orange-700 leading-relaxed">
+                    Une fois signé par le client, un contrat récurrent sera créé et des factures seront générées automatiquement à chaque échéance.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Lines */}

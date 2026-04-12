@@ -5,6 +5,14 @@ import { getNextInvoiceNumber } from '@/lib/document-numbers';
 
 export const runtime = 'nodejs';
 
+interface LineItem {
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  tva_rate: number;
+}
+
 interface ContractRow {
   id: string;
   user_id: string;
@@ -15,6 +23,7 @@ interface ContractRow {
   tva_rate: number;
   next_billing: string;
   auto_send: boolean;
+  line_items: LineItem[] | null;
   clients: { id: string; name: string; email: string | null } | null;
 }
 
@@ -40,7 +49,7 @@ export async function POST(request: Request) {
   // Fetch contracts due for billing
   const { data: contracts, error: fetchError } = await supabaseAdmin
     .from('recurring_contracts')
-    .select('id, user_id, client_id, title, amount, frequency, tva_rate, next_billing, auto_send, clients(id, name, email)')
+    .select('id, user_id, client_id, title, amount, frequency, tva_rate, next_billing, auto_send, line_items, clients(id, name, email)')
     .eq('status', 'actif')
     .lte('next_billing', today);
 
@@ -86,17 +95,37 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Create invoice line
-      await supabaseAdmin.from('invoice_lines').insert({
-        user_id: contract.user_id,
-        invoice_id: invoice.id,
-        description: contract.title,
-        quantity: 1,
-        unit: 'forfait',
-        unit_price: totalHt,
-        total: totalHt,
-        position: 0,
-      });
+      // Create invoice lines (multi-line if contract has line_items)
+      const items = Array.isArray(contract.line_items) && contract.line_items.length > 0
+        ? contract.line_items
+        : null;
+
+      if (items) {
+        await supabaseAdmin.from('invoice_lines').insert(
+          items.map((item, i) => ({
+            user_id: contract.user_id,
+            invoice_id: invoice.id,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit || 'forfait',
+            unit_price: item.unit_price,
+            tva_rate: item.tva_rate ?? tvaRate,
+            total: item.quantity * item.unit_price,
+            position: i,
+          }))
+        );
+      } else {
+        await supabaseAdmin.from('invoice_lines').insert({
+          user_id: contract.user_id,
+          invoice_id: invoice.id,
+          description: contract.title,
+          quantity: 1,
+          unit: 'forfait',
+          unit_price: totalHt,
+          total: totalHt,
+          position: 0,
+        });
+      }
 
       // Link contract to invoice
       const periodEnd = computePeriodEnd(contract.next_billing, contract.frequency);

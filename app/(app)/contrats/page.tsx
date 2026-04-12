@@ -21,6 +21,7 @@ import {
   Clock,
   Percent,
   Edit,
+  X,
 } from 'lucide-react';
 import {
   Area,
@@ -103,6 +104,7 @@ interface Contract {
   created_at: string;
   last_billed_at: string | null;
   quote_id: string | null;
+  line_items: ContractLineItem[];
   quotes: { id: string; quote_number: string; status: string } | null;
   clients: { id: string; name: string; email: string | null } | null;
   contract_invoices: ContractInvoice[];
@@ -139,6 +141,14 @@ const TVA_OPTIONS = [
   { value: 20, label: '20%' },
 ];
 
+interface ContractLineItem {
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  tva_rate: number;
+}
+
 interface FormState {
   title: string;
   clientId: string | null;
@@ -151,6 +161,7 @@ interface FormState {
   autoSend: boolean;
   startDate: string;
   endDate: string;
+  lineItems: ContractLineItem[];
 }
 
 const emptyForm: FormState = {
@@ -165,6 +176,7 @@ const emptyForm: FormState = {
   autoSend: false,
   startDate: new Date().toISOString().split('T')[0],
   endDate: '',
+  lineItems: [],
 };
 
 export default function ContratsPage() {
@@ -189,7 +201,7 @@ export default function ContratsPage() {
       .select(`
         id, title, description, contract_type, amount, frequency, tva_rate, status,
         start_date, end_date, next_billing, auto_send, notes, created_at, last_billed_at,
-        quote_id, quotes(id, quote_number, status, deleted_at),
+        quote_id, line_items, quotes(id, quote_number, status, deleted_at),
         clients(id, name, email, deleted_at),
         contract_invoices(id, invoice_id, billing_period_start, billing_period_end, created_at, invoices(id, invoice_number, title, status, total_ttc, paid_at))
       `)
@@ -221,12 +233,18 @@ export default function ContratsPage() {
   async function saveContract() {
     if (!user || !form.title.trim()) return;
 
+    // Recalculate amount from line items if present
+    const validLineItems = form.lineItems.filter(l => l.description.trim());
+    const computedAmount = validLineItems.length > 0
+      ? validLineItems.reduce((sum, l) => sum + l.quantity * l.unit_price, 0)
+      : form.amount;
+
     const payload = {
       user_id: user.id,
       title: form.title,
       client_id: form.clientId,
       contract_type: form.contractType,
-      amount: form.amount,
+      amount: computedAmount,
       frequency: form.frequency,
       tva_rate: form.tvaRate,
       description: form.description,
@@ -236,6 +254,7 @@ export default function ContratsPage() {
       end_date: form.endDate || null,
       next_billing: form.startDate || new Date().toISOString().split('T')[0],
       updated_at: new Date().toISOString(),
+      line_items: validLineItems.length > 0 ? validLineItems : [],
     };
 
     if (editingId) {
@@ -264,6 +283,7 @@ export default function ContratsPage() {
       autoSend: c.auto_send,
       startDate: c.start_date || '',
       endDate: c.end_date || '',
+      lineItems: Array.isArray(c.line_items) ? c.line_items : [],
     });
     setShowForm(true);
   }
@@ -308,17 +328,37 @@ export default function ContratsPage() {
 
       if (!invoice) return;
 
-      // Create invoice line
-      await supabase.from('invoice_lines').insert({
-        user_id: user.id,
-        invoice_id: invoice.id,
-        description: contract.title,
-        quantity: 1,
-        unit: 'forfait',
-        unit_price: totalHt,
-        total: totalHt,
-        position: 0,
-      });
+      // Create invoice lines (multi-line if contract has line_items)
+      const items = Array.isArray(contract.line_items) && contract.line_items.length > 0
+        ? contract.line_items
+        : null;
+
+      if (items) {
+        await supabase.from('invoice_lines').insert(
+          items.map((item: ContractLineItem, i: number) => ({
+            user_id: user.id,
+            invoice_id: invoice.id,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit || 'forfait',
+            unit_price: item.unit_price,
+            tva_rate: item.tva_rate ?? tvaRate,
+            total: item.quantity * item.unit_price,
+            position: i,
+          }))
+        );
+      } else {
+        await supabase.from('invoice_lines').insert({
+          user_id: user.id,
+          invoice_id: invoice.id,
+          description: contract.title,
+          quantity: 1,
+          unit: 'forfait',
+          unit_price: totalHt,
+          total: totalHt,
+          position: 0,
+        });
+      }
 
       // Link contract to invoice
       const billingStart = contract.next_billing || new Date().toISOString().split('T')[0];
@@ -894,11 +934,94 @@ export default function ContratsPage() {
                 </Select>
               </div>
             </div>
-            {form.amount > 0 && (
+            {form.amount > 0 && form.lineItems.length === 0 && (
               <p className="text-xs text-muted-foreground -mt-2">
                 TTC : {formatCurrency(Math.round(form.amount * (1 + form.tvaRate / 100) * 100) / 100)}
               </p>
             )}
+
+            {/* Line items (optional detailed breakdown) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Lignes du contrat</label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-xs h-7"
+                  onClick={() => setForm({
+                    ...form,
+                    lineItems: [...form.lineItems, { description: '', quantity: 1, unit: 'forfait', unit_price: 0, tva_rate: form.tvaRate }],
+                  })}
+                >
+                  <Plus className="h-3 w-3" /> Ligne
+                </Button>
+              </div>
+              {form.lineItems.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Aucune ligne. Le montant HT ci-dessus sera utilisé comme forfait unique.</p>
+              ) : (
+                <div className="space-y-2">
+                  {form.lineItems.map((item, i) => (
+                    <div key={i} className="rounded-lg border border-border p-2.5 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <Input
+                          className="flex-1 text-xs h-8"
+                          placeholder="Description"
+                          value={item.description}
+                          onChange={e => {
+                            const updated = [...form.lineItems];
+                            updated[i] = { ...updated[i], description: e.target.value };
+                            setForm({ ...form, lineItems: updated });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, lineItems: form.lineItems.filter((_, j) => j !== i) })}
+                          className="text-muted-foreground hover:text-red-500 p-1"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          className="w-16 text-xs h-7 text-center"
+                          type="number"
+                          min={0}
+                          value={item.quantity || ''}
+                          onChange={e => {
+                            const updated = [...form.lineItems];
+                            updated[i] = { ...updated[i], quantity: Number(e.target.value) };
+                            setForm({ ...form, lineItems: updated });
+                          }}
+                        />
+                        <span className="text-[10px] text-muted-foreground">×</span>
+                        <Input
+                          className="w-24 text-xs h-7"
+                          type="number"
+                          step="0.01"
+                          placeholder="Prix unit."
+                          value={item.unit_price || ''}
+                          onChange={e => {
+                            const updated = [...form.lineItems];
+                            updated[i] = { ...updated[i], unit_price: Number(e.target.value) };
+                            setForm({ ...form, lineItems: updated });
+                          }}
+                        />
+                        <span className="text-[10px] text-muted-foreground">=</span>
+                        <span className="text-xs font-medium whitespace-nowrap">
+                          {formatCurrency(item.quantity * item.unit_price)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-muted-foreground">Total HT :</span>
+                    <span className="text-sm font-semibold">
+                      {formatCurrency(form.lineItems.reduce((s, l) => s + l.quantity * l.unit_price, 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

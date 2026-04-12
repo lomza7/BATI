@@ -54,6 +54,8 @@ interface Quote {
   created_at: string;
   clients: { name: string; email: string | null } | null;
   recurring_contract_id: string | null;
+  is_recurring: boolean;
+  recurring_frequency: string | null;
 }
 
 export default function DevisPage() {
@@ -116,7 +118,7 @@ export default function DevisPage() {
     const [quotesRes, sendsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, clients(name, email, deleted_at), recurring_contracts(id)')
+        .select('id, quote_number, title, status, total_ttc, valid_until, created_at, is_recurring, recurring_frequency, clients(name, email, deleted_at), recurring_contracts(id)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
@@ -190,14 +192,14 @@ export default function DevisPage() {
   async function updateStatus(id: string, status: string) {
     await supabase.from('quotes').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
 
-    // If accepted, activate any linked recurring contract
+    // If manually accepted, also activate linked recurring contracts (safety net — the DocuSeal RPC handles the signature case)
     if (status === 'accepte') {
       const quote = quotes.find(q => q.id === id);
       if (quote?.recurring_contract_id) {
         await supabase.from('recurring_contracts').update({
           status: 'actif',
           updated_at: new Date().toISOString(),
-        }).eq('id', quote.recurring_contract_id);
+        }).eq('id', quote.recurring_contract_id).eq('status', 'en_attente');
       }
     }
 
@@ -417,8 +419,11 @@ export default function DevisPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <StatusBadge label={st.label} color={st.color} />
-                            {q.recurring_contract_id && (
-                              <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0"><RefreshCw className="h-2.5 w-2.5" /> Contrat</Badge>
+                            {(q.recurring_contract_id || q.is_recurring) && (
+                              <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0 border-[#d35400]/30 text-[#d35400] bg-orange-50">
+                                <RefreshCw className="h-2.5 w-2.5" />
+                                {q.recurring_frequency === 'mensuel' ? 'Contrat mensuel' : q.recurring_frequency === 'trimestriel' ? 'Contrat trimestriel' : q.recurring_frequency === 'annuel' ? 'Contrat annuel' : 'Contrat'}
+                              </Badge>
                             )}
                           </div>
                         </td>
