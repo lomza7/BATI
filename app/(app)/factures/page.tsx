@@ -752,7 +752,7 @@ export default function FacturesPage() {
             </select>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 max-h-[660px] space-y-3 overflow-y-auto pr-1">
             {loading ? (
               [1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />)
             ) : visibleQuotes.length === 0 ? (
