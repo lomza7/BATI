@@ -6,7 +6,6 @@ import { extractPdfText } from '@/lib/ai/pdf-extract';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
-import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -118,7 +117,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Fichier trop volumineux (max 10 Mo)' }, { status: 400 });
   }
 
-  let mime = (file.type || '').toLowerCase();
+  const mime = (file.type || '').toLowerCase();
   const isPdf = mime === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   const isHeic = mime === 'image/heic' || mime === 'image/heif' || /\.(heic|heif)$/i.test(file.name);
   const isImage = mime.startsWith('image/') || isHeic;
@@ -127,23 +126,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Format non supporté (image ou PDF uniquement)' }, { status: 400 });
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let buffer: any = Buffer.from(new Uint8Array(arrayBuffer));
-
-  // Auto-convert HEIC/HEIF (iPhone default) to JPEG
+  // HEIC should have been converted client-side, reject if it wasn't
   if (isHeic) {
-    try {
-      buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-      mime = 'image/jpeg';
-    } catch (e) {
-      console.error('HEIC conversion failed:', e);
-      return NextResponse.json(
-        { error: 'Impossible de convertir la photo. Essayez de prendre la photo en mode JPEG (Réglages → Appareil photo → Formats → Le plus compatible).' },
-        { status: 422 },
-      );
-    }
+    return NextResponse.json(
+      { error: 'Format HEIC non supporté. Veuillez réessayer ou aller dans Réglages → Appareil photo → Formats → Le plus compatible.' },
+      { status: 400 },
+    );
   }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(new Uint8Array(arrayBuffer));
 
   type ContentBlock =
     | { type: 'text'; text: string }

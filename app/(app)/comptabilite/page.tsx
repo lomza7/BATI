@@ -536,9 +536,23 @@ export default function ComptabilitePage() {
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       });
-      const data = await res.json();
+
+      // Parse response safely (Vercel can return HTML on 413/500)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        const msg = res.status === 413
+          ? 'Photo trop volumineuse. Réessayez avec une photo plus légère.'
+          : `Erreur serveur (${res.status}). Réessayez dans quelques instants.`;
+        setOcrError(msg);
+        toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+        return;
+      }
+
       if (!res.ok) {
-        const msg = data.error || 'Erreur OCR';
+        const msg = (data.error as string) || 'Erreur OCR';
         setOcrError(msg);
         toast({
           title: 'Échec de l\'analyse',

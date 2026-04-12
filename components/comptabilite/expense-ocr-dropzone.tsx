@@ -11,6 +11,74 @@ interface Props {
   error?: string | null;
 }
 
+/** Max dimension (width or height) for OCR — keeps file under ~1 Mo */
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.85;
+
+/**
+ * Compress an image file using Canvas API.
+ * Handles HEIC/HEIF transparently (iOS Safari renders them natively).
+ * Returns a JPEG File under ~1 Mo, suitable for OCR.
+ */
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    // PDFs are not images — skip compression
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      resolve(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      let { width, height } = img;
+
+      // Scale down if needed
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas non disponible'));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Compression impossible'));
+            return;
+          }
+          const compressed = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+          resolve(compressed);
+        },
+        'image/jpeg',
+        JPEG_QUALITY,
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // Fallback: return the original file if the browser can't render it
+      resolve(file);
+    };
+
+    img.src = url;
+  });
+}
+
 export function ExpenseOcrDropzone({ onFileSelected, busy = false, error = null }: Props) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,7 +86,9 @@ export function ExpenseOcrDropzone({ onFileSelected, busy = false, error = null 
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const file = files[0];
+    const raw = files[0];
+    // Compress images before upload (handles HEIC, reduces size for Vercel 4.5MB limit)
+    const file = await compressImage(raw);
     await onFileSelected(file);
   }
 
@@ -75,7 +145,7 @@ export function ExpenseOcrDropzone({ onFileSelected, busy = false, error = null 
               <AlertCircle className="h-7 w-7" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-red-600">Erreur d'analyse</p>
+              <p className="text-sm font-semibold text-red-600">Erreur d&apos;analyse</p>
               <p className="text-xs text-red-500/80">{error}</p>
             </div>
             <Button
