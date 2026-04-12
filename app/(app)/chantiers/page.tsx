@@ -64,6 +64,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PublishSiteDialog } from '@/components/chantiers/publish-site-dialog';
 import { InvoiceImportDialog } from '@/components/chantiers/invoice-import-dialog';
+import dynamic from 'next/dynamic';
+
+const MiniMap = dynamic(() => import('@/components/shared/mini-map').then((m) => m.MiniMap), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+});
 
 type PhotoCategory = 'presentation' | 'avant' | 'pendant' | 'apres';
 
@@ -148,6 +154,8 @@ interface Project {
   completed_phases: CompletedPhase[];
   clients: { name: string } | null;
   project_photos: ProjectPhoto[];
+  lat: number | null;
+  lng: number | null;
   trackedHours: number;
   plannedHours: number;
   plannedDays: number;
@@ -334,7 +342,7 @@ export default function ChantiersPage() {
       await Promise.all([
         supabase
           .from('projects')
-          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, is_public, public_description, public_category, public_slug, public_completion_date, published_at, clients(name, deleted_at), project_photos(id, url, caption, category, created_at)')
+          .select('id, client_id, name, address, city, status, progress, budget, start_date, end_date, created_at, notes, completed_phases, is_public, public_description, public_category, public_slug, public_completion_date, published_at, lat, lng, clients(name, deleted_at), project_photos(id, url, caption, category, created_at)')
           .is('deleted_at', null)
           .order('created_at', { ascending: false }),
         supabase.from('team_assignments').select('project_id, hours'),
@@ -1157,6 +1165,8 @@ export default function ChantiersPage() {
                       alt={project.name}
                       className="h-full w-full object-cover"
                     />
+                  ) : project.lat && project.lng ? (
+                    <MiniMap lat={project.lat} lng={project.lng} className="h-full w-full" />
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-background to-background">
                       <div className="absolute left-5 top-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-background/80 shadow-sm">
@@ -1320,6 +1330,10 @@ export default function ChantiersPage() {
                       <div className="flex items-center gap-3">
                         {coverPhoto ? (
                           <img src={coverPhoto.url} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0" />
+                        ) : project.lat && project.lng ? (
+                          <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden">
+                            <MiniMap lat={project.lat} lng={project.lng} zoom={13} className="h-full w-full" />
+                          </div>
                         ) : (
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                             <HardHat className="h-4 w-4 text-muted-foreground" />
