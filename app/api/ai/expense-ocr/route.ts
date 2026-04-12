@@ -53,13 +53,19 @@ RÈGLES :
 - payment_method : "cb" | "virement" | "especes" | "cheque" | "prelevement" | "autre" | null si non visible.
 - confidence : ta confiance globale sur l'extraction, entre 0 et 1.
 
+IMPORTANT — LIGNES DÉTAILLÉES :
+- Extrais CHAQUE article/ligne du ticket séparément dans le tableau "lines".
+- Chaque ligne a : description, quantity, unit_price_ht, amount_ht, tva_rate, category_slug.
+- Les champs globaux (amount_ht, amount_ttc, tva_total) sont les TOTAUX du ticket.
+- "description" global = résumé court du ticket (ex: "Matériaux chantier Leroy Merlin").
+
 FORMAT DE RÉPONSE (JSON pur) :
 {
   "supplier": "Leroy Merlin",
   "supplier_siret": "384 560 942 12345",
   "invoice_number": "FA-2026-001234",
   "date": "2026-04-08",
-  "description": "Achat matériaux placo",
+  "description": "Matériaux chantier",
   "amount_ht": 245.50,
   "amount_ttc": 294.60,
   "tva_total": 49.10,
@@ -67,7 +73,12 @@ FORMAT DE RÉPONSE (JSON pur) :
   "is_autoliquidation": false,
   "payment_method": "cb",
   "category_slug": "materiaux",
-  "confidence": 0.92
+  "confidence": 0.92,
+  "lines": [
+    { "description": "Parpaing 20x20x50", "quantity": 50, "unit_price_ht": 1.20, "amount_ht": 60.00, "tva_rate": 20, "category_slug": "materiaux" },
+    { "description": "Sac ciment 35kg", "quantity": 10, "unit_price_ht": 5.50, "amount_ht": 55.00, "tva_rate": 20, "category_slug": "materiaux" },
+    { "description": "Fer à béton 8mm", "quantity": 20, "unit_price_ht": 6.53, "amount_ht": 130.50, "tva_rate": 20, "category_slug": "materiaux" }
+  ]
 }`;
 
 function extractJsonFromText(content: string): string {

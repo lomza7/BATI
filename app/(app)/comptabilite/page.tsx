@@ -97,6 +97,8 @@ import {
   ExpenseFormDialog,
   type ExpenseFormValues,
 } from '@/components/comptabilite/expense-form-dialog';
+import { OcrReviewDialog, type OcrReviewData } from '@/components/comptabilite/ocr-review-dialog';
+import type { OcrLineItem } from '@/lib/ai/expense-ocr-schema';
 import { TvaPanel } from '@/components/comptabilite/tva-panel';
 import {
   AccountantInviteDialog,
@@ -375,6 +377,10 @@ export default function ComptabilitePage() {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [expenseInitial, setExpenseInitial] = useState<Partial<ExpenseFormValues> | null>(null);
 
+  // OCR review dialog (multi-line)
+  const [showOcrReview, setShowOcrReview] = useState(false);
+  const [ocrReviewData, setOcrReviewData] = useState<OcrReviewData | null>(null);
+
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -562,10 +568,28 @@ export default function ComptabilitePage() {
         return;
       }
       const ex = data.extracted;
+      const lines: OcrLineItem[] = ex.lines || [];
 
-      // Match category by slug
+      // Multi-line ticket → show review dialog
+      if (lines.length > 1) {
+        setOcrReviewData({
+          supplier: ex.supplier || '',
+          date: ex.date || new Date().toISOString().split('T')[0],
+          payment_method: ex.payment_method || null,
+          is_autoliquidation: Boolean(ex.is_autoliquidation),
+          confidence: ex.confidence ?? 0.5,
+          receipt_storage_path: data.receipt_storage_path || null,
+          amount_ht: Number(ex.amount_ht || 0),
+          amount_ttc: Number(ex.amount_ttc || 0),
+          tva_total: Number(ex.tva_total || 0),
+          lines,
+        });
+        setShowOcrReview(true);
+        return;
+      }
+
+      // Single line or no lines → open single expense form
       const cat = categories.find((c) => c.slug === ex.category_slug);
-
       const initial: Partial<ExpenseFormValues> = {
         description: ex.description || '',
         supplier: ex.supplier || '',
@@ -594,6 +618,48 @@ export default function ComptabilitePage() {
     } finally {
       setOcrBusy(false);
     }
+  }
+
+  // ───────────────────── OCR multi-lignes ─────────────────────
+
+  async function handleOcrConfirm(selectedLines: OcrLineItem[]) {
+    if (!user || !ocrReviewData) return;
+
+    setShowOcrReview(false);
+    let count = 0;
+
+    for (const line of selectedLines) {
+      const cat = categories.find((c) => c.slug === line.category_slug);
+      const ht = Number(line.amount_ht || 0);
+      const rate = Number(line.tva_rate || 0);
+      const isAutoLiq = ocrReviewData.is_autoliquidation;
+      const tva = isAutoLiq ? 0 : +(ht * (rate / 100)).toFixed(2);
+
+      const payload = {
+        user_id: user.id,
+        description: line.description,
+        supplier: ocrReviewData.supplier,
+        date: ocrReviewData.date,
+        amount_ht: ht,
+        tva_rate: rate,
+        tva_amount: tva,
+        amount: +(ht + tva).toFixed(2),
+        expense_category_id: cat?.id || null,
+        category: line.category_slug || 'autres',
+        payment_method: ocrReviewData.payment_method,
+        is_autoliquidation: isAutoLiq,
+        project_id: null,
+        source: 'ocr',
+        ocr_confidence: ocrReviewData.confidence,
+        receipt_storage_path: ocrReviewData.receipt_storage_path,
+      };
+
+      const { error } = await supabase.from('expenses').insert(payload);
+      if (!error) count++;
+    }
+
+    toast({ title: `${count} dépense${count > 1 ? 's' : ''} importée${count > 1 ? 's' : ''}` });
+    await loadAll();
   }
 
   // ───────────────────────── CRUD ─────────────────────────
@@ -2880,6 +2946,15 @@ export default function ComptabilitePage() {
         projects={projects}
         onSubmit={handleExpenseSubmit}
       />
+
+      {showOcrReview && ocrReviewData && (
+        <OcrReviewDialog
+          open={showOcrReview}
+          onOpenChange={setShowOcrReview}
+          data={ocrReviewData}
+          onConfirm={handleOcrConfirm}
+        />
+      )}
 
       <AccountantInviteDialog
         open={showInvite}

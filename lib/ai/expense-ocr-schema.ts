@@ -6,6 +6,15 @@ export const tvaLineSchema = z.object({
   tva: z.number().min(0),
 });
 
+export const ocrLineItemSchema = z.object({
+  description: z.string(),
+  quantity: z.number().default(1),
+  unit_price_ht: z.number().default(0),
+  amount_ht: z.number().min(0).default(0),
+  tva_rate: z.number().default(20),
+  category_slug: z.string().default('autres'),
+});
+
 export const expenseOcrSchema = z.object({
   supplier: z.string().default(''),
   supplier_siret: z.string().default(''),
@@ -23,6 +32,8 @@ export const expenseOcrSchema = z.object({
     .default(null),
   category_slug: z.string().default('autres'),
   confidence: z.number().min(0).max(1).default(0.5),
+  lines: z.array(ocrLineItemSchema).default([]),
 });
 
+export type OcrLineItem = z.infer<typeof ocrLineItemSchema>;
 export type ExpenseOcrResult = z.infer<typeof expenseOcrSchema>;

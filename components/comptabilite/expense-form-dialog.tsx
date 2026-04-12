@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { SupplierPicker } from '@/components/comptabilite/supplier-picker';
 
 export interface ExpenseFormValues {
   id?: string;
@@ -187,11 +188,9 @@ export function ExpenseFormDialog({ open, onOpenChange, initialValues, categorie
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="supplier">Fournisseur *</Label>
-              <Input
-                id="supplier"
+              <SupplierPicker
                 value={values.supplier}
-                onChange={(e) => update('supplier', e.target.value)}
-                placeholder="Leroy Merlin"
+                onChange={(name) => update('supplier', name)}
               />
             </div>
             <div>
