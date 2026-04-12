@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         type: 'standard',
         country: 'FR',
         email: user.email,
+        default_currency: 'eur',
       });
       accountId = account.id;
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
       refresh_url: `${siteUrl}/api/stripe/connect?token=${token}`,
       return_url: `${siteUrl}/api/stripe/connect/callback`,
       type: 'account_onboarding',
+      collection_options: { fields: 'eventually_due' },
     });
 
     const response = NextResponse.redirect(accountLink.url);

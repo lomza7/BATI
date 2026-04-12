@@ -58,6 +58,7 @@ export async function POST(request: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
+      locale: 'fr',
       payment_method_types: ['card'],
       customer_email: user_email,
       line_items: [{ price: resolvedPrice.id, quantity: 1 }],
