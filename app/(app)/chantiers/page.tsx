@@ -405,6 +405,9 @@ export default function ChantiersPage() {
     setProjects(mappedProjects);
     setLoading(false);
 
+    // Geocode projects missing lat/lng in the background
+    geocodeMissing(mappedProjects);
+
     // Check for orphan invoices (no project linked) — exclude acompte/solde
     // which legitimately have no project (they belong to a quote's project)
     supabase
@@ -413,6 +416,43 @@ export default function ChantiersPage() {
       .is('project_id', null)
       .or('invoice_type.eq.standard,invoice_type.is.null')
       .then(({ count }) => setOrphanCount(count || 0));
+  }
+
+  async function geocodeMissing(projectList: Project[]) {
+    const toGeocode = projectList.filter((p) => !p.lat && !p.lng && p.city.trim());
+    if (toGeocode.length === 0) return;
+
+    const updates: { id: string; lat: number; lng: number }[] = [];
+    for (const p of toGeocode) {
+      try {
+        const query = [p.address, p.city].filter(Boolean).join(' ');
+        const res = await fetch(
+          `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`,
+        );
+        const data = await res.json();
+        const coords = data.features?.[0]?.geometry?.coordinates;
+        if (coords) {
+          updates.push({ id: p.id, lat: coords[1], lng: coords[0] });
+        }
+      } catch {
+        // Skip failures silently
+      }
+    }
+
+    if (updates.length === 0) return;
+
+    // Persist to DB
+    for (const u of updates) {
+      await supabase.from('projects').update({ lat: u.lat, lng: u.lng }).eq('id', u.id);
+    }
+
+    // Update local state
+    setProjects((prev) =>
+      prev.map((p) => {
+        const found = updates.find((u) => u.id === p.id);
+        return found ? { ...p, lat: found.lat, lng: found.lng } : p;
+      }),
+    );
   }
 
   async function runBackfill() {
