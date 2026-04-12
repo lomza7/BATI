@@ -42,12 +42,13 @@ export async function POST(request: Request) {
     });
 
     const body = await request.json();
-    const { invoice_id, client_name, client_email, expires_in_days, excluded_attachment_ids } = body as {
+    const { invoice_id, client_name, client_email, expires_in_days, excluded_attachment_ids, reminders_enabled } = body as {
       invoice_id: string;
       client_name: string;
       client_email?: string;
       expires_in_days: number;
       excluded_attachment_ids?: string[];
+      reminders_enabled?: boolean;
     };
 
     if (!invoice_id || !client_name?.trim()) {
@@ -130,9 +131,10 @@ export async function POST(request: Request) {
     }
 
     // Passer la facture en envoyee + set issued_at si necessaire
-    const updates: Record<string, string> = {
+    const updates: Record<string, string | boolean> = {
       status: 'envoyee',
       updated_at: new Date().toISOString(),
+      reminders_enabled: reminders_enabled ?? false,
     };
     if (invoice.status === 'brouillon' || invoice.status === 'creee') {
       updates.issued_at = new Date().toISOString();

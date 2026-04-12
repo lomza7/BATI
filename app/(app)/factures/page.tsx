@@ -310,14 +310,25 @@ export default function FacturesPage() {
     setShowCreate(true);
   }
 
-  function handleConvertQuote(quote: QuoteCandidate) {
+  async function handleConvertQuote(quote: QuoteCandidate) {
+    // Re-fetch le statut du devis pour éviter les données stales
+    // (ex. devis accepté après le chargement de la page)
+    const { data: fresh } = await supabase
+      .from('quotes')
+      .select('status')
+      .eq('id', quote.id)
+      .maybeSingle();
+    const freshQuote = fresh?.status
+      ? { ...quote, status: fresh.status as QuoteCandidate['status'] }
+      : quote;
+
     // Si le devis a déjà son propre RIB, on ouvre directement la carte de facturation
-    if (quote.bank_account_id || hasBankAccount) {
-      setBillingQuote(quote);
+    if (freshQuote.bank_account_id || hasBankAccount) {
+      setBillingQuote(freshQuote);
       return;
     }
     // Sinon, on force l'ajout d'un RIB avant la facturation
-    setPendingQuoteForInvoice(quote);
+    setPendingQuoteForInvoice(freshQuote);
     setShowFirstRibDialog(true);
   }
 

@@ -40,6 +40,7 @@ interface QuoteSend {
   signed_at: string | null;
   created_at: string;
   view_count: number;
+  docuseal_submission_id: number | null;
   docuseal_signed_document_url: string | null;
 }
 
@@ -120,7 +121,7 @@ export default function DevisPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
-        .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_signed_document_url')
+        .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_submission_id, docuseal_signed_document_url')
         .order('created_at', { ascending: false }),
     ]);
 
@@ -209,6 +210,30 @@ export default function DevisPage() {
     navigator.clipboard.writeText(link);
     setCopiedLink(token);
     setTimeout(() => setCopiedLink(null), 2000);
+  }
+
+  async function downloadSignedQuote(send: QuoteSend) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const res = await fetch('/api/docuseal/download-signed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ quote_send_id: send.id }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, '_blank');
+      } else if (send.docuseal_signed_document_url) {
+        window.open(send.docuseal_signed_document_url, '_blank');
+      }
+    } catch {
+      if (send.docuseal_signed_document_url) window.open(send.docuseal_signed_document_url, '_blank');
+    }
   }
 
   async function resendEmail(quoteId: string) {
@@ -470,7 +495,7 @@ export default function DevisPage() {
                                 </DropdownMenuItem>
                               )}
                               {send?.docuseal_signed_document_url && (
-                                <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
+                                <DropdownMenuItem onClick={() => downloadSignedQuote(send)}>
                                   <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                                 </DropdownMenuItem>
                               )}
@@ -549,7 +574,7 @@ export default function DevisPage() {
                           </DropdownMenuItem>
                         )}
                         {send?.docuseal_signed_document_url && (
-                          <DropdownMenuItem onClick={() => window.open(send.docuseal_signed_document_url!, '_blank')}>
+                          <DropdownMenuItem onClick={() => downloadSignedQuote(send)}>
                             <Download className="mr-2 h-4 w-4" /> Télécharger le devis signé
                           </DropdownMenuItem>
                         )}
@@ -801,15 +826,14 @@ export default function DevisPage() {
                           <p className="text-sm font-medium text-emerald-700">Devis signé</p>
                           <p className="text-xs text-muted-foreground">{formatDate(send.signed_at)}</p>
                           {send.docuseal_signed_document_url && (
-                            <a
-                              href={send.docuseal_signed_document_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => downloadSignedQuote(send)}
                               className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
                             >
                               <Download className="h-3 w-3" />
                               Télécharger le devis signé
-                            </a>
+                            </button>
                           )}
                         </div>
                       </div>

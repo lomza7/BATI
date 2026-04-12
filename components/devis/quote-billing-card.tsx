@@ -117,13 +117,14 @@ export function QuoteBillingCard({
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 30);
 
-      const tva = computeTvaBreakdown(
-        quote.quote_lines.map((l) => ({
-          quantity: l.quantity,
-          unit_price: l.unit_price,
-          tva_rate: l.tva_rate ?? 20,
-        })),
-      );
+      const tvaInput = quote.quote_lines.length > 0
+        ? quote.quote_lines.map((l) => ({
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            tva_rate: l.tva_rate ?? 20,
+          }))
+        : [{ quantity: 1, unit_price: quote.total_ht, tva_rate: quote.tva_rate ?? 20 }];
+      const tva = computeTvaBreakdown(tvaInput);
 
       const { data: invoice, error: insertError } = await supabase
         .from('invoices')
@@ -166,6 +167,19 @@ export function QuoteBillingCard({
             position: typeof line.position === 'number' ? line.position : idx,
           })),
         );
+      } else if (quote.total_ht > 0) {
+        // Devis importé sans lignes détaillées : créer une ligne avec le total
+        await supabase.from('invoice_lines').insert({
+          user_id: user.id,
+          invoice_id: invoice.id,
+          description: quote.title || 'Prestation',
+          quantity: 1,
+          unit: 'forfait',
+          unit_price: quote.total_ht,
+          tva_rate: quote.tva_rate ?? 20,
+          total: quote.total_ht,
+          position: 0,
+        });
       }
 
       await refresh();

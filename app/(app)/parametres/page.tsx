@@ -40,6 +40,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
 import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
 import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
+import { PaymentReminderSettingsCard } from '@/components/parametres/payment-reminder-settings-card';
 import { ImportShowcase, type SourceId } from '@/components/parametres/import-showcase';
 import { ImportModal } from '@/components/onboarding/import-modal';
 import { Button } from '@/components/ui/button';
@@ -89,7 +90,7 @@ import {
   type WorkspaceRole,
 } from '@/lib/workspace';
 
-type SettingsTab = 'parametres' | 'import' | 'documents' | 'banque' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
+type SettingsTab = 'parametres' | 'import' | 'documents' | 'finance' | 'chantier' | 'equipe' | 'abonnement' | 'securite';
 
 interface SettingsProfile {
   id: string;
@@ -1232,7 +1233,7 @@ export default function ParametresPage() {
             </span>
           </TabsTrigger>
           <TabsTrigger value="documents" className="rounded-lg py-2.5 text-xs sm:text-sm">Documents</TabsTrigger>
-          <TabsTrigger value="banque" className="rounded-lg py-2.5 text-xs sm:text-sm">Banque</TabsTrigger>
+          <TabsTrigger value="finance" className="rounded-lg py-2.5 text-xs sm:text-sm">Finance</TabsTrigger>
           <TabsTrigger value="chantier" className="rounded-lg py-2.5 text-xs sm:text-sm">Chantier</TabsTrigger>
           <TabsTrigger value="equipe" className="rounded-lg py-2.5 text-xs sm:text-sm">Équipe</TabsTrigger>
           <TabsTrigger value="abonnement" className="rounded-lg py-2.5 text-xs sm:text-sm">Abonnement</TabsTrigger>
@@ -2274,8 +2275,9 @@ export default function ParametresPage() {
           <CompanyAttachmentsCard />
         </TabsContent>
 
-        <TabsContent value="banque" className="space-y-6">
+        <TabsContent value="finance" className="space-y-6">
           <BankAccountsCard />
+          <PaymentReminderSettingsCard />
         </TabsContent>
 
         <TabsContent value="equipe" className="space-y-6">

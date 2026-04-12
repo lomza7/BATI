@@ -144,6 +144,7 @@ export function buildQuoteHtml(
   lines: QuoteLine[],
   client: ClientData,
   artisan: ArtisanData,
+  signatureData?: { signatureImageUrl: string; signedAt: string } | null,
 ): string {
   const dc = (artisan.document_config || {}) as Record<string, string | boolean>;
   const accent = (dc.primary_color as string) || '#d35400';
@@ -336,16 +337,19 @@ export function buildQuoteHtml(
     </p>
   </div>
 
-  <!-- Zone signature : prévoir de la hauteur pour que DocuSeal
-       incruste la signature et la date correctement dans le PDF final -->
+  <!-- Zone signature -->
   <div style="padding:18px 18px 22px;border:1px solid ${border};border-radius:8px;margin-bottom:18px;background:#ffffff" class="no-break">
     <p style="margin:0 0 10px;font-size:9px;font-weight:700;letter-spacing:1px;color:${muted};text-transform:uppercase">Signature du client</p>
     <div style="min-height:110px;padding:6px 0">
-      <signature-field name="Signature" role="First Submitter" required="true"></signature-field>
+      ${signatureData
+        ? `<img src="${esc(signatureData.signatureImageUrl)}" alt="Signature" style="max-height:100px;max-width:280px" />`
+        : `<signature-field name="Signature" role="First Submitter" required="true"></signature-field>`}
     </div>
     <p style="margin:12px 0 4px;font-size:9px;font-weight:700;letter-spacing:1px;color:${muted};text-transform:uppercase">Date</p>
     <div style="min-height:24px">
-      <date-field name="Date" role="First Submitter" readonly="true"></date-field>
+      ${signatureData
+        ? `<p style="margin:0;font-size:11px;color:${textColor}">${esc(fmtDate(signatureData.signedAt))}</p>`
+        : `<date-field name="Date" role="First Submitter" readonly="true"></date-field>`}
     </div>
   </div>
 

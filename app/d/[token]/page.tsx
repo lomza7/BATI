@@ -336,10 +336,21 @@ export default function PublicQuotePage() {
     }
 
     // Poll pour recuperer l'URL du document signe
+    // On appelle sync-status à chaque iteration pour que l'URL en DB
+    // soit rafraîchie avec la version contenant la signature incrustée
+    // (le webhook stocke parfois une URL avant que le PDF soit finalisé).
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
       if (attempts > 20) { clearInterval(poll); return; }
+      // Re-sync depuis DocuSeal pour mettre à jour l'URL en DB
+      if (sendData?.docuseal_submission_id) {
+        await fetch('/api/docuseal/sync-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ submission_id: sendData.docuseal_submission_id }),
+        }).catch(() => {});
+      }
       const { data: fresh } = await anonClient
         .from('quote_sends')
         .select('docuseal_signed_document_url, docuseal_audit_log_url, docuseal_certificate_url')
@@ -349,7 +360,7 @@ export default function PublicQuotePage() {
         setSendData(prev => prev ? { ...prev, ...fresh } : prev);
         clearInterval(poll);
       }
-    }, 2000);
+    }, 3000);
   }
 
   // ── Loading ──

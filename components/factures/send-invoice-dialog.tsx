@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Send, Copy, Check, Link2, Loader as Loader2, Mail, CreditCard, Paperclip, FileText } from 'lucide-react';
+import { Send, Copy, Check, Link2, Loader as Loader2, Mail, CreditCard, Paperclip, FileText, Bell } from 'lucide-react';
 import { fireConfetti } from '@/lib/confetti';
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
@@ -44,17 +45,27 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const [emailSent, setEmailSent] = useState(false);
   const [attachments, setAttachments] = useState<CompanyAttachmentRow[]>([]);
   const [excludedAttachmentIds, setExcludedAttachmentIds] = useState<Set<string>>(new Set());
+  const [remindersEnabled, setRemindersEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from('company_attachments')
-        .select('id, name, size_bytes')
-        .eq('attach_to_invoices', true)
-        .order('position', { ascending: true })
-        .order('created_at', { ascending: true });
-      if (!cancelled) setAttachments((data as CompanyAttachmentRow[]) || []);
+      const [attRes, remRes] = await Promise.all([
+        supabase
+          .from('company_attachments')
+          .select('id, name, size_bytes')
+          .eq('attach_to_invoices', true)
+          .order('position', { ascending: true })
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('payment_reminder_settings')
+          .select('reminders_enabled')
+          .maybeSingle(),
+      ]);
+      if (!cancelled) {
+        setAttachments((attRes.data as CompanyAttachmentRow[]) || []);
+        setRemindersEnabled(remRes.data?.reminders_enabled ?? false);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -93,6 +104,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
           client_email: clientEmail.trim() || undefined,
           expires_in_days: parseInt(expiresIn),
           excluded_attachment_ids: Array.from(excludedAttachmentIds),
+          reminders_enabled: remindersEnabled,
         }),
       });
 
@@ -239,6 +251,17 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                 </p>
               </div>
             )}
+
+            <div className="flex items-center justify-between rounded-xl border border-border p-3">
+              <div className="flex items-center gap-2.5">
+                <Bell className="h-4 w-4 text-[#d35400]" />
+                <div>
+                  <p className="text-sm font-medium">Relances automatiques</p>
+                  <p className="text-xs text-muted-foreground">Envoyer des rappels si la facture n&apos;est pas payée</p>
+                </div>
+              </div>
+              <Switch checked={remindersEnabled} onCheckedChange={setRemindersEnabled} />
+            </div>
 
             <div>
               <label className="text-sm font-medium">Validité du lien</label>

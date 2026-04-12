@@ -722,6 +722,164 @@ export function buildRenduCampaignEmail(data: RenduCampaignEmailData): string {
 </html>`.trim();
 }
 
+// ---------- Relance facture impayée ----------
+
+export interface PaymentReminderEmailData {
+  clientName: string;
+  artisanName: string;
+  invoiceNumber: string;
+  invoiceTitle: string;
+  totalTtc: string;
+  dueDate: string | null;
+  magicLink: string;
+  hasOnlinePayment: boolean;
+  accentColor?: string;
+  reminderLevel: 1 | 2 | 3;
+  bodyText: string; // Already interpolated plain text
+}
+
+export function buildPaymentReminderEmail(data: PaymentReminderEmailData): string {
+  const accent = data.accentColor || '#d35400';
+
+  const levelLabels: Record<number, string> = {
+    1: 'Relance 1/3',
+    2: 'Relance 2/3',
+    3: 'Relance 3/3 — Dernier rappel',
+  };
+  const levelColors: Record<number, string> = {
+    1: '#3b82f6',
+    2: '#f59e0b',
+    3: '#ef4444',
+  };
+
+  const badgeColor = levelColors[data.reminderLevel] || accent;
+  const badgeLabel = levelLabels[data.reminderLevel] || 'Relance';
+
+  const dueDateLine = data.dueDate
+    ? `<p style="margin:0;font-size:13px;color:#6b6560">Échéance : ${escHtml(data.dueDate)}</p>`
+    : '';
+
+  const ctaLabel = data.hasOnlinePayment ? 'Voir et payer ma facture' : 'Consulter ma facture';
+
+  // Convert plain text body to HTML paragraphs
+  const bodyHtml = data.bodyText
+    .split('\n\n')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p style="margin:0 0 12px;font-size:14px;color:#6b6560;line-height:1.6">${escHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relance — Facture ${escHtml(data.invoiceNumber)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:${accent};padding:28px 32px;text-align:center">
+              <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">
+                ${escHtml(data.artisanName)}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Badge relance -->
+          <tr>
+            <td style="padding:16px 32px 0;text-align:center">
+              <span style="display:inline-block;background-color:${badgeColor};color:#ffffff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:4px 12px;border-radius:20px">
+                ${escHtml(badgeLabel)}
+              </span>
+            </td>
+          </tr>
+
+          <!-- Contenu principal -->
+          <tr>
+            <td style="padding:20px 32px 24px">
+              ${bodyHtml}
+
+              <!-- Bloc facture -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da;margin-bottom:24px">
+                <tr>
+                  <td style="padding:20px 24px">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td>
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Facture</p>
+                          <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.invoiceTitle || data.invoiceNumber)}</p>
+                          <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.invoiceNumber)}</p>
+                          ${dueDateLine}
+                        </td>
+                        <td style="text-align:right;vertical-align:top">
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Montant TTC</p>
+                          <p style="margin:0;font-size:22px;font-weight:700;color:${accent}">${escHtml(data.totalTtc)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Bouton CTA -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:12px;letter-spacing:-0.2px">
+                      ${ctaLabel}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:20px 0 0;font-size:12px;color:#999;text-align:center;line-height:1.5">
+                Ce lien est personnel et sécurisé.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:0 32px 24px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e1da;padding-top:16px">
+                <tr>
+                  <td>
+                    <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+                      Envoyé via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Lien en clair -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin-top:16px">
+          <tr>
+            <td align="center">
+              <p style="margin:0;font-size:11px;color:#999">
+                Si le bouton ne fonctionne pas, copiez ce lien :<br/>
+                <a href="${data.magicLink}" style="color:${accent};word-break:break-all">${data.magicLink}</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 function escHtml(str: string): string {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

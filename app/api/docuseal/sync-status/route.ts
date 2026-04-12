@@ -34,10 +34,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Submission introuvable' }, { status: 404 });
     }
 
-    // Deja signe en base — rien a faire
-    if (send.signed_at) {
-      return NextResponse.json({ ok: true, already_signed: true });
-    }
+    // Même si déjà signé, on peut vouloir rafraîchir l'URL du document
+    // (le webhook stocke parfois l'URL avant que DocuSeal ait fini de
+    // générer le PDF avec la signature incrustée).
+    const alreadySigned = !!send.signed_at;
 
     // Interroger DocuSeal pour l'etat de la submission
     interface DocuSealSubmission {
@@ -64,6 +64,20 @@ export async function POST(request: Request) {
     const auditLogUrl = submission.audit_log_url || '';
     const signerIp = submitter?.ip || '';
 
+    if (alreadySigned) {
+      // Déjà signé : juste rafraîchir l'URL du document si elle a changé
+      if (signedDocumentUrl) {
+        await admin
+          .from('quote_sends')
+          .update({
+            docuseal_signed_document_url: signedDocumentUrl,
+            docuseal_audit_log_url: auditLogUrl || undefined,
+          })
+          .eq('id', send.id);
+      }
+      return NextResponse.json({ ok: true, already_signed: true, document_url: signedDocumentUrl });
+    }
+
     // Appeler la RPC pour mettre a jour
     const { error: rpcError } = await admin.rpc('sign_quote_docuseal', {
       p_docuseal_submission_id: submission_id,
@@ -79,7 +93,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: rpcError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, synced: true });
+    return NextResponse.json({ ok: true, synced: true, document_url: signedDocumentUrl });
   } catch (err) {
     console.error('DocuSeal sync error:', err);
     const message = err instanceof Error ? err.message : 'Erreur interne';
