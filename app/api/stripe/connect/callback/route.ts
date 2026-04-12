@@ -8,7 +8,8 @@ const COOKIE_NAME = 'hellobat_stripe_uid';
 
 export async function GET(request: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
-  const redirectUrl = new URL('/paiements', siteUrl);
+  const returnTo = request.nextUrl.searchParams.get('return_to') || '/paiements';
+  const redirectUrl = new URL(returnTo, siteUrl);
 
   const userId = request.cookies.get(COOKIE_NAME)?.value;
   if (!userId) {

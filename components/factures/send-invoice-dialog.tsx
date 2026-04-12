@@ -49,6 +49,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const [enableStripePayment, setEnableStripePayment] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [connectFeePercent, setConnectFeePercent] = useState(0.5);
+  const [showStripePrompt, setShowStripePrompt] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,38 +294,83 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               </select>
             </div>
 
-            {stripeConnected && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between rounded-xl border border-border p-3">
-                  <div className="flex items-center gap-2.5">
-                    <CreditCard className="h-4 w-4 text-[#d35400]" />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                <div className="flex items-center gap-2.5">
+                  <CreditCard className="h-4 w-4 text-[#d35400]" />
+                  <div>
+                    <p className="text-sm font-medium">Paiement en ligne</p>
+                    <p className="text-xs text-muted-foreground">Le client pourra payer par carte, Apple Pay ou Google Pay</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={enableStripePayment}
+                  onCheckedChange={(checked) => {
+                    if (checked && !stripeConnected) {
+                      setShowStripePrompt(true);
+                    } else {
+                      setEnableStripePayment(checked);
+                    }
+                  }}
+                />
+              </div>
+              {enableStripePayment && stripeConnected && (
+                <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3">
+                  <p className="text-xs text-amber-800 font-medium mb-1">Frais de paiement en ligne</p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    Commission Hellobat : {connectFeePercent}% · Frais Stripe : ~1,5% + 0,25 €
+                  </p>
+                  <p className="text-[11px] text-amber-700 mt-1">
+                    Estimation sur 500 € :{' '}
+                    <span className="font-semibold">
+                      {(500 * connectFeePercent / 100 + 500 * 0.015 + 0.25).toFixed(2)} € de frais
+                    </span>
+                    {' '}→ vous recevez{' '}
+                    <span className="font-semibold">
+                      {(500 - 500 * connectFeePercent / 100 - 500 * 0.015 - 0.25).toFixed(2)} €
+                    </span>
+                  </p>
+                </div>
+              )}
+              {showStripePrompt && !stripeConnected && (
+                <div className="rounded-xl border border-[#d35400]/30 bg-orange-50/70 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-9 w-9 rounded-full bg-[#d35400]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <CreditCard className="h-4 w-4 text-[#d35400]" />
+                    </div>
                     <div>
-                      <p className="text-sm font-medium">Paiement en ligne</p>
-                      <p className="text-xs text-muted-foreground">Le client pourra payer par carte, Apple Pay ou Google Pay</p>
+                      <p className="text-sm font-semibold text-[#d35400]">Activez le paiement en ligne</p>
+                      <p className="text-xs text-[#a04000] mt-1 leading-relaxed">
+                        Recevez vos paiements en quelques secondes. Vos clients pourront payer par carte bancaire, Apple Pay ou Google Pay directement depuis leur facture.
+                      </p>
                     </div>
                   </div>
-                  <Switch checked={enableStripePayment} onCheckedChange={setEnableStripePayment} />
-                </div>
-                {enableStripePayment && (
-                  <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3">
-                    <p className="text-xs text-amber-800 font-medium mb-1">Frais de paiement en ligne</p>
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
-                      Commission Hellobat : {connectFeePercent}% · Frais Stripe : ~1,5% + 0,25 €
-                    </p>
-                    <p className="text-[11px] text-amber-700 mt-1">
-                      Estimation sur 500 € :{' '}
-                      <span className="font-semibold">
-                        {(500 * connectFeePercent / 100 + 500 * 0.015 + 0.25).toFixed(2)} € de frais
-                      </span>
-                      {' '}→ vous recevez{' '}
-                      <span className="font-semibold">
-                        {(500 - 500 * connectFeePercent / 100 - 500 * 0.015 - 0.25).toFixed(2)} €
-                      </span>
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 bg-[#d35400] hover:bg-[#b84800] text-white"
+                      onClick={async () => {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (session?.access_token) {
+                          window.location.href = `/api/stripe/connect?token=${session.access_token}&return_to=/factures`;
+                        }
+                      }}
+                    >
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Connecter Stripe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-muted-foreground"
+                      onClick={() => setShowStripePrompt(false)}
+                    >
+                      Plus tard
+                    </Button>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Annuler</Button>

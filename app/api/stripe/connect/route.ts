@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   const token = request.nextUrl.searchParams.get('token');
+  const returnTo = request.nextUrl.searchParams.get('return_to') || '/paiements';
   if (!token) {
     errorUrl.searchParams.set('stripe_error', 'Session utilisateur requise');
     return NextResponse.redirect(errorUrl);
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${siteUrl}/api/stripe/connect?token=${token}`,
-      return_url: `${siteUrl}/api/stripe/connect/callback`,
+      return_url: `${siteUrl}/api/stripe/connect/callback?return_to=${encodeURIComponent(returnTo)}`,
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });
