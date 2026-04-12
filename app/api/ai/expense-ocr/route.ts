@@ -196,11 +196,20 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const err = await response.text();
+      console.error(`[expense-ocr] Anthropic ${response.status}:`, err);
       await trackAiUsage({ user_id: user.id, route: 'ai/expense-ocr', status: 'error' });
-      return apiError('AI_FAILED', {
-        cause: err,
-        context: { route: 'ai/expense-ocr', user_id: user.id, status: response.status },
-      });
+
+      // Parse Anthropic error for a user-readable message
+      let detail = '';
+      try {
+        const parsed = JSON.parse(err);
+        detail = parsed?.error?.message || '';
+      } catch { /* not JSON */ }
+
+      return NextResponse.json(
+        { error: detail || `Erreur IA (${response.status}). Réessayez.` },
+        { status: 502 },
+      );
     }
 
     const data = (await response.json()) as {
