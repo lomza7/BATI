@@ -5,6 +5,7 @@ import {
   Plus,
   Search,
   Receipt,
+  Building2,
   TrendingDown,
   TrendingUp,
   Trash2,
@@ -1063,6 +1064,20 @@ export default function ComptabilitePage() {
       .sort((a, b) => b.value - a.value);
   }, [periodExpenses, categories]);
 
+  const supplierData = useMemo(() => {
+    const map: Record<string, { ht: number; count: number }> = {};
+    for (const e of periodExpenses) {
+      const name = (e.supplier || '').trim() || 'Non renseigné';
+      if (!map[name]) map[name] = { ht: 0, count: 0 };
+      map[name].ht += Number(e.amount_ht || 0);
+      map[name].count += 1;
+    }
+    return Object.entries(map)
+      .map(([name, { ht, count }]) => ({ name, value: +ht.toFixed(2), count }))
+      .filter((d) => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [periodExpenses]);
+
   const topCategoryName = categoryData[0]?.name || '—';
   const periodLabel = useMemo(() => getPeriodLabel(dashboardPeriod), [dashboardPeriod]);
   const isFranchise = vatRegime === 'franchise_en_base';
@@ -1762,6 +1777,73 @@ export default function ComptabilitePage() {
               )}
             </Card>
           </div>
+
+          {/* Top fournisseurs */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-[#D35400]" />
+                  Top fournisseurs
+                </h3>
+                <p className="text-[11px] text-muted-foreground">{periodLabel} — par montant HT</p>
+              </div>
+              {supplierData.length > 0 && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {supplierData.length} fournisseur{supplierData.length > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
+            {supplierData.length > 0 ? (
+              <div className="mt-3 space-y-0">
+                {/* Header */}
+                <div className="grid grid-cols-12 gap-2 px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground border-b">
+                  <span className="col-span-1">#</span>
+                  <span className="col-span-5">Fournisseur</span>
+                  <span className="col-span-2 text-right">Dépenses</span>
+                  <span className="col-span-2 text-right">Montant HT</span>
+                  <span className="col-span-2 text-right">% du total</span>
+                </div>
+                {supplierData.slice(0, 10).map((s, i) => {
+                  const totalHt = supplierData.reduce((sum, x) => sum + x.value, 0);
+                  const pct = totalHt > 0 ? ((s.value / totalHt) * 100).toFixed(1) : '0';
+                  return (
+                    <div
+                      key={s.name}
+                      className="grid grid-cols-12 gap-2 items-center px-2 py-2 text-sm rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="col-span-1 text-xs font-bold text-muted-foreground">{i + 1}</span>
+                      <span className="col-span-5 font-medium truncate">{s.name}</span>
+                      <span className="col-span-2 text-right tabular-nums text-muted-foreground">
+                        {s.count}
+                      </span>
+                      <span className="col-span-2 text-right tabular-nums font-semibold">
+                        {fmtEur(s.value)}
+                      </span>
+                      <div className="col-span-2 flex items-center justify-end gap-1.5">
+                        <div className="hidden sm:block h-1.5 w-16 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[#D35400]"
+                            style={{ width: `${Math.min(Number(pct), 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {supplierData.length > 10 && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    + {supplierData.length - 10} autre{supplierData.length - 10 > 1 ? 's' : ''} fournisseur{supplierData.length - 10 > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Aucune dépense sur {periodLabel.toLowerCase()}
+              </p>
+            )}
+          </Card>
         </TabsContent>
 
         {/* ─────── DÉPENSES ─────── */}
