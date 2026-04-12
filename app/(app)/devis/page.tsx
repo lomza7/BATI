@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Search, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Trash2, Mail, RefreshCw, Download, Receipt } from 'lucide-react';
+import { Plus, FileText, Search, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Pencil, Eye, Copy, ExternalLink, Trash2, Mail, RefreshCw, Download, Receipt } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
@@ -503,6 +503,11 @@ export default function DevisPage() {
                               <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                                 <Eye className="mr-2 h-4 w-4" /> Visualiser
                               </DropdownMenuItem>
+                              {(!send || !send.signed_at) && (
+                                <DropdownMenuItem onClick={() => router.push(`/devis/${q.id}/modifier`)}>
+                                  <Pencil className="mr-2 h-4 w-4" /> Modifier
+                                </DropdownMenuItem>
+                              )}
                               {q.status === 'accepte' && (
                                 <DropdownMenuItem onClick={() => router.push(`/factures?billing=${q.id}`)}>
                                   <Receipt className="mr-2 h-4 w-4" /> Facturation
@@ -584,6 +589,11 @@ export default function DevisPage() {
                         <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                           <Eye className="mr-2 h-4 w-4" /> Visualiser
                         </DropdownMenuItem>
+                        {(!send || !send.signed_at) && (
+                          <DropdownMenuItem onClick={() => router.push(`/devis/${q.id}/modifier`)}>
+                            <Pencil className="mr-2 h-4 w-4" /> Modifier
+                          </DropdownMenuItem>
+                        )}
                         {q.status === 'accepte' && (
                           <DropdownMenuItem onClick={() => router.push(`/factures?billing=${q.id}`)}>
                             <Receipt className="mr-2 h-4 w-4" /> Facturation
