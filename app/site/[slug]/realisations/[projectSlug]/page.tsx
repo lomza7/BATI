@@ -8,6 +8,7 @@ import { getSiteUrl } from '@/lib/site-utils';
 import { SiteHeader } from '@/components/site/site-header';
 import { SiteFooter } from '@/components/site/site-footer';
 import { SiteContact } from '@/components/site/site-contact';
+import { SiteWhatsappButton } from '@/components/site/site-whatsapp-button';
 
 export const revalidate = 3600;
 
@@ -559,7 +560,18 @@ export default async function ProjectDetailPage({
         />
       )}
 
-      <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} activity={profile.company_activity || undefined} city={profile.company_city || undefined} />
+      <SiteFooter
+        profile={profile}
+        footer={content.footer}
+        legalText={site.legal_text || undefined}
+        activity={profile.company_activity || undefined}
+        city={profile.company_city || undefined}
+        socialLinks={site.social_links || undefined}
+      />
+
+      {site.whatsapp_phone && (
+        <SiteWhatsappButton phone={site.whatsapp_phone} companyName={profile.company_name} />
+      )}
     </div>
   );
 }

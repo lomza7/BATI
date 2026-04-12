@@ -51,6 +51,13 @@ export interface SiteContent {
   faq?: SiteContentFaq[];
 }
 
+export interface SiteSocialLinks {
+  instagram?: string;
+  tiktok?: string;
+  facebook?: string;
+  linkedin?: string;
+}
+
 export interface ArtisanSite {
   id: string;
   user_id: string;
@@ -69,6 +76,8 @@ export interface ArtisanSite {
   legal_text: string;
   custom_slogan: string;
   public_phone: string;
+  whatsapp_phone: string;
+  social_links: SiteSocialLinks;
   published_at: string | null;
   created_at: string;
   updated_at: string;

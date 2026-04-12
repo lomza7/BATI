@@ -20,6 +20,7 @@ import { SiteFooter } from '@/components/site/site-footer';
 import { SiteJsonLd } from '@/components/site/site-json-ld';
 import { SiteFaq } from '@/components/site/site-faq';
 import { SiteMap } from '@/components/site/site-map';
+import { SiteWhatsappButton } from '@/components/site/site-whatsapp-button';
 
 export const revalidate = 3600; // ISR — revalidate every hour
 
@@ -304,7 +305,18 @@ export default async function SitePage({
         />
       )}
 
-      <SiteFooter profile={profile} footer={content.footer} legalText={site.legal_text || undefined} activity={profile.company_activity || undefined} city={profile.company_city || undefined} />
+      <SiteFooter
+        profile={profile}
+        footer={content.footer}
+        legalText={site.legal_text || undefined}
+        activity={profile.company_activity || undefined}
+        city={profile.company_city || undefined}
+        socialLinks={site.social_links || undefined}
+      />
+
+      {site.whatsapp_phone && (
+        <SiteWhatsappButton phone={site.whatsapp_phone} companyName={profile.company_name} />
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import type {
   SiteProject,
   SiteReview,
   SiteService,
+  SiteSocialLinks,
 } from '@/lib/site-utils';
 import { SiteHeader } from './site-header';
 import { SiteHero } from './site-hero';
@@ -43,6 +44,8 @@ interface SitePreviewModalProps {
   heroImages: string[];
   heroLayout: 'single' | 'grid' | 'carousel';
   publicPhone: string;
+  whatsappPhone: string;
+  socialLinks: SiteSocialLinks;
   legalText: string;
   showServices: boolean;
   showProjects: boolean;
@@ -151,6 +154,8 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
     heroImages,
     heroLayout,
     publicPhone,
+    whatsappPhone,
+    socialLinks,
     legalText,
     showServices,
     showProjects,
@@ -256,6 +261,7 @@ export function SitePreviewModal(props: SitePreviewModalProps) {
             mapProjects={mapProjects}
             reviews={reviews}
             legalText={legalText}
+            socialLinks={socialLinks}
           />
         )}
       </div>
@@ -285,13 +291,14 @@ interface PreviewContentProps {
   mapProjects: { id: string; title: string; city: string | null; lat: number; lng: number }[];
   reviews: SiteReview[];
   legalText: string;
+  socialLinks: SiteSocialLinks;
 }
 
 function SiteContentRenderer({
   theme, siteContent, previewProfile, previewSlug, previewPhone,
   heroImageUrl, heroImages, heroLayout,
   showServices, showProjects, showReviews, showContact, showMap,
-  services, projects, mapProjects, reviews, legalText,
+  services, projects, mapProjects, reviews, legalText, socialLinks,
 }: Omit<PreviewContentProps, 'device'>) {
   return (
     <div
@@ -398,6 +405,7 @@ function SiteContentRenderer({
         legalText={legalText || undefined}
         activity={previewProfile.company_activity || undefined}
         city={previewProfile.company_city || undefined}
+        socialLinks={socialLinks || undefined}
       />
     </div>
   );
