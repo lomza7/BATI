@@ -7,7 +7,9 @@ import {
   Building2,
   Check,
   CreditCard,
+  Download,
   ExternalLink,
+  FileText,
   Gift,
   Handshake,
   Loader2,
@@ -368,6 +370,12 @@ export default function ParametresPage() {
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
+  const [billingInvoices, setBillingInvoices] = useState<Array<{
+    id: string; number: string | null; date: number; period_start: number; period_end: number;
+    amount: number; currency: string; status: string | null; pdf_url: string | null;
+    hosted_url: string | null; description: string;
+  }>>([]);
+  const [billingInvoicesLoaded, setBillingInvoicesLoaded] = useState(false);
   const [pappersRefreshing, setPappersRefreshing] = useState(false);
   const [newLeadSource, setNewLeadSource] = useState<LeadSourceFormState>({
     name: '',
@@ -406,6 +414,13 @@ export default function ParametresPage() {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  // Load billing invoices when switching to abonnement tab
+  useEffect(() => {
+    if (activeTab === 'abonnement' && profile?.stripe_customer_id) {
+      loadBillingInvoices();
+    }
+  }, [activeTab, profile?.stripe_customer_id]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -984,6 +999,22 @@ export default function ParametresPage() {
       setError(portalError instanceof Error ? portalError.message : 'Erreur Stripe');
       setBillingLoading(null);
     }
+  }
+
+  async function loadBillingInvoices() {
+    if (billingInvoicesLoaded) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    try {
+      const res = await fetch('/api/stripe/invoices', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBillingInvoices(data.invoices || []);
+      }
+    } catch { /* ignore */ }
+    setBillingInvoicesLoaded(true);
   }
 
   async function inviteWorkspaceMember() {
@@ -2762,6 +2793,100 @@ export default function ParametresPage() {
               );
             })}
           </div>
+
+          {/* Historique de facturation */}
+          {profile?.stripe_customer_id && (
+            <Card className="rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <FileText className="h-5 w-5" />
+                  Historique de facturation
+                </CardTitle>
+                <CardDescription>
+                  Vos factures et paiements Hellobat.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!billingInvoicesLoaded ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : billingInvoices.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    Aucune facture pour le moment.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto -mx-6">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="px-6 py-2 font-medium">Date</th>
+                          <th className="px-6 py-2 font-medium">Description</th>
+                          <th className="px-6 py-2 font-medium">N° facture</th>
+                          <th className="px-6 py-2 font-medium text-right">Montant</th>
+                          <th className="px-6 py-2 font-medium text-center">Statut</th>
+                          <th className="px-6 py-2 font-medium text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {billingInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-6 py-3 whitespace-nowrap">
+                              {new Date(inv.date * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="px-6 py-3 max-w-[200px] truncate">
+                              {inv.description}
+                            </td>
+                            <td className="px-6 py-3 whitespace-nowrap text-muted-foreground">
+                              {inv.number || '—'}
+                            </td>
+                            <td className="px-6 py-3 text-right font-medium tabular-nums whitespace-nowrap">
+                              {(inv.amount / 100).toLocaleString('fr-FR', { style: 'currency', currency: inv.currency.toUpperCase() })}
+                            </td>
+                            <td className="px-6 py-3 text-center">
+                              {inv.status === 'paid' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                  <Check className="h-3 w-3" /> Payée
+                                </span>
+                              ) : inv.status === 'open' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                  En attente
+                                </span>
+                              ) : inv.status === 'void' ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                                  Annulée
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">{inv.status || '—'}</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {inv.hosted_url && (
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
+                                    <a href={inv.hosted_url} target="_blank" rel="noopener noreferrer" title="Voir la facture">
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                  </Button>
+                                )}
+                                {inv.pdf_url && (
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
+                                    <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer" title="Télécharger le PDF">
+                                      <Download className="h-3.5 w-3.5" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="securite" className="space-y-6">
