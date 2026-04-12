@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Plus, ChevronLeft, ChevronRight, Trash2, Clock,
-  RefreshCw, Unplug, CalendarCheck, Edit2,
+  RefreshCw, Unplug, CalendarCheck, Edit2, Apple, Cloud,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -121,6 +121,14 @@ export default function CalendrierPage() {
   // Google Calendar state
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalPulling, setGcalPulling] = useState(false);
+
+  // iCloud Calendar state
+  const [icloudConnected, setIcloudConnected] = useState(false);
+  const [icloudPulling, setIcloudPulling] = useState(false);
+  const [showIcloudConnect, setShowIcloudConnect] = useState(false);
+  const [icloudForm, setIcloudForm] = useState({ appleId: '', appPassword: '' });
+  const [icloudConnecting, setIcloudConnecting] = useState(false);
+  const [icloudError, setIcloudError] = useState('');
 
   // Event form
   const [showCreate, setShowCreate] = useState(false);
@@ -254,6 +262,91 @@ export default function CalendrierPage() {
     } catch { /* silent */ }
   }
 
+  // ─── iCloud Calendar ────────────────────────────────────────────────
+  useEffect(() => {
+    async function checkIcloud() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch('/api/icloud-calendar/status', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIcloudConnected(data.connected);
+        }
+      } catch { /* silent */ }
+    }
+    checkIcloud();
+  }, []);
+
+  async function connectIcloud() {
+    setIcloudConnecting(true);
+    setIcloudError('');
+    try {
+      const token = await getAccessToken();
+      const res = await fetch('/api/icloud-calendar/connect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appleId: icloudForm.appleId, appPassword: icloudForm.appPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setIcloudError(data.error || 'Erreur de connexion');
+        return;
+      }
+      setIcloudConnected(true);
+      setShowIcloudConnect(false);
+      setIcloudForm({ appleId: '', appPassword: '' });
+      // Auto-pull on first connect
+      pullFromIcloud();
+    } catch {
+      setIcloudError('Impossible de se connecter a iCloud');
+    } finally {
+      setIcloudConnecting(false);
+    }
+  }
+
+  async function syncToIcloud(eventId: string, action: 'create' | 'update' | 'delete') {
+    if (!icloudConnected) return;
+    try {
+      const token = await getAccessToken();
+      const res = await fetch('/api/icloud-calendar/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, action }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('[iCloud sync]', action, err);
+      }
+    } catch (e) { console.error('[iCloud sync error]', e); }
+  }
+
+  async function pullFromIcloud() {
+    setIcloudPulling(true);
+    try {
+      const token = await getAccessToken();
+      const res = await fetch('/api/icloud-calendar/pull', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) await loadData();
+    } catch { /* silent */ }
+    setIcloudPulling(false);
+  }
+
+  async function disconnectIcloud() {
+    try {
+      const token = await getAccessToken();
+      await fetch('/api/icloud-calendar/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setIcloudConnected(false);
+    } catch { /* silent */ }
+  }
+
   // Map calendar category to planning event_type
   function categoryToEventType(cat: string) {
     if (cat === 'visite_chantier') return 'chantier';
@@ -302,6 +395,7 @@ export default function CalendrierPage() {
           client_id: form.clientId,
         }).eq('id', editingEvent.id);
         syncToGoogle(editingEvent.id, 'update');
+        syncToIcloud(editingEvent.id, 'update');
       }
     } else {
       // Create in calendar_events
@@ -317,7 +411,10 @@ export default function CalendrierPage() {
         color: form.color,
         client_id: form.clientId,
       }).select('id');
-      if (inserted?.[0]) syncToGoogle(inserted[0].id, 'create');
+      if (inserted?.[0]) {
+        syncToGoogle(inserted[0].id, 'create');
+        syncToIcloud(inserted[0].id, 'create');
+      }
 
       // Also create in planning_events so it shows on the owner's row
       await supabase.from('planning_events').insert({
@@ -341,6 +438,7 @@ export default function CalendrierPage() {
       await supabase.from('planning_events').delete().eq('id', id);
     } else {
       syncToGoogle(id, 'delete');
+      syncToIcloud(id, 'delete');
       await supabase.from('calendar_events').delete().eq('id', id);
       // Also delete matching planning_event
       await supabase.from('planning_events').delete()
@@ -409,39 +507,71 @@ export default function CalendrierPage() {
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <PageHeader title="Calendrier" description="Votre agenda personnel et Google Calendar">
-        <div className="flex gap-2">
+      <PageHeader title="Calendrier" description="Votre agenda personnel, Google Calendar et iCloud">
+        <div className="flex flex-wrap gap-2">
+          {/* Google Calendar */}
           {gcalConnected ? (
             <>
               <Button variant="outline" size="sm" onClick={pullFromGoogle} disabled={gcalPulling} className="gap-1.5">
                 <RefreshCw className={cn('h-4 w-4', gcalPulling && 'animate-spin')} />
-                <span className="hidden sm:inline">Synchroniser</span>
+                <span className="hidden sm:inline">Google</span>
               </Button>
               <Button variant="ghost" size="sm" onClick={disconnectGcal} className="gap-1.5 text-muted-foreground" title="Déconnecter Google Calendar">
                 <Unplug className="h-4 w-4" />
               </Button>
             </>
           ) : (
-            <Button variant="outline" className="gap-2" onClick={async () => {
+            <Button variant="outline" size="sm" className="gap-2" onClick={async () => {
               const { data: { session } } = await supabase.auth.getSession();
               if (!session?.access_token) return;
               window.location.href = `/api/google-calendar/connect?token=${session.access_token}`;
             }}>
               <CalendarCheck className="h-4 w-4" />
-              Connecter Google Calendar
+              <span className="hidden sm:inline">Google Calendar</span>
+              <span className="sm:hidden">Google</span>
             </Button>
           )}
+
+          {/* iCloud Calendar */}
+          {icloudConnected ? (
+            <>
+              <Button variant="outline" size="sm" onClick={pullFromIcloud} disabled={icloudPulling} className="gap-1.5">
+                <RefreshCw className={cn('h-4 w-4', icloudPulling && 'animate-spin')} />
+                <span className="hidden sm:inline">iCloud</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={disconnectIcloud} className="gap-1.5 text-muted-foreground" title="Déconnecter iCloud Calendar">
+                <Unplug className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowIcloudConnect(true)}>
+              <Cloud className="h-4 w-4" />
+              <span className="hidden sm:inline">iCloud Calendar</span>
+              <span className="sm:hidden">iCloud</span>
+            </Button>
+          )}
+
           <Button onClick={() => { setForm({ title: '', description: '', category: 'rdv_client', startDate: todayStr, endDate: todayStr, startTime: '', endTime: '', color: EVENT_CATEGORIES.rdv_client.color, clientId: null }); setShowCreate(true); }} className="gap-2">
             <Plus className="h-4 w-4" /> Événement
           </Button>
         </div>
       </PageHeader>
 
-      {/* Google Calendar status banner */}
-      {gcalConnected && (
-        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-          <CalendarCheck className="h-3.5 w-3.5" />
-          Google Calendar connecté — vos événements sont synchronisés
+      {/* Calendar status banners */}
+      {(gcalConnected || icloudConnected) && (
+        <div className="flex flex-col gap-1.5">
+          {gcalConnected && (
+            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <CalendarCheck className="h-3.5 w-3.5" />
+              Google Calendar connecté — vos événements sont synchronisés
+            </div>
+          )}
+          {icloudConnected && (
+            <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+              <Cloud className="h-3.5 w-3.5" />
+              iCloud Calendar connecté — vos événements sont synchronisés
+            </div>
+          )}
         </div>
       )}
 
@@ -518,6 +648,7 @@ export default function CalendrierPage() {
                     {dayEvents.map(evt => {
                       const isStart = evt.start_date === ds;
                       const isGoogle = evt.source === 'google_calendar';
+                      const isIcloud = evt.source === 'icloud_calendar';
                       const isPlanning = evt.source === 'planning';
                       return (
                         <div
@@ -540,6 +671,9 @@ export default function CalendrierPage() {
                           <div className="flex items-center gap-1">
                             {isGoogle && (
                               <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-blue-500 text-white text-[7px] font-bold shrink-0">G</span>
+                            )}
+                            {isIcloud && (
+                              <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-purple-500 text-white shrink-0"><Cloud className="h-2 w-2" /></span>
                             )}
                             {isStart && (
                               <span className="truncate">{evt.title}</span>
@@ -602,6 +736,7 @@ export default function CalendrierPage() {
                     <div className="mt-0.5 space-y-0.5">
                       {dayEvents.slice(0, 3).map(evt => {
                         const isGoogle = evt.source === 'google_calendar';
+                        const isIcloud = evt.source === 'icloud_calendar';
                         return (
                           <div
                             key={evt.id}
@@ -615,6 +750,9 @@ export default function CalendrierPage() {
                           >
                             {isGoogle && (
                               <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-blue-500 text-white text-[7px] font-bold mr-0.5 -mt-px">G</span>
+                            )}
+                            {isIcloud && (
+                              <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-purple-500 text-white mr-0.5 -mt-px"><Cloud className="h-1.5 w-1.5" /></span>
                             )}
                             {evt.start_time && <span className="opacity-60">{formatTime(evt.start_time)} </span>}
                             {evt.title}
@@ -652,6 +790,12 @@ export default function CalendrierPage() {
             Google Calendar
           </div>
         )}
+        {icloudConnected && (
+          <div className="flex items-center gap-1.5 border-l border-border pl-3">
+            <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-purple-500 text-white"><Cloud className="h-2 w-2" /></span>
+            iCloud Calendar
+          </div>
+        )}
       </div>
 
       {/* ─── Dialog événement ─── */}
@@ -665,6 +809,12 @@ export default function CalendrierPage() {
                 <span className="inline-flex items-center gap-1 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full ml-2">
                   <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-blue-500 text-white text-[7px] font-bold">G</span>
                   Google
+                </span>
+              )}
+              {editingEvent?.source === 'icloud_calendar' && (
+                <span className="inline-flex items-center gap-1 text-xs font-normal text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full ml-2">
+                  <Cloud className="h-3 w-3" />
+                  iCloud
                 </span>
               )}
             </DialogTitle>
@@ -779,6 +929,74 @@ export default function CalendrierPage() {
                   {editingEvent ? 'Enregistrer' : 'Créer'}
                 </Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog connexion iCloud ─── */}
+      <Dialog open={showIcloudConnect} onOpenChange={(open) => { if (!open) { setShowIcloudConnect(false); setIcloudError(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cloud className="h-4 w-4 text-purple-500" />
+              Connecter iCloud Calendar
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2.5 space-y-2">
+              <p>Pour connecter votre calendrier iCloud, vous devez utiliser un <strong>mot de passe d&apos;application</strong> :</p>
+              <ol className="list-decimal list-inside space-y-1 text-xs">
+                <li>Allez sur <strong>appleid.apple.com</strong></li>
+                <li>Connexion et sécurité &rarr; Mots de passe d&apos;application</li>
+                <li>Cliquez sur <strong>Générer un mot de passe</strong></li>
+                <li>Nommez-le &quot;Hellobat&quot; et copiez le mot de passe</li>
+              </ol>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Identifiant Apple (email)</label>
+              <Input
+                className="mt-1"
+                type="email"
+                placeholder="votre@email.com"
+                value={icloudForm.appleId}
+                onChange={e => setIcloudForm({ ...icloudForm, appleId: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Mot de passe d&apos;application</label>
+              <Input
+                className="mt-1"
+                type="password"
+                placeholder="xxxx-xxxx-xxxx-xxxx"
+                value={icloudForm.appPassword}
+                onChange={e => setIcloudForm({ ...icloudForm, appPassword: e.target.value })}
+              />
+            </div>
+
+            {icloudError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {icloudError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setShowIcloudConnect(false); setIcloudError(''); }}>
+                Annuler
+              </Button>
+              <Button
+                onClick={connectIcloud}
+                disabled={!icloudForm.appleId.trim() || !icloudForm.appPassword.trim() || icloudConnecting}
+                className="gap-2"
+              >
+                {icloudConnecting ? (
+                  <><RefreshCw className="h-4 w-4 animate-spin" /> Connexion...</>
+                ) : (
+                  <><Cloud className="h-4 w-4" /> Connecter</>
+                )}
+              </Button>
             </div>
           </div>
         </DialogContent>

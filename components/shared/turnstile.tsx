@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useImperativeHandle, forwardRef } from 'react';
 
 /*
  * Wrapper React minimaliste autour du widget Cloudflare Turnstile.
@@ -62,6 +62,11 @@ function loadScript(): Promise<void> {
   return scriptPromise;
 }
 
+export interface TurnstileHandle {
+  /** Reinitialise le widget pour obtenir un nouveau token (a appeler apres chaque tentative). */
+  reset: () => void;
+}
+
 interface TurnstileProps {
   /** Callback appele avec le token Cloudflare lorsque le challenge est resolu. */
   onVerify: (token: string) => void;
@@ -71,56 +76,66 @@ interface TurnstileProps {
   theme?: 'light' | 'dark' | 'auto';
 }
 
-export function Turnstile({ onVerify, onError, theme = 'auto' }: TurnstileProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const id = useId();
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(
+  function Turnstile({ onVerify, onError, theme = 'auto' }, ref) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const widgetIdRef = useRef<string | null>(null);
+    const id = useId();
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-  useEffect(() => {
-    // Pas de cle → mode degrade : on debloque immediatement le formulaire.
-    if (!siteKey) {
-      onVerify('');
-      return;
-    }
-
-    let cancelled = false;
-
-    loadScript()
-      .then(() => {
-        if (cancelled || !containerRef.current || !window.turnstile) return;
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          theme,
-          callback: (token: string) => {
-            if (!cancelled) onVerify(token);
-          },
-          'error-callback': () => {
-            if (!cancelled && onError) onError();
-          },
-          'expired-callback': () => {
-            if (!cancelled) onVerify('');
-          },
-        });
-      })
-      .catch(() => {
-        if (!cancelled && onError) onError();
-      });
-
-    return () => {
-      cancelled = true;
-      if (widgetIdRef.current && window.turnstile) {
-        try {
-          window.turnstile.remove(widgetIdRef.current);
-        } catch {
-          // ignore
+    useImperativeHandle(ref, () => ({
+      reset() {
+        if (widgetIdRef.current && window.turnstile) {
+          window.turnstile.reset(widgetIdRef.current);
         }
-        widgetIdRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteKey, theme]);
+      },
+    }));
 
-  if (!siteKey) return null;
-  return <div ref={containerRef} id={`turnstile-${id}`} />;
-}
+    useEffect(() => {
+      // Pas de cle → mode degrade : on debloque immediatement le formulaire.
+      if (!siteKey) {
+        onVerify('');
+        return;
+      }
+
+      let cancelled = false;
+
+      loadScript()
+        .then(() => {
+          if (cancelled || !containerRef.current || !window.turnstile) return;
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: siteKey,
+            theme,
+            callback: (token: string) => {
+              if (!cancelled) onVerify(token);
+            },
+            'error-callback': () => {
+              if (!cancelled && onError) onError();
+            },
+            'expired-callback': () => {
+              if (!cancelled) onVerify('');
+            },
+          });
+        })
+        .catch(() => {
+          if (!cancelled && onError) onError();
+        });
+
+      return () => {
+        cancelled = true;
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(widgetIdRef.current);
+          } catch {
+            // ignore
+          }
+          widgetIdRef.current = null;
+        }
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [siteKey, theme]);
+
+    if (!siteKey) return null;
+    return <div ref={containerRef} id={`turnstile-${id}`} />;
+  },
+);

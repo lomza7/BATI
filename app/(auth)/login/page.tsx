@@ -1,11 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Eye, EyeOff, ArrowRight, ArrowLeft, Zap, RefreshCw, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { Turnstile } from '@/components/shared/turnstile';
+import { Turnstile, type TurnstileHandle } from '@/components/shared/turnstile';
 
 export default function LoginPage() {
   return (
@@ -26,6 +26,7 @@ function LoginContent() {
   const [magicLinkSending, setMagicLinkSending] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
   const teamInvite = searchParams.get('team') === '1';
   const invitedEmail = searchParams.get('email') || '';
 
@@ -53,6 +54,8 @@ function LoginContent() {
     });
 
     if (signInError) {
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
       setError(
         signInError.message === 'Invalid login credentials'
           ? 'Email ou mot de passe incorrect'
@@ -63,6 +66,8 @@ function LoginContent() {
     }
 
     if (!data.session) {
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
       setError('Connexion réussie, mais la session n\'a pas pu être ouverte. Réessayez.');
       setLoading(false);
       return;
@@ -71,6 +76,8 @@ function LoginContent() {
     const { data: sessionState } = await supabase.auth.getSession();
 
     if (!sessionState.session) {
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
       setError('La session utilisateur n\'est pas encore disponible. Réessayez.');
       setLoading(false);
       return;
@@ -96,6 +103,8 @@ function LoginContent() {
     setMagicLinkSending(false);
 
     if (mlError) {
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
       setError(mlError.message);
       return;
     }
@@ -222,7 +231,7 @@ function LoginContent() {
               </div>
             </div>
 
-            <Turnstile onVerify={(token) => setCaptchaToken(token)} />
+            <Turnstile ref={turnstileRef} onVerify={(token) => setCaptchaToken(token)} />
 
             <button
               type="submit"

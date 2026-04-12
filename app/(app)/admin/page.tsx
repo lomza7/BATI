@@ -8,7 +8,7 @@ import {
   UserCheck, UserX, Clock, CalendarDays, BarChart3,
   Save, Check, AlertCircle, ExternalLink, Loader2, Globe,
   Brain, Ban, ShieldCheck, Wand2, Eye, EyeOff, Gift, Mail, Sparkles,
-  Trash2, AlertTriangle, X,
+  Trash2, AlertTriangle, X, Ticket, Plus, Percent, Copy, CheckCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -205,6 +205,37 @@ export default function AdminPage() {
     months_earned: number;
   }>>([]);
   const [referralLoading, setReferralLoading] = useState(false);
+
+  // Codes promo
+  const [promoCodes, setPromoCodes] = useState<Array<{
+    id: string;
+    code: string;
+    active: boolean;
+    percent_off: number | null;
+    amount_off: number | null;
+    currency: string | null;
+    duration: string | null;
+    duration_in_months: number | null;
+    max_redemptions: number | null;
+    times_redeemed: number;
+    expires_at: string | null;
+    created: string;
+  }>>([]);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoCreating, setPromoCreating] = useState(false);
+  const [showPromoForm, setShowPromoForm] = useState(false);
+  const [promoForm, setPromoForm] = useState({
+    code: '',
+    discount_type: 'percent' as 'percent' | 'amount',
+    percent_off: '20',
+    amount_off: '10',
+    duration: 'once' as 'once' | 'repeating' | 'forever',
+    duration_in_months: '3',
+    max_redemptions: '',
+    expires_at: '',
+  });
+  const [promoError, setPromoError] = useState('');
+  const [promoCopied, setPromoCopied] = useState<string | null>(null);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
 
@@ -430,6 +461,93 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadPromoCodes = useCallback(async () => {
+    setPromoLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/admin/promo-codes', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPromoCodes(data.codes || []);
+      }
+    } catch {
+      // silent
+    } finally {
+      setPromoLoading(false);
+    }
+  }, []);
+
+  async function createPromoCode() {
+    setPromoCreating(true);
+    setPromoError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Session expiree');
+
+      const body: Record<string, unknown> = {
+        code: promoForm.code.trim(),
+        duration: promoForm.duration,
+      };
+      if (promoForm.discount_type === 'percent') {
+        body.percent_off = Number(promoForm.percent_off);
+      } else {
+        body.amount_off = Number(promoForm.amount_off);
+      }
+      if (promoForm.duration === 'repeating' && promoForm.duration_in_months) {
+        body.duration_in_months = Number(promoForm.duration_in_months);
+      }
+      if (promoForm.max_redemptions) {
+        body.max_redemptions = Number(promoForm.max_redemptions);
+      }
+      if (promoForm.expires_at) {
+        body.expires_at = promoForm.expires_at;
+      }
+
+      const res = await fetch('/api/admin/promo-codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+
+      setShowPromoForm(false);
+      setPromoForm({
+        code: '', discount_type: 'percent', percent_off: '20', amount_off: '10',
+        duration: 'once', duration_in_months: '3', max_redemptions: '', expires_at: '',
+      });
+      await loadPromoCodes();
+    } catch (e) {
+      setPromoError(e instanceof Error ? e.message : 'Erreur inconnue');
+    } finally {
+      setPromoCreating(false);
+    }
+  }
+
+  async function deactivatePromoCode(id: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      await fetch('/api/admin/promo-codes', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ id }),
+      });
+      setPromoCodes(prev => prev.map(c => c.id === id ? { ...c, active: false } : c));
+    } catch {
+      // silent
+    }
+  }
+
   async function toggleBlockUser(userId: string, currentlyBlocked: boolean) {
     setBlockingUser(userId);
     try {
@@ -533,7 +651,8 @@ export default function AdminPage() {
     loadAiUsage();
     loadImageSecrets();
     loadReferrals();
-  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage, loadImageSecrets, loadReferrals]);
+    loadPromoCodes();
+  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage, loadImageSecrets, loadReferrals, loadPromoCodes]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -1352,6 +1471,242 @@ export default function AdminPage() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Codes promo */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-primary" /> Codes promo
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Créez des codes de réduction pour vos amis et partenaires. Les codes sont utilisables au moment du paiement.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={loadPromoCodes} disabled={promoLoading} className="gap-1.5">
+                  <RefreshCw className={cn('h-3.5 w-3.5', promoLoading && 'animate-spin')} />
+                </Button>
+                <Button size="sm" onClick={() => setShowPromoForm(true)} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> Créer
+                </Button>
+              </div>
+            </div>
+
+            {/* Formulaire de création */}
+            {showPromoForm && (
+              <div className="p-4 sm:p-5 border-b border-border bg-muted/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Code</label>
+                    <Input
+                      value={promoForm.code}
+                      onChange={e => setPromoForm(prev => ({ ...prev, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                      placeholder="AMIS20"
+                      className="uppercase font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Type de réduction</label>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={promoForm.discount_type === 'percent' ? 'default' : 'outline'}
+                        onClick={() => setPromoForm(prev => ({ ...prev, discount_type: 'percent' }))}
+                        className="gap-1"
+                      >
+                        <Percent className="h-3 w-3" /> Pourcentage
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={promoForm.discount_type === 'amount' ? 'default' : 'outline'}
+                        onClick={() => setPromoForm(prev => ({ ...prev, discount_type: 'amount' }))}
+                        className="gap-1"
+                      >
+                        EUR Montant
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {promoForm.discount_type === 'percent' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Réduction (%)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={promoForm.percent_off}
+                        onChange={e => setPromoForm(prev => ({ ...prev, percent_off: e.target.value }))}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Montant (EUR)</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={promoForm.amount_off}
+                        onChange={e => setPromoForm(prev => ({ ...prev, amount_off: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Durée</label>
+                    <select
+                      className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm"
+                      value={promoForm.duration}
+                      onChange={e => setPromoForm(prev => ({ ...prev, duration: e.target.value as 'once' | 'repeating' | 'forever' }))}
+                    >
+                      <option value="once">1er mois seulement</option>
+                      <option value="repeating">Plusieurs mois</option>
+                      <option value="forever">Pour toujours</option>
+                    </select>
+                  </div>
+                  {promoForm.duration === 'repeating' && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Nombre de mois</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={36}
+                        value={promoForm.duration_in_months}
+                        onChange={e => setPromoForm(prev => ({ ...prev, duration_in_months: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Utilisations max (vide = illimité)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={promoForm.max_redemptions}
+                      onChange={e => setPromoForm(prev => ({ ...prev, max_redemptions: e.target.value }))}
+                      placeholder="Illimité"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">Date d&apos;expiration (optionnel)</label>
+                    <Input
+                      type="date"
+                      value={promoForm.expires_at}
+                      onChange={e => setPromoForm(prev => ({ ...prev, expires_at: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                {promoError && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 flex items-start gap-2">
+                    <AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-destructive">{promoError}</p>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 justify-end">
+                  <Button size="sm" variant="outline" onClick={() => { setShowPromoForm(false); setPromoError(''); }}>
+                    Annuler
+                  </Button>
+                  <Button size="sm" onClick={createPromoCode} disabled={promoCreating || !promoForm.code.trim()} className="gap-1.5">
+                    {promoCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Créer le code
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Liste des codes */}
+            {promoCodes.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                {promoLoading ? 'Chargement…' : 'Aucun code promo pour le moment'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Code</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Réduction</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Durée</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Utilisations</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Expiration</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs">Statut</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promoCodes.map(pc => {
+                      const discount = pc.percent_off
+                        ? `${pc.percent_off}%`
+                        : pc.amount_off
+                          ? `${(pc.amount_off / 100).toFixed(0)} EUR`
+                          : '—';
+                      const durationLabel = pc.duration === 'once'
+                        ? '1er mois'
+                        : pc.duration === 'forever'
+                          ? 'Pour toujours'
+                          : `${pc.duration_in_months} mois`;
+                      const isExpired = pc.expires_at && new Date(pc.expires_at) < new Date();
+                      return (
+                        <tr key={pc.id} className="border-b border-border hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-semibold text-foreground">{pc.code}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(pc.code);
+                                  setPromoCopied(pc.id);
+                                  setTimeout(() => setPromoCopied(null), 2000);
+                                }}
+                                className="text-muted-foreground hover:text-foreground"
+                                title="Copier le code"
+                              >
+                                {promoCopied === pc.id ? (
+                                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-foreground">{discount}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{durationLabel}</td>
+                          <td className="px-4 py-3 text-right text-xs text-foreground">
+                            {pc.times_redeemed}{pc.max_redemptions ? ` / ${pc.max_redemptions}` : ''}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                            {pc.expires_at ? new Date(pc.expires_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={cn(
+                              'text-[11px] px-2 py-0.5 rounded-full font-medium',
+                              !pc.active || isExpired
+                                ? 'bg-slate-100 text-slate-500'
+                                : 'bg-emerald-100 text-emerald-700'
+                            )}>
+                              {!pc.active ? 'Désactivé' : isExpired ? 'Expiré' : 'Actif'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {pc.active && !isExpired && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deactivatePromoCode(pc.id)}
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                              >
+                                Désactiver
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

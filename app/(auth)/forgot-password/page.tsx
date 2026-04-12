@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Mail, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { Turnstile } from '@/components/shared/turnstile';
+import { Turnstile, type TurnstileHandle } from '@/components/shared/turnstile';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +12,7 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -110,7 +111,7 @@ export default function ForgotPasswordPage() {
                 className="flex h-11 w-full rounded-lg border border-border bg-white px-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
 
-              <Turnstile onVerify={(token) => setCaptchaToken(token)} />
+              <Turnstile ref={turnstileRef} onVerify={(token) => setCaptchaToken(token)} />
 
               <button
                 type="submit"

@@ -1,11 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Eye, EyeOff, ArrowRight, Check, Gift } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { Turnstile } from '@/components/shared/turnstile';
+import { Turnstile, type TurnstileHandle } from '@/components/shared/turnstile';
 
 const benefits = [
   'Devis et factures en quelques clics',
@@ -31,6 +31,7 @@ function SignupContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
   const teamInvite = searchParams.get('team') === '1';
   const invitedEmail = searchParams.get('email') || '';
   const referralCode = searchParams.get('ref') || '';
@@ -87,6 +88,8 @@ function SignupContent() {
         router.push('/verify-email');
         return;
       }
+      setCaptchaToken(null);
+      turnstileRef.current?.reset();
       setError(signUpError.message);
       setLoading(false);
       return;
@@ -236,7 +239,7 @@ function SignupContent() {
               )}
             </div>
 
-            <Turnstile onVerify={(token) => setCaptchaToken(token)} />
+            <Turnstile ref={turnstileRef} onVerify={(token) => setCaptchaToken(token)} />
 
             <button
               type="submit"
