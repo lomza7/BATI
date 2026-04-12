@@ -42,13 +42,14 @@ export async function POST(request: Request) {
     });
 
     const body = await request.json();
-    const { invoice_id, client_name, client_email, expires_in_days, excluded_attachment_ids, reminders_enabled } = body as {
+    const { invoice_id, client_name, client_email, expires_in_days, excluded_attachment_ids, reminders_enabled, enable_stripe_payment } = body as {
       invoice_id: string;
       client_name: string;
       client_email?: string;
       expires_in_days: number;
       excluded_attachment_ids?: string[];
       reminders_enabled?: boolean;
+      enable_stripe_payment?: boolean;
     };
 
     if (!invoice_id || !client_name?.trim()) {
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
       client_email: client_email?.trim() || null,
       token,
       expires_at: expiresAt.toISOString(),
+      enable_stripe_payment: Boolean(enable_stripe_payment),
     });
 
     if (insertError) {

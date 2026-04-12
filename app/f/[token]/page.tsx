@@ -33,6 +33,7 @@ interface SendData {
   expires_at: string;
   viewed_at: string | null;
   paid_at: string | null;
+  enable_stripe_payment: boolean;
 }
 
 interface InvoiceData {
@@ -162,6 +163,7 @@ export default function PublicInvoicePage() {
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [bankAccount, setBankAccount] = useState<BankAccountData | null>(null);
   const [stripeAvailable, setStripeAvailable] = useState(false);
+  const [stripeEnabledForSend, setStripeEnabledForSend] = useState(false);
   const [paying, setPaying] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
@@ -174,7 +176,7 @@ export default function PublicInvoicePage() {
     // 1. Fetch send by token
     const { data: send, error: sendError } = await anonClient
       .from('invoice_sends')
-      .select('id, invoice_id, user_id, client_name, expires_at, viewed_at, paid_at')
+      .select('id, invoice_id, user_id, client_name, expires_at, viewed_at, paid_at, enable_stripe_payment')
       .eq('token', token)
       .maybeSingle();
 
@@ -198,6 +200,7 @@ export default function PublicInvoicePage() {
     }
 
     setSendData(send);
+    setStripeEnabledForSend(Boolean(send.enable_stripe_payment));
 
     if (send.paid_at) {
       setIsPaid(true);
@@ -716,7 +719,7 @@ export default function PublicInvoicePage() {
           )}
 
           {/* Payment section */}
-          {!isPaid && stripeAvailable && payableAmount > 0 && (
+          {!isPaid && stripeAvailable && stripeEnabledForSend && payableAmount > 0 && (
             <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
               <div className="flex items-center gap-2 mb-4">
                 <CreditCard className="h-4 w-4 text-[#6b6560]" />

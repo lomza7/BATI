@@ -46,11 +46,14 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const [attachments, setAttachments] = useState<CompanyAttachmentRow[]>([]);
   const [excludedAttachmentIds, setExcludedAttachmentIds] = useState<Set<string>>(new Set());
   const [remindersEnabled, setRemindersEnabled] = useState(false);
+  const [enableStripePayment, setEnableStripePayment] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [connectFeePercent, setConnectFeePercent] = useState(0.5);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [attRes, remRes] = await Promise.all([
+      const [attRes, remRes, stripeRes, configRes] = await Promise.all([
         supabase
           .from('company_attachments')
           .select('id, name, size_bytes')
@@ -61,10 +64,23 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
           .from('payment_reminder_settings')
           .select('reminders_enabled')
           .maybeSingle(),
+        supabase
+          .from('stripe_connections')
+          .select('charges_enabled')
+          .maybeSingle(),
+        supabase
+          .from('platform_config')
+          .select('value')
+          .eq('key', 'stripe_connect_fee_percent')
+          .maybeSingle(),
       ]);
       if (!cancelled) {
         setAttachments((attRes.data as CompanyAttachmentRow[]) || []);
         setRemindersEnabled(remRes.data?.reminders_enabled ?? false);
+        const connected = Boolean(stripeRes.data?.charges_enabled);
+        setStripeConnected(connected);
+        setEnableStripePayment(connected);
+        setConnectFeePercent(parseFloat(configRes.data?.value || '0.5'));
       }
     })();
     return () => { cancelled = true; };
@@ -105,6 +121,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
           expires_in_days: parseInt(expiresIn),
           excluded_attachment_ids: Array.from(excludedAttachmentIds),
           reminders_enabled: remindersEnabled,
+          enable_stripe_payment: enableStripePayment,
         }),
       });
 
@@ -276,14 +293,38 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               </select>
             </div>
 
-            <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
-              <div className="flex items-start gap-2">
-                <CreditCard className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-blue-700">
-                  Si votre compte Stripe est connecté, le client pourra payer directement en ligne depuis le lien de la facture.
-                </p>
+            {stripeConnected && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                  <div className="flex items-center gap-2.5">
+                    <CreditCard className="h-4 w-4 text-[#d35400]" />
+                    <div>
+                      <p className="text-sm font-medium">Paiement en ligne</p>
+                      <p className="text-xs text-muted-foreground">Le client pourra payer par carte, Apple Pay ou Google Pay</p>
+                    </div>
+                  </div>
+                  <Switch checked={enableStripePayment} onCheckedChange={setEnableStripePayment} />
+                </div>
+                {enableStripePayment && (
+                  <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3">
+                    <p className="text-xs text-amber-800 font-medium mb-1">Frais de paiement en ligne</p>
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                      Commission Hellobat : {connectFeePercent}% · Frais Stripe : ~1,5% + 0,25 €
+                    </p>
+                    <p className="text-[11px] text-amber-700 mt-1">
+                      Estimation sur 500 € :{' '}
+                      <span className="font-semibold">
+                        {(500 * connectFeePercent / 100 + 500 * 0.015 + 0.25).toFixed(2)} € de frais
+                      </span>
+                      {' '}→ vous recevez{' '}
+                      <span className="font-semibold">
+                        {(500 - 500 * connectFeePercent / 100 - 500 * 0.015 - 0.25).toFixed(2)} €
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Annuler</Button>
