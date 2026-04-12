@@ -96,6 +96,7 @@ export const CONTACT_TYPES = {
   client: { label: 'Client', color: 'bg-blue-50 text-blue-700' },
   prospect: { label: 'Prospect', color: 'bg-amber-50 text-amber-700' },
   prestataire: { label: 'Prestataire', color: 'bg-purple-50 text-purple-700' },
+  fournisseur: { label: 'Fournisseur', color: 'bg-orange-50 text-orange-700' },
 } as const;
 
 export const MEMBER_TYPES = {

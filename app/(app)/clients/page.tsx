@@ -187,7 +187,7 @@ export default function ClientsPage() {
                 onClick={() => setTypeFilter(key)}
                 className="gap-1.5"
               >
-                <span className={cn('h-2 w-2 rounded-full', val.color.split(' ')[0].replace('bg-', 'bg-'))} style={{ backgroundColor: key === 'client' ? '#3b82f6' : key === 'prospect' ? '#f59e0b' : '#a855f7' }} />
+                <span className={cn('h-2 w-2 rounded-full')} style={{ backgroundColor: key === 'client' ? '#3b82f6' : key === 'prospect' ? '#f59e0b' : key === 'fournisseur' ? '#f97316' : '#a855f7' }} />
                 {val.label} ({count})
               </Button>
             );

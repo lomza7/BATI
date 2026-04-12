@@ -673,6 +673,29 @@ export default function ComptabilitePage() {
       toast({ title: 'Erreur lors de l\'import', variant: 'destructive' });
     } else {
       toast({ title: 'Dépense importée' });
+      // Auto-create supplier as fournisseur contact if not existing
+      const supplierName = ocrReviewData.supplier.trim();
+      if (supplierName) {
+        const { data: existing } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('contact_type', 'fournisseur')
+          .ilike('name', supplierName)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (!existing) {
+          await supabase.from('clients').insert({
+            name: supplierName,
+            contact_type: 'fournisseur',
+            email: '',
+            phone: '',
+            address: '',
+            city: '',
+            postal_code: '',
+            notes: '',
+          });
+        }
+      }
     }
     await loadAll();
   }

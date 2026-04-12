@@ -15,8 +15,8 @@ interface Props {
 
 /**
  * Autocomplete for supplier names.
- * Sources: unique supplier names from expenses + client names from clients table.
- * The user can also type a new name freely.
+ * Sources: contacts with contact_type = 'fournisseur'.
+ * When the user picks a new name, it is auto-created as a fournisseur contact.
  */
 export function SupplierPicker({ value, onChange, className, placeholder = 'Leroy Merlin' }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -25,49 +25,28 @@ export function SupplierPicker({ value, onChange, className, placeholder = 'Lero
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load all unique supplier names once
+  // Load supplier names from contacts (fournisseur type only)
   useEffect(() => {
     async function load() {
-      // Get unique suppliers from expenses
-      const { data: expenses } = await supabase
-        .from('expenses')
-        .select('supplier')
-        .neq('supplier', '')
-        .order('supplier');
-
-      const expenseNames = new Set<string>();
-      (expenses || []).forEach((e) => {
-        const name = (e.supplier || '').trim();
-        if (name) expenseNames.add(name);
-      });
-
-      // Get client names (all contact types)
       const { data: clients } = await supabase
         .from('clients')
         .select('name')
+        .eq('contact_type', 'fournisseur')
         .is('deleted_at', null)
         .order('name');
 
-      const clientNames = new Set<string>();
+      const names: string[] = [];
+      const seen = new Set<string>();
       (clients || []).forEach((c) => {
         const name = (c.name || '').trim();
-        if (name) clientNames.add(name);
-      });
-
-      // Merge and deduplicate (case-insensitive)
-      const seen = new Set<string>();
-      const all: string[] = [];
-      const merged = Array.from(expenseNames).concat(Array.from(clientNames));
-      for (let i = 0; i < merged.length; i++) {
-        const name = merged[i];
         const key = name.toLowerCase();
-        if (!seen.has(key)) {
+        if (name && !seen.has(key)) {
           seen.add(key);
-          all.push(name);
+          names.push(name);
         }
-      }
-      all.sort((a, b) => a.localeCompare(b, 'fr'));
-      setSuggestions(all);
+      });
+      names.sort((a, b) => a.localeCompare(b, 'fr'));
+      setSuggestions(names);
     }
     load();
   }, []);
@@ -87,6 +66,35 @@ export function SupplierPicker({ value, onChange, className, placeholder = 'Lero
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  async function createSupplierContact(name: string) {
+    const { data: existing } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('contact_type', 'fournisseur')
+      .ilike('name', name)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from('clients').insert({
+        name,
+        contact_type: 'fournisseur',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        postal_code: '',
+        notes: '',
+      });
+      // Update suggestions list
+      setSuggestions((prev) => {
+        const next = [...prev, name];
+        next.sort((a, b) => a.localeCompare(b, 'fr'));
+        return next;
+      });
+    }
+  }
 
   const filtered = search.trim()
     ? suggestions.filter((s) => s.toLowerCase().includes(search.toLowerCase()))
@@ -120,12 +128,14 @@ export function SupplierPicker({ value, onChange, className, placeholder = 'Lero
               className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 text-[#D35400] font-medium"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
-                onChange(search.trim());
+                const name = search.trim();
+                onChange(name);
                 setOpen(false);
+                createSupplierContact(name);
               }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Nouveau : {search.trim()}
+              Nouveau fournisseur : {search.trim()}
             </button>
           )}
           {filtered.slice(0, 20).map((name) => (
