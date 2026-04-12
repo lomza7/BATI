@@ -2677,12 +2677,12 @@ export default function ParametresPage() {
                   )}
                 </div>
 
-                {profile?.plan !== 'starter' ? (
+                {profile?.plan !== 'starter' && profile?.stripe_customer_id ? (
                   <div className="flex flex-wrap gap-3">
                     <Button
                       variant="outline"
                       onClick={openBillingPortal}
-                      disabled={billingLoading === 'portal' || !profile?.stripe_customer_id}
+                      disabled={billingLoading === 'portal'}
                     >
                       {billingLoading === 'portal' ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2692,22 +2692,12 @@ export default function ParametresPage() {
                       Gérer ou résilier dans Stripe
                     </Button>
                   </div>
-                ) : (
+                ) : profile?.plan === 'starter' ? (
                   <p className="text-sm text-muted-foreground">
                     Vous pouvez passer à un plan payant quand vous voulez.
                   </p>
-                )}
+                ) : null}
               </div>
-
-              {profile?.plan !== 'starter' && !profile?.stripe_customer_id && (
-                <Alert>
-                  <CreditCard className="h-4 w-4" />
-                  <AlertTitle>Gestion automatique bientôt disponible</AlertTitle>
-                  <AlertDescription>
-                    Votre plan est actif, mais nous n&apos;avons pas encore de client Stripe relié à ce compte. Le portail de gestion sera disponible dès que la liaison Stripe sera terminée.
-                  </AlertDescription>
-                </Alert>
-              )}
             </CardContent>
           </Card>
 
