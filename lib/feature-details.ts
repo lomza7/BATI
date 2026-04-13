@@ -467,6 +467,38 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
     plan: 'pro',
   },
   {
+    slug: 'hellopay',
+    title: 'HelloPay',
+    subtitle: 'Encaissez vos clients sur place, en 10 secondes',
+    heroDescription: 'Fini les virements qui n\'arrivent jamais et les cheques qui trainent. Avec HelloPay, vous encaissez votre client directement depuis votre telephone : il scanne un QR code, paie en 2 clics, et l\'argent tombe sur votre compte. La facture est generee automatiquement.',
+    sections: [
+      {
+        title: 'Comment ca marche ?',
+        content: 'Depuis votre telephone, ouvrez HelloPay et renseignez le montant, le client et l\'objet du paiement. Appuyez sur "Encaisser" et choisissez le mode : QR Code ou carte bancaire. En mode QR Code, montrez simplement l\'ecran a votre client — il scanne avec son telephone, arrive sur une page de paiement securisee, et paie par carte ou Apple Pay / Google Pay. Vous recevez une notification instantanee et la facture est creee automatiquement.',
+      },
+      {
+        title: 'Le QR Code : le mode prefere des artisans',
+        content: 'Le QR Code est la methode la plus rapide et la plus naturelle. Vous n\'avez pas besoin de manipuler le telephone du client, il utilise le sien. La page de paiement est optimisee pour le mobile : le montant s\'affiche clairement, et le client n\'a qu\'a entrer sa carte ou utiliser Apple Pay. Le paiement tombe en quelques secondes, et votre page HelloPay detecte automatiquement le succes.',
+      },
+      {
+        title: 'Facturation automatique',
+        content: 'Chaque encaissement HelloPay genere automatiquement une facture conforme, numerotee et associee au bon client. Plus besoin de creer la facture apres coup : elle existe deja, avec le bon montant, la bonne TVA, et le statut "payee". Vous gagnez du temps et votre comptabilite est toujours a jour.',
+      },
+      {
+        title: 'Argent direct sur votre compte',
+        content: 'HelloPay utilise Stripe Connect : l\'argent arrive directement sur votre compte bancaire, pas sur un compte intermediaire. La commission plateforme est de seulement 0.5% — bien en dessous des terminaux de paiement classiques. Vous gardez le controle total de vos fonds.',
+      },
+    ],
+    highlights: [
+      'QR Code genere en 1 clic — le client scanne et paie',
+      'Facture creee automatiquement apres paiement',
+      'Argent direct sur votre compte Stripe',
+      'Commission a seulement 0.5%',
+      'Fonctionne sur tout telephone, sans materiel',
+    ],
+    plan: 'pro',
+  },
+  {
     slug: 'paiements-stripe',
     title: 'Paiements Stripe',
     subtitle: 'Acceptez les paiements en ligne',

@@ -24,6 +24,7 @@ import {
   Package,
   PenLine,
   ShieldCheck,
+  Zap,
 } from 'lucide-react';
 
 export interface FeatureCard {
@@ -43,6 +44,14 @@ export const featureCards: FeatureCard[] = [
     special: 'ai',
     sectionId: 'devis',
     slug: 'devis-ia',
+  },
+  {
+    icon: Zap,
+    title: 'HelloPay',
+    desc: 'Encaissez vos clients sur place : QR code, carte bancaire. Le paiement tombe en 10 secondes.',
+    special: 'hellopay',
+    sectionId: 'hellopay',
+    slug: 'hellopay',
   },
   {
     icon: FileText,
@@ -189,6 +198,12 @@ export const featureCards: FeatureCard[] = [
 
 function getCardClasses(special?: string) {
   switch (special) {
+    case 'hellopay':
+      return {
+        card: 'bg-gradient-to-br from-amber-400/15 to-orange-500/10 border-amber-400/30 hover:border-amber-500/50 ring-1 ring-amber-300/20',
+        iconBg: 'bg-gradient-to-br from-amber-400 to-orange-500',
+        iconColor: 'text-white',
+      };
     case 'stripe':
       return {
         card: 'bg-gradient-to-br from-[#635bff]/10 to-[#635bff]/5 border-[#635bff]/20 hover:border-[#635bff]/40',

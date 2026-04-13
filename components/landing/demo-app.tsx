@@ -76,6 +76,7 @@ const navGroups: NavGroup[] = [
       { id: 'factures', label: 'Factures', emoji: '🧾' },
       { id: 'prestations', label: 'Mes prestations', emoji: '🛠️' },
       { id: 'documents', label: 'Mes documents', emoji: '📁' },
+      { id: 'hellopay', label: 'HelloPay', emoji: '⚡' },
     ],
   },
   {
@@ -368,6 +369,8 @@ export function DemoViewContent({ view }: { view: string }) {
       return <RendusView />;
     case 'site-web':
       return <SiteWebView />;
+    case 'hellopay':
+      return <HelloPayView />;
     case 'paiements':
       return <PaiementView />;
     case 'contrats':
@@ -2662,6 +2665,97 @@ function SiteWebView() {
 /* ════════════════════════════════════════════════════════════════════
    20. PAIEMENTS STRIPE
    ════════════════════════════════════════════════════════════════════ */
+
+function HelloPayView() {
+  const recentPayments = [
+    { client: 'M. Dupont', montant: '850 €', date: 'il y a 2 min', mode: 'QR Code', status: 'Payé' },
+    { client: 'Mme Bernard', montant: '1 200 €', date: 'il y a 15 min', mode: 'Carte', status: 'Payé' },
+    { client: 'M. Lefebvre', montant: '320 €', date: 'il y a 1h', mode: 'QR Code', status: 'Payé' },
+  ];
+
+  return (
+    <div>
+      <LandingPageHeader
+        title="HelloPay"
+        description="Encaissez vos clients en 10 secondes"
+      />
+
+      {/* Premium banner */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-400/15 to-orange-500/10 border border-amber-400/30 ring-1 ring-amber-300/20 mb-4">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0">
+          <Zap className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-[var(--landing-text)] flex items-center gap-1.5">
+            HelloPay
+            <Sparkles className="w-3 h-3 text-amber-500" />
+          </div>
+          <div className="text-[10px] text-[var(--landing-muted)]">
+            QR Code + Carte · Commission 0,5% · Argent direct sur votre compte
+          </div>
+        </div>
+        <CheckCircle2 className="w-4 h-4 text-amber-500 shrink-0" />
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+          <div className="text-[10px] text-amber-700 font-medium uppercase tracking-wide">Aujourd&apos;hui</div>
+          <div className="text-base sm:text-lg font-bold text-amber-800 mt-1">2 370 €</div>
+        </div>
+        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+          <div className="text-[10px] text-emerald-700 font-medium uppercase tracking-wide">Ce mois</div>
+          <div className="text-base sm:text-lg font-bold text-emerald-800 mt-1">18 450 €</div>
+        </div>
+        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
+          <div className="text-[10px] text-blue-700 font-medium uppercase tracking-wide">Paiements</div>
+          <div className="text-base sm:text-lg font-bold text-blue-800 mt-1">47</div>
+        </div>
+      </div>
+
+      {/* Quick payment form mockup */}
+      <div className="p-4 rounded-xl border border-[var(--landing-border)] bg-white mb-4">
+        <div className="text-xs font-semibold text-[var(--landing-text)] mb-3">Nouvel encaissement</div>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="p-2.5 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+            <div className="text-[10px] text-[var(--landing-muted)]">Client</div>
+            <div className="text-xs font-medium text-[var(--landing-text)] mt-0.5">M. Dupont</div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+            <div className="text-[10px] text-[var(--landing-muted)]">Montant TTC</div>
+            <div className="text-xs font-medium text-[var(--landing-text)] mt-0.5">850,00 €</div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs font-medium">
+            <ScanLine className="w-3.5 h-3.5" />
+            QR Code
+          </button>
+          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--landing-border)] text-xs font-medium text-[var(--landing-text)]">
+            <CreditCard className="w-3.5 h-3.5" />
+            Carte
+          </button>
+        </div>
+      </div>
+
+      {/* Recent payments */}
+      <div className="space-y-2">
+        {recentPayments.map((p, i) => (
+          <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--landing-border)] bg-white">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-[var(--landing-text)]">{p.client}</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">{p.date} · {p.mode}</div>
+            </div>
+            <div className="text-xs font-bold text-emerald-700">{p.montant}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function PaiementView() {
   const payments = [

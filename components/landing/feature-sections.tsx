@@ -769,6 +769,128 @@ export function PaiementSection() {
   );
 }
 
+export function HelloPaySection() {
+  return (
+    <section id="hellopay" className="py-12 sm:py-24 bg-gradient-to-b from-[var(--landing-off)] to-amber-50/30">
+      <div className="max-w-[1200px] mx-auto px-6">
+        <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-16">
+          <div className="flex-1 space-y-4 sm:space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 text-xs font-semibold border border-amber-200/60">
+              <Sparkles className="w-3 h-3" />
+              HelloPay
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-[var(--landing-text)]">
+              Encaissez sur place,{' '}
+              <em className="italic text-[var(--landing-accent)]">en 10 secondes</em>
+            </h2>
+            <p className="text-[var(--landing-muted)] leading-relaxed">
+              Fini les virements qui n&apos;arrivent jamais et les cheques qui trainent. Avec HelloPay, vous encaissez votre client directement depuis votre telephone : il scanne un QR code, paie en 2 clics, et l&apos;argent tombe sur votre compte. La facture est generee automatiquement.
+            </p>
+            <ul className="space-y-3">
+              {[
+                'QR code genere instantanement — le client scanne et paie',
+                'Paiement carte bancaire, Apple Pay, Google Pay',
+                'Facture creee automatiquement apres le paiement',
+                'Argent directement sur votre compte Stripe',
+                'Commission plateforme a seulement 0.5%',
+              ].map((point) => (
+                <li key={point} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="text-sm text-[var(--landing-text)]">{point}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/fonctionnalites/hellopay"
+              className="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[var(--landing-accent)] to-orange-500 text-white text-sm font-medium hover:from-[#b94800] hover:to-orange-600 transition-all shadow-lg shadow-orange-500/20"
+            >
+              Decouvrir HelloPay <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="flex-1 w-full">
+            {/* Phone mockup */}
+            <div className="mx-auto max-w-[280px]">
+              <div className="rounded-[2rem] border-[3px] border-gray-800 bg-white shadow-2xl overflow-hidden">
+                {/* Phone notch */}
+                <div className="bg-gray-800 h-6 flex items-center justify-center">
+                  <div className="w-16 h-3 bg-gray-900 rounded-full" />
+                </div>
+                {/* Screen content */}
+                <div className="p-4 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">⚡</span>
+                    </div>
+                    <span className="font-bold text-sm">HelloPay</span>
+                    <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[8px] font-semibold text-amber-600 border border-amber-200/60">
+                      ✨ Nouveau
+                    </span>
+                  </div>
+
+                  {/* Form preview */}
+                  <div className="space-y-2">
+                    <div className="rounded-lg bg-gray-50 p-2">
+                      <div className="text-[8px] text-gray-400 mb-0.5">Objet</div>
+                      <div className="text-[10px] font-medium">Renovation salle de bain</div>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-2">
+                      <div className="text-[8px] text-gray-400 mb-0.5">Client</div>
+                      <div className="text-[10px] font-medium">M. Dupont</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex-1 rounded-lg bg-gray-50 p-2">
+                        <div className="text-[8px] text-gray-400 mb-0.5">Montant HT</div>
+                        <div className="text-[10px] font-bold">3 500,00 EUR</div>
+                      </div>
+                      <div className="flex-1 rounded-lg bg-gray-50 p-2">
+                        <div className="text-[8px] text-gray-400 mb-0.5">TVA</div>
+                        <div className="text-[10px] font-medium">10%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total */}
+                  <div className="rounded-lg bg-orange-50 border border-orange-200/50 p-2 flex justify-between items-center">
+                    <span className="text-[9px] text-orange-600">TTC</span>
+                    <span className="text-sm font-bold text-orange-700">3 850,00 EUR</span>
+                  </div>
+
+                  {/* CTA button */}
+                  <div className="rounded-xl bg-gradient-to-r from-[#d35400] to-orange-500 text-white text-center py-2.5 text-xs font-semibold shadow-lg">
+                    ⚡ Encaisser 3 850,00 EUR
+                  </div>
+
+                  {/* QR Code preview */}
+                  <div className="flex flex-col items-center gap-2 pt-1">
+                    <div className="text-[9px] text-gray-400 font-medium">LE CLIENT SCANNE</div>
+                    <div className="w-20 h-20 bg-gray-900 rounded-lg p-1.5 flex items-center justify-center">
+                      <div className="grid grid-cols-5 gap-[2px] w-full h-full">
+                        {Array.from({ length: 25 }).map((_, i) => (
+                          <div key={i} className={`rounded-[1px] ${[0,1,2,4,5,6,10,12,14,15,16,18,19,20,21,22,24].includes(i) ? 'bg-white' : 'bg-gray-700'}`} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-[8px] text-emerald-600 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      En attente du paiement...
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phone bottom bar */}
+                <div className="h-4 flex items-center justify-center">
+                  <div className="w-20 h-1 bg-gray-300 rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function AbonnementsSection() {
   return (
     <FeatureSection
