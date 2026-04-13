@@ -1,11 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadStripe, type Stripe, type PaymentRequest } from '@stripe/stripe-js';
+import { useEffect, useRef, useState } from 'react';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
-  PaymentRequestButtonElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
@@ -16,15 +15,14 @@ import {
   Check,
   X,
   Receipt,
-  Smartphone,
   QrCode,
-  Wifi,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, INVOICE_STATUSES } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
-import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
@@ -38,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-type Step = 'form' | 'creating' | 'choose' | 'contactless' | 'qr' | 'card' | 'success' | 'error';
+type Step = 'form' | 'creating' | 'choose' | 'qr' | 'card' | 'success' | 'error';
 
 interface RecentPayment {
   id: string;
@@ -58,114 +56,6 @@ interface SessionData {
   stripe_account_id: string;
   publishable_key: string;
   pay_url: string;
-}
-
-// ---------- Contactless (Apple Pay / Google Pay) ----------
-
-function ContactlessPayment({
-  amountCents,
-  onSuccess,
-  onError,
-  onFallback,
-}: {
-  amountCents: number;
-  onSuccess: () => void;
-  onError: (msg: string) => void;
-  onFallback: () => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
-  const [canPay, setCanPay] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!stripe) return;
-
-    const pr = stripe.paymentRequest({
-      country: 'FR',
-      currency: 'eur',
-      total: { label: 'HelloPay', amount: amountCents },
-      requestPayerName: true,
-    });
-
-    pr.canMakePayment().then((result) => {
-      if (result) {
-        setPaymentRequest(pr);
-        setCanPay(true);
-      } else {
-        setCanPay(false);
-      }
-    });
-
-    pr.on('paymentmethod', async (ev) => {
-      if (!elements) {
-        ev.complete('fail');
-        return;
-      }
-      const { error } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          payment_method: ev.paymentMethod.id,
-          return_url: window.location.href,
-        },
-        redirect: 'if_required',
-      });
-      if (error) {
-        ev.complete('fail');
-        onError(error.message || 'Le paiement a echoue');
-      } else {
-        ev.complete('success');
-        onSuccess();
-      }
-    });
-  }, [stripe, amountCents, elements, onSuccess, onError]);
-
-  if (canPay === null) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Verification du paiement sans contact...</p>
-      </div>
-    );
-  }
-
-  if (canPay === false) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center">
-          <Wifi className="h-7 w-7 text-amber-500" />
-        </div>
-        <div>
-          <p className="font-medium text-foreground">Apple Pay / Google Pay non disponible</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Ce navigateur ne supporte pas le paiement sans contact.
-          </p>
-        </div>
-        <Button variant="outline" onClick={onFallback}>
-          Utiliser un autre mode de paiement
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center gap-5 py-4">
-      <div className="text-center space-y-2">
-        <p className="text-lg font-semibold">{formatCurrency(amountCents / 100)}</p>
-        <p className="text-sm text-muted-foreground">
-          Tendez votre telephone au client pour qu&apos;il paie avec Apple Pay ou Google Pay
-        </p>
-      </div>
-      {paymentRequest && (
-        <div className="w-full max-w-xs">
-          <PaymentRequestButtonElement
-            options={{ paymentRequest }}
-            className="w-full"
-          />
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ---------- Card Payment (Payment Element) ----------
@@ -432,7 +322,15 @@ export default function EncaissementPage() {
   if (stripeConnected === false) {
     return (
       <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-        <PageHeader title="HelloPay" description="Encaissez vos clients directement depuis votre telephone" />
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-1">
+          <div className="relative">
+            <Zap className="h-7 w-7 text-primary" />
+            <Sparkles className="h-3.5 w-3.5 text-amber-400 absolute -top-1 -right-1.5" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">HelloPay</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-10">Encaissez vos clients en un instant</p>
         <div className="mt-8">
           <EmptyState
             icon={CreditCard}
@@ -450,7 +348,21 @@ export default function EncaissementPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
-      <PageHeader title="HelloPay" description="Encaissez vos clients directement depuis votre telephone" />
+      {/* Header with sparkles */}
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="relative">
+            <Zap className="h-7 w-7 text-primary" />
+            <Sparkles className="h-3.5 w-3.5 text-amber-400 absolute -top-1 -right-1.5" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">HelloPay</h1>
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200/60">
+            <Sparkles className="h-3 w-3" />
+            Nouveau
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground ml-10">Encaissez vos clients en un instant</p>
+      </div>
 
       {/* STEP: FORM */}
       {step === 'form' && (
@@ -518,12 +430,12 @@ export default function EncaissementPage() {
             </div>
 
             <Button
-              className="w-full"
+              className="w-full bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90"
               size="lg"
               onClick={startPayment}
               disabled={totalHt <= 0}
             >
-              <CreditCard className="mr-2 h-4 w-4" />
+              <Zap className="mr-2 h-4 w-4" />
               Encaisser {totalTtc > 0 ? formatCurrency(totalTtc) : ''}
             </Button>
           </div>
@@ -571,7 +483,7 @@ export default function EncaissementPage() {
         </div>
       )}
 
-      {/* STEP: CHOOSE — pick payment method */}
+      {/* STEP: CHOOSE — QR Code or Card */}
       {step === 'choose' && sessionData && (
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-5">
@@ -583,44 +495,32 @@ export default function EncaissementPage() {
             <h2 className="text-base font-semibold mb-3">Comment encaisser ?</h2>
 
             <div className="space-y-3">
-              {/* Option 1: Contactless */}
-              <button
-                type="button"
-                onClick={() => setStep('contactless')}
-                className="w-full flex items-start gap-4 rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Smartphone className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">Sans contact</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Apple Pay ou Google Pay — le client paie d&apos;un geste
-                  </p>
-                </div>
-              </button>
-
-              {/* Option 2: QR Code */}
+              {/* Option 1: QR Code */}
               <button
                 type="button"
                 onClick={() => {
                   setStep('qr');
                   startQrPolling();
                 }}
-                className="w-full flex items-start gap-4 rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors"
+                className="w-full flex items-start gap-4 rounded-xl border-2 border-primary/30 bg-primary/5 p-4 text-left hover:bg-primary/10 transition-colors"
               >
-                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center">
-                  <QrCode className="h-5 w-5 text-blue-600" />
+                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-gradient-to-br from-primary/20 to-orange-200 flex items-center justify-center">
+                  <QrCode className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">QR Code</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">QR Code</p>
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600">
+                      <Sparkles className="h-2.5 w-2.5" /> Recommande
+                    </span>
+                  </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Le client scanne le QR code et paie sur son telephone
+                    Le client scanne et paie depuis son telephone
                   </p>
                 </div>
               </button>
 
-              {/* Option 3: Card */}
+              {/* Option 2: Card */}
               <button
                 type="button"
                 onClick={() => setStep('card')}
@@ -642,33 +542,6 @@ export default function EncaissementPage() {
           <Button variant="ghost" className="w-full" onClick={resetForm}>
             Annuler
           </Button>
-        </div>
-      )}
-
-      {/* STEP: CONTACTLESS — Apple Pay / Google Pay */}
-      {step === 'contactless' && sessionData && stripePromise && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Button variant="ghost" size="sm" onClick={() => setStep('choose')}>
-              ← Retour
-            </Button>
-            <h2 className="text-base font-semibold">Paiement sans contact</h2>
-          </div>
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret: sessionData.client_secret,
-              appearance: { theme: 'stripe', variables: { colorPrimary: '#d35400' } },
-              locale: 'fr',
-            }}
-          >
-            <ContactlessPayment
-              amountCents={Math.round(totalTtc * 100)}
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
-              onFallback={() => setStep('choose')}
-            />
-          </Elements>
         </div>
       )}
 
@@ -742,11 +615,14 @@ export default function EncaissementPage() {
       {step === 'success' && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex flex-col items-center gap-4 py-10">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Check className="h-8 w-8 text-green-600" />
+            <div className="relative">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <Check className="h-8 w-8 text-green-600" />
+              </div>
+              <Sparkles className="h-5 w-5 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
             </div>
             <div className="text-center">
-              <p className="text-lg font-semibold text-green-800">Paiement encaisse</p>
+              <p className="text-lg font-semibold text-green-800">Paiement encaisse !</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(totalTtc)}</p>
             </div>
             {createdInvoiceNumber && (
@@ -755,7 +631,8 @@ export default function EncaissementPage() {
                 Facture {createdInvoiceNumber} creee automatiquement
               </div>
             )}
-            <Button className="mt-4" size="lg" onClick={resetForm}>
+            <Button className="mt-4 bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90" size="lg" onClick={resetForm}>
+              <Zap className="mr-2 h-4 w-4" />
               Nouvel encaissement
             </Button>
           </div>

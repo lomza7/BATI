@@ -35,7 +35,7 @@ const navGroups: NavGroup[] = [
       { label: 'Factures', href: '/factures', emoji: '🧾' },
       { label: 'Mes prestations', href: '/prestations', emoji: '🛠️' },
       { label: 'Mes documents', href: '/documents', emoji: '📁' },
-      { label: 'HelloPay', href: '/encaissement', emoji: '📱' },
+      { label: 'HelloPay', href: '/encaissement', emoji: '⚡' },
     ],
   },
   {
