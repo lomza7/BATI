@@ -56,6 +56,7 @@ interface QuoteData {
   valid_until: string | null;
   signed_at: string | null;
   created_at: string;
+  deposit_percentage: number | null;
   bank_account_id: string | null;
   clients: {
     name: string;
@@ -212,7 +213,7 @@ export default function PublicQuotePage() {
       // 2. Fetch quote with client
       const { data: quoteData, error: quoteError } = await anonClient
         .from('quotes')
-        .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, bank_account_id, clients(name, email, phone, address, city, postal_code)')
+        .select('id, quote_number, title, description, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, valid_until, signed_at, created_at, bank_account_id, deposit_percentage, clients(name, email, phone, address, city, postal_code)')
         .eq('id', send.quote_id)
         .is('deleted_at', null)
         .maybeSingle();
@@ -797,6 +798,21 @@ export default function PublicQuotePage() {
                 <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
                 <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(quote.total_ttc)}</span>
               </div>
+              {quote.deposit_percentage && quote.deposit_percentage > 0 && (
+                <div className="flex flex-col items-end gap-0.5 w-full sm:w-72 pt-2 mt-1 border-t border-dashed border-[#e5e1da]/70">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm font-medium" style={{ color: accent }}>
+                      Acompte de {Number.isInteger(quote.deposit_percentage) ? quote.deposit_percentage : quote.deposit_percentage.toFixed(2).replace('.', ',')}% à la signature
+                    </span>
+                    <span className="text-sm font-semibold" style={{ color: accent }}>
+                      {formatCurrency(Math.round(quote.total_ttc * quote.deposit_percentage) / 100)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#6b6560] w-full">
+                    Ce montant sera facturé à l&apos;acceptation du devis.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

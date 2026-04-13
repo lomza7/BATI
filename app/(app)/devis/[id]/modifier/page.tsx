@@ -13,11 +13,13 @@ import {
   RefreshCw,
   Search,
   Save,
+  Receipt,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_UNITS, formatCurrency } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
@@ -79,6 +81,7 @@ export default function ModifierDevisPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [isRecurringQuote, setIsRecurringQuote] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState('annuel');
+  const [depositPercentage, setDepositPercentage] = useState<string>('');
   const [projectId, setProjectId] = useState<string | null>(null);
 
   // Service catalog
@@ -88,6 +91,8 @@ export default function ModifierDevisPage() {
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
   const serviceSearchRef = useRef<HTMLInputElement>(null);
+  const [autocompleteIndex, setAutocompleteIndex] = useState<number | null>(null);
+  const autocompleteRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     loadQuote();
@@ -138,6 +143,7 @@ export default function ModifierDevisPage() {
     setValidUntil(q.valid_until || '');
     setIsRecurringQuote(q.is_recurring || false);
     setRecurringFrequency(q.recurring_frequency || 'annuel');
+    setDepositPercentage(q.deposit_percentage ? String(q.deposit_percentage) : '');
     setProjectId(q.project_id || null);
 
     const loadedLines: QuoteLine[] = (linesRes.data || []).map((l: Record<string, unknown>) => ({
@@ -177,6 +183,34 @@ export default function ModifierDevisPage() {
     const updated = [...lines];
     (updated[index] as unknown as Record<string, string | number>)[field] = value;
     setLines(updated);
+    if (field === 'description') {
+      setAutocompleteIndex(typeof value === 'string' && value.trim().length >= 1 ? index : null);
+    }
+  }
+
+  function getAutocompleteSuggestions(query: string): Service[] {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return services.filter(s => s.name.toLowerCase().includes(q)).slice(0, 6);
+  }
+
+  function applySuggestion(lineIndex: number, s: Service) {
+    const updated = [...lines];
+    updated[lineIndex] = {
+      ...updated[lineIndex],
+      description: s.name,
+      detail: s.description || updated[lineIndex].detail || '',
+      unit: s.unit,
+      unit_price: s.unit_price,
+      tva_rate: s.tva_rate ?? 20,
+      section: s.section || 'materiel',
+      is_recurring: s.is_recurring,
+      frequency: s.frequency,
+      _savedAsPrestation: true,
+    };
+    setLines(updated);
+    setAutocompleteIndex(null);
+    setAddedServiceIds(prev => new Set(prev).add(s.id));
   }
 
   function removeLine(index: number) {
@@ -260,6 +294,7 @@ export default function ModifierDevisPage() {
           valid_until: validUntil || null,
           is_recurring: isRecurringQuote,
           recurring_frequency: recurringFrequency,
+          deposit_percentage: depositPercentage ? parseFloat(depositPercentage) : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', quoteId);
@@ -453,6 +488,60 @@ export default function ModifierDevisPage() {
               )}
             </div>
 
+            {/* Acompte */}
+            <div className="rounded-xl border border-border p-3 space-y-2">
+              <div className="flex items-center gap-2.5">
+                <Receipt className="h-4 w-4 text-[#d35400]" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Acompte à la signature</p>
+                  <p className="text-xs text-muted-foreground">Le client verra le montant de l&apos;acompte sur le devis</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {[30, 40, 50].map(pct => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setDepositPercentage(depositPercentage === String(pct) ? '' : String(pct))}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                      depositPercentage === String(pct)
+                        ? 'bg-[#d35400] text-white'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    )}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    step="any"
+                    placeholder="Autre %"
+                    value={depositPercentage && ![30, 40, 50].includes(Number(depositPercentage)) ? depositPercentage : ''}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '' || (Number(v) > 0 && Number(v) <= 100)) setDepositPercentage(v);
+                    }}
+                    className="h-8 w-24 text-xs pr-6"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+                {depositPercentage && (
+                  <button type="button" onClick={() => setDepositPercentage('')} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {depositPercentage && Number(depositPercentage) > 0 && linesTotals.total_ht > 0 && (
+                <p className="text-xs text-[#d35400] font-medium">
+                  Soit {formatCurrency(computeDepositAmount('percentage', Number(depositPercentage), linesTotals.total_ht, linesTotals.tva_breakdown[0]?.rate ?? 20).total_ttc)} TTC à la signature
+                </p>
+              )}
+            </div>
+
             {/* Lines */}
             <div>
               <div className="flex items-center justify-between mb-3 gap-2">
@@ -482,12 +571,43 @@ export default function ModifierDevisPage() {
                     <div className="sm:hidden space-y-2">
                       <div className="flex items-start gap-2">
                         <div className="flex-1 space-y-1.5">
-                          <Input
-                            placeholder="Nom de la prestation"
-                            value={line.description}
-                            onChange={e => updateLine(i, 'description', e.target.value)}
-                            className="text-sm"
-                          />
+                          <div className="relative" ref={el => { autocompleteRefs.current[i] = el; }}>
+                            <Input
+                              placeholder="Nom de la prestation"
+                              value={line.description}
+                              onChange={e => updateLine(i, 'description', e.target.value)}
+                              onFocus={() => { if (line.description.trim().length >= 1) setAutocompleteIndex(i); }}
+                              onBlur={() => setTimeout(() => setAutocompleteIndex(null), 150)}
+                              className="text-sm"
+                            />
+                            {autocompleteIndex === i && line.description.trim().length >= 1 && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-48 overflow-y-auto">
+                                {getAutocompleteSuggestions(line.description).map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => applySuggestion(i, s)}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-2"
+                                  >
+                                    <span className="truncate font-medium">{s.name}</span>
+                                    <span className="text-xs text-muted-foreground shrink-0">{formatCurrency(s.unit_price)}/{s.unit}</span>
+                                  </button>
+                                ))}
+                                {!line._savedAsPrestation && !services.some(s => s.name.toLowerCase() === line.description.trim().toLowerCase()) && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => { setAutocompleteIndex(null); saveLineAsPrestation(i); }}
+                                    className="w-full text-left px-3 py-2 text-sm border-t border-border hover:bg-muted transition-colors flex items-center gap-2 text-primary"
+                                  >
+                                    <BookmarkPlus className="h-3.5 w-3.5 shrink-0" />
+                                    <span>Enregistrer &laquo;{line.description.trim().slice(0, 40)}&raquo; comme prestation</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <textarea
                             placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
                             value={line.detail || ''}
@@ -546,7 +666,45 @@ export default function ModifierDevisPage() {
                     <div className="hidden sm:block">
                       <div className="grid grid-cols-12 gap-2 items-start">
                         <div className="col-span-5 space-y-1">
-                          <Input placeholder="Nom de la prestation" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} />
+                          <div className="relative" ref={el => { autocompleteRefs.current[i + 1000] = el; }}>
+                            <Input
+                              placeholder="Nom de la prestation"
+                              value={line.description}
+                              onChange={e => updateLine(i, 'description', e.target.value)}
+                              onFocus={() => { if (line.description.trim().length >= 1) setAutocompleteIndex(i); }}
+                              onBlur={() => setTimeout(() => setAutocompleteIndex(null), 150)}
+                            />
+                            {autocompleteIndex === i && line.description.trim().length >= 1 && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
+                                {getAutocompleteSuggestions(line.description).map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => applySuggestion(i, s)}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-3"
+                                  >
+                                    <div className="truncate">
+                                      <span className="font-medium">{s.name}</span>
+                                      {s.description && <span className="text-muted-foreground ml-2 text-xs">{s.description.slice(0, 50)}</span>}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground shrink-0">{formatCurrency(s.unit_price)}/{s.unit}</span>
+                                  </button>
+                                ))}
+                                {!line._savedAsPrestation && !services.some(s => s.name.toLowerCase() === line.description.trim().toLowerCase()) && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => { setAutocompleteIndex(null); saveLineAsPrestation(i); }}
+                                    className="w-full text-left px-3 py-2 text-sm border-t border-border hover:bg-muted transition-colors flex items-center gap-2 text-primary"
+                                  >
+                                    <BookmarkPlus className="h-3.5 w-3.5 shrink-0" />
+                                    <span>Enregistrer &laquo;{line.description.trim().slice(0, 40)}&raquo; comme prestation</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <textarea
                             placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
                             value={line.detail || ''}
@@ -767,6 +925,7 @@ export default function ModifierDevisPage() {
         lines={lines}
         clientId={selectedClientId}
         bankAccountId={selectedBankAccountId}
+        depositPercentage={depositPercentage ? parseFloat(depositPercentage) : null}
       />
     </div>
   );

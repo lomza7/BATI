@@ -92,6 +92,7 @@ interface Props {
   validUntil?: string | null;
   dueDate?: string | null;
   bankAccountId?: string | null;
+  depositPercentage?: number | null;
   // DB-load mode (used by list rows — fetches the saved quote/invoice)
   documentId?: string | null;
 }
@@ -125,6 +126,7 @@ export function DocumentPreviewDialog({
   validUntil: validUntilProp,
   dueDate: dueDateProp,
   bankAccountId: bankAccountIdProp,
+  depositPercentage: depositPercentageProp,
   documentId,
 }: Props) {
   const { user } = useAuth();
@@ -159,10 +161,10 @@ export function DocumentPreviewDialog({
     setResolvedDueDate(dueDateProp);
     setResolvedCreatedAt(new Date());
     setInvoiceType('standard');
-    setDepositPercentage(null);
+    setDepositPercentage(depositPercentageProp ?? null);
     setLinkedQuoteNumber(null);
     setLinkedDeposits([]);
-  }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp]);
+  }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp, depositPercentageProp]);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -187,7 +189,7 @@ export function DocumentPreviewDialog({
         if (mode === 'quote') {
           const { data: quote } = await supabase
             .from('quotes')
-            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id')
+            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id, deposit_percentage')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -199,6 +201,7 @@ export function DocumentPreviewDialog({
             setResolvedDueDate(null);
             setResolvedCreatedAt(new Date(quote.created_at));
             resolvedBankAccountId = quote.bank_account_id || null;
+            setDepositPercentage(typeof quote.deposit_percentage === 'number' ? quote.deposit_percentage : null);
 
             const { data: linesData } = await supabase
               .from('quote_lines')
@@ -709,6 +712,18 @@ export function DocumentPreviewDialog({
                   <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
                   <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(totalTtc)}</span>
                 </div>
+                {mode === 'quote' && depositPercentage && depositPercentage > 0 && (
+                  <div className="flex flex-col items-end gap-0.5 w-full sm:w-72 pt-2 mt-1 border-t border-dashed border-[#e5e1da]/70">
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-sm font-medium" style={{ color: accent }}>
+                        Acompte de {Number.isInteger(depositPercentage) ? depositPercentage : depositPercentage.toFixed(2).replace('.', ',')}% à la signature
+                      </span>
+                      <span className="text-sm font-semibold" style={{ color: accent }}>
+                        {formatCurrency(Math.round(totalTtc * depositPercentage) / 100)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
