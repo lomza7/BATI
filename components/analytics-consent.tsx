@@ -3,30 +3,27 @@
 import { useEffect, useState } from 'react';
 import { GoogleTagManager } from '@next/third-parties/google';
 
-const STORAGE_KEY = 'hellobat-cookie-consent';
+const COOKIE_NAME = 'hellobat-cookie-consent';
+const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 an en secondes
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 
 type ConsentState = 'granted' | 'denied' | null;
 
-/**
- * RGPD-compliant analytics wrapper.
- *
- * - Loads Google Tag Manager only after the visitor has explicitly granted
- *   consent, as required by the CNIL in France.
- * - Displays a discreet cookie banner in the bottom-right corner on first
- *   visit, with equally-sized "Refuser" and "Accepter" buttons (CNIL asks
- *   that refusing is as easy as accepting).
- * - Stores the choice in localStorage so the banner never reappears.
- *
- * To change your mind later, clear `hellobat-cookie-consent` in localStorage
- * (or we can add a footer link "Gérer les cookies" in a later iteration).
- */
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name: string, value: string) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
 export function AnalyticsConsent() {
   const [consent, setConsent] = useState<ConsentState>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = getCookie(COOKIE_NAME);
     if (stored === 'granted' || stored === 'denied') {
       setConsent(stored);
     }
@@ -34,12 +31,12 @@ export function AnalyticsConsent() {
   }, []);
 
   function handleAccept() {
-    localStorage.setItem(STORAGE_KEY, 'granted');
+    setCookie(COOKIE_NAME, 'granted');
     setConsent('granted');
   }
 
   function handleRefuse() {
-    localStorage.setItem(STORAGE_KEY, 'denied');
+    setCookie(COOKIE_NAME, 'denied');
     setConsent('denied');
   }
 
