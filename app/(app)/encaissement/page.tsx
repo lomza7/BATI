@@ -105,7 +105,7 @@ export default function EncaissementPage() {
       .eq('payment_method', 'terminal')
       .order('created_at', { ascending: false })
       .limit(10);
-    setRecentPayments((data as RecentPayment[]) || []);
+    setRecentPayments((data as unknown as RecentPayment[]) || []);
   }
 
   const fetchConnectionToken = useCallback(async () => {
