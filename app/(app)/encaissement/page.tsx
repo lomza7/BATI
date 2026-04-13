@@ -220,7 +220,7 @@ export default function EncaissementPage() {
         tva_rate: tva.primary_rate,
         tva_breakdown: tva.tva_breakdown,
         due_date: dueDate.toISOString().split('T')[0],
-        status: 'creee',
+        status: 'brouillon',
         issued_at: new Date().toISOString(),
         payment_method: 'hellopay',
       }).select('id').single();
