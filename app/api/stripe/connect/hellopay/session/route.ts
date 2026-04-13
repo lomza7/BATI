@@ -73,33 +73,29 @@ export async function POST(request: Request) {
 
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
-    // Create payment session for QR code / public pay page
-    const { data: session, error: sessionError } = await supabaseAdmin
-      .from('payment_sessions')
-      .insert({
-        user_id: user.id,
-        invoice_id: invoice_id || null,
-        stripe_account_id: connection.stripe_account_id,
-        payment_intent_id: paymentIntent.id,
-        client_secret: paymentIntent.client_secret,
-        publishable_key: publishableKey,
-        amount_cents,
-        description: description || 'HelloPay',
-        status: 'pending',
-      })
-      .select('id')
-      .single();
+    // Create payment session via RPC (bypasses PostgREST schema cache)
+    const { data: sessionId, error: sessionError } = await supabaseAdmin
+      .rpc('create_payment_session', {
+        p_user_id: user.id,
+        p_invoice_id: invoice_id || null,
+        p_stripe_account_id: connection.stripe_account_id,
+        p_payment_intent_id: paymentIntent.id,
+        p_client_secret: paymentIntent.client_secret!,
+        p_publishable_key: publishableKey,
+        p_amount_cents: amount_cents,
+        p_description: description || 'HelloPay',
+      });
 
-    if (sessionError || !session) {
-      console.error('payment_sessions insert error', JSON.stringify(sessionError), 'publishableKey:', publishableKey ? 'set' : 'EMPTY', 'client_secret:', paymentIntent.client_secret ? 'set' : 'NULL');
+    if (sessionError || !sessionId) {
+      console.error('payment_sessions rpc error', JSON.stringify(sessionError));
       return NextResponse.json({ error: `Erreur creation session: ${sessionError?.message || 'unknown'}` }, { status: 500 });
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
-    const payUrl = `${siteUrl}/pay/${session.id}`;
+    const payUrl = `${siteUrl}/pay/${sessionId}`;
 
     return NextResponse.json({
-      session_id: session.id,
+      session_id: sessionId,
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
       stripe_account_id: connection.stripe_account_id,
