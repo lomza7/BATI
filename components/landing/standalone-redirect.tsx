@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export function StandaloneRedirect() {
   const router = useRouter();
@@ -12,7 +13,9 @@ export function StandaloneRedirect() {
       window.matchMedia('(display-mode: standalone)').matches;
 
     if (isStandalone) {
-      router.replace('/login');
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        router.replace(session ? '/dashboard' : '/login');
+      });
     }
   }, [router]);
 

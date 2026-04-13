@@ -2,7 +2,7 @@
   "name": "Hellobat — Logiciel du bâtiment",
   "short_name": "Hellobat",
   "description": "La plateforme tout-en-un pour les artisans du bâtiment en France.",
-  "start_url": "/login",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#D35400",
