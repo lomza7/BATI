@@ -252,6 +252,7 @@ export async function POST(request: Request) {
         const result = await resend.emails.send({
           from: fromEmail,
           to: recipientEmail,
+          ...(user.email ? { cc: user.email } : {}),
           subject: `Devis ${quote.quote_number} — ${companyName}`,
           html: emailHtml,
           attachments: companyAttachments.map(att => ({
