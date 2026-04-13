@@ -117,6 +117,7 @@ export async function POST(request: Request) {
     // Create the promotion code linked to the coupon
     const promoParams: Stripe.PromotionCodeCreateParams = {
       promotion: { type: 'coupon', coupon: coupon.id },
+      coupon: coupon.id,
       code: code.toUpperCase(),
       ...(max_redemptions ? { max_redemptions } : {}),
       ...(expires_at ? { expires_at: Math.floor(new Date(expires_at).getTime() / 1000) } : {}),
