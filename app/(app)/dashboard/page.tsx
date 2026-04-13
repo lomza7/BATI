@@ -1666,16 +1666,16 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm text-muted-foreground">Devis, factures et encaissements — {periodLabel.toLowerCase()}</p>
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-2">
                   {revenueSeries.has('encaisse') && <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.encaisse, 0))}
-                    <span className="text-sm font-normal text-muted-foreground ml-1.5">encaissé</span>
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + (revenueUnit === 'ht' ? r.encaisse_ht : r.encaisse), 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">encaissé{revenueUnit === 'ht' ? ' HT' : ''}</span>
                   </p>}
                   {revenueSeries.has('factures') && <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.factures, 0))}
-                    <span className="text-sm font-normal text-muted-foreground ml-1.5">facturé</span>
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + (revenueUnit === 'ht' ? r.factures_ht : r.factures), 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">facturé{revenueUnit === 'ht' ? ' HT' : ''}</span>
                   </p>}
                   {revenueSeries.has('devis') && <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.devis, 0))}
-                    <span className="text-sm font-normal text-muted-foreground ml-1.5">devisé</span>
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + (revenueUnit === 'ht' ? r.devis_ht : r.devis), 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">devisé{revenueUnit === 'ht' ? ' HT' : ''}</span>
                   </p>}
                 </div>
               </div>
