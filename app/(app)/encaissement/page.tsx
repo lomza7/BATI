@@ -245,11 +245,10 @@ export default function EncaissementPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur creation paiement');
 
-      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-      if (!publishableKey) throw new Error('Configuration Stripe manquante');
+      if (!data.publishable_key) throw new Error('Configuration Stripe manquante');
 
       setClientSecret(data.client_secret);
-      setStripePromise(loadStripe(publishableKey, { stripeAccount: data.stripe_account_id }));
+      setStripePromise(loadStripe(data.publishable_key, { stripeAccount: data.stripe_account_id }));
       setStep('payment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur paiement');

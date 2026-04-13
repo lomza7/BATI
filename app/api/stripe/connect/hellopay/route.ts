@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
       stripe_account_id: connection.stripe_account_id,
+      publishable_key: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
     });
   } catch (error) {
     return NextResponse.json(
