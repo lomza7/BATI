@@ -30,6 +30,7 @@ interface Service {
   unit: string;
   unit_price: number;
   category: string;
+  section: string;
   tva_rate: number;
   is_recurring: boolean;
   frequency: string;
@@ -60,12 +61,23 @@ const FREQ_LABELS: Record<string, string> = {
   annuel: 'Annuel',
 };
 
+const SECTION_OPTIONS = [
+  { value: 'materiel', label: 'Matériel' },
+  { value: 'main_oeuvre', label: "Main d'oeuvre" },
+];
+
+const SECTION_LABELS: Record<string, string> = {
+  materiel: 'Matériel fournis',
+  main_oeuvre: "Main d'oeuvre et installation",
+};
+
 const emptyForm = {
   name: '',
   description: '',
   unit: 'u',
   unit_price: 0,
   category: '',
+  section: 'materiel',
   tva_rate: 20,
   is_recurring: false,
   frequency: 'mensuel',
@@ -78,6 +90,7 @@ export default function PrestationsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sectionFilter, setSectionFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -104,6 +117,9 @@ export default function PrestationsPage() {
 
   const filtered = useMemo(() => {
     let list = services;
+    if (sectionFilter !== 'all') {
+      list = list.filter(s => (s.section || 'materiel') === sectionFilter);
+    }
     if (categoryFilter !== 'all') {
       list = list.filter(s => s.category === categoryFilter);
     }
@@ -114,7 +130,7 @@ export default function PrestationsPage() {
       s.description.toLowerCase().includes(q) ||
       s.category.toLowerCase().includes(q)
     );
-  }, [services, search, categoryFilter]);
+  }, [services, search, categoryFilter, sectionFilter]);
 
   function openCreate() {
     setForm(emptyForm);
@@ -129,6 +145,7 @@ export default function PrestationsPage() {
       unit: s.unit,
       unit_price: s.unit_price,
       category: s.category,
+      section: s.section || 'materiel',
       tva_rate: s.tva_rate,
       is_recurring: s.is_recurring,
       frequency: s.frequency || 'mensuel',
@@ -172,15 +189,26 @@ export default function PrestationsPage() {
     loadServices();
   }
 
-  // Group services by category for display
+  // Group services by section, then by category within each section
   const grouped = useMemo(() => {
-    const map = new Map<string, Service[]>();
-    for (const s of filtered) {
-      const cat = s.category || 'Sans catégorie';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(s);
+    const sections: { key: string; label: string; categories: [string, Service[]][] }[] = [];
+    const sectionOrder = ['materiel', 'main_oeuvre'];
+    for (const sKey of sectionOrder) {
+      const sectionItems = filtered.filter(s => (s.section || 'materiel') === sKey);
+      if (sectionItems.length === 0) continue;
+      const catMap = new Map<string, Service[]>();
+      for (const s of sectionItems) {
+        const cat = s.category || 'Sans catégorie';
+        if (!catMap.has(cat)) catMap.set(cat, []);
+        catMap.get(cat)!.push(s);
+      }
+      sections.push({
+        key: sKey,
+        label: SECTION_LABELS[sKey] || sKey,
+        categories: Array.from(catMap.entries()),
+      });
     }
-    return Array.from(map.entries());
+    return sections;
   }, [filtered]);
 
   return (
@@ -204,6 +232,17 @@ export default function PrestationsPage() {
             className="pl-10"
           />
         </div>
+        <Select value={sectionFilter} onValueChange={setSectionFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Section" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toutes les sections</SelectItem>
+            {SECTION_OPTIONS.map(s => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -258,8 +297,15 @@ export default function PrestationsPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-sm text-muted-foreground">Aucun résultat pour cette recherche.</div>
       ) : (
-        <div className="space-y-6">
-          {grouped.map(([category, items]) => (
+        <div className="space-y-8">
+          {grouped.map(section => (
+            <div key={section.key}>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-base font-semibold">{section.label}</h2>
+                <Badge variant="outline" className="text-xs">{section.categories.reduce((n, [, items]) => n + items.length, 0)}</Badge>
+              </div>
+              <div className="space-y-6 pl-0 sm:pl-2">
+              {section.categories.map(([category, items]) => (
             <div key={category}>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{category}</h3>
               <div className="space-y-2">
@@ -277,6 +323,9 @@ export default function PrestationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium truncate">{s.name}</p>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {SECTION_LABELS[s.section || 'materiel'] || 'Matériel fournis'}
+                        </Badge>
                         {s.is_recurring && (
                           <Badge variant="outline" className="gap-1 text-[10px] px-1.5 py-0 border-primary/30 text-primary">
                             <RefreshCw className="h-2.5 w-2.5" /> {FREQ_LABELS[s.frequency] || s.frequency}
@@ -320,6 +369,9 @@ export default function PrestationsPage() {
                     </DropdownMenu>
                   </div>
                 ))}
+              </div>
+            </div>
+          ))}
               </div>
             </div>
           ))}
@@ -378,6 +430,19 @@ export default function PrestationsPage() {
                 </Select>
               </div>
             </div>
+            <div>
+              <label className="text-sm font-medium">Section</label>
+              <Select value={form.section} onValueChange={v => setForm({ ...form, section: v })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECTION_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium">Catégorie</label>
@@ -390,7 +455,6 @@ export default function PrestationsPage() {
                     {DEFAULT_CATEGORIES.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
-                    {/* Show user custom categories not in defaults */}
                     {categories.filter(c => !DEFAULT_CATEGORIES.includes(c)).map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}

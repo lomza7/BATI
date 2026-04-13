@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 interface QuoteLine {
   description: string;
@@ -40,6 +41,7 @@ interface QuoteLine {
   unit: string;
   unit_price: number;
   tva_rate: number;
+  section?: string;
   is_recurring?: boolean;
   frequency?: string;
   _savedAsPrestation?: boolean;
@@ -54,6 +56,7 @@ interface Service {
   unit_price: number;
   category: string;
   tva_rate: number | null;
+  section: string;
   is_recurring: boolean;
   frequency: string;
 }
@@ -81,6 +84,7 @@ export default function ModifierDevisPage() {
   // Service catalog
   const [services, setServices] = useState<Service[]>([]);
   const [serviceSearch, setServiceSearch] = useState('');
+  const [serviceSectionFilter, setServiceSectionFilter] = useState<'all' | 'materiel' | 'main_oeuvre'>('all');
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
   const serviceSearchRef = useRef<HTMLInputElement>(null);
@@ -143,6 +147,7 @@ export default function ModifierDevisPage() {
       unit: (l.unit as string) || 'u',
       unit_price: (l.unit_price as number) || 0,
       tva_rate: (l.tva_rate as number) ?? 20,
+      section: (l.section as string) || undefined,
     }));
 
     if (loadedLines.length === 0) {
@@ -156,7 +161,7 @@ export default function ModifierDevisPage() {
   async function loadServices() {
     const { data } = await supabase
       .from('services')
-      .select('id, name, description, unit, unit_price, category, tva_rate, is_recurring, frequency')
+      .select('id, name, description, unit, unit_price, category, tva_rate, section, is_recurring, frequency')
       .eq('is_active', true)
       .is('deleted_at', null)
       .order('category')
@@ -188,6 +193,7 @@ export default function ModifierDevisPage() {
       unit: s.unit,
       unit_price: s.unit_price,
       tva_rate: s.tva_rate ?? 20,
+      section: s.section || 'materiel',
       is_recurring: s.is_recurring,
       frequency: s.frequency,
       _savedAsPrestation: true,
@@ -213,6 +219,7 @@ export default function ModifierDevisPage() {
       unit: line.unit || 'u',
       unit_price: line.unit_price,
       category: '',
+      section: line.section || 'materiel',
       tva_rate: 20,
       is_recurring: false,
       is_active: true,
@@ -270,6 +277,7 @@ export default function ModifierDevisPage() {
             unit: l.unit,
             unit_price: l.unit_price,
             tva_rate: l.tva_rate,
+            section: l.section || null,
             total: l.quantity * l.unit_price,
             position: i,
           }))
@@ -289,13 +297,17 @@ export default function ModifierDevisPage() {
   }
 
   // Service filtering
-  const filteredServices = serviceSearch
-    ? services.filter(s =>
-        s.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-        s.description.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-        s.category.toLowerCase().includes(serviceSearch.toLowerCase())
-      )
+  let filteredServices = serviceSectionFilter !== 'all'
+    ? services.filter(s => (s.section || 'materiel') === serviceSectionFilter)
     : services;
+  if (serviceSearch) {
+    const q = serviceSearch.toLowerCase();
+    filteredServices = filteredServices.filter(s =>
+      s.name.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q) ||
+      s.category.toLowerCase().includes(q)
+    );
+  }
 
   const groupedServices = new Map<string, Service[]>();
   for (const s of filteredServices) {
@@ -662,6 +674,23 @@ export default function ModifierDevisPage() {
                 className="pl-9 h-8 text-sm"
               />
             </div>
+            <div className="flex gap-1 mt-2">
+              {([['all', 'Tout'], ['materiel', 'Matériaux'], ['main_oeuvre', "Main d'oeuvre"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setServiceSectionFilter(val)}
+                  className={cn(
+                    'flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                    serviceSectionFilter === val
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <ServiceList
             services={services}
@@ -697,6 +726,23 @@ export default function ModifierDevisPage() {
                     className="pl-9 h-9 text-sm"
                     autoFocus
                   />
+                </div>
+                <div className="flex gap-1 mt-2">
+                  {([['all', 'Tout'], ['materiel', 'Matériaux'], ['main_oeuvre', "Main d'oeuvre"]] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setServiceSectionFilter(val)}
+                      className={cn(
+                        'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                        serviceSectionFilter === val
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <ServiceList
