@@ -493,6 +493,10 @@ export default function DevisPage() {
                         <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(q.total_ttc)}</td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(q.created_at)}</td>
                         <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteQuote(q.id)} title="Supprimer">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -559,6 +563,7 @@ export default function DevisPage() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -579,6 +584,10 @@ export default function DevisPage() {
                       <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
                       <p className="text-xs text-muted-foreground">{q.clients?.name || '-'} &middot; {q.quote_number}</p>
                     </div>
+                    <div className="flex items-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive" onClick={() => deleteQuote(q.id)} title="Supprimer">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
@@ -643,6 +652,7 @@ export default function DevisPage() {
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center gap-2">

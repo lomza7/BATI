@@ -18,10 +18,12 @@ import {
   RefreshCw,
   Search,
   Send,
+  Trash2,
   TriangleAlert as AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
@@ -790,10 +792,25 @@ export default function FacturesPage() {
                       </div>
 
                       <div className="flex flex-col items-stretch gap-2 sm:min-w-[180px]">
-                        <Button onClick={() => handleConvertQuote(quote)} className="gap-2">
-                          <Receipt className="h-4 w-4" />
-                          {alreadyHasInvoices ? 'Ouvrir la facturation' : 'Facturer'}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={() => handleConvertQuote(quote)} className="gap-2 flex-1">
+                            <Receipt className="h-4 w-4" />
+                            {alreadyHasInvoices ? 'Ouvrir la facturation' : 'Facturer'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive flex-shrink-0"
+                            title="Supprimer le devis"
+                            onClick={async () => {
+                              if (!user) return;
+                              await moveEntityToTrash('quote', quote.id, user.id);
+                              loadData();
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                         {quote.valid_until && (
                           <p className="text-center text-xs text-muted-foreground">Validité jusqu&apos;au {formatDate(quote.valid_until)}</p>
                         )}

@@ -24,6 +24,8 @@ import {
   FolderKanban,
   Receipt,
   RefreshCw,
+  BarChart3,
+  Table2,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -113,6 +115,7 @@ interface QuoteRow {
   quote_number: string;
   title: string;
   status: keyof typeof QUOTE_STATUSES;
+  total_ht: number;
   total_ttc: number;
   valid_until: string | null;
   created_at: string;
@@ -261,6 +264,9 @@ type RevenuePoint = {
   encaisse: number;
   devis: number;
   factures: number;
+  encaisse_ht: number;
+  devis_ht: number;
+  factures_ht: number;
 };
 
 type FunnelPoint = {
@@ -600,6 +606,27 @@ function createAdminReminders(
   return reminders;
 }
 
+function buildRevenuePoint(
+  month: string,
+  quotes: QuoteRow[],
+  invoices: InvoiceRow[],
+  start: Date,
+  end: Date
+): RevenuePoint {
+  const paidInvs = invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end));
+  const periodInvs = invoices.filter((inv) => isBetween(inv.created_at, start, end));
+  const periodQuotes = quotes.filter((q) => isBetween(q.created_at, start, end));
+  return {
+    month,
+    encaisse: paidInvs.reduce((s, inv) => s + inv.total_ttc, 0),
+    factures: periodInvs.reduce((s, inv) => s + inv.total_ttc, 0),
+    devis: periodQuotes.reduce((s, q) => s + q.total_ttc, 0),
+    encaisse_ht: paidInvs.reduce((s, inv) => s + inv.total_ht, 0),
+    factures_ht: periodInvs.reduce((s, inv) => s + inv.total_ht, 0),
+    devis_ht: periodQuotes.reduce((s, q) => s + q.total_ht, 0),
+  };
+}
+
 function buildRevenueSeries(
   quotes: QuoteRow[],
   invoices: InvoiceRow[],
@@ -616,29 +643,17 @@ function buildRevenueSeries(
       for (let h = 8; h <= 20; h += 2) {
         const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
         const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
-        points.push({
-          month: `${h}h`,
-          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-        });
+        points.push(buildRevenuePoint(`${h}h`, quotes, invoices, start, end));
       }
     } else if (durationDays <= 31) {
-      // Up to a month → each day
       let cursor = new Date(range.start);
       while (cursor <= range.end) {
         const start = new Date(cursor);
         const end = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 23, 59, 59, 999);
-        points.push({
-          month: `${cursor.getDate()}/${cursor.getMonth() + 1}`,
-          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-        });
+        points.push(buildRevenuePoint(`${cursor.getDate()}/${cursor.getMonth() + 1}`, quotes, invoices, start, end));
         cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
       }
     } else if (durationDays <= 365) {
-      // Up to a year → each month
       let cursor = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
       while (cursor <= range.end) {
         const start = new Date(cursor);
@@ -646,64 +661,35 @@ function buildRevenueSeries(
         const clampedStart = start < range.start ? range.start : start;
         const clampedEnd = end > range.end ? range.end : end;
         const label = cursor.toLocaleDateString('fr-FR', { month: 'short' });
-        points.push({
-          month: label.charAt(0).toUpperCase() + label.slice(1),
-          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, clampedStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
-          factures: invoices.filter((inv) => isBetween(inv.created_at, clampedStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
-          devis: quotes.filter((q) => isBetween(q.created_at, clampedStart, clampedEnd)).reduce((s, q) => s + q.total_ttc, 0),
-        });
+        points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, clampedStart, clampedEnd));
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
       }
     } else {
-      // Multi-year → each year
       for (let y = range.start.getFullYear(); y <= range.end.getFullYear(); y++) {
-        const start = new Date(y, 0, 1);
-        const end = new Date(y, 11, 31, 23, 59, 59, 999);
-        points.push({
-          month: String(y),
-          encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-          devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-        });
+        points.push(buildRevenuePoint(String(y), quotes, invoices, new Date(y, 0, 1), new Date(y, 11, 31, 23, 59, 59, 999)));
       }
     }
   } else if (preset === 'jour') {
     for (let h = 8; h <= 20; h += 2) {
       const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
       const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
-      points.push({
-        month: `${h}h`,
-        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-      });
+      points.push(buildRevenuePoint(`${h}h`, quotes, invoices, start, end));
     }
   } else if (preset === 'semaine') {
     const dayLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     for (let d = 0; d < 7; d++) {
       const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate() + d);
       const end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
-      points.push({
-        month: dayLabels[d],
-        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-      });
+      points.push(buildRevenuePoint(dayLabels[d], quotes, invoices, start, end));
     }
   } else if (preset === 'mois') {
-    const monthStart = range.start;
     let weekNum = 1;
-    let cursor = new Date(monthStart);
+    let cursor = new Date(range.start);
     while (cursor <= range.end) {
       const weekStart = new Date(cursor);
       const weekEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6, 23, 59, 59, 999);
       const clampedEnd = weekEnd > range.end ? range.end : weekEnd;
-      points.push({
-        month: `S${weekNum}`,
-        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, weekStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
-        factures: invoices.filter((inv) => isBetween(inv.created_at, weekStart, clampedEnd)).reduce((s, inv) => s + inv.total_ttc, 0),
-        devis: quotes.filter((q) => isBetween(q.created_at, weekStart, clampedEnd)).reduce((s, q) => s + q.total_ttc, 0),
-      });
+      points.push(buildRevenuePoint(`S${weekNum}`, quotes, invoices, weekStart, clampedEnd));
       cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
       weekNum++;
     }
@@ -712,12 +698,7 @@ function buildRevenueSeries(
       const start = new Date(range.start.getFullYear(), m, 1);
       const end = new Date(range.start.getFullYear(), m + 1, 0, 23, 59, 59, 999);
       const label = start.toLocaleDateString('fr-FR', { month: 'short' });
-      points.push({
-        month: label.charAt(0).toUpperCase() + label.slice(1),
-        encaisse: invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        factures: invoices.filter((inv) => isBetween(inv.created_at, start, end)).reduce((s, inv) => s + inv.total_ttc, 0),
-        devis: quotes.filter((q) => isBetween(q.created_at, start, end)).reduce((s, q) => s + q.total_ttc, 0),
-      });
+      points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, start, end));
     }
   }
 
@@ -742,6 +723,9 @@ export default function DashboardPage() {
   const [teamAssignments, setTeamAssignments] = useState<TeamAssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState<DatePreset>('annee');
+  const [revenueView, setRevenueView] = useState<'chart' | 'table'>('chart');
+  const [revenueSeries, setRevenueSeries] = useState(() => new Set<'devis' | 'factures' | 'encaisse'>(['factures']));
+  const [revenueUnit, setRevenueUnit] = useState<'ttc' | 'ht'>('ttc');
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -752,7 +736,7 @@ export default function DashboardPage() {
     const [quotesRes, invoicesRes, projectsRes, leadsRes, leadSourcesRes, leadStagesRes, teamMembersRes, planningEventsRes, reminderSettingsRes, profileRes, todosRes, contractsRes, expensesRes, assignmentsRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('id, quote_number, title, status, total_ttc, valid_until, project_id, created_at, updated_at, clients(name, deleted_at)')
+        .select('id, quote_number, title, status, total_ht, total_ttc, valid_until, project_id, created_at, updated_at, clients(name, deleted_at)')
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
@@ -823,6 +807,7 @@ export default function DashboardPage() {
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || '') }
           : null,
+        total_ht: toNumber(quote.total_ht as string | number | null | undefined),
         total_ttc: toNumber(quote.total_ttc as string | number | null | undefined),
         project_id: (quote.project_id as string | null) || null,
       } as QuoteRow;
@@ -1674,45 +1659,166 @@ export default function DashboardPage() {
         </EmptyState>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
-              <KpiCard
-                title={`CA encaissé — ${periodLabel.toLowerCase()}`}
-                value={formatCurrency(dashboardData.revenueThisMonth)}
-                subtitle={revenueSubtitle}
-                trend={
-                  dashboardData.revenueThisMonth > 0 || dashboardData.revenuePreviousMonth > 0
-                    ? {
-                        value: `${dashboardData.revenueDelta >= 0 ? '+' : ''}${dashboardData.revenueDelta}%`,
-                        positive: dashboardData.revenueDelta >= 0,
-                      }
-                    : undefined
-                }
-                icon={Euro}
-                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.encaisse }))}
-                sparklineColor="hsl(var(--chart-1))"
-              />
-            </Link>
-            <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
-              <KpiCard
-                title={`Devis créés — ${periodLabel.toLowerCase()}`}
-                value={formatCurrency(dashboardData.totalQuotesPeriod)}
-                subtitle={`${dashboardData.pendingQuotes.length} en attente de réponse`}
-                icon={FileText}
-                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.devis }))}
-                sparklineColor="hsl(var(--chart-3))"
-              />
-            </Link>
-            <Link href="/factures" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
-              <KpiCard
-                title={`Factures créées — ${periodLabel.toLowerCase()}`}
-                value={formatCurrency(dashboardData.totalInvoicesPeriod)}
-                subtitle={`${dashboardData.unpaidInvoicesTotal > 0 ? formatCurrency(dashboardData.unpaidInvoicesTotal) + ' à encaisser' : 'Aucune facture impayée'}`}
-                icon={Receipt}
-                sparkline={dashboardData.revenueChartData.map(p => ({ value: p.factures }))}
-                sparklineColor="hsl(var(--chart-2))"
-              />
-            </Link>
+          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Dynamique business</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Devis, factures et encaissements — {periodLabel.toLowerCase()}</p>
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-2">
+                  {revenueSeries.has('encaisse') && <p className="text-2xl font-bold text-foreground">
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.encaisse, 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">encaissé</span>
+                  </p>}
+                  {revenueSeries.has('factures') && <p className="text-2xl font-bold text-foreground">
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.factures, 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">facturé</span>
+                  </p>}
+                  {revenueSeries.has('devis') && <p className="text-2xl font-bold text-foreground">
+                    {formatCurrency(dashboardData.revenueChartData.reduce((s, r) => s + r.devis, 0))}
+                    <span className="text-sm font-normal text-muted-foreground ml-1.5">devisé</span>
+                  </p>}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setRevenueUnit('ttc')}
+                    className={`px-2.5 py-1 text-xs font-medium transition-colors ${revenueUnit === 'ttc' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+                  >
+                    TTC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRevenueUnit('ht')}
+                    className={`px-2.5 py-1 text-xs font-medium transition-colors ${revenueUnit === 'ht' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+                  >
+                    HT
+                  </button>
+                </div>
+                <div className="flex rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setRevenueView('chart')}
+                    className={`p-1.5 transition-colors ${revenueView === 'chart' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+                    title="Graphique"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRevenueView('table')}
+                    className={`p-1.5 transition-colors ${revenueView === 'table' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
+                    title="Tableau"
+                  >
+                    <Table2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <Button asChild variant="outline" size="sm" className="hidden sm:flex">
+                  <Link href="/factures">Ouvrir les factures</Link>
+                </Button>
+              </div>
+            </div>
+            {(() => {
+              const isHt = revenueUnit === 'ht';
+              const suffix = isHt ? ' HT' : '';
+              const rv = (row: RevenuePoint, key: 'devis' | 'factures' | 'encaisse') =>
+                isHt ? row[`${key}_ht`] : row[key];
+              const total = (key: 'devis' | 'factures' | 'encaisse') =>
+                dashboardData.revenueChartData.reduce((s, r) => s + rv(r, key), 0);
+              return (<>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {([['devis', 'Devis créés', 'hsl(var(--chart-3))'], ['factures', 'Factures créées', 'hsl(var(--chart-2))'], ['encaisse', 'Encaissé', 'hsl(var(--chart-1))']] as const).map(([key, label, color]) => {
+                const active = revenueSeries.has(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setRevenueSeries(prev => {
+                      const next = new Set(prev);
+                      if (next.has(key)) { if (next.size > 1) next.delete(key); }
+                      else next.add(key);
+                      return next;
+                    })}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      active ? 'border-transparent text-white' : 'border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                    style={active ? { background: color } : undefined}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: color, opacity: active ? 1 : 0.4 }} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4">
+              {revenueView === 'chart' ? (
+                <ChartContainer config={revenueChartConfig} className="h-[260px] sm:h-[280px] w-full">
+                  <BarChart data={dashboardData.revenueChartData.map(row => ({
+                    month: row.month,
+                    devis: rv(row, 'devis'),
+                    factures: rv(row, 'factures'),
+                    encaisse: rv(row, 'encaisse'),
+                  }))} margin={{ left: 4, right: 4, top: 10 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+                    <YAxis hide />
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => (
+                      <div className="flex w-full items-center justify-between gap-4">
+                        <span>{name}</span>
+                        <span className="font-medium text-foreground">{formatCurrency(Number(value || 0))}{suffix}</span>
+                      </div>
+                    )} />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    {revenueSeries.has('devis') && <Bar dataKey="devis" fill="var(--color-devis)" radius={[4, 4, 0, 0]} />}
+                    {revenueSeries.has('factures') && <Bar dataKey="factures" fill="var(--color-factures)" radius={[4, 4, 0, 0]} />}
+                    {revenueSeries.has('encaisse') && <Bar dataKey="encaisse" fill="var(--color-encaisse)" radius={[4, 4, 0, 0]} />}
+                  </BarChart>
+                </ChartContainer>
+              ) : (
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <table className="w-full text-sm min-w-[400px]">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="text-left font-medium py-2 pr-4 pl-4 sm:pl-0">Période</th>
+                        {revenueSeries.has('devis') && <th className="text-right font-medium py-2 px-3">
+                          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(var(--chart-3))' }} />Devis{suffix}</span>
+                        </th>}
+                        {revenueSeries.has('factures') && <th className="text-right font-medium py-2 px-3">
+                          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(var(--chart-2))' }} />Factures{suffix}</span>
+                        </th>}
+                        {revenueSeries.has('encaisse') && <th className="text-right font-medium py-2 pl-3 pr-4 sm:pr-0">
+                          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(var(--chart-1))' }} />Encaissé{suffix}</span>
+                        </th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboardData.revenueChartData.map((row, idx) => (
+                        <tr key={idx} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                          <td className="py-2.5 pr-4 pl-4 sm:pl-0 font-medium text-foreground">{row.month}</td>
+                          {revenueSeries.has('devis') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'devis') > 0 ? formatCurrency(rv(row, 'devis')) : <span className="text-muted-foreground">—</span>}</td>}
+                          {revenueSeries.has('factures') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'factures') > 0 ? formatCurrency(rv(row, 'factures')) : <span className="text-muted-foreground">—</span>}</td>}
+                          {revenueSeries.has('encaisse') && <td className="py-2.5 pl-3 pr-4 sm:pr-0 text-right tabular-nums font-medium">{rv(row, 'encaisse') > 0 ? formatCurrency(rv(row, 'encaisse')) : <span className="text-muted-foreground">—</span>}</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-border font-semibold">
+                        <td className="py-2.5 pr-4 pl-4 sm:pl-0">Total</td>
+                        {revenueSeries.has('devis') && <td className="py-2.5 px-3 text-right tabular-nums">{formatCurrency(total('devis'))}</td>}
+                        {revenueSeries.has('factures') && <td className="py-2.5 px-3 text-right tabular-nums">{formatCurrency(total('factures'))}</td>}
+                        {revenueSeries.has('encaisse') && <td className="py-2.5 pl-3 pr-4 sm:pr-0 text-right tabular-nums">{formatCurrency(total('encaisse'))}</td>}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+              </>);
+            })()}
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
             <Link href="/devis" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
               <KpiCard
                 title="Devis en attente"
@@ -1752,41 +1858,6 @@ export default function DashboardPage() {
               />
             </Link>
           </div>
-
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-            <div className="xl:col-span-2 rounded-xl border border-border bg-card p-4 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Dynamique business</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Devis, factures et encaissements — {periodLabel.toLowerCase()}</p>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/factures">Ouvrir les factures</Link>
-                </Button>
-              </div>
-              <div className="mt-6">
-                <ChartContainer config={revenueChartConfig} className="h-[280px] w-full">
-                  <AreaChart data={dashboardData.revenueChartData} margin={{ left: 12, right: 12, top: 10 }}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis hide />
-                    <ChartTooltip content={<ChartTooltipContent formatter={(value, name) => (
-                      <div className="flex w-full items-center justify-between gap-4">
-                        <span>{name}</span>
-                        <span className="font-medium text-foreground">{formatCurrency(Number(value || 0))}</span>
-                      </div>
-                    )} />} />
-                    <ChartLegend content={<ChartLegendContent />} />
-                    <Area type="monotone" dataKey="devis" stroke="var(--color-devis)" fill="var(--color-devis)" fillOpacity={0.08} strokeWidth={2} />
-                    <Area type="monotone" dataKey="factures" stroke="var(--color-factures)" fill="var(--color-factures)" fillOpacity={0.12} strokeWidth={2} />
-                    <Area type="monotone" dataKey="encaisse" stroke="var(--color-encaisse)" fill="var(--color-encaisse)" fillOpacity={0.18} strokeWidth={3} />
-                  </AreaChart>
-                </ChartContainer>
-              </div>
-            </div>
-
-          </div>
-
 
           {dashboardData.activeContractsCount > 0 && (
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
