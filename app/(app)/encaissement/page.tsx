@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import {
   CreditCard,
@@ -133,7 +133,7 @@ export default function EncaissementPage() {
   const [step, setStep] = useState<Step>('form');
   const [error, setError] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [stripeAccountId, setStripeAccountId] = useState('');
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState('');
 
   // Recent payments
@@ -245,8 +245,11 @@ export default function EncaissementPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur creation paiement');
 
+      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey) throw new Error('Configuration Stripe manquante');
+
       setClientSecret(data.client_secret);
-      setStripeAccountId(data.stripe_account_id);
+      setStripePromise(loadStripe(publishableKey, { stripeAccount: data.stripe_account_id }));
       setStep('payment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur paiement');
@@ -273,7 +276,7 @@ export default function EncaissementPage() {
     setStep('form');
     setError('');
     setClientSecret('');
-    setStripeAccountId('');
+    setStripePromise(null);
     setCreatedInvoiceNumber('');
   }
 
@@ -303,8 +306,6 @@ export default function EncaissementPage() {
       </div>
     );
   }
-
-  const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
@@ -430,14 +431,14 @@ export default function EncaissementPage() {
       )}
 
       {/* STEP: PAYMENT — Stripe Payment Element */}
-      {step === 'payment' && clientSecret && stripePublishableKey && (
+      {step === 'payment' && clientSecret && stripePromise && (
         <div className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-base font-semibold mb-4">Paiement par carte</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Donnez votre telephone au client pour qu&apos;il entre sa carte, ou utilisez Apple Pay / Google Pay.
           </p>
           <Elements
-            stripe={loadStripe(stripePublishableKey, { stripeAccount: stripeAccountId })}
+            stripe={stripePromise}
             options={{
               clientSecret,
               appearance: {
