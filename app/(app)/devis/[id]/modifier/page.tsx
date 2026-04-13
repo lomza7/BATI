@@ -14,6 +14,9 @@ import {
   Search,
   Save,
   Receipt,
+  Layers,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -176,7 +179,25 @@ export default function ModifierDevisPage() {
   }
 
   function addLine() {
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20 }]);
+    const lastSection = lines.length > 0 ? lines[lines.length - 1].section : undefined;
+    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: lastSection }]);
+  }
+
+  function addSection() {
+    const name = prompt('Nom de la section :');
+    if (!name?.trim()) return;
+    const lastSection = lines.length > 0 ? lines[lines.length - 1].section : undefined;
+    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: name.trim() }]);
+  }
+
+  function renameSection(oldName: string) {
+    const newName = prompt('Renommer la section :', oldName);
+    if (!newName?.trim() || newName.trim() === oldName) return;
+    setLines(lines.map(l => l.section === oldName ? { ...l, section: newName.trim() } : l));
+  }
+
+  function deleteSection(sectionName: string) {
+    setLines(lines.map(l => l.section === sectionName ? { ...l, section: undefined } : l));
   }
 
   function updateLine(index: number, field: keyof QuoteLine, value: string | number) {
@@ -455,93 +476,6 @@ export default function ModifierDevisPage() {
               />
             </div>
 
-            {/* Recurring contract toggle */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-xl border border-border p-3">
-                <div className="flex items-center gap-2.5">
-                  <RefreshCw className="h-4 w-4 text-[#d35400]" />
-                  <div>
-                    <p className="text-sm font-medium">Contrat récurrent</p>
-                    <p className="text-xs text-muted-foreground">Ce devis créera un contrat avec facturation automatique</p>
-                  </div>
-                </div>
-                <Switch checked={isRecurringQuote} onCheckedChange={setIsRecurringQuote} />
-              </div>
-              {isRecurringQuote && (
-                <div className="rounded-lg bg-orange-50/70 border border-orange-200/60 p-3 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-medium text-orange-800 whitespace-nowrap">Fréquence :</label>
-                    <select
-                      value={recurringFrequency}
-                      onChange={e => setRecurringFrequency(e.target.value)}
-                      className="h-8 rounded-md border border-orange-200 bg-white px-2 text-xs text-orange-900"
-                    >
-                      <option value="mensuel">Mensuel</option>
-                      <option value="trimestriel">Trimestriel</option>
-                      <option value="annuel">Annuel</option>
-                    </select>
-                  </div>
-                  <p className="text-[11px] text-orange-700 leading-relaxed">
-                    Une fois signé par le client, un contrat récurrent sera créé et des factures seront générées automatiquement à chaque échéance.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Acompte */}
-            <div className="rounded-xl border border-border p-3 space-y-2">
-              <div className="flex items-center gap-2.5">
-                <Receipt className="h-4 w-4 text-[#d35400]" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Acompte à la signature</p>
-                  <p className="text-xs text-muted-foreground">Le client verra le montant de l&apos;acompte sur le devis</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {[30, 40, 50].map(pct => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => setDepositPercentage(depositPercentage === String(pct) ? '' : String(pct))}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                      depositPercentage === String(pct)
-                        ? 'bg-[#d35400] text-white'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    )}
-                  >
-                    {pct}%
-                  </button>
-                ))}
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    step="any"
-                    placeholder="Autre %"
-                    value={depositPercentage && ![30, 40, 50].includes(Number(depositPercentage)) ? depositPercentage : ''}
-                    onChange={e => {
-                      const v = e.target.value;
-                      if (v === '' || (Number(v) > 0 && Number(v) <= 100)) setDepositPercentage(v);
-                    }}
-                    className="h-8 w-24 text-xs pr-6"
-                  />
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                </div>
-                {depositPercentage && (
-                  <button type="button" onClick={() => setDepositPercentage('')} className="text-muted-foreground hover:text-destructive transition-colors">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {depositPercentage && Number(depositPercentage) > 0 && linesTotals.total_ht > 0 && (
-                <p className="text-xs text-[#d35400] font-medium">
-                  Soit {formatCurrency(computeDepositAmount('percentage', Number(depositPercentage), linesTotals.total_ht, linesTotals.tva_breakdown[0]?.rate ?? 20).total_ttc)} TTC à la signature
-                </p>
-              )}
-            </div>
-
             {/* Lines */}
             <div>
               <div className="flex items-center justify-between mb-3 gap-2">
@@ -558,6 +492,9 @@ export default function ModifierDevisPage() {
                   >
                     <Package className="h-3 w-3" /> Prestations
                   </Button>
+                  <Button variant="outline" size="sm" onClick={addSection} className="gap-1 text-xs">
+                    <Layers className="h-3 w-3" /> Section
+                  </Button>
                   <Button variant="outline" size="sm" onClick={addLine} className="gap-1 text-xs">
                     <Plus className="h-3 w-3" /> Ligne
                   </Button>
@@ -566,6 +503,22 @@ export default function ModifierDevisPage() {
 
               <div className="space-y-2">
                 {lines.map((line, i) => (
+                  <>
+                  {/* Section header */}
+                  {line.section && (i === 0 || lines[i - 1].section !== line.section) && (
+                    <div key={`section-${i}`} className="flex items-center gap-2 pt-2 first:pt-0">
+                      <div className="flex-1 flex items-center gap-2 rounded-lg bg-muted/70 border border-border px-3 py-2">
+                        <Layers className="h-3.5 w-3.5 text-[#d35400]" />
+                        <span className="text-sm font-semibold text-foreground">{line.section}</span>
+                      </div>
+                      <button type="button" onClick={() => renameSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => deleteSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                   <div key={i} className="rounded-lg border border-border bg-card p-2.5 sm:p-3">
                     {/* Mobile: stacked layout */}
                     <div className="sm:hidden space-y-2">
@@ -755,6 +708,7 @@ export default function ModifierDevisPage() {
                       )}
                     </div>
                   </div>
+                  </>
                 ))}
               </div>
 
@@ -791,6 +745,96 @@ export default function ModifierDevisPage() {
               <div className="text-right flex-shrink-0">
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Total TTC</p>
                 <p className="text-xl sm:text-3xl font-bold text-foreground">{formatCurrency(linesTotals.total_ttc)}</p>
+              </div>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3">
+              {/* Acompte */}
+              <div className="rounded-xl border border-border p-3 space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <Receipt className="h-4 w-4 text-[#d35400]" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Acompte à la signature</p>
+                    <p className="text-xs text-muted-foreground">Le client verra le montant de l&apos;acompte sur le devis</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[30, 40, 50].map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setDepositPercentage(depositPercentage === String(pct) ? '' : String(pct))}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                        depositPercentage === String(pct)
+                          ? 'bg-[#d35400] text-white'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      )}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step="any"
+                      placeholder="Autre %"
+                      value={depositPercentage && ![30, 40, 50].includes(Number(depositPercentage)) ? depositPercentage : ''}
+                      onChange={e => {
+                        const v = e.target.value;
+                        if (v === '' || (Number(v) > 0 && Number(v) <= 100)) setDepositPercentage(v);
+                      }}
+                      className="h-8 w-24 text-xs pr-6"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                  {depositPercentage && (
+                    <button type="button" onClick={() => setDepositPercentage('')} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                {depositPercentage && Number(depositPercentage) > 0 && linesTotals.total_ht > 0 && (
+                  <p className="text-xs text-[#d35400] font-medium">
+                    Soit {formatCurrency(computeDepositAmount('percentage', Number(depositPercentage), linesTotals.total_ht, linesTotals.tva_breakdown[0]?.rate ?? 20).total_ttc)} TTC à la signature
+                  </p>
+                )}
+              </div>
+
+              {/* Recurring contract toggle */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                  <div className="flex items-center gap-2.5">
+                    <RefreshCw className="h-4 w-4 text-[#d35400]" />
+                    <div>
+                      <p className="text-sm font-medium">Contrat récurrent</p>
+                      <p className="text-xs text-muted-foreground">Ce devis créera un contrat avec facturation automatique</p>
+                    </div>
+                  </div>
+                  <Switch checked={isRecurringQuote} onCheckedChange={setIsRecurringQuote} />
+                </div>
+                {isRecurringQuote && (
+                  <div className="rounded-lg bg-orange-50/70 border border-orange-200/60 p-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs font-medium text-orange-800 whitespace-nowrap">Fréquence :</label>
+                      <select
+                        value={recurringFrequency}
+                        onChange={e => setRecurringFrequency(e.target.value)}
+                        className="h-8 rounded-md border border-orange-200 bg-white px-2 text-xs text-orange-900"
+                      >
+                        <option value="mensuel">Mensuel</option>
+                        <option value="trimestriel">Trimestriel</option>
+                        <option value="annuel">Annuel</option>
+                      </select>
+                    </div>
+                    <p className="text-[11px] text-orange-700 leading-relaxed">
+                      Une fois signé par le client, un contrat récurrent sera créé et des factures seront générées automatiquement à chaque échéance.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
