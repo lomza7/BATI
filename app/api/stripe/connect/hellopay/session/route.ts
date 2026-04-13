@@ -31,6 +31,9 @@ export async function POST(request: Request) {
   if (!amount_cents || amount_cents <= 0) {
     return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
   }
+  if (!invoice_id) {
+    return NextResponse.json({ error: 'invoice_id requis' }, { status: 400 });
+  }
 
   // Fetch artisan's Stripe connection
   const { data: connection } = await supabaseAdmin
@@ -64,7 +67,7 @@ export async function POST(request: Request) {
         application_fee_amount: feeCents,
         description: description || 'HelloPay',
         metadata: {
-          ...(invoice_id ? { invoice_id } : {}),
+          invoice_id,
           source: 'hellopay',
         },
       },
@@ -73,29 +76,25 @@ export async function POST(request: Request) {
 
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
-    // Create payment session via RPC (bypasses PostgREST schema cache)
-    const { data: sessionId, error: sessionError } = await supabaseAdmin
-      .rpc('create_payment_session', {
-        p_user_id: user.id,
-        p_invoice_id: invoice_id || null,
-        p_stripe_account_id: connection.stripe_account_id,
-        p_payment_intent_id: paymentIntent.id,
-        p_client_secret: paymentIntent.client_secret!,
-        p_publishable_key: publishableKey,
-        p_amount_cents: amount_cents,
-        p_description: description || 'HelloPay',
-      });
+    // Store payment session data on the invoice itself (avoids payment_sessions table / PostgREST cache issue)
+    const { error: updateError } = await supabaseAdmin
+      .from('invoices')
+      .update({
+        payment_client_secret: paymentIntent.client_secret,
+        payment_stripe_account_id: connection.stripe_account_id,
+        payment_publishable_key: publishableKey,
+      })
+      .eq('id', invoice_id);
 
-    if (sessionError || !sessionId) {
-      console.error('payment_sessions rpc error', JSON.stringify(sessionError));
-      return NextResponse.json({ error: `Erreur creation session: ${sessionError?.message || 'unknown'}` }, { status: 500 });
+    if (updateError) {
+      console.error('invoice update error', JSON.stringify(updateError));
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
-    const payUrl = `${siteUrl}/pay/${sessionId}`;
+    const payUrl = `${siteUrl}/pay/${invoice_id}`;
 
     return NextResponse.json({
-      session_id: sessionId,
+      session_id: invoice_id,
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
       stripe_account_id: connection.stripe_account_id,

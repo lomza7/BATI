@@ -36,12 +36,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ received: true });
     }
 
-    // Mark payment session as completed
-    await supabaseAdmin
-      .from('payment_sessions')
-      .update({ status: 'completed' })
-      .eq('payment_intent_id', pi.id);
-
     // Mark invoice as paid
     const invoiceId = pi.metadata?.invoice_id;
     if (invoiceId) {

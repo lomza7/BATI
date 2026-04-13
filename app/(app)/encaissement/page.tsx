@@ -385,11 +385,11 @@ export default function EncaissementPage() {
     pollingRef.current = setInterval(async () => {
       if (!sessionData) return;
       const { data } = await supabase
-        .from('payment_sessions')
+        .from('invoices')
         .select('status')
         .eq('id', sessionData.session_id)
         .maybeSingle();
-      if (data?.status === 'completed') {
+      if (data?.status === 'payee') {
         if (pollingRef.current) clearInterval(pollingRef.current);
         handlePaymentSuccess();
       }

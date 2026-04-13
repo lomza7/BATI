@@ -18,7 +18,7 @@ const supabaseAnon = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
-interface PaymentSession {
+interface PaySession {
   id: string;
   stripe_account_id: string;
   client_secret: string;
@@ -26,7 +26,6 @@ interface PaymentSession {
   amount_cents: number;
   description: string | null;
   status: string;
-  expires_at: string;
 }
 
 function formatEur(cents: number) {
@@ -50,17 +49,13 @@ function PayForm({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
 
-  // Set up Payment Request (Apple Pay / Google Pay)
   useEffect(() => {
     if (!stripe) return;
 
     const pr = stripe.paymentRequest({
       country: 'FR',
       currency: 'eur',
-      total: {
-        label: 'HelloPay',
-        amount: amountCents,
-      },
+      total: { label: 'HelloPay', amount: amountCents },
       requestPayerName: true,
     });
 
@@ -78,7 +73,6 @@ function PayForm({
         ev.complete('fail');
         return;
       }
-
       const { error: confirmError } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -87,7 +81,6 @@ function PayForm({
         },
         redirect: 'if_required',
       });
-
       if (confirmError) {
         ev.complete('fail');
         setError(confirmError.message || 'Le paiement a echoue');
@@ -107,9 +100,7 @@ function PayForm({
 
     const { error: confirmError } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        return_url: window.location.href,
-      },
+      confirmParams: { return_url: window.location.href },
       redirect: 'if_required',
     });
 
@@ -123,7 +114,6 @@ function PayForm({
 
   return (
     <div className="space-y-5">
-      {/* Apple Pay / Google Pay button */}
       {canPay && paymentRequest && (
         <div>
           <PaymentRequestButtonElement
@@ -147,7 +137,6 @@ function PayForm({
         </p>
       )}
 
-      {/* Card payment form */}
       <form onSubmit={handleCardSubmit}>
         <div className="rounded-lg border border-gray-200 p-4">
           <PaymentElement
@@ -188,9 +177,9 @@ function PayForm({
 
 export default function PublicPayPage() {
   const params = useParams();
-  const sessionId = params.id as string;
+  const invoiceId = params.id as string;
 
-  const [session, setSession] = useState<PaymentSession | null>(null);
+  const [session, setSession] = useState<PaySession | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -198,15 +187,16 @@ export default function PublicPayPage() {
 
   useEffect(() => {
     loadSession();
-  }, [sessionId]);
+  }, [invoiceId]);
 
   async function loadSession() {
-    if (!sessionId) return;
+    if (!invoiceId) return;
 
+    // Fetch invoice with payment session data
     const { data, error: fetchError } = await supabaseAnon
-      .from('payment_sessions')
-      .select('*')
-      .eq('id', sessionId)
+      .from('invoices')
+      .select('id, title, total_ttc, status, payment_client_secret, payment_stripe_account_id, payment_publishable_key')
+      .eq('id', invoiceId)
       .maybeSingle();
 
     if (fetchError || !data) {
@@ -215,36 +205,47 @@ export default function PublicPayPage() {
       return;
     }
 
-    if (data.status !== 'pending') {
+    if (data.status === 'payee') {
       setPaid(true);
-      setSession(data as PaymentSession);
+      setSession({
+        id: data.id,
+        stripe_account_id: data.payment_stripe_account_id || '',
+        client_secret: data.payment_client_secret || '',
+        publishable_key: data.payment_publishable_key || '',
+        amount_cents: Math.round(Number(data.total_ttc) * 100),
+        description: data.title,
+        status: 'completed',
+      });
       setLoading(false);
       return;
     }
 
-    if (new Date(data.expires_at) < new Date()) {
-      setError('Ce lien de paiement a expire');
+    if (!data.payment_client_secret || !data.payment_stripe_account_id) {
+      setError('Ce lien de paiement n\'est pas valide');
       setLoading(false);
       return;
     }
 
-    setSession(data as PaymentSession);
+    const s: PaySession = {
+      id: data.id,
+      stripe_account_id: data.payment_stripe_account_id,
+      client_secret: data.payment_client_secret,
+      publishable_key: data.payment_publishable_key || '',
+      amount_cents: Math.round(Number(data.total_ttc) * 100),
+      description: data.title,
+      status: 'pending',
+    };
+
+    setSession(s);
     setStripePromise(
-      loadStripe(data.publishable_key, { stripeAccount: data.stripe_account_id }),
+      loadStripe(s.publishable_key, { stripeAccount: s.stripe_account_id }),
     );
     setLoading(false);
   }
 
   const handleSuccess = useCallback(async () => {
     setPaid(true);
-    // Mark session as completed
-    if (session) {
-      await supabaseAnon
-        .from('payment_sessions')
-        .update({ status: 'completed' })
-        .eq('id', session.id);
-    }
-  }, [session]);
+  }, []);
 
   if (loading) {
     return (
@@ -293,7 +294,6 @@ export default function PublicPayPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <span className="text-lg font-bold" style={{ color: '#D35400' }}>Hellobat</span>
@@ -304,10 +304,8 @@ export default function PublicPayPage() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 flex items-start justify-center px-4 py-8">
         <div className="max-w-md w-full space-y-6">
-          {/* Amount card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 text-center">
             <p className="text-sm text-gray-500 mb-1">Montant a regler</p>
             <p className="text-3xl font-bold text-gray-900">{formatEur(session.amount_cents)}</p>
@@ -316,7 +314,6 @@ export default function PublicPayPage() {
             )}
           </div>
 
-          {/* Payment form */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <Elements
               stripe={stripePromise}
