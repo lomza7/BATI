@@ -449,7 +449,7 @@ export default function NouveauDevisPage() {
   const linesTotals = computeTvaBreakdown(lines.filter(l => l.description.trim()));
 
   return (
-    <div className="-mx-4 sm:-mx-6 lg:-mx-8 -my-5 lg:-my-8 flex flex-col min-h-[100dvh] sm:h-[calc(100vh-3.5rem)]">
+    <div className="-mx-4 sm:-mx-6 lg:-mx-8 -my-5 lg:-my-8 flex flex-col min-h-[100dvh] sm:h-screen">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
