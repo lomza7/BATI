@@ -27,6 +27,7 @@ import { Testimonials } from '@/components/landing/testimonials';
 import { FAQ } from '@/components/landing/faq';
 import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
+import { StandaloneRedirect } from '@/components/landing/standalone-redirect';
 
 export const metadata: Metadata = {
   title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA | Logiciel bâtiment',
@@ -56,6 +57,7 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[var(--landing-off)]">
+      <StandaloneRedirect />
       <Navbar />
       <Hero />
       <Marquee />
