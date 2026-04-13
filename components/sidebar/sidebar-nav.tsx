@@ -35,6 +35,7 @@ const navGroups: NavGroup[] = [
       { label: 'Factures', href: '/factures', emoji: '🧾' },
       { label: 'Mes prestations', href: '/prestations', emoji: '🛠️' },
       { label: 'Mes documents', href: '/documents', emoji: '📁' },
+      { label: 'HelloPay', href: '/encaissement', emoji: '📱' },
     ],
   },
   {
@@ -71,7 +72,6 @@ const navGroups: NavGroup[] = [
   {
     title: 'Finance',
     items: [
-      { label: 'Encaissement', href: '/encaissement', emoji: '📱' },
       { label: 'Paiement Stripe', href: '/paiements', emoji: '💳' },
       { label: 'Contrats récurrents', href: '/contrats', emoji: '🔄' },
       { label: 'Comptabilité IA', href: '/comptabilite', emoji: '🧮' },

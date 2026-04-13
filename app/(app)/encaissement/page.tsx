@@ -1,17 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadStripeTerminal } from '@stripe/terminal-js';
-import type { Terminal, Reader } from '@stripe/terminal-js';
+import { useCallback, useEffect, useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import {
   CreditCard,
   Loader2,
-  Wifi,
-  WifiOff,
   Check,
   X,
-  Smartphone,
-  RefreshCw,
   Receipt,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -32,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-type Step = 'form' | 'discover' | 'connecting' | 'ready' | 'collecting' | 'processing' | 'success' | 'error';
+type Step = 'form' | 'payment' | 'processing' | 'success' | 'error';
 
 interface RecentPayment {
   id: string;
@@ -45,9 +41,82 @@ interface RecentPayment {
   clients: { name: string } | null;
 }
 
+// ---------- Payment form (inside Elements provider) ----------
+
+function PaymentForm({
+  totalTtc,
+  onSuccess,
+  onError,
+  onCancel,
+}: {
+  totalTtc: number;
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: window.location.href,
+      },
+      redirect: 'if_required',
+    });
+
+    if (error) {
+      setProcessing(false);
+      onError(error.message || 'Le paiement a echoue');
+    } else {
+      onSuccess();
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="rounded-lg border border-border/70 bg-muted/30 p-4 flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">Montant a encaisser</span>
+        <span className="text-xl font-bold">{formatCurrency(totalTtc)}</span>
+      </div>
+
+      <div className="rounded-lg border border-border p-4">
+        <PaymentElement
+          onReady={() => setReady(true)}
+          options={{
+            layout: 'tabs',
+            wallets: { applePay: 'auto', googlePay: 'auto' },
+          }}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" className="flex-1" onClick={onCancel} disabled={processing}>
+          Retour
+        </Button>
+        <Button type="submit" className="flex-1" size="lg" disabled={!stripe || !ready || processing}>
+          {processing ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Traitement...</>
+          ) : (
+            <><CreditCard className="mr-2 h-4 w-4" /> Encaisser {formatCurrency(totalTtc)}</>
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ---------- Main page ----------
+
 export default function EncaissementPage() {
   const { user, session } = useAuth();
-  const terminalRef = useRef<Terminal | null>(null);
 
   // Stripe status
   const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
@@ -60,14 +129,11 @@ export default function EncaissementPage() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [bankAccountId, setBankAccountId] = useState<string | null>(null);
 
-  // Terminal
+  // Payment
   const [step, setStep] = useState<Step>('form');
-  const [readers, setReaders] = useState<Reader[]>([]);
-  const [selectedReader, setSelectedReader] = useState<Reader | null>(null);
-  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState('');
-
-  // Created invoice
+  const [clientSecret, setClientSecret] = useState('');
+  const [stripeAccountId, setStripeAccountId] = useState('');
   const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState('');
 
   // Recent payments
@@ -102,93 +168,20 @@ export default function EncaissementPage() {
     const { data } = await supabase
       .from('invoices')
       .select('id, invoice_number, title, total_ttc, status, paid_at, created_at, clients(name)')
-      .eq('payment_method', 'terminal')
+      .in('payment_method', ['terminal', 'hellopay'])
       .order('created_at', { ascending: false })
       .limit(10);
     setRecentPayments((data as unknown as RecentPayment[]) || []);
   }
 
-  const fetchConnectionToken = useCallback(async () => {
-    const res = await fetch('/api/stripe/terminal/connection-token', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session?.access_token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Erreur connection token');
-    return data.secret;
-  }, [session?.access_token]);
+  async function startPayment() {
+    if (!session?.access_token || !user || totalTtc <= 0) return;
 
-  async function initTerminalAndDiscover() {
-    setStep('discover');
-    setError('');
-    setDiscovering(true);
-
-    try {
-      if (!terminalRef.current) {
-        const StripeTerminal = await loadStripeTerminal();
-        if (!StripeTerminal) throw new Error('Impossible de charger le SDK Terminal');
-
-        const terminal = StripeTerminal.create({
-          onFetchConnectionToken: fetchConnectionToken,
-          onUnexpectedReaderDisconnect: () => {
-            setStep('error');
-            setError('Le lecteur a été déconnecté');
-            setSelectedReader(null);
-          },
-        });
-        terminalRef.current = terminal;
-      }
-
-      const result = await terminalRef.current.discoverReaders({ simulated: false });
-      if ('error' in result && result.error) {
-        setError(result.error.message || 'Impossible de trouver des lecteurs');
-      } else if ('discoveredReaders' in result) {
-        setReaders(result.discoveredReaders);
-        if (result.discoveredReaders.length === 0) {
-          setError('Aucun lecteur détecté. Vérifiez que votre lecteur est allumé et connecté au Wi-Fi.');
-        }
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur découverte lecteurs');
-    } finally {
-      setDiscovering(false);
-    }
-  }
-
-  async function connectToReader(reader: Reader) {
-    const terminal = terminalRef.current;
-    if (!terminal) return;
-
-    setStep('connecting');
+    setStep('processing');
     setError('');
 
     try {
-      const result = await terminal.connectReader(reader);
-      if ('error' in result && result.error) {
-        setError(result.error.message || 'Impossible de se connecter au lecteur');
-        setStep('discover');
-        return;
-      }
-      setSelectedReader(reader);
-      setStep('ready');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur connexion lecteur');
-      setStep('discover');
-    }
-  }
-
-  async function collectPayment() {
-    const terminal = terminalRef.current;
-    if (!terminal || !session?.access_token || !user) return;
-
-    setStep('collecting');
-    setError('');
-
-    try {
-      // 1. Create invoice in Hellobat
+      // 1. Create invoice
       const tva = computeTvaBreakdown([
         { quantity: 1, unit_price: totalHt, tva_rate: tvaRate },
       ]);
@@ -204,7 +197,7 @@ export default function EncaissementPage() {
         invoice_number: invoiceNumber,
         client_id: clientId,
         bank_account_id: bankAccountId,
-        title: title || 'Encaissement Terminal',
+        title: title || 'HelloPay',
         total_ht: tva.total_ht,
         total_tva: tva.total_tva,
         total_ttc: tva.total_ttc,
@@ -213,17 +206,17 @@ export default function EncaissementPage() {
         due_date: dueDate.toISOString().split('T')[0],
         status: 'creee',
         issued_at: new Date().toISOString(),
-        payment_method: 'terminal',
+        payment_method: 'hellopay',
       }).select('id').single();
 
-      if (!invoice) throw new Error('Erreur création facture');
+      if (!invoice) throw new Error('Erreur creation facture');
 
       // Create invoice line
       if (totalHt > 0) {
         await supabase.from('invoice_lines').insert({
           user_id: user.id,
           invoice_id: invoice.id,
-          description: title || 'Encaissement Terminal',
+          description: title || 'HelloPay',
           quantity: 1,
           unit: 'forfait',
           unit_price: totalHt,
@@ -235,43 +228,40 @@ export default function EncaissementPage() {
 
       setCreatedInvoiceNumber(invoiceNumber);
 
-      // 2. Create PaymentIntent on backend
-      const res = await fetch('/api/stripe/terminal/create-payment-intent', {
+      // 2. Create PaymentIntent via API
+      const amountCents = Math.round(tva.total_ttc * 100);
+      const res = await fetch('/api/stripe/connect/hellopay', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ invoice_id: invoice.id }),
+        body: JSON.stringify({
+          amount_cents: amountCents,
+          description: `${invoiceNumber} — ${title || 'HelloPay'}`,
+          invoice_id: invoice.id,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erreur création paiement');
+      if (!res.ok) throw new Error(data.error || 'Erreur creation paiement');
 
-      // 3. Collect payment method from reader
-      const collectResult = await terminal.collectPaymentMethod(data.clientSecret);
-      if ('error' in collectResult && collectResult.error) {
-        throw new Error(collectResult.error.message || 'Paiement annulé');
-      }
-
-      // 4. Process payment
-      setStep('processing');
-      const paymentIntent = 'paymentIntent' in collectResult
-        ? collectResult.paymentIntent
-        : collectResult;
-      const processResult = await terminal.processPayment(
-        paymentIntent as Parameters<Terminal['processPayment']>[0],
-      );
-
-      if ('error' in processResult && processResult.error) {
-        throw new Error(processResult.error.message || 'Paiement refusé');
-      }
-
-      setStep('success');
-      loadRecentPayments();
+      setClientSecret(data.client_secret);
+      setStripeAccountId(data.stripe_account_id);
+      setStep('payment');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur paiement');
       setStep('error');
     }
+  }
+
+  function handlePaymentSuccess() {
+    setStep('success');
+    loadRecentPayments();
+  }
+
+  function handlePaymentError(msg: string) {
+    setError(msg);
+    setStep('error');
   }
 
   function resetForm() {
@@ -282,6 +272,8 @@ export default function EncaissementPage() {
     setBankAccountId(null);
     setStep('form');
     setError('');
+    setClientSecret('');
+    setStripeAccountId('');
     setCreatedInvoiceNumber('');
   }
 
@@ -296,12 +288,12 @@ export default function EncaissementPage() {
   if (stripeConnected === false) {
     return (
       <div className="p-4 sm:p-6 max-w-2xl mx-auto">
-        <PageHeader title="Encaissement" description="Encaissez vos clients en personne avec un lecteur de carte" />
+        <PageHeader title="HelloPay" description="Encaissez vos clients directement depuis votre telephone" />
         <div className="mt-8">
           <EmptyState
             icon={CreditCard}
-            title="Stripe non connecté"
-            description="Connectez votre compte Stripe dans la section Paiements pour pouvoir encaisser par Terminal."
+            title="Stripe non connecte"
+            description="Connectez votre compte Stripe dans la section Paiements pour activer HelloPay."
           >
             <Button onClick={() => window.location.href = '/paiements'}>
               Configurer Stripe
@@ -312,9 +304,11 @@ export default function EncaissementPage() {
     );
   }
 
+  const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
-      <PageHeader title="Encaissement" description="Encaissez vos clients en personne avec un lecteur de carte" />
+      <PageHeader title="HelloPay" description="Encaissez vos clients directement depuis votre telephone" />
 
       {/* STEP: FORM */}
       {step === 'form' && (
@@ -384,7 +378,7 @@ export default function EncaissementPage() {
             <Button
               className="w-full"
               size="lg"
-              onClick={initTerminalAndDiscover}
+              onClick={startPayment}
               disabled={totalHt <= 0}
             >
               <CreditCard className="mr-2 h-4 w-4" />
@@ -392,7 +386,7 @@ export default function EncaissementPage() {
             </Button>
           </div>
 
-          {/* Recent Terminal payments */}
+          {/* Recent payments */}
           {recentPayments.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-base font-semibold">Derniers encaissements</h2>
@@ -425,128 +419,41 @@ export default function EncaissementPage() {
         </div>
       )}
 
-      {/* STEP: DISCOVER READERS */}
-      {step === 'discover' && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <h2 className="text-base font-semibold">Connexion au lecteur</h2>
-
-          {discovering ? (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Recherche de lecteurs...</p>
-            </div>
-          ) : readers.length > 0 ? (
-            <div className="space-y-2">
-              {readers.map((reader) => (
-                <button
-                  key={reader.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:bg-accent"
-                  onClick={() => connectToReader(reader)}
-                >
-                  <Smartphone className="h-6 w-6 text-primary" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {reader.label || reader.id}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {reader.device_type} — {reader.status}
-                    </p>
-                  </div>
-                  <Wifi className="h-4 w-4 text-green-500" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <WifiOff className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground text-center">
-                {error || 'Aucun lecteur trouvé'}
-              </p>
-              <p className="text-xs text-muted-foreground text-center max-w-xs">
-                Vérifiez que votre lecteur est allumé, connecté au Wi-Fi et sur le même réseau que votre appareil.
-              </p>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setStep('form')}>
-              Retour
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={() => initTerminalAndDiscover()} disabled={discovering}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Rechercher
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP: CONNECTING */}
-      {step === 'connecting' && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Connexion au lecteur...</p>
-          </div>
-        </div>
-      )}
-
-      {/* STEP: READY — confirm payment */}
-      {step === 'ready' && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3">
-            <Wifi className="h-4 w-4 text-green-600" />
-            <p className="text-sm text-green-800">
-              Connecté à <span className="font-medium">{selectedReader?.label || selectedReader?.id}</span>
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-border/70 bg-muted/30 p-4 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Objet</span>
-              <span className="font-medium">{title || 'Encaissement Terminal'}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Montant TTC</span>
-              <span className="text-lg font-semibold">{formatCurrency(totalTtc)}</span>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setStep('form')}>
-              Annuler
-            </Button>
-            <Button className="flex-1" size="lg" onClick={collectPayment}>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Encaisser
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP: COLLECTING — waiting for card */}
-      {step === 'collecting' && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex flex-col items-center gap-4 py-10">
-            <div className="relative">
-              <CreditCard className="h-14 w-14 text-primary" />
-              <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-orange-400 animate-pulse" />
-            </div>
-            <div className="text-center">
-              <p className="text-base font-medium">Présentez la carte</p>
-              <p className="text-sm text-muted-foreground mt-1">{formatCurrency(totalTtc)}</p>
-            </div>
-            <p className="text-xs text-muted-foreground">En attente du paiement sur le lecteur...</p>
-          </div>
-        </div>
-      )}
-
-      {/* STEP: PROCESSING */}
+      {/* STEP: PROCESSING (creating invoice + payment intent) */}
       {step === 'processing' && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex flex-col items-center gap-3 py-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Traitement du paiement...</p>
+            <p className="text-sm text-muted-foreground">Preparation du paiement...</p>
           </div>
+        </div>
+      )}
+
+      {/* STEP: PAYMENT — Stripe Payment Element */}
+      {step === 'payment' && clientSecret && stripePublishableKey && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-base font-semibold mb-4">Paiement par carte</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Donnez votre telephone au client pour qu&apos;il entre sa carte, ou utilisez Apple Pay / Google Pay.
+          </p>
+          <Elements
+            stripe={loadStripe(stripePublishableKey, { stripeAccount: stripeAccountId })}
+            options={{
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: { colorPrimary: '#d35400' },
+              },
+              locale: 'fr',
+            }}
+          >
+            <PaymentForm
+              totalTtc={totalTtc}
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+              onCancel={() => setStep('form')}
+            />
+          </Elements>
         </div>
       )}
 
@@ -558,13 +465,13 @@ export default function EncaissementPage() {
               <Check className="h-8 w-8 text-green-600" />
             </div>
             <div className="text-center">
-              <p className="text-lg font-semibold text-green-800">Paiement encaissé</p>
+              <p className="text-lg font-semibold text-green-800">Paiement encaisse</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(totalTtc)}</p>
             </div>
             {createdInvoiceNumber && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Receipt className="h-4 w-4" />
-                Facture {createdInvoiceNumber} créée automatiquement
+                Facture {createdInvoiceNumber} creee automatiquement
               </div>
             )}
             <Button className="mt-4" size="lg" onClick={resetForm}>
@@ -587,9 +494,11 @@ export default function EncaissementPage() {
             <Button variant="outline" className="flex-1" onClick={resetForm}>
               Recommencer
             </Button>
-            <Button className="flex-1" onClick={() => setStep(selectedReader ? 'ready' : 'discover')}>
-              Réessayer
-            </Button>
+            {clientSecret && (
+              <Button className="flex-1" onClick={() => setStep('payment')}>
+                Reessayer
+              </Button>
+            )}
           </div>
         </div>
       )}
