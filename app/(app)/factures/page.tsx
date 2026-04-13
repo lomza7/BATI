@@ -50,6 +50,7 @@ import {
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
+import { ClientPicker, type Client } from '@/components/shared/client-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { QuoteBillingCard } from '@/components/devis/quote-billing-card';
 import type { DepositInvoice } from '@/lib/invoices/deposits';
@@ -142,7 +143,8 @@ export default function FacturesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
-  const [form, setForm] = useState({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
+  const [form, setForm] = useState({ title: '', totalHt: 0, tvaRate: 20 });
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
   const [hasBankAccount, setHasBankAccount] = useState<boolean | null>(null);
   const [showFirstRibDialog, setShowFirstRibDialog] = useState(false);
@@ -175,9 +177,7 @@ export default function FacturesPage() {
     } else if (paramClientId || paramProjectId) {
       if (paramProjectId) prefillProjectId.current = paramProjectId;
       if (paramClientId) {
-        supabase.from('clients').select('name').eq('id', paramClientId).is('deleted_at', null).single().then(({ data }) => {
-          if (data) setForm(prev => ({ ...prev, clientName: data.name }));
-        });
+        setSelectedClientId(paramClientId);
       }
       setShowCreate(true);
       router.replace('/factures', { scroll: false });
@@ -338,16 +338,7 @@ export default function FacturesPage() {
   async function createInvoice() {
     if (!user) return;
 
-    let clientId: string | null = null;
-    if (form.clientName.trim()) {
-      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).is('deleted_at', null).maybeSingle();
-      if (existing) {
-        clientId = existing.id;
-      } else {
-        const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();
-        clientId = newC?.id || null;
-      }
-    }
+    const clientId = selectedClientId;
     const invNumber = await getNextInvoiceNumber(supabase, user.id);
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
@@ -387,7 +378,8 @@ export default function FacturesPage() {
     }
 
     setShowCreate(false);
-    setForm({ title: '', clientName: '', totalHt: 0, tvaRate: 20 });
+    setForm({ title: '', totalHt: 0, tvaRate: 20 });
+    setSelectedClientId(null);
     setSelectedBankAccountId(null);
     prefillProjectId.current = null;
     loadData();
@@ -1032,7 +1024,11 @@ export default function FacturesPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Client</label>
-              <Input className="mt-1" placeholder="Nom du client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })} />
+              <ClientPicker
+                className="mt-1"
+                value={selectedClientId}
+                onChange={(id) => setSelectedClientId(id)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
