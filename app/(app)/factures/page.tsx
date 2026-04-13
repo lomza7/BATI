@@ -53,6 +53,7 @@ import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { ClientPicker, type Client } from '@/components/shared/client-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { QuoteBillingCard } from '@/components/devis/quote-billing-card';
+import { TerminalPaymentDialog } from '@/components/terminal/terminal-payment-dialog';
 import type { DepositInvoice } from '@/lib/invoices/deposits';
 import {
   Select,
@@ -129,7 +130,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 export default function FacturesPage() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
   // Utilisé quand on arrive sur /factures?billing=<quote_id> depuis une autre
@@ -158,6 +159,8 @@ export default function FacturesPage() {
   // Loaded from profiles.document_config — controls the inline warning shown
   // in the create-invoice dialog when payment terms are disabled.
   const [paymentTermsOnInvoices, setPaymentTermsOnInvoices] = useState<boolean>(true);
+  const [terminalInvoice, setTerminalInvoice] = useState<Invoice | null>(null);
+  const [stripeChargesEnabled, setStripeChargesEnabled] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -302,6 +305,19 @@ export default function FacturesPage() {
         .maybeSingle();
       const config = (profile?.document_config || {}) as { payment_terms_on_invoices?: boolean };
       setPaymentTermsOnInvoices(config.payment_terms_on_invoices !== false);
+    }
+
+    // Check Stripe Connect status for Terminal button visibility
+    if (session?.access_token) {
+      try {
+        const res = await fetch('/api/stripe/connect/status', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const data = await res.json();
+        setStripeChargesEnabled(data.charges_enabled === true);
+      } catch {
+        setStripeChargesEnabled(false);
+      }
     }
   }
 
@@ -559,6 +575,11 @@ export default function FacturesPage() {
                   <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
                     <Send className="mr-2 h-4 w-4" /> Envoyer au client
                   </DropdownMenuItem>
+                  {stripeChargesEnabled && inv.status !== 'payee' && (
+                    <DropdownMenuItem onClick={() => setTerminalInvoice(inv)}>
+                      <CreditCard className="mr-2 h-4 w-4" /> Encaisser par Terminal
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
@@ -1073,6 +1094,20 @@ export default function FacturesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {terminalInvoice && (
+        <TerminalPaymentDialog
+          open={!!terminalInvoice}
+          onOpenChange={(open) => { if (!open) setTerminalInvoice(null); }}
+          invoiceId={terminalInvoice.id}
+          invoiceNumber={terminalInvoice.invoice_number}
+          totalTtc={terminalInvoice.total_ttc}
+          onPaymentSuccess={() => {
+            setTerminalInvoice(null);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }

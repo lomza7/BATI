@@ -71,6 +71,7 @@ const navGroups: NavGroup[] = [
   {
     title: 'Finance',
     items: [
+      { label: 'Encaissement', href: '/encaissement', emoji: '📱' },
       { label: 'Paiement Stripe', href: '/paiements', emoji: '💳' },
       { label: 'Contrats récurrents', href: '/contrats', emoji: '🔄' },
       { label: 'Comptabilité IA', href: '/comptabilite', emoji: '🧮' },

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getNextInvoiceNumber } from '@/lib/document-numbers';
 
 export const runtime = 'nodejs';
 
@@ -46,6 +47,34 @@ export async function POST(request: Request) {
           referredUserId: session.metadata.user_id,
           referralCode: session.metadata?.referral_code || '',
         });
+      }
+      break;
+    }
+
+    case 'payment_intent.succeeded': {
+      const intent = event.data.object as Stripe.PaymentIntent;
+      const isTerminal = (intent.payment_method_types || []).includes('card_present');
+      if (!isTerminal) break;
+
+      const invoiceId = intent.metadata?.invoice_id;
+      const connectedAccountId = event.account; // set on Connect events
+
+      if (invoiceId) {
+        // Payment initiated from Hellobat Terminal — mark invoice paid
+        await supabaseAdmin.rpc('mark_invoice_paid', {
+          p_invoice_id: invoiceId,
+          p_payment_intent_id: intent.id,
+          p_checkout_session_id: '',
+        });
+        // Override payment_method to 'terminal' (RPC sets 'stripe')
+        await supabaseAdmin
+          .from('invoices')
+          .update({ payment_method: 'terminal' })
+          .eq('id', invoiceId);
+      } else if (connectedAccountId) {
+        // Payment made outside Hellobat (artisan used Stripe app directly)
+        // → create a draft invoice for traceability
+        await createDraftInvoiceFromTerminal(intent, connectedAccountId);
       }
       break;
     }
@@ -123,5 +152,53 @@ async function applyReferralReward(args: { referredUserId: string; referralCode:
       .eq('id', args.referredUserId);
   } catch (e) {
     console.error('applyReferralReward error', e);
+  }
+}
+
+/**
+ * Crée une facture brouillon quand un paiement Terminal est détecté
+ * sans invoice_id dans les metadata (= paiement fait hors Hellobat).
+ */
+async function createDraftInvoiceFromTerminal(
+  intent: Stripe.PaymentIntent,
+  stripeAccountId: string,
+) {
+  try {
+    // Avoid duplicates: check if we already created an invoice for this PI
+    const { data: existing } = await supabaseAdmin
+      .from('invoices')
+      .select('id')
+      .eq('stripe_payment_intent_id', intent.id)
+      .maybeSingle();
+    if (existing) return;
+
+    // Find the user who owns this connected account
+    const { data: connection } = await supabaseAdmin
+      .from('stripe_connections')
+      .select('user_id')
+      .eq('stripe_account_id', stripeAccountId)
+      .maybeSingle();
+    if (!connection) return;
+
+    const userId = connection.user_id;
+    const amountTtc = (intent.amount || 0) / 100;
+    const title = intent.description || 'Paiement Terminal';
+
+    const invoiceNumber = await getNextInvoiceNumber(supabaseAdmin, userId);
+
+    await supabaseAdmin.from('invoices').insert({
+      user_id: userId,
+      invoice_number: invoiceNumber,
+      title,
+      status: 'brouillon',
+      total_ht: amountTtc, // Approximation — l'artisan devra ajuster
+      total_ttc: amountTtc,
+      tva_rate: 0,
+      payment_method: 'terminal',
+      stripe_payment_intent_id: intent.id,
+      paid_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error('createDraftInvoiceFromTerminal error', e);
   }
 }
