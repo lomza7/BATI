@@ -1,14 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { loadStripe, type Stripe, type PaymentRequest } from '@stripe/stripe-js';
+import {
+  Elements,
+  PaymentElement,
+  PaymentRequestButtonElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   CreditCard,
   Loader2,
   Check,
   X,
   Receipt,
+  Smartphone,
+  QrCode,
+  Wifi,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -28,7 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-type Step = 'form' | 'payment' | 'processing' | 'success' | 'error';
+type Step = 'form' | 'creating' | 'choose' | 'contactless' | 'qr' | 'card' | 'success' | 'error';
 
 interface RecentPayment {
   id: string;
@@ -41,18 +51,133 @@ interface RecentPayment {
   clients: { name: string } | null;
 }
 
-// ---------- Payment form (inside Elements provider) ----------
+interface SessionData {
+  session_id: string;
+  client_secret: string;
+  payment_intent_id: string;
+  stripe_account_id: string;
+  publishable_key: string;
+  pay_url: string;
+}
 
-function PaymentForm({
+// ---------- Contactless (Apple Pay / Google Pay) ----------
+
+function ContactlessPayment({
+  amountCents,
+  onSuccess,
+  onError,
+  onFallback,
+}: {
+  amountCents: number;
+  onSuccess: () => void;
+  onError: (msg: string) => void;
+  onFallback: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [canPay, setCanPay] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!stripe) return;
+
+    const pr = stripe.paymentRequest({
+      country: 'FR',
+      currency: 'eur',
+      total: { label: 'HelloPay', amount: amountCents },
+      requestPayerName: true,
+    });
+
+    pr.canMakePayment().then((result) => {
+      if (result) {
+        setPaymentRequest(pr);
+        setCanPay(true);
+      } else {
+        setCanPay(false);
+      }
+    });
+
+    pr.on('paymentmethod', async (ev) => {
+      if (!elements) {
+        ev.complete('fail');
+        return;
+      }
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          payment_method: ev.paymentMethod.id,
+          return_url: window.location.href,
+        },
+        redirect: 'if_required',
+      });
+      if (error) {
+        ev.complete('fail');
+        onError(error.message || 'Le paiement a echoue');
+      } else {
+        ev.complete('success');
+        onSuccess();
+      }
+    });
+  }, [stripe, amountCents, elements, onSuccess, onError]);
+
+  if (canPay === null) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Verification du paiement sans contact...</p>
+      </div>
+    );
+  }
+
+  if (canPay === false) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-8 text-center">
+        <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center">
+          <Wifi className="h-7 w-7 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-medium text-foreground">Apple Pay / Google Pay non disponible</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Ce navigateur ne supporte pas le paiement sans contact.
+          </p>
+        </div>
+        <Button variant="outline" onClick={onFallback}>
+          Utiliser un autre mode de paiement
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 py-4">
+      <div className="text-center space-y-2">
+        <p className="text-lg font-semibold">{formatCurrency(amountCents / 100)}</p>
+        <p className="text-sm text-muted-foreground">
+          Tendez votre telephone au client pour qu&apos;il paie avec Apple Pay ou Google Pay
+        </p>
+      </div>
+      {paymentRequest && (
+        <div className="w-full max-w-xs">
+          <PaymentRequestButtonElement
+            options={{ paymentRequest }}
+            className="w-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Card Payment (Payment Element) ----------
+
+function CardPayment({
   totalTtc,
   onSuccess,
   onError,
-  onCancel,
 }: {
   totalTtc: number;
   onSuccess: () => void;
   onError: (msg: string) => void;
-  onCancel: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -66,9 +191,7 @@ function PaymentForm({
     setProcessing(true);
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        return_url: window.location.href,
-      },
+      confirmParams: { return_url: window.location.href },
       redirect: 'if_required',
     });
 
@@ -97,18 +220,13 @@ function PaymentForm({
         />
       </div>
 
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel} disabled={processing}>
-          Retour
-        </Button>
-        <Button type="submit" className="flex-1" size="lg" disabled={!stripe || !ready || processing}>
-          {processing ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Traitement...</>
-          ) : (
-            <><CreditCard className="mr-2 h-4 w-4" /> Encaisser {formatCurrency(totalTtc)}</>
-          )}
-        </Button>
-      </div>
+      <Button type="submit" className="w-full" size="lg" disabled={!stripe || !ready || processing}>
+        {processing ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Traitement...</>
+        ) : (
+          <><CreditCard className="mr-2 h-4 w-4" /> Encaisser {formatCurrency(totalTtc)}</>
+        )}
+      </Button>
     </form>
   );
 }
@@ -116,7 +234,7 @@ function PaymentForm({
 // ---------- Main page ----------
 
 export default function EncaissementPage() {
-  const { user, session } = useAuth();
+  const { user, session: authSession } = useAuth();
 
   // Stripe status
   const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
@@ -132,9 +250,10 @@ export default function EncaissementPage() {
   // Payment
   const [step, setStep] = useState<Step>('form');
   const [error, setError] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState('');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Recent payments
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
@@ -146,13 +265,20 @@ export default function EncaissementPage() {
   useEffect(() => {
     checkStripeStatus();
     loadRecentPayments();
-  }, [user, session?.access_token]);
+  }, [user, authSession?.access_token]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   async function checkStripeStatus() {
-    if (!session?.access_token) return;
+    if (!authSession?.access_token) return;
     try {
       const res = await fetch('/api/stripe/connect/status', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
       });
       const data = await res.json();
       setStripeConnected(data.charges_enabled === true);
@@ -175,9 +301,9 @@ export default function EncaissementPage() {
   }
 
   async function startPayment() {
-    if (!session?.access_token || !user || totalTtc <= 0) return;
+    if (!authSession?.access_token || !user || totalTtc <= 0) return;
 
-    setStep('processing');
+    setStep('creating');
     setError('');
 
     try {
@@ -211,7 +337,6 @@ export default function EncaissementPage() {
 
       if (!invoice) throw new Error('Erreur creation facture');
 
-      // Create invoice line
       if (totalHt > 0) {
         await supabase.from('invoice_lines').insert({
           user_id: user.id,
@@ -228,12 +353,12 @@ export default function EncaissementPage() {
 
       setCreatedInvoiceNumber(invoiceNumber);
 
-      // 2. Create PaymentIntent via API
+      // 2. Create payment session via API
       const amountCents = Math.round(tva.total_ttc * 100);
-      const res = await fetch('/api/stripe/connect/hellopay', {
+      const res = await fetch('/api/stripe/connect/hellopay/session', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${authSession.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -244,19 +369,35 @@ export default function EncaissementPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur creation paiement');
-
       if (!data.publishable_key) throw new Error('Configuration Stripe manquante');
 
-      setClientSecret(data.client_secret);
+      setSessionData(data);
       setStripePromise(loadStripe(data.publishable_key, { stripeAccount: data.stripe_account_id }));
-      setStep('payment');
+      setStep('choose');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur paiement');
       setStep('error');
     }
   }
 
+  function startQrPolling() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      if (!sessionData) return;
+      const { data } = await supabase
+        .from('payment_sessions')
+        .select('status')
+        .eq('id', sessionData.session_id)
+        .maybeSingle();
+      if (data?.status === 'completed') {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        handlePaymentSuccess();
+      }
+    }, 3000);
+  }
+
   function handlePaymentSuccess() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
     setStep('success');
     loadRecentPayments();
   }
@@ -267,6 +408,7 @@ export default function EncaissementPage() {
   }
 
   function resetForm() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
     setTitle('');
     setTotalHt(0);
     setTvaRate(20);
@@ -274,7 +416,7 @@ export default function EncaissementPage() {
     setBankAccountId(null);
     setStep('form');
     setError('');
-    setClientSecret('');
+    setSessionData(null);
     setStripePromise(null);
     setCreatedInvoiceNumber('');
   }
@@ -419,8 +561,8 @@ export default function EncaissementPage() {
         </div>
       )}
 
-      {/* STEP: PROCESSING (creating invoice + payment intent) */}
-      {step === 'processing' && (
+      {/* STEP: CREATING (invoice + payment session) */}
+      {step === 'creating' && (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex flex-col items-center gap-3 py-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -429,29 +571,168 @@ export default function EncaissementPage() {
         </div>
       )}
 
-      {/* STEP: PAYMENT — Stripe Payment Element */}
-      {step === 'payment' && clientSecret && stripePromise && (
+      {/* STEP: CHOOSE — pick payment method */}
+      {step === 'choose' && sessionData && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="text-center mb-5">
+              <p className="text-sm text-muted-foreground">Montant a encaisser</p>
+              <p className="text-2xl font-bold mt-1">{formatCurrency(totalTtc)}</p>
+            </div>
+
+            <h2 className="text-base font-semibold mb-3">Comment encaisser ?</h2>
+
+            <div className="space-y-3">
+              {/* Option 1: Contactless */}
+              <button
+                type="button"
+                onClick={() => setStep('contactless')}
+                className="w-full flex items-start gap-4 rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">Sans contact</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Apple Pay ou Google Pay — le client paie d&apos;un geste
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2: QR Code */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('qr');
+                  startQrPolling();
+                }}
+                className="w-full flex items-start gap-4 rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-blue-50 flex items-center justify-center">
+                  <QrCode className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">QR Code</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Le client scanne le QR code et paie sur son telephone
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 3: Card */}
+              <button
+                type="button"
+                onClick={() => setStep('card')}
+                className="w-full flex items-start gap-4 rounded-xl border border-border p-4 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-shrink-0 h-11 w-11 rounded-full bg-gray-100 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-gray-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">Carte bancaire</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Le client entre les numeros de sa carte manuellement
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <Button variant="ghost" className="w-full" onClick={resetForm}>
+            Annuler
+          </Button>
+        </div>
+      )}
+
+      {/* STEP: CONTACTLESS — Apple Pay / Google Pay */}
+      {step === 'contactless' && sessionData && stripePromise && (
         <div className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-base font-semibold mb-4">Paiement par carte</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Donnez votre telephone au client pour qu&apos;il entre sa carte, ou utilisez Apple Pay / Google Pay.
-          </p>
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="ghost" size="sm" onClick={() => setStep('choose')}>
+              ← Retour
+            </Button>
+            <h2 className="text-base font-semibold">Paiement sans contact</h2>
+          </div>
           <Elements
             stripe={stripePromise}
             options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: { colorPrimary: '#d35400' },
-              },
+              clientSecret: sessionData.client_secret,
+              appearance: { theme: 'stripe', variables: { colorPrimary: '#d35400' } },
               locale: 'fr',
             }}
           >
-            <PaymentForm
+            <ContactlessPayment
+              amountCents={Math.round(totalTtc * 100)}
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+              onFallback={() => setStep('choose')}
+            />
+          </Elements>
+        </div>
+      )}
+
+      {/* STEP: QR CODE */}
+      {step === 'qr' && sessionData && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="ghost" size="sm" onClick={() => {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              setStep('choose');
+            }}>
+              ← Retour
+            </Button>
+            <h2 className="text-base font-semibold">QR Code</h2>
+          </div>
+
+          <div className="flex flex-col items-center gap-5 py-4">
+            <p className="text-sm text-muted-foreground text-center">
+              Montrez ce QR code au client pour qu&apos;il le scanne avec son telephone
+            </p>
+
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-border">
+              <QRCodeSVG
+                value={sessionData.pay_url}
+                size={220}
+                level="M"
+                includeMargin
+              />
+            </div>
+
+            <div className="text-center">
+              <p className="text-2xl font-bold">{formatCurrency(totalTtc)}</p>
+              {title && <p className="text-sm text-muted-foreground mt-1">{title}</p>}
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              En attente du paiement...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STEP: CARD — Payment Element */}
+      {step === 'card' && sessionData && stripePromise && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="ghost" size="sm" onClick={() => setStep('choose')}>
+              ← Retour
+            </Button>
+            <h2 className="text-base font-semibold">Paiement par carte</h2>
+          </div>
+          <Elements
+            stripe={stripePromise}
+            options={{
+              clientSecret: sessionData.client_secret,
+              appearance: { theme: 'stripe', variables: { colorPrimary: '#d35400' } },
+              locale: 'fr',
+            }}
+          >
+            <CardPayment
               totalTtc={totalTtc}
               onSuccess={handlePaymentSuccess}
               onError={handlePaymentError}
-              onCancel={() => setStep('form')}
             />
           </Elements>
         </div>
@@ -494,8 +775,8 @@ export default function EncaissementPage() {
             <Button variant="outline" className="flex-1" onClick={resetForm}>
               Recommencer
             </Button>
-            {clientSecret && (
-              <Button className="flex-1" onClick={() => setStep('payment')}>
+            {sessionData && (
+              <Button className="flex-1" onClick={() => setStep('choose')}>
                 Reessayer
               </Button>
             )}

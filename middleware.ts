@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 const BASE_DOMAIN = 'hellobat.app';
 
 const publicPaths = ['/', '/login', '/signup', '/carte/publique', '/mentions-legales', '/confidentialite', '/cookies', '/cgu', '/a-propos', '/contact', '/carrieres', '/presse', '/blog'];
-const publicPrefixes = ['/site/', '/c/', '/d/', '/f/', '/r/', '/fonctionnalites/', '/comptable/'];
+const publicPrefixes = ['/site/', '/c/', '/d/', '/f/', '/r/', '/fonctionnalites/', '/comptable/', '/pay/'];
 
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
