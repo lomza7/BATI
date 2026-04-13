@@ -91,8 +91,8 @@ export async function POST(request: Request) {
       .single();
 
     if (sessionError || !session) {
-      console.error('payment_sessions insert error', sessionError);
-      return NextResponse.json({ error: 'Erreur creation session' }, { status: 500 });
+      console.error('payment_sessions insert error', JSON.stringify(sessionError), 'publishableKey:', publishableKey ? 'set' : 'EMPTY', 'client_secret:', paymentIntent.client_secret ? 'set' : 'NULL');
+      return NextResponse.json({ error: `Erreur creation session: ${sessionError?.message || 'unknown'}` }, { status: 500 });
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
