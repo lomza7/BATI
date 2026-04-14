@@ -324,6 +324,61 @@ export default function EncaissementPage() {
     setStep('error');
   }
 
+  async function reopenDraftPayment(invoiceId: string) {
+    if (!authSession?.access_token) return;
+
+    setStep('creating');
+    setError('');
+
+    try {
+      const { data: invoice } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, title, total_ttc, status')
+        .eq('id', invoiceId)
+        .maybeSingle();
+
+      if (!invoice) throw new Error('Facture introuvable');
+      if (invoice.status === 'payee') {
+        loadRecentPayments();
+        setStep('form');
+        return;
+      }
+
+      const ttc = Number(invoice.total_ttc);
+      const amountCents = Math.round(ttc * 100);
+
+      // Regenerate a fresh Stripe session for this invoice — handles old
+      // invoices without payment fields and ensures the QR always works.
+      const res = await fetch('/api/stripe/connect/hellopay/session', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount_cents: amountCents,
+          description: `${invoice.invoice_number} — ${invoice.title || 'HelloPay'}`,
+          invoice_id: invoice.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur creation paiement');
+      if (!data.publishable_key) throw new Error('Configuration Stripe manquante');
+
+      setTitle(invoice.title || '');
+      setTotalHt(ttc);
+      setTvaRate(0);
+      setCreatedInvoiceNumber(invoice.invoice_number || '');
+      setSessionData(data);
+      setStripePromise(loadStripe(data.publishable_key, { stripeAccount: data.stripe_account_id }));
+      setStep('qr');
+      startQrPolling();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+      setStep('error');
+    }
+  }
+
   function resetForm() {
     if (pollingRef.current) clearInterval(pollingRef.current);
     setTitle('');
@@ -591,10 +646,18 @@ export default function EncaissementPage() {
               <div className="space-y-2">
                 {recentPayments.map(p => {
                   const st = INVOICE_STATUSES[p.status] || INVOICE_STATUSES.brouillon;
+                  const isOpen = p.status !== 'payee';
                   return (
-                    <div
+                    <button
                       key={p.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
+                      type="button"
+                      onClick={isOpen ? () => reopenDraftPayment(p.id) : undefined}
+                      disabled={!isOpen}
+                      className={`w-full flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors ${
+                        isOpen
+                          ? 'hover:bg-muted/40 hover:border-primary/40 cursor-pointer'
+                          : 'cursor-default opacity-80'
+                      }`}
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{p.title}</p>
@@ -602,13 +665,16 @@ export default function EncaissementPage() {
                           {p.clients?.name || 'Client inconnu'} — {p.invoice_number}
                         </p>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-3">
-                        <p className="text-sm font-semibold">{formatCurrency(p.total_ttc)}</p>
-                        <p className={`text-xs ${p.status === 'payee' ? 'text-green-600' : 'text-muted-foreground'}`}>
-                          {st.label}
-                        </p>
+                      <div className="text-right flex-shrink-0 ml-3 flex items-center gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{formatCurrency(p.total_ttc)}</p>
+                          <p className={`text-xs ${p.status === 'payee' ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            {isOpen ? 'Afficher le QR code' : st.label}
+                          </p>
+                        </div>
+                        {isOpen && <QrCode className="h-4 w-4 text-muted-foreground" />}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

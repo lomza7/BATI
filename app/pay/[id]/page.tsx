@@ -10,13 +10,7 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { createClient } from '@supabase/supabase-js';
 import { Loader2, Check, CreditCard, ShieldCheck } from 'lucide-react';
-
-const supabaseAnon = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 interface PaySession {
   id: string;
@@ -192,18 +186,13 @@ export default function PublicPayPage() {
   async function loadSession() {
     if (!invoiceId) return;
 
-    // Fetch invoice with payment session data
-    const { data, error: fetchError } = await supabaseAnon
-      .from('invoices')
-      .select('id, title, total_ttc, status, payment_client_secret, payment_stripe_account_id, payment_publishable_key')
-      .eq('id', invoiceId)
-      .maybeSingle();
-
-    if (fetchError || !data) {
+    const res = await fetch(`/api/hellopay/pay-session/${invoiceId}`);
+    if (!res.ok) {
       setError('Lien de paiement invalide ou expire');
       setLoading(false);
       return;
     }
+    const data = await res.json();
 
     if (data.status === 'payee') {
       setPaid(true);
