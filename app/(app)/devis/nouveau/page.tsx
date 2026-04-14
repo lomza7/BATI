@@ -494,6 +494,51 @@ export default function NouveauDevisPage() {
     }
   }
 
+  // Autosave totals/lines on the existing draft so the list reflects real amounts
+  // even if the user navigates away without clicking "Enregistrer".
+  useEffect(() => {
+    if (!user || !draftId.current) return;
+    const timer = setTimeout(async () => {
+      const id = draftId.current;
+      if (!id) return;
+      const validLines = lines.filter(l => l.description.trim());
+      const tva = computeTvaBreakdown(validLines);
+      await supabase
+        .from('quotes')
+        .update({
+          title,
+          description,
+          total_ht: tva.total_ht,
+          total_tva: tva.total_tva,
+          total_ttc: tva.total_ttc,
+          tva_rate: tva.primary_rate,
+          tva_breakdown: tva.tva_breakdown,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      await supabase.from('quote_lines').delete().eq('quote_id', id);
+      if (validLines.length > 0) {
+        await supabase.from('quote_lines').insert(
+          validLines.map((l, i) => ({
+            user_id: user.id,
+            quote_id: id,
+            description: l.description,
+            detail: l.detail || null,
+            quantity: l.quantity,
+            unit: l.unit,
+            unit_price: l.unit_price,
+            tva_rate: l.tva_rate,
+            section: l.section || null,
+            total: l.quantity * l.unit_price,
+            position: i,
+          }))
+        );
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, title, description, user]);
+
   // Service filtering
   let filteredServices = serviceSectionFilter !== 'all'
     ? services.filter(s => (s.section || 'materiel') === serviceSectionFilter)
