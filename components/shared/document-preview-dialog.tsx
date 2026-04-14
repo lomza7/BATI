@@ -203,13 +203,15 @@ export function DocumentPreviewDialog({
             resolvedBankAccountId = quote.bank_account_id || null;
             setDepositPercentage(typeof quote.deposit_percentage === 'number' ? quote.deposit_percentage : null);
 
-            const { data: linesData } = await supabase
+            const { data: linesData, error: linesErr } = await supabase
               .from('quote_lines')
               .select('description, detail, quantity, unit, unit_price, tva_rate, position, section')
               .eq('quote_id', documentId)
               .order('position', { ascending: true });
-            if (!cancelled && linesData) {
-              setResolvedLines(linesData as PreviewLine[]);
+            if (linesErr) console.error('[preview] quote_lines error:', linesErr);
+            console.log('[preview] quote_lines fetched for', documentId, ':', linesData?.length ?? 0, 'rows');
+            if (!cancelled) {
+              setResolvedLines((linesData as PreviewLine[]) || []);
             }
 
             if (quote.client_id) {
