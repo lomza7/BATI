@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { apiError } from '@/lib/api-errors';
+import { resolveStripePrice } from '../utils';
 
 export const runtime = 'nodejs';
 
@@ -72,12 +73,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    const resolved = await resolveStripePrice(stripe, priceId);
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       locale: 'fr',
       payment_method_types: ['card'],
       customer_email: user.email ?? undefined,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: resolved.id, quantity: 1 }],
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/parametres?tab=abonnement&credits=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/parametres?tab=abonnement&credits=cancel`,
       metadata: {

@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: profileError.message }, { status: 400 });
   }
 
-  if (!profile?.stripe_customer_id || profile.plan === 'starter') {
+  if (!profile?.stripe_customer_id) {
     return NextResponse.json(
       { error: 'Aucun abonnement Stripe actif a gerer pour ce compte' },
       { status: 400 }

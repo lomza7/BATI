@@ -7,9 +7,13 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secrets = [
+    process.env.STRIPE_WEBHOOK_SECRET,
+    process.env.STRIPE_WEBHOOK_SECRET_2,
+    process.env.STRIPE_WEBHOOK_SECRET_3,
+  ].filter((s): s is string => Boolean(s));
 
-  if (!stripeKey || !webhookSecret) {
+  if (!stripeKey || secrets.length === 0) {
     return NextResponse.json({ error: 'Configuration Stripe manquante' }, { status: 503 });
   }
 
@@ -22,10 +26,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Signature manquante' }, { status: 400 });
   }
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch {
+  let event: Stripe.Event | null = null;
+  for (const secret of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, secret);
+      break;
+    } catch {
+      // try next secret
+    }
+  }
+  if (!event) {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
   }
 
