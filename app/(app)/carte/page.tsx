@@ -98,7 +98,7 @@ export default function CartePage() {
 
     let clientId: string | null = null;
     if (form.clientName.trim()) {
-      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).is('deleted_at', null).maybeSingle();
+      const { data: existing } = await supabase.from('clients').select('id').eq('name', form.clientName.trim()).in('contact_type', ['client', 'prospect']).is('deleted_at', null).maybeSingle();
       if (existing) { clientId = existing.id; }
       else {
         const { data: newC } = await supabase.from('clients').insert({ name: form.clientName.trim(), user_id: user.id }).select('id').single();

@@ -403,6 +403,21 @@ export default function FacturesPage() {
   }
 
   async function updateStatus(id: string, status: string) {
+    // Whitelist : empêche les régressions comptables (ex: payee → brouillon).
+    // Une facture officiellement émise (creee/envoyee/payee/en_retard) ne peut
+    // plus revenir en brouillon. "payee" est terminal — pas de retour possible.
+    const current = invoices.find(i => i.id === id)?.status;
+    const ALLOWED: Record<string, string[]> = {
+      brouillon: ['creee', 'envoyee', 'payee'],
+      creee: ['envoyee', 'payee', 'en_retard'],
+      envoyee: ['payee', 'en_retard'],
+      en_retard: ['payee', 'envoyee'],
+      payee: [],
+    };
+    if (current && !ALLOWED[current]?.includes(status)) {
+      window.alert(`Transition interdite : ${current} → ${status}`);
+      return;
+    }
     const updates: Record<string, string> = { status, updated_at: new Date().toISOString() };
     if (status === 'payee') updates.paid_at = new Date().toISOString();
     // Horodatage d'émission officielle : settée lors de la création officielle de la facture

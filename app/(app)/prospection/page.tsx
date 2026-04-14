@@ -453,6 +453,7 @@ export default function ProspectionPage() {
       .from('clients')
       .select('id')
       .eq('name', clientName.trim())
+      .in('contact_type', ['client', 'prospect'])
       .is('deleted_at', null)
       .maybeSingle();
 

@@ -60,8 +60,8 @@ export async function consumeAi(userId: string, feature: AiFeature): Promise<Con
   const { data, error } = await supabaseAdmin.rpc('consume_ai', {
     p_user_id: userId,
     p_feature: feature,
+    p_quota: AI_FREE_QUOTAS[feature],
     p_credit_cost: AI_CREDIT_COSTS[feature],
-    p_free_quota: AI_FREE_QUOTAS[feature],
   });
 
   if (error) {
