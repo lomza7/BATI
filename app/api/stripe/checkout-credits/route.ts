@@ -80,6 +80,10 @@ export async function POST(request: Request) {
       payment_method_types: ['card'],
       customer_email: user.email ?? undefined,
       line_items: [{ price: resolved.id, quantity: 1 }],
+      billing_address_collection: 'required',
+      tax_id_collection: { enabled: true },
+      automatic_tax: { enabled: true },
+      invoice_creation: { enabled: true },
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/parametres?tab=abonnement&credits=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/parametres?tab=abonnement&credits=cancel`,
       metadata: {

@@ -63,6 +63,9 @@ export async function POST(request: Request) {
       customer_email: user_email,
       line_items: [{ price: resolvedPrice.id, quantity: 1 }],
       allow_promotion_codes: true,
+      billing_address_collection: 'required',
+      tax_id_collection: { enabled: true },
+      automatic_tax: { enabled: true },
       success_url: success_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/dashboard?checkout=success`,
       cancel_url: cancel_url || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app'}/dashboard?checkout=cancel`,
       ...(trialDays > 0
