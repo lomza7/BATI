@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
+import { CreditsBadge } from '@/components/credits/credits-badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/lib/sidebar-context';
@@ -16,9 +17,14 @@ function SidebarContent({ onNavigate, collapsed = false }: { onNavigate?: () => 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
         {!collapsed && (
-          <span className="font-serif font-medium tracking-tight text-foreground text-lg">
-            Hellobat
-          </span>
+          <>
+            <span className="font-serif font-medium tracking-tight text-foreground text-lg">
+              Hellobat
+            </span>
+            <div className="ml-auto">
+              <CreditsBadge />
+            </div>
+          </>
         )}
       </div>
 

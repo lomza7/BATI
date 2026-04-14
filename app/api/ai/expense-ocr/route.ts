@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { expenseOcrSchema } from '@/lib/ai/expense-ocr-schema';
-import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { trackAiUsage } from '@/lib/ai-usage';
+import { consumeAi } from '@/lib/credits';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -119,9 +120,15 @@ export async function POST(request: Request) {
     const rl = checkRateLimit(`ai-expense-ocr:${user.id}`, 15, 60_000);
     if (!rl.ok) return rateLimitResponse(rl);
 
-    const limitCheck = await checkAiLimit(user.id);
-    if (!limitCheck.allowed) {
-      return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
+    const gate = await consumeAi(user.id, 'accounting_ai');
+    if (!gate.ok) {
+      if (gate.reason === 'no_pro_access') {
+        return NextResponse.json({ error: 'Abonnement Pro requis.' }, { status: 403 });
+      }
+      return NextResponse.json(
+        { error: 'Cr\u00e9dits IA insuffisants.', balance: gate.balance, required: gate.required },
+        { status: 402 },
+      );
     }
 
     let formData: FormData;

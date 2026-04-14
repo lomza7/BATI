@@ -884,3 +884,126 @@ function escHtml(str: string): string {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paywall / abonnement
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TrialReminderEmailData {
+  firstName: string;
+  daysLeft: number; // 7, 2, or 0 (expiré)
+  upgradeUrl: string;
+  accentColor?: string;
+}
+
+export function buildTrialReminderEmail(data: TrialReminderEmailData): string {
+  const accent = data.accentColor || '#d35400';
+  const { daysLeft } = data;
+
+  const subject =
+    daysLeft >= 7
+      ? 'Il vous reste 7 jours d\'essai Hellobat'
+      : daysLeft >= 2
+        ? `Plus que ${daysLeft} jours d'essai Hellobat`
+        : 'Votre essai Hellobat est terminé';
+
+  const headline =
+    daysLeft >= 7
+      ? 'Encore 7 jours pour profiter de tout Hellobat'
+      : daysLeft >= 2
+        ? `Plus que ${daysLeft} jours pour passer en Pro`
+        : 'Votre essai gratuit est terminé';
+
+  const body =
+    daysLeft >= 2
+      ? `
+        <p style="margin:0 0 16px;font-size:14px;color:#4a4540;line-height:1.6">
+          Votre essai de 30 jours touche bientôt à sa fin. Passez en <strong>Pro à 19,50 € TTC / mois</strong>
+          pour continuer à profiter de devis/factures illimités, de l'équipe, du planning, des catalogues,
+          du CRM et de toutes les fonctionnalités IA.
+        </p>
+        <p style="margin:0 0 24px;font-size:14px;color:#4a4540;line-height:1.6">
+          Sans engagement, résiliable à tout moment.
+        </p>`
+      : `
+        <p style="margin:0 0 16px;font-size:14px;color:#4a4540;line-height:1.6">
+          Votre essai gratuit de 30 jours est terminé. Vous continuez sur le plan <strong>Gratuit</strong>,
+          qui inclut toujours 5 devis et 5 factures par mois, les chantiers, les contacts, HelloPay
+          et le calendrier.
+        </p>
+        <p style="margin:0 0 24px;font-size:14px;color:#4a4540;line-height:1.6">
+          Pour débloquer le reste — équipe, planning, catalogues, CRM, IA — passez en <strong>Pro
+          à 19,50 € TTC / mois</strong>.
+        </p>`;
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>${escHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+        <tr><td style="background-color:${accent};padding:28px 32px;text-align:center">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff">Hellobat</p>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <h1 style="margin:0 0 12px;font-size:20px;color:#1a1a1a;line-height:1.3">${escHtml(headline)}</h1>
+          <p style="margin:0 0 20px;font-size:15px;color:#1a1a1a">Bonjour ${escHtml(data.firstName)},</p>
+          ${body}
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background-color:${accent}">
+            <a href="${data.upgradeUrl}" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px">
+              Passer en Pro — 19,50 € TTC / mois
+            </a>
+          </td></tr></table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+export interface LowCreditsEmailData {
+  firstName: string;
+  balance: number;
+  buyUrl: string;
+  accentColor?: string;
+}
+
+export function buildLowCreditsEmail(data: LowCreditsEmailData): string {
+  const accent = data.accentColor || '#d35400';
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>Crédits IA bas</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+        <tr><td style="background-color:${accent};padding:28px 32px;text-align:center">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff">Hellobat</p>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <h1 style="margin:0 0 12px;font-size:20px;color:#1a1a1a">Votre solde de crédits IA est bas</h1>
+          <p style="margin:0 0 16px;font-size:15px;color:#1a1a1a">Bonjour ${escHtml(data.firstName)},</p>
+          <p style="margin:0 0 16px;font-size:14px;color:#4a4540;line-height:1.6">
+            Il vous reste <strong>${data.balance} crédits IA</strong>. Pour éviter toute interruption
+            de vos actions IA une fois vos quotas mensuels épuisés, nous vous recommandons de recharger
+            votre solde dès maintenant.
+          </p>
+          <p style="margin:0 0 24px;font-size:14px;color:#4a4540;line-height:1.6">
+            Les crédits sont <strong>permanents</strong> : ils ne périment jamais.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background-color:${accent}">
+            <a href="${data.buyUrl}" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px">
+              Recharger mes crédits
+            </a>
+          </td></tr></table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}

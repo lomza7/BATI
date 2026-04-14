@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Star, ChevronDown } from 'lucide-react';
+import { Star, ChevronDown, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
+import { useAccessState } from '@/hooks/use-access-state';
 import { cn } from '@/lib/utils';
 import { SidebarEmojiPicker } from './sidebar-emoji-picker';
 
@@ -16,7 +17,21 @@ interface NavItem {
   // map directly to the feature so a craftsman scanning the sidebar can
   // recognize each item by glance, even with poor eyesight.
   emoji: string;
+  proOnly?: boolean;
 }
+
+const PRO_ONLY_PATHS = new Set([
+  '/equipe',
+  '/planning',
+  '/carte',
+  '/catalogues',
+  '/prospection',
+  '/contrats',
+  '/agents',
+  '/rendus',
+  '/site-web',
+  '/comptabilite',
+]);
 
 interface NavGroup {
   title: string;
@@ -132,7 +147,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { hasPermission } = useWorkspace();
+  const { state: accessState } = useAccessState();
   const isAdmin = user?.email === 'louis@maaza.pro';
+  const showLock = accessState ? !accessState.hasProAccess : false;
 
   const [favorites, setFavorites] = useState<string[]>([]);
   // Accordion: a single non-favorites group is open at a time. `null` means
@@ -234,6 +251,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   function renderItem(item: NavItem) {
     const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
     const isFav = favorites.includes(item.href);
+    const isLocked = showLock && PRO_ONLY_PATHS.has(item.href);
     const customEmoji = emojis[item.href];
     // Effective emoji = user override OR the route's default emoji.
     const effectiveEmoji = customEmoji ?? item.emoji;
@@ -253,6 +271,9 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           )}
         >
           <span className="flex-1 truncate">{item.label}</span>
+          {isLocked && (
+            <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" aria-label="Réservé au plan Pro" />
+          )}
         </Link>
 
         {/* Active indicator: vertical accent bar that scales in */}

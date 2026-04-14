@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
+import { QuotaMeter } from '@/components/paywall/quota-meter';
 
 interface QuoteSend {
   id: string;
@@ -348,6 +349,8 @@ export default function DevisPage() {
           Nouveau devis
         </Button>
       </PageHeader>
+
+      <QuotaMeter feature="quote" />
 
       {aiCreatedNumber && (
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">

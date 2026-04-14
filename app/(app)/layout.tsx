@@ -10,6 +10,7 @@ import { OnboardingModal } from '@/components/onboarding/onboarding-modal';
 import { purgeExpiredRecycleBinItems } from '@/lib/recycle-bin';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
+import { TrialBanner } from '@/components/paywall/trial-banner';
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
@@ -18,6 +19,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className={`pt-[60px] lg:pt-0 transition-[padding-left] duration-300 ease-in-out ${collapsed ? 'lg:pl-[60px]' : 'lg:pl-[240px]'}`}>
         <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+          <TrialBanner />
           {children}
         </div>
       </main>

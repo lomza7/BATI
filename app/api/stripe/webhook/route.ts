@@ -41,12 +41,53 @@ export async function POST(request: Request) {
         });
       }
 
-      // Referral reward: subscription mode only
+      // Credit pack purchase (one-shot payment)
+      if (session.metadata?.kind === 'credits_pack' && session.metadata?.user_id) {
+        await creditPackPurchase({
+          userId: session.metadata.user_id,
+          credits: Number(session.metadata.credits || 0),
+          sessionId: session.id,
+        });
+      }
+
+      // Subscription started via checkout — sync plan/status
       if (session.mode === 'subscription' && session.metadata?.user_id) {
+        const customerId = typeof session.customer === 'string' ? session.customer : null;
+        const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
+        await activateProSubscription({
+          userId: session.metadata.user_id,
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscriptionId,
+        });
         await applyReferralReward({
           referredUserId: session.metadata.user_id,
           referralCode: session.metadata?.referral_code || '',
         });
+      }
+      break;
+    }
+
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated': {
+      const sub = event.data.object as Stripe.Subscription;
+      await syncSubscriptionStatus(sub);
+      break;
+    }
+
+    case 'customer.subscription.deleted': {
+      const sub = event.data.object as Stripe.Subscription;
+      await downgradeToFree(sub);
+      break;
+    }
+
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+      if (customerId) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ subscription_status: 'past_due' })
+          .eq('stripe_customer_id', customerId);
       }
       break;
     }
@@ -96,6 +137,90 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+async function creditPackPurchase(args: { userId: string; credits: number; sessionId: string }) {
+  if (args.credits <= 0) return;
+  try {
+    // Idempotence : si on a déjà enregistré cette session, on ne re-crédite pas.
+    const { data: existing } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('id')
+      .eq('stripe_session_id', args.sessionId)
+      .maybeSingle();
+    if (existing) return;
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('ai_credits_balance')
+      .eq('id', args.userId)
+      .maybeSingle();
+
+    const current = profile?.ai_credits_balance ?? 0;
+    await supabaseAdmin
+      .from('profiles')
+      .update({ ai_credits_balance: current + args.credits })
+      .eq('id', args.userId);
+
+    await supabaseAdmin.from('credit_transactions').insert({
+      user_id: args.userId,
+      delta: args.credits,
+      kind: 'purchase',
+      stripe_session_id: args.sessionId,
+    });
+  } catch (e) {
+    console.error('creditPackPurchase error', e);
+  }
+}
+
+async function activateProSubscription(args: {
+  userId: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+}) {
+  try {
+    const update: Record<string, unknown> = {
+      plan: 'pro',
+      subscription_status: 'active',
+    };
+    if (args.stripeCustomerId) update.stripe_customer_id = args.stripeCustomerId;
+    if (args.stripeSubscriptionId) update.stripe_subscription_id = args.stripeSubscriptionId;
+    await supabaseAdmin.from('profiles').update(update).eq('id', args.userId);
+  } catch (e) {
+    console.error('activateProSubscription error', e);
+  }
+}
+
+async function syncSubscriptionStatus(sub: Stripe.Subscription) {
+  const customerId = typeof sub.customer === 'string' ? sub.customer : null;
+  if (!customerId) return;
+
+  // Stripe status → notre enum
+  let status: 'active' | 'past_due' | 'canceled' | 'trialing' = 'active';
+  if (sub.status === 'past_due' || sub.status === 'unpaid') status = 'past_due';
+  else if (sub.status === 'canceled' || sub.status === 'incomplete_expired') status = 'canceled';
+  else if (sub.status === 'trialing') status = 'trialing';
+  // active, incomplete → 'active' (incomplete = checkout réussi en attente 3DS)
+
+  const plan = status === 'canceled' ? 'free' : 'pro';
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({
+      plan,
+      subscription_status: status,
+      stripe_subscription_id: sub.id,
+    })
+    .eq('stripe_customer_id', customerId);
+}
+
+async function downgradeToFree(sub: Stripe.Subscription) {
+  const customerId = typeof sub.customer === 'string' ? sub.customer : null;
+  if (!customerId) return;
+  await supabaseAdmin
+    .from('profiles')
+    .update({ plan: 'free', subscription_status: 'canceled' })
+    .eq('stripe_customer_id', customerId);
 }
 
 async function applyReferralReward(args: { referredUserId: string; referralCode: string }) {

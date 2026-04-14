@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { trackAiUsage } from '@/lib/ai-usage';
+import { requireProAccess } from '@/lib/credits';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
 
@@ -60,11 +61,12 @@ export async function POST(request: Request) {
   const rl = checkRateLimit(rlKey, 30, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);
 
-  if (userId) {
-    const limitCheck = await checkAiLimit(userId);
-    if (!limitCheck.allowed) {
-      return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
-    }
+  if (!userId) {
+    return NextResponse.json({ error: 'Authentification requise' }, { status: 401 });
+  }
+  const gate = await requireProAccess(userId);
+  if (!gate.ok) {
+    return NextResponse.json({ error: 'Abonnement Pro requis.' }, { status: 403 });
   }
 
   let audioFile: File;

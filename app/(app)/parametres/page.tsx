@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
+import { UsageWidget } from '@/components/credits/usage-widget';
 import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
 import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
 import { PaymentReminderSettingsCard } from '@/components/parametres/payment-reminder-settings-card';
@@ -211,15 +212,13 @@ interface TeamInviteFormState {
 }
 
 const planIcons = {
-  starter: Users,
+  free: Users,
   pro: Zap,
-  business: Crown,
 } as const;
 
 const planBadgeClasses = {
-  starter: 'bg-slate-100 text-slate-700 border-slate-200',
+  free: 'bg-slate-100 text-slate-700 border-slate-200',
   pro: 'bg-blue-100 text-blue-700 border-blue-200',
-  business: 'bg-amber-100 text-amber-700 border-amber-200',
 } as const;
 
 const teamSizeOptions = [
@@ -1020,7 +1019,7 @@ export default function ParametresPage() {
   async function inviteWorkspaceMember() {
     if (!user || !teamInviteForm.email.trim()) return;
 
-    if (isWorkspaceOwner && currentPlan.key === 'starter') {
+    if (isWorkspaceOwner && currentPlan.key === 'free') {
       setInviteSuccess('');
       setGeneratedInviteLink('');
       setActiveTab('abonnement');
@@ -1178,7 +1177,7 @@ export default function ParametresPage() {
       ...plan,
       price:
         platformConfig[`price_${plan.key}` as keyof PlatformConfig] ||
-        plan.defaultPrice,
+        plan.defaultPriceTtc,
       stripePriceId:
         platformConfig[`stripe_price_${plan.key}` as keyof PlatformConfig] || '',
       features: parsePlanFeatures(
@@ -1188,7 +1187,7 @@ export default function ParametresPage() {
     }));
   }, [platformConfig]);
 
-  const currentPlan = plans.find((plan) => plan.key === (profile?.plan || 'starter')) || plans[0];
+  const currentPlan = plans.find((plan) => plan.key === (profile?.plan || 'free')) || plans[0];
   const checkoutStatus = searchParams.get('checkout');
   const reminderCompletionScore = [
     reminderSettings.legal_form,
@@ -1203,7 +1202,7 @@ export default function ParametresPage() {
   const partnerSourcesCount = leadSources.filter((source) => source.source_type === 'partner' && source.is_active).length;
   const isWorkspaceOwner = !myWorkspaceMembership;
   const canManageWorkspaceAccounts = canManageWorkspaceTeam(workspaceRole);
-  const teamFeatureUnlocked = isWorkspaceOwner ? currentPlan.key !== 'starter' : true;
+  const teamFeatureUnlocked = isWorkspaceOwner ? currentPlan.key !== 'free' : true;
   const activeWorkspaceMembers = workspaceMemberships.filter((membership) => membership.status === 'active').length;
   const pendingWorkspaceInvites = workspaceMemberships.filter((membership) => membership.status === 'pending').length;
 
@@ -1559,7 +1558,7 @@ export default function ParametresPage() {
                     Plan {currentPlan.name}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {currentPlan.key === 'starter'
+                    {currentPlan.key === 'free'
                       ? 'Vous êtes actuellement sur le plan gratuit.'
                       : `Plan actif depuis ${profile?.plan_started_at ? formatDate(profile.plan_started_at) : 'peu'}.`}
                   </p>
@@ -2651,6 +2650,7 @@ export default function ParametresPage() {
         </TabsContent>
 
         <TabsContent value="abonnement" className="space-y-6">
+          <UsageWidget />
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle className="text-xl">Mon abonnement</CardTitle>
@@ -2667,7 +2667,7 @@ export default function ParametresPage() {
                       {currentPlan.name}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {currentPlan.key === 'starter' ? 'Gratuit' : `${currentPlan.price} EUR / mois`}
+                      {currentPlan.key === 'free' ? 'Gratuit' : `${currentPlan.price} EUR / mois`}
                     </span>
                   </div>
                   {profile?.plan_started_at && (
@@ -2677,7 +2677,7 @@ export default function ParametresPage() {
                   )}
                 </div>
 
-                {profile?.plan !== 'starter' && profile?.stripe_customer_id ? (
+                {profile?.plan !== 'free' && profile?.stripe_customer_id ? (
                   <div className="flex flex-wrap gap-3">
                     <Button
                       variant="outline"
@@ -2692,7 +2692,7 @@ export default function ParametresPage() {
                       Gérer ou résilier dans Stripe
                     </Button>
                   </div>
-                ) : profile?.plan === 'starter' ? (
+                ) : profile?.plan === 'free' ? (
                   <p className="text-sm text-muted-foreground">
                     Vous pouvez passer à un plan payant quand vous voulez.
                   </p>
@@ -2705,7 +2705,7 @@ export default function ParametresPage() {
             {plans.map((plan) => {
               const Icon = planIcons[plan.key];
               const isCurrent = profile?.plan === plan.key;
-              const isPaidPlan = plan.key !== 'starter';
+              const isPaidPlan = plan.key !== 'free';
               const canCheckout = Boolean(plan.stripePriceId);
 
               return (
@@ -2732,10 +2732,10 @@ export default function ParametresPage() {
                   <CardContent className="space-y-5">
                     <div>
                       <p className="text-3xl font-semibold text-foreground">
-                        {plan.key === 'starter' ? 'Gratuit' : `${plan.price} EUR`}
+                        {plan.key === 'free' ? 'Gratuit' : `${plan.price} EUR`}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {plan.key === 'starter' ? 'Sans carte bancaire' : 'par mois'}
+                        {plan.key === 'free' ? 'Sans carte bancaire' : 'par mois'}
                       </p>
                     </div>
 
@@ -2753,7 +2753,7 @@ export default function ParametresPage() {
                         <Button disabled className="w-full">
                           Plan actuel
                         </Button>
-                      ) : plan.key === 'starter' ? (
+                      ) : plan.key === 'free' ? (
                         <Button disabled variant="outline" className="w-full">
                           Plan gratuit
                         </Button>

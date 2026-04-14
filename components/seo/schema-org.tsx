@@ -1,10 +1,7 @@
 import { PRICING_PLAN_DEFAULTS } from '@/lib/pricing-plans';
 
-// Starter price sourced from lib/pricing-plans.ts (PRICING_PLAN_DEFAULTS).
-// Fallback to "0" if the starter plan is ever removed.
-// TODO: sync with real starter price from platform_config at runtime if needed.
 const STARTER_PRICE =
-  PRICING_PLAN_DEFAULTS.find((plan) => plan.key === 'starter')?.defaultPrice ?? '0';
+  PRICING_PLAN_DEFAULTS.find((plan) => plan.key === 'free')?.defaultPriceTtc ?? '0';
 
 const SITE_URL = 'https://hellobat.app';
 

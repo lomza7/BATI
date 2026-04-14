@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { generateImage } from '@/lib/ai/image-generation';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
+import { consumeAi } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -90,6 +91,21 @@ export async function POST(
     return NextResponse.json(
       { error: 'Limite atteinte. Contactez l\'artisan pour plus de rendus.' },
       { status: 429 },
+    );
+  }
+
+  // Consommation de quota/crédits au compte de l'artisan propriétaire de la campagne.
+  const gate = await consumeAi(campaign.user_id, 'before_after');
+  if (!gate.ok) {
+    if (gate.reason === 'no_pro_access') {
+      return NextResponse.json(
+        { error: 'Cette campagne n\u2019est plus active (abonnement artisan expir\u00e9).' },
+        { status: 403 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'Cette campagne est temporairement suspendue. Recontactez l\u2019artisan.' },
+      { status: 402 },
     );
   }
 

@@ -28,6 +28,7 @@ import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { PageHeader } from '@/components/shared/page-header';
+import { QuotaMeter } from '@/components/paywall/quota-meter';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
@@ -711,6 +712,8 @@ export default function FacturesPage() {
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>
       </PageHeader>
+
+      <QuotaMeter feature="invoice" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-4">

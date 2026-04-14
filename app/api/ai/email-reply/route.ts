@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
+import { consumeAi } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 
@@ -35,6 +36,17 @@ export async function POST(request: Request) {
   // Burst protection (sliding window) — per-user
   const rl = checkRateLimit(`ai-email-reply:${user.id}`, 20, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);
+
+  const gate = await consumeAi(user.id, 'email_ai');
+  if (!gate.ok) {
+    if (gate.reason === 'no_pro_access') {
+      return NextResponse.json({ error: 'Abonnement Pro requis pour l\u2019IA.' }, { status: 403 });
+    }
+    return NextResponse.json(
+      { error: 'Cr\u00e9dits IA insuffisants.', balance: gate.balance, required: gate.required },
+      { status: 402 },
+    );
+  }
 
   const body = await request.json().catch(() => null);
   if (!body?.emailBody || !body?.emailFrom || !body?.emailSubject) {

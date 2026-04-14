@@ -94,7 +94,7 @@ export function Navbar() {
             )}
           </div>
 
-          <Link href="/#pricing" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
+          <Link href="/tarifs" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
             Tarifs
           </Link>
           <Link href="/#testimonials" className="text-sm text-[var(--landing-muted)] hover:text-[var(--landing-text)] transition-colors">
@@ -146,7 +146,7 @@ export function Navbar() {
           </div>
           <div className="border-t border-[var(--landing-border)] pt-4 space-y-2">
             <Link
-              href="/#pricing"
+              href="/tarifs"
               className="block text-sm text-[var(--landing-muted)] py-2"
               onClick={() => setMobileOpen(false)}
             >

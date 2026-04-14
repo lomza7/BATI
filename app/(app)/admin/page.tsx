@@ -37,9 +37,9 @@ interface Stats {
   users_this_month: number;
   users_this_year: number;
   onboarding_completed: number;
-  plan_starter: number;
+  plan_starter: number; // legacy alias = plan_free
   plan_pro: number;
-  plan_business: number;
+  plan_business: number; // legacy, unused (business → pro)
   total_quotes: number;
   total_invoices: number;
   total_projects: number;
@@ -112,9 +112,8 @@ const periodLabels: Record<Period, string> = {
 };
 
 const planConfig = {
-  starter: { label: 'Starter', color: 'bg-slate-100 text-slate-700', icon: Users },
+  free: { label: 'Gratuit', color: 'bg-slate-100 text-slate-700', icon: Users },
   pro: { label: 'Pro', color: 'bg-blue-100 text-blue-700', icon: Zap },
-  business: { label: 'Business', color: 'bg-amber-100 text-amber-700', icon: Crown },
 };
 
 function parseMonthlyPrice(value: string | undefined, fallback: number) {
@@ -161,9 +160,8 @@ export default function AdminPage() {
   const [stripeInfo, setStripeInfo] = useState<Record<string, { product_name: string; amount: number; interval: string | null; active: boolean } | null>>({});
   const [stripeFetching, setStripeFetching] = useState<string | null>(null);
   const [planFeatures, setPlanFeatures] = useState<Record<PricingPlanKey, string>>({
-    starter: DEFAULT_PLAN_FEATURES.starter.join('\n'),
+    free: DEFAULT_PLAN_FEATURES.free.join('\n'),
     pro: DEFAULT_PLAN_FEATURES.pro.join('\n'),
-    business: DEFAULT_PLAN_FEATURES.business.join('\n'),
   });
 
   // AI image generation secrets (admin-only)
@@ -254,9 +252,8 @@ export default function AdminPage() {
         price_business: cfg.price_business || '89',
       }));
       setPlanFeatures({
-        starter: parsePlanFeatures(cfg.features_starter, DEFAULT_PLAN_FEATURES.starter).join('\n'),
+        free: parsePlanFeatures(cfg.features_free, DEFAULT_PLAN_FEATURES.free).join('\n'),
         pro: parsePlanFeatures(cfg.features_pro, DEFAULT_PLAN_FEATURES.pro).join('\n'),
-        business: parsePlanFeatures(cfg.features_business, DEFAULT_PLAN_FEATURES.business).join('\n'),
       });
     }
     setConfigLoading(false);
@@ -273,9 +270,8 @@ export default function AdminPage() {
         price_starter: '0',
       };
       const featureConfig = {
-        features_starter: stringifyPlanFeatures(parsePlanFeatures(planFeatures.starter, DEFAULT_PLAN_FEATURES.starter)),
+        features_free: stringifyPlanFeatures(parsePlanFeatures(planFeatures.free, DEFAULT_PLAN_FEATURES.free)),
         features_pro: stringifyPlanFeatures(parsePlanFeatures(planFeatures.pro, DEFAULT_PLAN_FEATURES.pro)),
-        features_business: stringifyPlanFeatures(parsePlanFeatures(planFeatures.business, DEFAULT_PLAN_FEATURES.business)),
       };
 
       const results = await Promise.all(
@@ -308,7 +304,7 @@ export default function AdminPage() {
   }
 
   async function fetchStripePrice(plan: string) {
-    if (plan === 'starter') {
+    if (plan === 'free') {
       setStripeInfo(prev => ({ ...prev, starter: null }));
       setStripeConfig(prev => ({
         ...prev,
@@ -700,14 +696,11 @@ export default function AdminPage() {
   const maxChart = Math.max(...(chart.map(c => c.value) || [1]), 1);
 
   const monthlyPrices = {
-    starter: 0,
-    pro: parseMonthlyPrice(stripeConfig.price_pro, 49),
-    business: parseMonthlyPrice(stripeConfig.price_business, 89),
+    free: 0,
+    pro: parseMonthlyPrice(stripeConfig.price_pro, 19.5),
   };
-  const payingUsers = (stats?.plan_pro || 0) + (stats?.plan_business || 0);
-  const mrr =
-    (stats?.plan_pro || 0) * monthlyPrices.pro +
-    (stats?.plan_business || 0) * monthlyPrices.business;
+  const payingUsers = stats?.plan_pro || 0;
+  const mrr = (stats?.plan_pro || 0) * monthlyPrices.pro;
 
   return (
     <div className="space-y-6">
@@ -761,7 +754,7 @@ export default function AdminPage() {
               icon={TrendingUp}
               label="MRR estimé"
               value={formatCurrency(mrr)}
-              sub={`${stats.plan_pro} Pro + ${stats.plan_business} Business`}
+              sub={`${stats.plan_pro} Pro`}
               accent
             />
             <KpiCard
@@ -773,9 +766,9 @@ export default function AdminPage() {
           </div>
 
           {/* Répartition par plan */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {(Object.entries(planConfig) as [keyof typeof planConfig, typeof planConfig[keyof typeof planConfig]][]).map(([key, conf]) => {
-              const count = key === 'starter' ? stats.plan_starter : key === 'pro' ? stats.plan_pro : stats.plan_business;
+              const count = key === 'free' ? stats.plan_starter : stats.plan_pro;
               const pct = stats.total_users > 0 ? Math.round((count / stats.total_users) * 100) : 0;
               const price = monthlyPrices[key];
               return (
@@ -796,7 +789,7 @@ export default function AdminPage() {
                   </div>
                   <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={cn('h-full rounded-full transition-all', key === 'starter' ? 'bg-slate-400' : key === 'pro' ? 'bg-blue-500' : 'bg-amber-500')}
+                      className={cn('h-full rounded-full transition-all', key === 'free' ? 'bg-slate-400' : 'bg-blue-500')}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -884,7 +877,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {(['starter', 'pro', 'business'] as const).map((plan) => {
+              {(['free', 'pro'] as const).map((plan) => {
                 const conf = planConfig[plan];
                 const priceKey = `stripe_price_${plan}` as keyof typeof stripeConfig;
                 const amountKey = `price_${plan}` as keyof typeof stripeConfig;
@@ -908,17 +901,17 @@ export default function AdminPage() {
                         <label className="text-xs font-medium text-muted-foreground">Stripe Price ID ou Product ID</label>
                         <div className="flex gap-2 mt-1">
                           <Input
-                            placeholder={plan === 'starter' ? 'Aucun ID Stripe requis pour Starter' : 'price_1Abc... ou prod_1Abc...'}
+                            placeholder={plan === 'free' ? 'Aucun ID Stripe requis pour Starter' : 'price_1Abc... ou prod_1Abc...'}
                             className="text-xs font-mono"
-                            value={plan === 'starter' ? '' : stripeConfig[priceKey]}
+                            value={plan === 'free' ? '' : stripeConfig[priceKey]}
                             onChange={e => setStripeConfig(prev => ({ ...prev, [priceKey]: e.target.value }))}
-                            disabled={plan === 'starter'}
+                            disabled={plan === 'free'}
                           />
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => fetchStripePrice(plan)}
-                            disabled={plan === 'starter' || !stripeConfig[priceKey] || stripeFetching === plan}
+                            disabled={plan === 'free' || !stripeConfig[priceKey] || stripeFetching === plan}
                             className="shrink-0"
                           >
                             {stripeFetching === plan ? (
@@ -934,9 +927,9 @@ export default function AdminPage() {
                         <Input
                           type="number"
                           className="mt-1"
-                          value={plan === 'starter' ? '0' : stripeConfig[amountKey]}
+                          value={plan === 'free' ? '0' : stripeConfig[amountKey]}
                           onChange={e => setStripeConfig(prev => ({ ...prev, [amountKey]: e.target.value }))}
-                          disabled={plan === 'starter'}
+                          disabled={plan === 'free'}
                         />
                       </div>
                     </div>
@@ -961,7 +954,7 @@ export default function AdminPage() {
                       </p>
                     </div>
 
-                    {plan === 'starter' && (
+                    {plan === 'free' && (
                       <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                         Le plan Starter reste gratuit. Aucun produit Stripe ni carte bancaire n&apos;est nécessaire.
                       </div>
@@ -1748,7 +1741,8 @@ export default function AdminPage() {
                 </thead>
                 <tbody>
                   {filteredUsers.map(u => {
-                    const plan = planConfig[u.plan as keyof typeof planConfig] || planConfig.starter;
+                    const normalizedPlanKey = (u.plan === 'pro' || u.plan === 'business' ? 'pro' : 'free') as keyof typeof planConfig;
+                    const plan = planConfig[normalizedPlanKey];
                     return (
                       <tr key={u.id} className="border-b border-border hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-3">

@@ -147,13 +147,26 @@ function SignupContent() {
             <span className="font-serif font-medium text-foreground text-lg">Hellobat</span>
           </div>
 
-          <div className="space-y-2 mb-8">
+          <div className="space-y-2 mb-6">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               Créez votre compte
             </h1>
             <p className="text-muted-foreground">
               Commencez à gérer vos chantiers en quelques minutes
             </p>
+          </div>
+
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-start gap-3">
+            <div className="h-9 w-9 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <Gift className="h-4.5 w-4.5 text-emerald-700" />
+            </div>
+            <div className="text-sm text-emerald-900">
+              <p className="font-semibold">30 jours gratuits, sans engagement</p>
+              <p className="text-xs text-emerald-800/80 mt-0.5">
+                Toutes les fonctionnalités Pro débloquées pendant 30 jours. Aucune carte bancaire
+                demandée.
+              </p>
+            </div>
           </div>
 
           {teamInvite && (

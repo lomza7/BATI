@@ -7,7 +7,8 @@ import {
   AI_QUOTE_SECTIONS,
   type QuoteTurn,
 } from '@/lib/ai/quote-schema';
-import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { trackAiUsage } from '@/lib/ai-usage';
+import { consumeAi } from '@/lib/credits';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
 
@@ -220,11 +221,30 @@ export async function POST(request: Request) {
   const rl = checkRateLimit(rlKey, 20, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);
 
-  if (userId) {
-    const limitCheck = await checkAiLimit(userId);
-    if (!limitCheck.allowed) {
-      return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
+  if (!userId) {
+    return NextResponse.json({ error: 'Authentification requise' }, { status: 401 });
+  }
+  const gate = await consumeAi(userId, 'quote_ai');
+  if (!gate.ok) {
+    if (gate.reason === 'no_pro_access') {
+      return NextResponse.json(
+        { error: 'Abonnement Pro requis pour utiliser l\u2019IA.' },
+        { status: 403 },
+      );
     }
+    if (gate.reason === 'free_quota_reached') {
+      return NextResponse.json(
+        {
+          error:
+            'Vous avez utilis\u00e9 vos 3 devis IA offerts ce mois-ci. Passez au Pro pour un usage illimit\u00e9.',
+        },
+        { status: 403 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'Cr\u00e9dits IA insuffisants.', balance: gate.balance, required: gate.required },
+      { status: 402 },
+    );
   }
 
   try {

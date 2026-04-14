@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { trackAiUsage } from '@/lib/ai-usage';
+import { requireProAccess } from '@/lib/credits';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
 
@@ -43,9 +44,9 @@ export async function POST(request: Request) {
   const rl = checkRateLimit(`ai-project-description:${user.id}`, 20, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);
 
-  const limitCheck = await checkAiLimit(user.id);
-  if (!limitCheck.allowed) {
-    return NextResponse.json({ error: limitCheck.reason }, { status: 429 });
+  const gate = await requireProAccess(user.id);
+  if (!gate.ok) {
+    return NextResponse.json({ error: 'Abonnement Pro requis.' }, { status: 403 });
   }
 
   try {

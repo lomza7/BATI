@@ -7,6 +7,10 @@
     {
       "path": "/api/reminders/send",
       "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/cron/paywall-emails",
+      "schedule": "30 7 * * *"
     }
   ]
 }
