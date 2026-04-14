@@ -9,10 +9,10 @@ import { CTA } from '@/components/landing/cta';
 export const metadata = {
   title: 'Tarifs — Hellobat, logiciel de gestion pour les artisans du bâtiment',
   description:
-    'Découvrez les tarifs Hellobat : plan Gratuit à vie et plan Pro à 19,50 € TTC/mois. Essai 30 jours sans engagement. Comparatif complet des fonctionnalités : devis IA, facturation, chantiers, comptabilité automatisée.',
+    'Découvrez les tarifs Hellobat : plan Gratuit à vie et plan Pro à 16,25 € HT/mois. Essai 30 jours sans engagement. Comparatif complet des fonctionnalités : devis IA, facturation, chantiers, comptabilité automatisée.',
   alternates: { canonical: 'https://hellobat.app/tarifs' },
   openGraph: {
-    title: 'Tarifs Hellobat — Gratuit ou Pro à 19,50 € / mois',
+    title: 'Tarifs Hellobat — Gratuit ou Pro à 16,25 € HT / mois',
     description:
       'Comparez nos deux formules pour les artisans du bâtiment. Essai gratuit 30 jours, sans engagement, résiliable à tout moment.',
     url: 'https://hellobat.app/tarifs',
@@ -113,11 +113,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Les prix affichés sont-ils HT ou TTC ?',
-    a: 'Par défaut les prix sont affichés TTC (TVA française 20 % incluse). Vous pouvez basculer l’affichage en HT sur la page de tarification.',
+    a: 'Par défaut les prix sont affichés HT (hors TVA 20 %). Vous pouvez basculer l’affichage en TTC à tout moment sur la page de tarification.',
   },
   {
     q: 'Existe-t-il une réduction pour le paiement à l’année ?',
-    a: 'Oui. Le plan Pro annuel est à 195 € TTC au lieu de 234 € TTC — soit 2 mois offerts par rapport au mensuel.',
+    a: 'Oui. Le plan Pro annuel est à 162,50 € HT au lieu de 195 € HT — soit 2 mois offerts par rapport au mensuel.',
   },
   {
     q: 'Hellobat est-il conforme à la facturation électronique 2026 ?',
@@ -149,7 +149,7 @@ export default function TarifsPage() {
               <em className="italic text-[var(--landing-accent)]">simples</em> et transparents
             </h1>
             <p className="mt-5 text-lg text-[var(--landing-muted)] max-w-2xl mx-auto">
-              Un plan Gratuit à vie pour démarrer, un plan Pro à 19,50 € TTC par mois pour tout
+              Un plan Gratuit à vie pour démarrer, un plan Pro à 16,25 € HT par mois pour tout
               débloquer. Essai gratuit 30 jours, sans carte bancaire, sans engagement.
             </p>
           </div>

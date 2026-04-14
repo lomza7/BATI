@@ -21,7 +21,7 @@ export function Pricing() {
     DEFAULT_PLAN_FEATURES,
   );
   const [billing, setBilling] = useState<Billing>('monthly');
-  const [taxMode, setTaxMode] = useState<TaxMode>('ttc');
+  const [taxMode, setTaxMode] = useState<TaxMode>('ht');
 
   useEffect(() => {
     async function loadPrices() {
