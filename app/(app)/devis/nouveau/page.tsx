@@ -84,6 +84,7 @@ export default function NouveauDevisPage() {
   const { user } = useAuth();
   const router = useRouter();
   const draftId = useRef<string | null>(null);
+  const draftPromise = useRef<Promise<string | null> | null>(null);
   const prefillProjectId = useRef<string | null>(null);
 
   const [title, setTitle] = useState('');
@@ -138,8 +139,8 @@ export default function NouveauDevisPage() {
   }
 
   // Auto-save draft when client is selected
-  async function autosaveDraft(clientId: string) {
-    if (!user || draftId.current) return;
+  async function autosaveDraft(clientId: string): Promise<string | null> {
+    if (!user || draftId.current) return draftId.current;
     const quoteNumber = await getNextQuoteNumber(supabase, user.id);
     const { data } = await supabase
       .from('quotes')
@@ -159,12 +160,13 @@ export default function NouveauDevisPage() {
       .select('id')
       .single();
     if (data) draftId.current = data.id;
+    return draftId.current;
   }
 
   function handleClientSelect(clientId: string | null) {
     setSelectedClientId(clientId);
-    if (clientId && !draftId.current) {
-      autosaveDraft(clientId);
+    if (clientId && !draftId.current && !draftPromise.current) {
+      draftPromise.current = autosaveDraft(clientId);
     }
   }
 
@@ -293,6 +295,11 @@ export default function NouveauDevisPage() {
     setSaving(true);
 
     try {
+      // Wait for any in-flight draft creation so we don't create a duplicate
+      if (draftPromise.current && !draftId.current) {
+        try { await draftPromise.current; } catch { /* ignore */ }
+      }
+
       const validLines = lines.filter(l => l.description.trim());
       const tva = computeTvaBreakdown(validLines);
       const totalHt = tva.total_ht;
@@ -495,14 +502,19 @@ export default function NouveauDevisPage() {
   }
 
   // Autosave totals/lines on the existing draft so the list reflects real amounts
-  // even if the user navigates away without clicking "Enregistrer".
+  // even if the user navigates away without clicking "Enregistrer". Uses a generation
+  // counter to cancel stale autosaves and avoid racing with saveQuote.
+  const autosaveGenRef = useRef(0);
   useEffect(() => {
-    if (!user || !draftId.current) return;
+    if (!user || !draftId.current || saving) return;
+    const gen = ++autosaveGenRef.current;
     const timer = setTimeout(async () => {
+      if (gen !== autosaveGenRef.current) return;
       const id = draftId.current;
       if (!id) return;
       const validLines = lines.filter(l => l.description.trim());
       const tva = computeTvaBreakdown(validLines);
+      if (gen !== autosaveGenRef.current) return;
       await supabase
         .from('quotes')
         .update({
@@ -516,7 +528,9 @@ export default function NouveauDevisPage() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
+      if (gen !== autosaveGenRef.current) return;
       await supabase.from('quote_lines').delete().eq('quote_id', id);
+      if (gen !== autosaveGenRef.current) return;
       if (validLines.length > 0) {
         await supabase.from('quote_lines').insert(
           validLines.map((l, i) => ({
@@ -535,9 +549,12 @@ export default function NouveauDevisPage() {
         );
       }
     }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      autosaveGenRef.current++;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines, title, description, user]);
+  }, [lines, title, description, user, saving]);
 
   // Service filtering
   let filteredServices = serviceSectionFilter !== 'all'
