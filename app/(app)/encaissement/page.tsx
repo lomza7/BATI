@@ -18,12 +18,15 @@ import {
   QrCode,
   Sparkles,
   Zap,
+  ShieldCheck,
+  CalendarClock,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, INVOICE_STATUSES } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
-import { EmptyState } from '@/components/shared/empty-state';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { Button } from '@/components/ui/button';
@@ -148,14 +151,38 @@ export default function EncaissementPage() {
   // Recent payments
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
 
+  // Platform fee (HelloPay) — loaded from platform_config
+  const [platformFeePercent, setPlatformFeePercent] = useState(0.5);
+
   // Computed amounts
   const tvaAmount = (totalHt || 0) * tvaRate / 100;
   const totalTtc = (totalHt || 0) + tvaAmount;
 
+  // Fee breakdown. Stripe Connect Standard France: 1.5% + 0.25 € pour une
+  // carte EU. On affiche une estimation — les frais réels dépendent du type
+  // de carte (EU/non-EU, corporate, etc.).
+  const STRIPE_FEE_PERCENT = 1.5;
+  const STRIPE_FEE_FIXED = 0.25;
+  const stripeFee = totalTtc > 0 ? (totalTtc * STRIPE_FEE_PERCENT) / 100 + STRIPE_FEE_FIXED : 0;
+  const platformFee = totalTtc > 0 ? (totalTtc * platformFeePercent) / 100 : 0;
+  const totalFees = stripeFee + platformFee;
+  const netAmount = totalTtc - totalFees;
+
   useEffect(() => {
     checkStripeStatus();
     loadRecentPayments();
+    loadPlatformFee();
   }, [user, authSession?.access_token]);
+
+  async function loadPlatformFee() {
+    const { data } = await supabase
+      .from('platform_config')
+      .select('value')
+      .eq('key', 'stripe_connect_fee_percent')
+      .maybeSingle();
+    const v = parseFloat(data?.value || '0.5');
+    if (!isNaN(v)) setPlatformFeePercent(v);
+  }
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -321,26 +348,115 @@ export default function EncaissementPage() {
 
   if (stripeConnected === false) {
     return (
-      <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-1">
-          <div className="relative">
-            <Zap className="h-7 w-7 text-primary" />
-            <Sparkles className="h-3.5 w-3.5 text-amber-400 absolute -top-1 -right-1.5" />
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="relative">
+              <Zap className="h-7 w-7 text-primary" />
+              <Sparkles className="h-3.5 w-3.5 text-amber-400 absolute -top-1 -right-1.5" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">HelloPay</h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-orange-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200/60">
+              <Sparkles className="h-3 w-3" />
+              Nouveau
+            </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">HelloPay</h1>
+          <p className="text-sm text-muted-foreground ml-10">Encaissez vos clients en 10 secondes depuis votre telephone</p>
         </div>
-        <p className="text-sm text-muted-foreground ml-10">Encaissez vos clients en un instant</p>
-        <div className="mt-8">
-          <EmptyState
-            icon={CreditCard}
-            title="Stripe non connecte"
-            description="Connectez votre compte Stripe dans la section Paiements pour activer HelloPay."
+
+        {/* Welcome hero */}
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-6 sm:p-8">
+          <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br from-amber-200/40 to-orange-200/40 blur-3xl" />
+          <div className="relative space-y-4">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+              Encaissez vos clients sur place, en <span className="text-primary">10 secondes</span>
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Fini les cheques qui trainent et les virements qui n&apos;arrivent jamais. Avec HelloPay,
+              votre client scanne un QR code depuis son telephone et paie par carte bancaire,
+              Apple Pay ou Google Pay. L&apos;argent tombe sur votre compte.
+            </p>
+          </div>
+        </div>
+
+        {/* 3 steps */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Comment ca marche
+          </h3>
+          <div className="space-y-2">
+            {[
+              {
+                n: '1',
+                title: 'Creez votre compte Stripe depuis HelloPay',
+                desc: 'Suivez les instructions de Stripe — piece d\'identite, IBAN, informations legales. Ca prend 5 minutes, c\'est gratuit.',
+              },
+              {
+                n: '2',
+                title: 'Encaissez par QR code depuis votre telephone',
+                desc: 'Saisissez le montant, montrez le QR code a votre client. Il scanne, il paie, c\'est termine.',
+              },
+              {
+                n: '3',
+                title: 'L\'argent arrive sur votre compte',
+                desc: 'Choisissez la frequence des virements depuis votre tableau de bord Stripe : tous les jours, toutes les semaines ou tous les mois.',
+              },
+            ].map((s) => (
+              <div key={s.n} className="flex items-start gap-4 rounded-xl border border-border bg-card p-4">
+                <div className="flex-shrink-0 h-9 w-9 rounded-full bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center text-white font-bold text-sm">
+                  {s.n}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">{s.title}</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Benefits */}
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Les avantages
+          </h3>
+          <ul className="space-y-2.5">
+            {[
+              { Icon: QrCode, text: 'QR code genere instantanement, paiement carte/Apple Pay/Google Pay' },
+              { Icon: FileText, text: 'Facture creee automatiquement dans Hellobat apres le paiement' },
+              { Icon: CalendarClock, text: 'Virements quotidiens, hebdomadaires ou mensuels, a votre choix' },
+              { Icon: ShieldCheck, text: 'Paiements securises par Stripe, conformite PCI garantie' },
+            ].map(({ Icon, text }) => (
+              <li key={text} className="flex items-start gap-3">
+                <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm leading-relaxed pt-1">{text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* CTA */}
+        <div className="sticky bottom-4 rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50 p-4 shadow-lg">
+          <Button
+            className="w-full bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90"
+            size="lg"
+            onClick={async () => {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                window.location.href = `/api/stripe/connect?token=${session.access_token}`;
+              }
+            }}
           >
-            <Button onClick={() => window.location.href = '/paiements'}>
-              Configurer Stripe
-            </Button>
-          </EmptyState>
+            <Zap className="mr-2 h-4 w-4" />
+            Creer mon compte Stripe (5 min)
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <p className="text-[11px] text-center text-muted-foreground mt-2">
+            Gratuit. Vous pourrez encaisser vos clients immediatement apres la validation.
+          </p>
         </div>
       </div>
     );
@@ -429,6 +545,34 @@ export default function EncaissementPage() {
               </div>
             </div>
 
+            {/* Fee breakdown (live) */}
+            {totalTtc > 0 && (
+              <div className="rounded-lg border border-border/70 bg-muted/30 p-3 space-y-1.5 text-sm">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                  Frais estimes
+                </p>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Frais Stripe ({STRIPE_FEE_PERCENT}% + {formatCurrency(STRIPE_FEE_FIXED)})</span>
+                  <span>- {formatCurrency(stripeFee)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Frais HelloPay ({platformFeePercent}%)</span>
+                  <span>- {formatCurrency(platformFee)}</span>
+                </div>
+                <div className="flex justify-between font-medium text-foreground pt-1.5 border-t border-border/60">
+                  <span>Total des frais</span>
+                  <span>- {formatCurrency(totalFees)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-foreground pt-1.5 border-t border-border/60">
+                  <span>Vous recevez</span>
+                  <span className="text-green-700">{formatCurrency(netAmount)}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Estimation pour une carte EU. Les frais Stripe reels peuvent varier selon le type de carte.
+                </p>
+              </div>
+            )}
+
             <Button
               className="w-full bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90"
               size="lg"
@@ -490,6 +634,32 @@ export default function EncaissementPage() {
             <div className="text-center mb-5">
               <p className="text-sm text-muted-foreground">Montant a encaisser</p>
               <p className="text-2xl font-bold mt-1">{formatCurrency(totalTtc)}</p>
+            </div>
+
+            {/* Fee breakdown */}
+            <div className="mb-5 rounded-lg border border-border/70 bg-muted/30 p-3 space-y-1.5 text-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                Frais estimes
+              </p>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Frais Stripe ({STRIPE_FEE_PERCENT}% + {formatCurrency(STRIPE_FEE_FIXED)})</span>
+                <span>- {formatCurrency(stripeFee)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Frais HelloPay ({platformFeePercent}%)</span>
+                <span>- {formatCurrency(platformFee)}</span>
+              </div>
+              <div className="flex justify-between font-medium text-foreground pt-1.5 border-t border-border/60">
+                <span>Total des frais</span>
+                <span>- {formatCurrency(totalFees)}</span>
+              </div>
+              <div className="flex justify-between font-semibold text-foreground pt-1.5 border-t border-border/60">
+                <span>Vous recevez</span>
+                <span className="text-green-700">{formatCurrency(netAmount)}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Estimation pour une carte EU. Les frais Stripe reels peuvent varier selon le type de carte.
+              </p>
             </div>
 
             <h2 className="text-base font-semibold mb-3">Comment encaisser ?</h2>
