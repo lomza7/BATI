@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -37,6 +37,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface QuoteLine {
@@ -93,6 +95,7 @@ export default function ModifierDevisPage() {
   const [serviceSectionFilter, setServiceSectionFilter] = useState<'all' | 'materiel' | 'main_oeuvre'>('all');
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
+  const [sectionDialog, setSectionDialog] = useState<{ mode: 'create' | 'rename'; oldName?: string; value: string } | null>(null);
   const serviceSearchRef = useRef<HTMLInputElement>(null);
   const [autocompleteIndex, setAutocompleteIndex] = useState<number | null>(null);
   const autocompleteRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -184,16 +187,23 @@ export default function ModifierDevisPage() {
   }
 
   function addSection() {
-    const name = prompt('Nom de la section :');
-    if (!name?.trim()) return;
-    const lastSection = lines.length > 0 ? lines[lines.length - 1].section : undefined;
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: name.trim() }]);
+    setSectionDialog({ mode: 'create', value: '' });
   }
 
   function renameSection(oldName: string) {
-    const newName = prompt('Renommer la section :', oldName);
-    if (!newName?.trim() || newName.trim() === oldName) return;
-    setLines(lines.map(l => l.section === oldName ? { ...l, section: newName.trim() } : l));
+    setSectionDialog({ mode: 'rename', oldName, value: oldName });
+  }
+
+  function confirmSectionDialog() {
+    if (!sectionDialog) return;
+    const name = sectionDialog.value.trim();
+    if (!name) return;
+    if (sectionDialog.mode === 'create') {
+      setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: name }]);
+    } else if (sectionDialog.mode === 'rename' && sectionDialog.oldName && name !== sectionDialog.oldName) {
+      setLines(lines.map(l => l.section === sectionDialog.oldName ? { ...l, section: name } : l));
+    }
+    setSectionDialog(null);
   }
 
   function deleteSection(sectionName: string) {
@@ -503,10 +513,10 @@ export default function ModifierDevisPage() {
 
               <div className="space-y-2">
                 {lines.map((line, i) => (
-                  <>
+                  <Fragment key={i}>
                   {/* Section header */}
                   {line.section && (i === 0 || lines[i - 1].section !== line.section) && (
-                    <div key={`section-${i}`} className="flex items-center gap-2 pt-2 first:pt-0">
+                    <div className="flex items-center gap-2 pt-2 first:pt-0">
                       <div className="flex-1 flex items-center gap-2 rounded-lg bg-muted/70 border border-border px-3 py-2">
                         <Layers className="h-3.5 w-3.5 text-[#d35400]" />
                         <span className="text-sm font-semibold text-foreground">{line.section}</span>
@@ -708,7 +718,7 @@ export default function ModifierDevisPage() {
                       )}
                     </div>
                   </div>
-                  </>
+                  </Fragment>
                 ))}
               </div>
 
@@ -971,6 +981,29 @@ export default function ModifierDevisPage() {
         bankAccountId={selectedBankAccountId}
         depositPercentage={depositPercentage ? parseFloat(depositPercentage) : null}
       />
+
+      <Dialog open={!!sectionDialog} onOpenChange={(o) => !o && setSectionDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{sectionDialog?.mode === 'rename' ? 'Renommer la section' : 'Nouvelle section'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="section-name">Nom de la section</Label>
+            <Input
+              id="section-name"
+              value={sectionDialog?.value ?? ''}
+              onChange={(e) => setSectionDialog(sectionDialog ? { ...sectionDialog, value: e.target.value } : null)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmSectionDialog(); } }}
+              placeholder="Ex. Salle de bain"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSectionDialog(null)}>Annuler</Button>
+            <Button onClick={confirmSectionDialog} style={{ backgroundColor: '#D35400' }}>Valider</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
