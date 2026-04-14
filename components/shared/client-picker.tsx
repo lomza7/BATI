@@ -84,7 +84,12 @@ export function ClientPicker({ value, onChange, className }: ClientPickerProps) 
   }, []);
 
   async function loadClients() {
-    const { data } = await supabase.from('clients').select('*').is('deleted_at', null).order('name');
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .in('contact_type', ['client', 'prospect'])
+      .is('deleted_at', null)
+      .order('name');
     setClients((data as Client[]) || []);
   }
 
