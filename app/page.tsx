@@ -66,6 +66,7 @@ export default function LandingPage() {
       <DemoApp />
       <DevisSection />
       <FactureElectroniqueSection />
+      <HelloPaySection />
       <ContactsSection />
       <PlanningSection />
       <EquipeSection />
@@ -77,7 +78,6 @@ export default function LandingPage() {
       <ComptaSection />
       <AvisSection />
       <PlansSection />
-      <HelloPaySection />
       <PaiementSection />
       <AbonnementsSection />
       <AgentsSection />

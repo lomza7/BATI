@@ -47,9 +47,9 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
   },
   {
     slug: 'devis-factures',
-    title: 'Devis',
-    subtitle: 'Un devis en une minute au lieu d\'une heure',
-    heroDescription: 'Décrivez les travaux en quelques mots ou à la voix, et l\'IA génère un devis complet — chiffré avec vos propres tarifs. Elle connaît votre catalogue, elle apprend de chaque devis que vous faites, et elle s\'améliore au fil du temps. En quelques clics, c\'est bouclé.',
+    title: 'Devis & Factures',
+    subtitle: 'Un devis en une minute au lieu d\'une heure, et des factures conformes à la réforme 2026',
+    heroDescription: 'Décrivez les travaux en quelques mots ou à la voix, et l\'IA génère un devis complet — chiffré avec vos propres tarifs. Transformez-le en facture en un clic, au format Factur-X conforme à la réforme 2026. Tout est archivé et transmis automatiquement à l\'administration.',
     videoUrl: 'https://ijdscgzpswlskwaozbuh.supabase.co/storage/v1/object/public/Video%20prez/DEVIS%20.mp4',
     sections: [
       {
@@ -76,16 +76,24 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
         title: 'Du devis à la facture, tout est connecté',
         content: 'Quand le client accepte, transformez le devis en facture instantanément — toutes les lignes et montants sont repris. Chaque devis crée aussi automatiquement un lead dans votre pipeline commercial. Numérotation conforme, TVA multi-taux, mentions légales : tout est géré.',
       },
+      {
+        title: 'Facture électronique conforme à la réforme 2026',
+        content: 'À partir de septembre 2026, toutes les entreprises françaises devront émettre des factures électroniques. Hellobat génère vos factures au format Factur-X — un PDF lisible par l\'humain contenant des données structurées XML reconnues par l\'administration. Aucune configuration à faire : vous êtes prêt dès maintenant.',
+      },
+      {
+        title: 'E-reporting et archivage légal',
+        content: 'Pour vos transactions avec des particuliers ou des entreprises étrangères, Hellobat transmet automatiquement les données de facturation à l\'administration fiscale dans les délais imposés. Vos factures sont archivées de manière sécurisée pendant les 10 ans exigés par la loi, avec intégrité garantie.',
+      },
     ],
     highlights: [
       'Devis généré par dictée vocale en quelques secondes',
       'Questions de clarification IA — répondez à la voix',
       'Chiffrage basé sur votre catalogue et votre historique',
-      'Historique client pour des prix cohérents',
       'Signature électronique intégrée (eIDAS)',
-      'Enrichissement automatique de votre catalogue',
       'Transformation devis → facture en 1 clic',
-      'Pipeline commercial alimenté automatiquement',
+      'Format Factur-X conforme à la réforme 2026',
+      'E-reporting automatique vers l\'administration',
+      'Archivage légal 10 ans',
     ],
     plan: 'starter',
   },

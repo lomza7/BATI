@@ -5,6 +5,7 @@ import { DemoViewContent } from './demo-app';
 import { SiteWebInteractiveDemo } from './site-web-demo';
 import { ProspectionInteractiveDemo } from './prospection-demo';
 import { RendusInteractiveDemo } from './rendus-demo';
+import { HelloPayInteractiveDemo } from './hellopay-demo';
 
 const SLUG_TO_VIEW: Record<string, string> = {
   'devis-ia': 'devis',
@@ -58,6 +59,7 @@ const INTERACTIVE_DEMOS: Record<string, React.ComponentType> = {
   'site-vitrine': SiteWebInteractiveDemo,
   'prospection-crm': ProspectionInteractiveDemo,
   'rendus-ia': RendusInteractiveDemo,
+  'hellopay': HelloPayInteractiveDemo,
 };
 
 export function FeatureDemo({ slug }: { slug: string }) {

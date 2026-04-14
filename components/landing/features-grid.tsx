@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import {
   FileText,
@@ -10,20 +9,14 @@ import {
   Globe,
   Target,
   Mail,
-  Star,
-  FileImage,
   CreditCard,
   Bot,
   Mic,
   Contact,
-  UsersRound,
   BookOpen,
-  Calendar,
-  RefreshCw,
   Calculator,
   Package,
   PenLine,
-  ShieldCheck,
   Zap,
 } from 'lucide-react';
 
@@ -55,18 +48,11 @@ export const featureCards: FeatureCard[] = [
   },
   {
     icon: FileText,
-    title: 'Devis & Factures',
-    desc: 'Créez, envoyez et suivez vos devis et factures en quelques clics.',
-    sectionId: 'devis',
-    slug: 'devis-factures',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Facture électronique',
-    desc: 'Conforme à la réforme 2026 : format Factur-X, e-reporting et archivage légal.',
+    title: 'Factures',
+    desc: 'Factures conformes à la réforme 2026, envoyées et suivies en quelques clics.',
     special: 'compliance',
-    sectionId: 'facture-electronique',
-    slug: 'facture-electronique',
+    sectionId: 'devis',
+    slug: 'factures',
   },
   {
     icon: Package,
@@ -99,25 +85,10 @@ export const featureCards: FeatureCard[] = [
   },
   {
     icon: CalendarDays,
-    title: 'Planning équipe',
-    desc: 'Vue semaine et mois avec drag & drop pour planifier vos interventions.',
+    title: 'Planning & équipe',
+    desc: 'Planifiez vos interventions en drag & drop et gérez salariés, intérimaires et sous-traitants.',
     sectionId: 'planning',
     slug: 'planning-equipe',
-  },
-  {
-    icon: Calendar,
-    title: 'Google Calendar',
-    desc: 'Synchronisation bidirectionnelle de vos rendez-vous avec Google Calendar.',
-    special: 'google',
-    sectionId: 'planning',
-    slug: 'google-calendar',
-  },
-  {
-    icon: UsersRound,
-    title: 'Équipe & sous-traitants',
-    desc: 'Gérez salariés, intérimaires et sous-traitants avec suivi des heures.',
-    sectionId: 'equipe',
-    slug: 'equipe',
   },
   {
     icon: MapPin,
@@ -149,34 +120,19 @@ export const featureCards: FeatureCard[] = [
   },
   {
     icon: Mail,
-    title: 'Gmail intégré',
-    desc: 'Votre boîte Gmail synchronisée : envoi, réception et réponse IA depuis Hellobat.',
+    title: 'Emails & avis clients',
+    desc: 'Gérez vos emails, votre agenda et collectez vos avis clients, tout connecté à Google.',
     special: 'google',
     sectionId: 'email',
-    slug: 'gmail-integre',
-  },
-  {
-    icon: Star,
-    title: 'Avis Google',
-    desc: 'Collectez et gérez vos avis clients automatiquement.',
-    sectionId: 'avis',
-    slug: 'avis-google',
+    slug: 'emails-avis-clients',
   },
   {
     icon: CreditCard,
-    title: 'Paiements Stripe',
-    desc: 'Acceptez les paiements en ligne avec lien de paiement et suivi en temps réel.',
+    title: 'Paiement en ligne & abonnements',
+    desc: 'Faites-vous payer en ligne par vos clients et automatisez la facturation de vos contrats d\'entretien.',
     special: 'stripe',
     sectionId: 'paiement',
-    slug: 'paiements-stripe',
-  },
-  {
-    icon: RefreshCw,
-    title: 'Contrats récurrents',
-    desc: 'Contrats d\'entretien avec facturation automatique et suivi MRR.',
-    special: 'recurring',
-    sectionId: 'abonnements',
-    slug: 'contrats-recurrents',
+    slug: 'paiement-abonnements',
   },
   {
     icon: Calculator,
