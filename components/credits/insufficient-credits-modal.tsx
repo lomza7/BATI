@@ -38,8 +38,8 @@ export function InsufficientCreditsModal({
               Crédits IA insuffisants
             </DialogTitle>
             <DialogDescription>
-              Vous avez atteint votre quota mensuel pour cette fonctionnalité. Achetez des crédits
-              pour continuer dès maintenant, ou attendez le 1<sup>er</sup> du mois prochain.
+              Vous avez épuisé vos crédits IA pour cette période. Achetez des crédits permanents
+              pour continuer dès maintenant, ou attendez la prochaine recharge mensuelle.
             </DialogDescription>
           </DialogHeader>
 

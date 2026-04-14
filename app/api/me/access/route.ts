@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAccessState } from '@/lib/subscription';
-import { getMonthlyUsage, AI_QUOTAS, AI_CREDIT_COSTS } from '@/lib/credits';
+import { getMonthlyUsage, AI_CREDIT_COSTS } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 
@@ -36,10 +36,13 @@ export async function GET(request: Request) {
     daysLeftInTrial: access.daysLeftInTrial,
     hasProAccess: access.hasProAccess,
     creditsBalance: access.creditsBalance,
+    monthlyCreditsRemaining: access.monthlyCreditsRemaining,
+    monthlyCreditsAllocation: access.monthlyCreditsAllocation,
+    purchasedCreditsBalance: access.purchasedCreditsBalance,
+    creditsNextRefillAt: access.creditsNextRefillAt?.toISOString() ?? null,
     usage: usage.ai,
     docUsage: usage.docs,
     docLimit: 5,
-    quotas: AI_QUOTAS,
     creditCosts: AI_CREDIT_COSTS,
   });
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Zap, Loader2 } from 'lucide-react';
+import { Zap, Loader2, Calendar } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import { useAccessState } from '@/hooks/use-access-state';
+
+function formatRefillDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+}
 
 type Pack = {
   key: '50' | '200' | '1000';
@@ -43,7 +51,9 @@ interface BuyCreditsModalProps {
 export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
   const { session } = useAuth();
   const { toast } = useToast();
+  const { state } = useAccessState();
   const [loading, setLoading] = useState<string | null>(null);
+  const refillLabel = formatRefillDate(state?.creditsNextRefillAt ?? null);
 
   async function buy(pack: Pack['key']) {
     if (!session?.access_token) return;
@@ -81,9 +91,35 @@ export function BuyCreditsModal({ open, onOpenChange }: BuyCreditsModalProps) {
             Acheter des crédits IA
           </DialogTitle>
           <DialogDescription>
-            Les crédits permettent de dépasser vos quotas IA mensuels. Ils ne périment jamais.
+            Les crédits achetés viennent s’ajouter à vos crédits mensuels inclus. Ils ne périment
+            jamais et ne sont utilisés qu’après épuisement du quota mensuel.
           </DialogDescription>
         </DialogHeader>
+
+        {state?.hasProAccess && (
+          <div className="grid gap-2 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+            <div>
+              <div className="text-xs text-muted-foreground">Crédits mensuels restants</div>
+              <div className="mt-0.5 text-lg font-semibold">
+                {state.monthlyCreditsRemaining}
+                <span className="text-sm font-normal text-muted-foreground">
+                  {' '}
+                  / {state.monthlyCreditsAllocation}
+                </span>
+              </div>
+              {refillLabel && (
+                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  Rechargement le {refillLabel}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Crédits achetés (permanents)</div>
+              <div className="mt-0.5 text-lg font-semibold">{state.purchasedCreditsBalance}</div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-3">
           {PACKS.map((pack) => (

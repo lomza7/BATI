@@ -12,14 +12,25 @@ export interface AccessState {
   trialEndAt: Date | null;
   daysLeftInTrial: number | null;
   hasProAccess: boolean;
+  /** Crédits mensuels Pro restants (se rechargent à la date anniversaire). */
+  monthlyCreditsRemaining: number;
+  /** Allocation mensuelle totale du plan. */
+  monthlyCreditsAllocation: number;
+  /** Crédits permanents issus de packs achetés (ne se péremeront pas). */
+  purchasedCreditsBalance: number;
+  /** Total affiché au user = mensuel restant + permanents. */
   creditsBalance: number;
+  /** Prochaine date de recharge des crédits mensuels. */
+  creditsNextRefillAt: Date | null;
   stripeCustomerId: string | null;
 }
 
 export async function getAccessState(userId: string): Promise<AccessState> {
   const { data } = await supabaseAdmin
     .from('profiles')
-    .select('plan, subscription_status, trial_end_at, ai_credits_balance, stripe_customer_id')
+    .select(
+      'plan, subscription_status, trial_end_at, ai_credits_balance, stripe_customer_id, monthly_credits_allocation, monthly_credits_used, credits_period_start',
+    )
     .eq('id', userId)
     .maybeSingle();
 
@@ -30,7 +41,11 @@ export async function getAccessState(userId: string): Promise<AccessState> {
       trialEndAt: null,
       daysLeftInTrial: null,
       hasProAccess: false,
+      monthlyCreditsRemaining: 0,
+      monthlyCreditsAllocation: 0,
+      purchasedCreditsBalance: 0,
       creditsBalance: 0,
+      creditsNextRefillAt: null,
       stripeCustomerId: null,
     };
   }
@@ -47,13 +62,30 @@ export async function getAccessState(userId: string): Promise<AccessState> {
   const trialActive = status === 'trialing' && trialEndAt !== null && trialEndAt.getTime() > now;
   const hasProAccess = plan === 'pro' && (status === 'active' || trialActive);
 
+  const allocation = data.monthly_credits_allocation ?? 0;
+  const used = data.monthly_credits_used ?? 0;
+  const monthlyRemaining = Math.max(allocation - used, 0);
+  const purchased = data.ai_credits_balance ?? 0;
+
+  // Prochaine recharge = credits_period_start + 1 mois (avance en live dans consume_ai).
+  let nextRefill: Date | null = null;
+  if (data.credits_period_start) {
+    const start = new Date(data.credits_period_start);
+    nextRefill = new Date(start);
+    nextRefill.setMonth(nextRefill.getMonth() + 1);
+  }
+
   return {
     plan,
     status,
     trialEndAt,
     daysLeftInTrial,
     hasProAccess,
-    creditsBalance: data.ai_credits_balance ?? 0,
+    monthlyCreditsRemaining: monthlyRemaining,
+    monthlyCreditsAllocation: allocation,
+    purchasedCreditsBalance: purchased,
+    creditsBalance: monthlyRemaining + purchased,
+    creditsNextRefillAt: nextRefill,
     stripeCustomerId: data.stripe_customer_id ?? null,
   };
 }

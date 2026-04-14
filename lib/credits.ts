@@ -3,14 +3,12 @@
 
 import { supabaseAdmin } from './supabase-admin';
 
-export const AI_QUOTAS = {
-  quote_ai: 50,
-  agent: 50,
-  email_ai: 50,
-  accounting_ai: 50,
-  before_after: 10,
-  site_web: 3,
-} as const;
+/**
+ * Allocation mensuelle de crédits pour un abonné Pro.
+ * Rechargée automatiquement à la date anniversaire du compte via la
+ * fonction SQL `refresh_credits_period` appelée depuis `consume_ai`.
+ */
+export const MONTHLY_CREDITS_ALLOCATION = 300;
 
 export const AI_CREDIT_COSTS = {
   quote_ai: 3,
@@ -22,11 +20,11 @@ export const AI_CREDIT_COSTS = {
 } as const;
 
 /**
- * Quotas mensuels offerts aux utilisateurs du plan Gratuit (sans Pro).
- * Zéro par défaut — seul quote_ai est offert à hauteur de 3 / mois pour
- * que les artisans testent la génération IA avant de passer au Pro.
+ * Quotas offerts aux utilisateurs du plan Gratuit (sans Pro).
+ * Seul `quote_ai` est partagé à hauteur de 3/mois, les autres features
+ * IA restent derrière le paywall Pro.
  */
-export const AI_FREE_QUOTAS: Record<keyof typeof AI_QUOTAS, number> = {
+export const AI_FREE_QUOTAS: Record<keyof typeof AI_CREDIT_COSTS, number> = {
   quote_ai: 3,
   agent: 0,
   email_ai: 0,
@@ -35,19 +33,24 @@ export const AI_FREE_QUOTAS: Record<keyof typeof AI_QUOTAS, number> = {
   site_web: 0,
 };
 
-export type AiFeature = keyof typeof AI_QUOTAS;
+export type AiFeature = keyof typeof AI_CREDIT_COSTS;
 
 export type ConsumeAiResult =
   | {
       ok: true;
-      source: 'quota' | 'credits' | 'free_quota';
-      balance?: number;
+      source: 'credits' | 'free_quota';
       consumed?: number;
+      monthly_consumed?: number;
+      purchased_consumed?: number;
+      monthly_remaining?: number;
+      purchased?: number;
     }
   | {
       ok: false;
       reason: 'no_pro_access' | 'insufficient_credits' | 'free_quota_reached';
       balance?: number;
+      monthly_remaining?: number;
+      purchased?: number;
       required?: number;
       limit?: number;
       used?: number;
@@ -57,7 +60,6 @@ export async function consumeAi(userId: string, feature: AiFeature): Promise<Con
   const { data, error } = await supabaseAdmin.rpc('consume_ai', {
     p_user_id: userId,
     p_feature: feature,
-    p_quota: AI_QUOTAS[feature],
     p_credit_cost: AI_CREDIT_COSTS[feature],
     p_free_quota: AI_FREE_QUOTAS[feature],
   });
@@ -92,7 +94,7 @@ export async function getMonthlyUsage(
     .eq('period', period);
 
   const ai = Object.fromEntries(
-    (Object.keys(AI_QUOTAS) as AiFeature[]).map((k) => [k, 0]),
+    (Object.keys(AI_CREDIT_COSTS) as AiFeature[]).map((k) => [k, 0]),
   ) as Record<AiFeature, number>;
   const docs = { quote: 0, invoice: 0 };
 

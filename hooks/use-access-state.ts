@@ -21,11 +21,15 @@ export interface AccessState {
   trialEndAt: string | null;
   daysLeftInTrial: number | null;
   hasProAccess: boolean;
+  /** Total affiché (mensuel restant + permanents). */
   creditsBalance: number;
+  monthlyCreditsRemaining: number;
+  monthlyCreditsAllocation: number;
+  purchasedCreditsBalance: number;
+  creditsNextRefillAt: string | null;
   usage: Record<AiFeature, number>;
   docUsage: { quote: number; invoice: number };
   docLimit: number;
-  quotas: Record<AiFeature, number>;
   creditCosts: Record<AiFeature, number>;
 }
 
