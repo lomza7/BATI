@@ -189,7 +189,7 @@ export function DocumentPreviewDialog({
         if (mode === 'quote') {
           const { data: quote } = await supabase
             .from('quotes')
-            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id, deposit_percentage')
+            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -201,7 +201,7 @@ export function DocumentPreviewDialog({
             setResolvedDueDate(null);
             setResolvedCreatedAt(new Date(quote.created_at));
             resolvedBankAccountId = quote.bank_account_id || null;
-            setDepositPercentage(typeof quote.deposit_percentage === 'number' ? quote.deposit_percentage : null);
+            setDepositPercentage(null);
 
             const { data: linesData, error: linesErr } = await supabase
               .from('quote_lines')
