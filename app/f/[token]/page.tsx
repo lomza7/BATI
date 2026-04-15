@@ -173,134 +173,42 @@ export default function PublicInvoicePage() {
 
   const fetchData = useCallback(async () => {
     try {
-    // 1. Fetch send by token
-    const { data: send, error: sendError } = await anonClient
-      .from('invoice_sends')
-      .select('id, invoice_id, user_id, client_name, expires_at, viewed_at, paid_at, enable_stripe_payment')
-      .eq('token', token)
-      .maybeSingle();
+      const { data: payload, error: rpcError } = await anonClient
+        .rpc('get_public_invoice_by_token', { p_token: token });
 
-    if (sendError) {
-      console.error('[f/token] invoice_sends fetch error:', sendError);
-      setError('Une erreur technique est survenue. Veuillez réessayer.');
-      setLoading(false);
-      return;
-    }
-
-    if (!send) {
-      setError('Ce lien est invalide ou a expiré.');
-      setLoading(false);
-      return;
-    }
-
-    if (new Date(send.expires_at) < new Date()) {
-      setError('Ce lien a expiré. Contactez votre artisan pour obtenir un nouveau lien.');
-      setLoading(false);
-      return;
-    }
-
-    setSendData(send);
-    setStripeEnabledForSend(Boolean(send.enable_stripe_payment));
-
-    if (send.paid_at) {
-      setIsPaid(true);
-    }
-
-    // Mark viewed_at (non-blocking)
-    anonClient
-      .from('invoice_sends')
-      .update({ viewed_at: new Date().toISOString() })
-      .eq('id', send.id)
-      .is('viewed_at', null)
-      .then(({ error }) => { if (error) console.warn('[f/token] viewed_at update:', error.message); });
-
-    // 2. Fetch invoice with client
-    const { data: invoiceData } = await anonClient
-      .from('invoices')
-      .select('id, invoice_number, title, status, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc, due_date, paid_at, created_at, payment_method, bank_account_id, invoice_type, deposit_percentage, quote_id, clients(name, email, phone, address, city, postal_code)')
-      .eq('id', send.invoice_id)
-      .maybeSingle();
-
-    if (invoiceData) {
-      setInvoice(invoiceData as unknown as InvoiceData);
-      if (invoiceData.status === 'payee' || invoiceData.paid_at) {
-        setIsPaid(true);
+      if (rpcError) {
+        console.error('[f/token] rpc error:', rpcError);
+        setError('Une erreur technique est survenue. Veuillez réessayer.');
+        setLoading(false);
+        return;
       }
 
-      const typedInvoice = invoiceData as unknown as InvoiceData;
-
-      // Pour les factures d'acompte ou de solde : on récupère le numéro du devis
-      // source pour l'afficher dans le header.
-      if (typedInvoice.quote_id && (typedInvoice.invoice_type === 'acompte' || typedInvoice.invoice_type === 'solde')) {
-        const { data: srcQuote } = await anonClient
-          .from('quotes')
-          .select('quote_number')
-          .eq('id', typedInvoice.quote_id)
-          .maybeSingle();
-        if (srcQuote?.quote_number) setLinkedQuoteNumber(srcQuote.quote_number);
+      if (!payload) {
+        setError('Ce lien est invalide ou a expiré.');
+        setLoading(false);
+        return;
       }
 
-      // Pour les factures de solde : on charge les acomptes déjà émis pour
-      // afficher la déduction. Lecture autorisée par la policy RLS anon
-      // "Public can view deposit invoices via final invoice send".
-      if (typedInvoice.invoice_type === 'solde' && typedInvoice.quote_id) {
-        const { data: depositRows } = await anonClient
-          .from('invoices')
-          .select('id, invoice_number, total_ttc, issued_at, created_at, status, deposit_percentage')
-          .eq('quote_id', typedInvoice.quote_id)
-          .eq('invoice_type', 'acompte')
-          .neq('status', 'annulee')
-          .order('issued_at', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: true });
-        if (depositRows) setLinkedDeposits(depositRows as LinkedDeposit[]);
+      const send = payload.send;
+      setSendData(send);
+      setStripeEnabledForSend(Boolean(send.enable_stripe_payment));
+      if (send.paid_at) setIsPaid(true);
+
+      const invoiceData = payload.invoice as InvoiceData | null;
+      if (invoiceData) {
+        setInvoice(invoiceData);
+        if (invoiceData.status === 'payee' || invoiceData.paid_at) setIsPaid(true);
       }
-    }
 
-    // Fetch bank account if attached
-    const invoiceBankId = (invoiceData as unknown as InvoiceData | null)?.bank_account_id;
-    if (invoiceBankId) {
-      const { data: bankData } = await anonClient
-        .from('bank_accounts')
-        .select('label, bank_name, account_holder, iban, bic')
-        .eq('id', invoiceBankId)
-        .maybeSingle();
-      if (bankData) setBankAccount(bankData as BankAccountData);
-    }
+      if (payload.linked_quote_number) setLinkedQuoteNumber(payload.linked_quote_number);
+      if (payload.linked_deposits) setLinkedDeposits(payload.linked_deposits as LinkedDeposit[]);
 
-    // 3. Fetch invoice lines
-    const { data: linesData } = await anonClient
-      .from('invoice_lines')
-      .select('id, description, quantity, unit, unit_price, tva_rate, total, position')
-      .eq('invoice_id', send.invoice_id)
-      .order('position');
+      setLines((payload.lines || []) as InvoiceLine[]);
+      if (payload.artisan) setArtisan(payload.artisan as ArtisanProfile);
+      if (payload.bank_account) setBankAccount(payload.bank_account as BankAccountData);
+      if (payload.stripe_charges_enabled) setStripeAvailable(true);
 
-    if (linesData) {
-      setLines(linesData as InvoiceLine[]);
-    }
-
-    // 4. Fetch artisan profile
-    const { data: profile } = await anonClient
-      .from('profiles')
-      .select('company_name, full_name, siret, tva_number, company_address, company_postal_code, company_city, company_phone, logo_url, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, document_config')
-      .eq('id', send.user_id)
-      .maybeSingle();
-
-    if (profile) {
-      setArtisan(profile as ArtisanProfile);
-    }
-
-    // 5. Check if artisan has Stripe connected
-    const { data: stripeConn } = await anonClient
-      .from('stripe_connections')
-      .select('charges_enabled')
-      .eq('user_id', send.user_id)
-      .maybeSingle();
-
-    if (stripeConn?.charges_enabled) {
-      setStripeAvailable(true);
-    }
-
-    setLoading(false);
+      setLoading(false);
     } catch (err) {
       console.error('[f/token] unexpected error:', err);
       setError('Une erreur technique est survenue. Veuillez réessayer.');

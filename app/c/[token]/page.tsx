@@ -62,85 +62,22 @@ export default function ClientCatalogPage() {
   const [noteText, setNoteText] = useState('');
 
   const fetchData = useCallback(async () => {
-    const { data: send } = await anonClient
-      .from('catalog_sends')
-      .select('id, client_name, catalog_id, expires_at')
-      .eq('token', token)
-      .maybeSingle();
+    const { data: payload, error: rpcError } = await anonClient
+      .rpc('get_public_catalog_by_token', { p_token: token });
 
-    if (!send) {
+    if (rpcError || !payload) {
       setError('Ce lien est invalide ou a expire.');
       setLoading(false);
       return;
     }
 
-    if (new Date(send.expires_at) < new Date()) {
-      setError('Ce lien a expire. Contactez votre artisan pour obtenir un nouveau lien.');
-      setLoading(false);
-      return;
-    }
+    setSendData(payload.send);
+    setCatalogName(payload.catalog?.name || '');
+    setCatalogDesc(payload.catalog?.description || '');
+    setCollections((payload.collections || []) as Collection[]);
 
-    setSendData(send);
-
-    await anonClient
-      .from('catalog_sends')
-      .update({ viewed_at: new Date().toISOString() })
-      .eq('id', send.id)
-      .is('viewed_at', null);
-
-    const { data: catalog } = await anonClient
-      .from('catalogs')
-      .select('name, description')
-      .eq('id', send.catalog_id)
-      .is('deleted_at', null)
-      .maybeSingle();
-
-    if (!catalog) {
-      setError('Ce catalogue n est plus disponible.');
-      setLoading(false);
-      return;
-    }
-
-    setCatalogName(catalog.name);
-    setCatalogDesc(catalog.description);
-
-    const { data: links } = await anonClient
-      .from('catalog_catalog_collections')
-      .select('collection_id, sort_order')
-      .eq('catalog_id', send.catalog_id)
-      .order('sort_order');
-
-    if (links && links.length > 0) {
-      const colIds = links.map((l: any) => l.collection_id);
-
-      const { data: cols } = await anonClient
-        .from('catalog_collections')
-        .select('id, name, color')
-        .in('id', colIds);
-
-      const { data: prods } = await anonClient
-        .from('catalog_products')
-        .select('*')
-        .in('collection_id', colIds)
-        .order('sort_order');
-
-      const ordered: Collection[] = links.map((link: any) => {
-        const col = cols?.find((c: any) => c.id === link.collection_id);
-        return {
-          ...col,
-          products: prods?.filter((p: any) => p.collection_id === link.collection_id) || [],
-        } as Collection;
-      });
-
-      setCollections(ordered);
-    }
-
-    const { data: existing } = await anonClient
-      .from('catalog_client_selections')
-      .select('product_id, note')
-      .eq('send_id', send.id);
-
-    if (existing && existing.length > 0) {
+    const existing = (payload.existing_selections || []) as Selection[];
+    if (existing.length > 0) {
       setExistingSelections(existing);
       setSelections(existing);
       setSubmitted(true);
@@ -185,13 +122,17 @@ export default function ClientCatalogPage() {
     if (!sendData || selections.length === 0) return;
     setSubmitting(true);
 
-    const inserts = selections.map((s) => ({
-      send_id: sendData.id,
-      product_id: s.product_id,
-      note: s.note,
-    }));
+    const { data: ok, error: rpcErr } = await anonClient.rpc('record_catalog_selection', {
+      p_token: token,
+      p_selections: selections.map((s) => ({ product_id: s.product_id, note: s.note || '' })),
+    });
 
-    await anonClient.from('catalog_client_selections').insert(inserts);
+    if (rpcErr || !ok) {
+      setSubmitting(false);
+      window.alert("Impossible d'enregistrer votre selection. Le lien est peut-etre expire ou deja utilise.");
+      return;
+    }
+
     setSubmitted(true);
     setSubmitting(false);
   }
