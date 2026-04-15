@@ -59,6 +59,7 @@ interface CardQuote {
   bank_account_id: string | null;
   client_id: string | null;
   project_id?: string | null;
+  deposit_percentage?: number | null;
   quote_lines: QuoteLine[];
 }
 
@@ -302,7 +303,7 @@ export function QuoteBillingCard({
                 className="gap-2 flex-1"
                 onClick={() => setShowDepositDialog(true)}
               >
-                <Plus className="h-4 w-4" /> Demander un acompte
+                <Plus className="h-4 w-4" /> Créer une facture d&apos;acompte
               </Button>
             )}
             {!hasDeposits && !billing.hasFinalInvoice && !billing.hasStandardInvoice && (
@@ -316,7 +317,7 @@ export function QuoteBillingCard({
                 ) : (
                   <ArrowRight className="h-4 w-4" />
                 )}
-                Facturer en totalité
+                Créer la facture totale
               </Button>
             )}
             {hasDeposits && !billing.hasFinalInvoice && (

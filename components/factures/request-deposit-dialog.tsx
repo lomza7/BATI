@@ -39,6 +39,8 @@ interface DialogQuote {
   bank_account_id: string | null;
   client_id: string | null;
   project_id?: string | null;
+  /** % d'acompte prévu à la création du devis — utilisé pour préremplir */
+  deposit_percentage?: number | null;
 }
 
 interface Props {
@@ -73,7 +75,12 @@ export function RequestDepositDialog({ open, onOpenChange, quote, billing, onCre
   useEffect(() => {
     if (!open) return;
     setMode('percentage');
-    setPercentValue('30');
+    // Prérempli avec le % d'acompte défini sur le devis si présent,
+    // sinon 30 par défaut.
+    const prefillPct = quote.deposit_percentage && quote.deposit_percentage > 0
+      ? String(quote.deposit_percentage)
+      : '30';
+    setPercentValue(prefillPct);
     setAmountHtValue('');
     setCustomTitle('');
     setDueDate(defaultDueDate());

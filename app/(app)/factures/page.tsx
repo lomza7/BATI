@@ -113,11 +113,14 @@ interface QuoteCandidate {
   clients: { name: string; email?: string | null } | null;
   /** Indique s'il existe au moins une facture liée (tous types confondus) */
   has_linked_invoice: boolean;
+  deposit_percentage: number | null;
   quote_lines: QuoteLine[];
 }
 
 type QuoteInvoiceFilter = 'to_invoice' | 'already_invoiced';
 type QuoteSortKey = 'recent' | 'oldest' | 'amount_desc' | 'amount_asc' | 'client';
+type InvoiceStatusFilter = 'all' | keyof typeof INVOICE_STATUSES;
+type InvoiceSortKey = 'recent' | 'oldest' | 'due_asc' | 'due_desc' | 'amount_desc' | 'amount_asc' | 'client';
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '-';
@@ -145,6 +148,8 @@ export default function FacturesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [quoteFilter, setQuoteFilter] = useState<QuoteInvoiceFilter>('to_invoice');
   const [quoteSort, setQuoteSort] = useState<QuoteSortKey>('recent');
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<InvoiceStatusFilter>('all');
+  const [invoiceSort, setInvoiceSort] = useState<InvoiceSortKey>('recent');
   const [form, setForm] = useState({ title: '', totalHt: 0, tvaRate: 20 });
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
@@ -226,6 +231,7 @@ export default function FacturesPage() {
           bank_account_id,
           client_id,
           project_id,
+          deposit_percentage,
           clients(name, email, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position, section),
           invoices(id)
@@ -273,6 +279,10 @@ export default function FacturesPage() {
           ? { name: String((clientValue as { name?: string }).name || ''), email: (clientValue as { email?: string | null }).email || null }
           : null,
         has_linked_invoice: linkedInvoices.length > 0,
+        deposit_percentage:
+          quote.deposit_percentage === null || quote.deposit_percentage === undefined
+            ? null
+            : Number(quote.deposit_percentage),
         quote_lines: Array.isArray(quote.quote_lines)
           ? (quote.quote_lines as QuoteLine[]).map((line) => ({
               ...line,
@@ -451,11 +461,44 @@ export default function FacturesPage() {
   const activeInvoices = invoices.filter(inv => !inv.is_archived);
   const archivedInvoices = invoices.filter(inv => inv.is_archived);
 
-  const filteredInvoices = activeInvoices.filter((inv) =>
-    inv.title.toLowerCase().includes(search.toLowerCase()) ||
-    inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-    inv.clients?.name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredInvoices = useMemo(() => {
+    const term = search.toLowerCase();
+    return activeInvoices
+      .filter((inv) => {
+        const matchesSearch =
+          inv.title.toLowerCase().includes(term) ||
+          inv.invoice_number.toLowerCase().includes(term) ||
+          inv.clients?.name?.toLowerCase().includes(term);
+        if (!matchesSearch) return false;
+        if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        switch (invoiceSort) {
+          case 'oldest':
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          case 'due_asc': {
+            const da = a.due_date ? new Date(a.due_date).getTime() : Number.POSITIVE_INFINITY;
+            const db = b.due_date ? new Date(b.due_date).getTime() : Number.POSITIVE_INFINITY;
+            return da - db;
+          }
+          case 'due_desc': {
+            const da = a.due_date ? new Date(a.due_date).getTime() : Number.NEGATIVE_INFINITY;
+            const db = b.due_date ? new Date(b.due_date).getTime() : Number.NEGATIVE_INFINITY;
+            return db - da;
+          }
+          case 'amount_desc':
+            return b.total_ttc - a.total_ttc;
+          case 'amount_asc':
+            return a.total_ttc - b.total_ttc;
+          case 'client':
+            return (a.clients?.name || '').localeCompare(b.clients?.name || '', 'fr');
+          case 'recent':
+          default:
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+      });
+  }, [activeInvoices, search, invoiceStatusFilter, invoiceSort]);
 
   const filteredArchived = archivedInvoices.filter((inv) =>
     inv.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -860,6 +903,42 @@ export default function FacturesPage() {
               <p className="text-sm font-semibold text-foreground">Factures émises</p>
               <p className="text-sm text-muted-foreground">Suivez les paiements et reprenez le fil de vos devis convertis.</p>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <Button variant={invoiceStatusFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('all')}>
+                Toutes
+              </Button>
+              <Button variant={invoiceStatusFilter === 'brouillon' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('brouillon')}>
+                Brouillons
+              </Button>
+              <Button variant={invoiceStatusFilter === 'creee' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('creee')}>
+                Créées
+              </Button>
+              <Button variant={invoiceStatusFilter === 'envoyee' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('envoyee')}>
+                Envoyées
+              </Button>
+              <Button variant={invoiceStatusFilter === 'payee' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('payee')}>
+                Payées
+              </Button>
+              <Button variant={invoiceStatusFilter === 'en_retard' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('en_retard')}>
+                En retard
+              </Button>
+            </div>
+            <select
+              value={invoiceSort}
+              onChange={(e) => setInvoiceSort(e.target.value as InvoiceSortKey)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+            >
+              <option value="recent">Plus récentes</option>
+              <option value="oldest">Plus anciennes</option>
+              <option value="due_asc">Échéance proche</option>
+              <option value="due_desc">Échéance lointaine</option>
+              <option value="amount_desc">Montant décroissant</option>
+              <option value="amount_asc">Montant croissant</option>
+              <option value="client">Client A-Z</option>
+            </select>
           </div>
 
           {loading ? (

@@ -98,7 +98,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: rpcError.message }, { status: 500 });
     }
 
-    // Auto-création facture d'acompte si le devis a un deposit_percentage
+    // Auto-création facture d'acompte si le devis a un deposit_percentage.
+    // Aucune facture standard n'est créée automatiquement — l'artisan choisit
+    // via "Devis convertibles" -> "Facturer" quand il est prêt.
     if (rpcResult?.success && !rpcResult?.already_signed) {
       try {
         await maybeCreateDepositInvoice(admin, submissionId);
@@ -118,7 +120,6 @@ async function maybeCreateDepositInvoice(
   admin: SupabaseClient,
   docusealSubmissionId: number,
 ) {
-  // 1. Trouver le devis via quote_sends
   const { data: send } = await admin
     .from('quote_sends')
     .select('quote_id')
@@ -127,7 +128,6 @@ async function maybeCreateDepositInvoice(
 
   if (!send?.quote_id) return;
 
-  // 2. Charger le devis avec deposit_percentage
   const { data: quote } = await admin
     .from('quotes')
     .select('id, quote_number, title, user_id, client_id, project_id, bank_account_id, total_ht, total_ttc, tva_rate, deposit_percentage')
@@ -136,7 +136,6 @@ async function maybeCreateDepositInvoice(
 
   if (!quote?.deposit_percentage || quote.deposit_percentage <= 0) return;
 
-  // 3. Idempotence — vérifier qu'aucune facture d'acompte n'existe déjà
   const { data: existing } = await admin
     .from('invoices')
     .select('id')
@@ -144,26 +143,17 @@ async function maybeCreateDepositInvoice(
     .eq('invoice_type', 'acompte')
     .neq('status', 'annulee')
     .limit(1);
-
   if (existing && existing.length > 0) return;
 
-  // 4. Calculer les montants
   const pct = quote.deposit_percentage;
   const safeRate = quote.tva_rate ?? 20;
   const preview = computeDepositAmount('percentage', pct, quote.total_ht, safeRate);
-
-  // 5. Générer le numéro de facture
   const invoiceNumber = await getNextInvoiceNumber(admin, quote.user_id);
-
-  // 6. Échéance = 15 jours
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 15);
   const dueDateStr = dueDate.toISOString().split('T')[0];
-
-  // 7. Label du pourcentage
   const pctLabel = Number.isInteger(pct) ? `${pct}` : pct.toFixed(2).replace('.', ',');
 
-  // 8. Créer la facture d'acompte (brouillon)
   const { data: invoice, error: invoiceError } = await admin
     .from('invoices')
     .insert({
@@ -190,7 +180,6 @@ async function maybeCreateDepositInvoice(
 
   if (invoiceError || !invoice) return;
 
-  // 9. Créer la ligne de facture
   await admin.from('invoice_lines').insert({
     user_id: quote.user_id,
     invoice_id: invoice.id,
