@@ -148,6 +148,7 @@ export async function POST(request: Request) {
           {
             name: client_name.trim(),
             email: submitterEmail,
+            send_email: false,
           },
         ],
       },
