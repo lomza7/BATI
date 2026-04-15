@@ -132,8 +132,7 @@ hooks/
 
 1. **Principal** : Tableau de bord, Calendrier, Mes tâches, Contacts, Devis, Factures, Mes prestations
 2. **Chantiers** : Mes chantiers, Planning, Carte, Équipe
-3. **Commercial** : Catalogues, Prospection, Site web IA
-4. **Communication** : Assistant email IA, Avis clients
+3. **Commercial** : Catalogues, Prospection, Site web IA, Avis clients
 5. **Créativité** : Avant/Après IA
 6. **Agents IA** : Mes Agents
 7. **Finance** : Paiement Stripe, Contrats récurrents, Comptabilité IA

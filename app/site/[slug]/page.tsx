@@ -21,6 +21,7 @@ import { SiteJsonLd } from '@/components/site/site-json-ld';
 import { SiteFaq } from '@/components/site/site-faq';
 import { SiteMap } from '@/components/site/site-map';
 import { SiteWhatsappButton } from '@/components/site/site-whatsapp-button';
+import { refreshGoogleReviewsIfStale } from '@/lib/refresh-google-reviews';
 
 export const revalidate = 3600; // ISR — revalidate every hour
 
@@ -52,6 +53,20 @@ async function getSiteData(slug: string) {
   if (!site) return null;
 
   const typedSite = site as ArtisanSite;
+
+  // Lazy refresh Google reviews if stale (>24h) — capped by ISR=1h, so safe for Places quota
+  const { data: ownerProfile } = await sb
+    .from('profiles')
+    .select('google_place_id, google_reviews_last_synced_at')
+    .eq('id', typedSite.user_id)
+    .maybeSingle();
+  if (ownerProfile?.google_place_id) {
+    await refreshGoogleReviewsIfStale(
+      typedSite.user_id,
+      ownerProfile.google_place_id,
+      ownerProfile.google_reviews_last_synced_at,
+    );
+  }
 
   const [profileRes, projectsRes, reviewsRes, servicesRes] = await Promise.all([
     sb.from('profiles').select('*').eq('id', typedSite.user_id).maybeSingle(),

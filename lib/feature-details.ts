@@ -453,23 +453,27 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
     heroDescription: 'Centralisez vos avis clients dans Hellobat, demandez des avis par SMS après chaque chantier, et affichez vos meilleurs témoignages sur votre site vitrine. Ajoutez votre lien Google Reviews pour rediriger vos clients satisfaits.',
     sections: [
       {
-        title: 'Avis internes',
-        content: 'Ajoutez vos avis clients manuellement ou importez-les. Chaque avis peut être publié sur votre site vitrine Hellobat, répondu, et associé à un chantier.',
+        title: 'Import Google en 1 clic',
+        content: 'Collez le lien de votre fiche Google Business : Hellobat importe vos avis Google (5 derniers + note moyenne + total) via l\'API officielle. Réimportez quand vous voulez pour récupérer les nouveaux avis.',
       },
       {
-        title: 'Demande d\'avis par SMS',
-        content: 'Après chaque chantier terminé, envoyez un SMS à votre client avec un template pré-rédigé incluant votre lien Google Reviews. Un copier-coller et c\'est parti.',
+        title: 'Lien public d\'avis',
+        content: 'Hellobat génère un lien personnalisé que vous envoyez à vos clients. Ils déposent un avis sur votre page Hellobat. Vous modérez avant publication sur votre site vitrine.',
       },
       {
-        title: 'Lien Google Reviews',
-        content: 'Ajoutez votre URL Google Reviews dans vos paramètres — elle est utilisée dans les demandes d\'avis pour rediriger vos clients directement sur votre fiche Google.',
+        title: 'Affichage sur votre site',
+        content: 'Tous les avis publiés (Google ou natifs) s\'affichent automatiquement sur votre site vitrine Hellobat avec votre note moyenne — visible pour vos prospects et bon pour le référencement.',
+      },
+      {
+        title: 'Modération et réponses',
+        content: 'Vous validez chaque nouvel avis avant publication. Répondez aux avis directement depuis Hellobat. Toggle « Afficher sur le site » par avis.',
       },
     ],
     highlights: [
-      'Gestion manuelle des avis',
-      'Publication sur site vitrine',
-      'Demande d\'avis par SMS',
-      'Lien Google Reviews personnalisable',
+      'Import auto Google Reviews (Places API)',
+      'Lien public personnalisé pour vos clients',
+      'Modération avant publication',
+      'Affichage natif sur votre site vitrine',
     ],
     plan: 'pro',
   },

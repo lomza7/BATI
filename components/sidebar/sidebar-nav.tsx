@@ -70,11 +70,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Catalogues', href: '/catalogues', emoji: '📚' },
       { label: 'Prospection', href: '/prospection', emoji: '🎯' },
-    ],
-  },
-  {
-    title: 'Communication',
-    items: [
       { label: 'Avis clients', href: '/avis', emoji: '⭐' },
     ],
   },
