@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Paintbrush,
   Upload,
@@ -804,15 +804,88 @@ function SelfRenderingWizard() {
   const [roomType, setRoomType] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [customContext, setCustomContext] = useState('');
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  function handleGenerate() {
+  useEffect(() => {
+    if (!generating) {
+      setProgress(0);
+      return;
+    }
+    setProgress(2);
+    const start = Date.now();
+    const expected = 75_000; // ~75 s pour quality=high
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      // courbe asymptotique : monte vite puis ralentit, plafonne à 95 %
+      const pct = Math.min(95, 95 * (1 - Math.exp(-elapsed / (expected / 2.5))));
+      setProgress(pct);
+    }, 250);
+    return () => clearInterval(id);
+  }, [generating]);
+
+  const PHASES = [
+    { at: 0, label: 'Analyse de la photo…' },
+    { at: 25, label: 'Compréhension de la structure…' },
+    { at: 55, label: 'Application du style…' },
+    { at: 80, label: 'Finalisation du rendu…' },
+  ];
+  const currentPhase = PHASES.slice().reverse().find((p) => progress >= p.at) || PHASES[0];
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert('La photo dépasse 10 MB.');
+      return;
+    }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function handleGenerate() {
+    if (!photoFile || !selectedStyle) return;
     setStep(3);
     setGenerating(true);
-    setTimeout(() => {
-      setGenerating(false);
+    setGenerationError(null);
+    setGenerated(false);
+    setGeneratedImage(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) throw new Error('Session expirée, veuillez vous reconnecter.');
+
+      const formData = new FormData();
+      formData.append('image', photoFile);
+      formData.append('style', selectedStyle);
+      formData.append('roomType', roomType);
+      if (customContext.trim()) formData.append('context', customContext.trim());
+
+      const res = await fetch('/api/rendus/generate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.error || 'La génération a échoué');
+      }
+      setGeneratedImage(json.image);
       setGenerated(true);
       setStep(4);
-    }, 3000);
+    } catch (err: any) {
+      setGenerationError(err?.message || 'Erreur inconnue');
+      setStep(2);
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function reset() {
@@ -820,6 +893,12 @@ function SelfRenderingWizard() {
     setSelectedStyle('');
     setRoomType('');
     setGenerated(false);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setGeneratedImage(null);
+    setGenerationError(null);
+    setCustomContext('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   const STEPS = [
@@ -854,15 +933,47 @@ function SelfRenderingWizard() {
 
       {step === 1 && (
         <div className="max-w-lg mx-auto">
-          <div className="rounded-xl border-2 border-dashed border-border bg-card p-12 text-center transition-all hover:border-primary/50">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mx-auto">
-              <Upload className="h-8 w-8 text-primary" />
-            </div>
-            <h3 className="mt-4 font-semibold text-foreground">Déposez votre photo</h3>
-            <p className="mt-1 text-sm text-muted-foreground">PNG, JPG jusqu&apos;à 10 MB</p>
-            <Button className="mt-4 gap-2">
-              <Camera className="h-4 w-4" /> Choisir une photo
-            </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
+          <div
+            className="rounded-xl border-2 border-dashed border-border bg-card p-12 text-center transition-all hover:border-primary/50 cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {photoPreview ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreview} alt="Aperçu" className="mx-auto max-h-56 rounded-lg object-contain" />
+                <p className="mt-3 text-sm text-muted-foreground truncate">{photoFile?.name}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4 gap-2"
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                >
+                  <Camera className="h-4 w-4" /> Changer de photo
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mx-auto">
+                  <Upload className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="mt-4 font-semibold text-foreground">Déposez votre photo</h3>
+                <p className="mt-1 text-sm text-muted-foreground">PNG, JPG jusqu&apos;à 10 MB</p>
+                <Button
+                  type="button"
+                  className="mt-4 gap-2"
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                >
+                  <Camera className="h-4 w-4" /> Choisir une photo
+                </Button>
+              </>
+            )}
           </div>
           <div className="mt-6">
             <label className="text-sm font-medium text-foreground">Type de pièce</label>
@@ -883,7 +994,7 @@ function SelfRenderingWizard() {
               ))}
             </div>
           </div>
-          <Button className="w-full mt-6" onClick={() => setStep(2)} disabled={!roomType}>
+          <Button className="w-full mt-6" onClick={() => setStep(2)} disabled={!roomType || !photoFile}>
             Suivant <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -892,6 +1003,11 @@ function SelfRenderingWizard() {
       {step === 2 && (
         <div className="max-w-2xl mx-auto space-y-6">
           <h2 className="font-semibold text-foreground text-center">Choisissez un style</h2>
+          {generationError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {generationError}
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {STYLES.map((s) => (
               <button
@@ -910,6 +1026,23 @@ function SelfRenderingWizard() {
               </button>
             ))}
           </div>
+          <div className="space-y-2">
+            <label htmlFor="custom-context" className="text-sm font-medium text-foreground">
+              Précisions pour l&apos;IA <span className="text-muted-foreground font-normal">(optionnel)</span>
+            </label>
+            <textarea
+              id="custom-context"
+              value={customContext}
+              onChange={(e) => setCustomContext(e.target.value.slice(0, 500))}
+              placeholder="Ex : parquet en chêne clair, verrière atelier noire, plante verte XXL dans le coin, palette bleu canard et terracotta…"
+              rows={3}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Ajoute des matériaux, couleurs, mobilier précis ou contraintes — l&apos;IA en tiendra compte.
+              {customContext.length > 0 && ` ${customContext.length}/500`}
+            </p>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStep(1)}>
               Retour
@@ -922,23 +1055,32 @@ function SelfRenderingWizard() {
       )}
 
       {step === 3 && generating && (
-        <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-12 text-center">
-          <div className="relative mx-auto w-20 h-20">
+        <div className="max-w-lg mx-auto rounded-xl border border-border bg-card p-8 sm:p-10 text-center">
+          <div className="relative mx-auto w-16 h-16">
             <div className="absolute inset-0 rounded-full border-4 border-muted animate-spin border-t-primary" />
-            <Sparkles className="absolute inset-0 m-auto h-8 w-8 text-primary" />
+            <Sparkles className="absolute inset-0 m-auto h-7 w-7 text-primary" />
           </div>
-          <h3 className="mt-6 font-semibold text-foreground">Génération en cours...</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h3 className="mt-6 font-semibold text-foreground">Génération en cours…</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
             L&apos;IA transforme votre photo en {selectedStyle}
           </p>
-          <div className="mt-6 space-y-2">
-            {['Analyse de la photo...', 'Application du style...', 'Image finale...'].map((t, i) => (
-              <div key={t} className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
-                <div className={cn('h-2 w-2 rounded-full', i < 2 ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse')} />
-                {t}
-              </div>
-            ))}
+
+          <div className="mt-6">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{currentPhase.label}</span>
+              <span className="tabular-nums">{Math.round(progress)} %</span>
+            </div>
           </div>
+
+          <p className="mt-6 text-xs text-muted-foreground">
+            Le rendu haute qualité prend ~1 minute. Ne ferme pas cette page.
+          </p>
         </div>
       )}
 
@@ -947,27 +1089,48 @@ function SelfRenderingWizard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="bg-muted h-64 flex items-center justify-center">
-                <div className="text-center">
-                  <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto" />
-                  <p className="mt-2 text-sm text-muted-foreground">Photo originale</p>
-                  <p className="text-xs text-muted-foreground">{roomType}</p>
-                </div>
+                {photoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoPreview} alt="Photo originale" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="text-center">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground mx-auto" />
+                    <p className="mt-2 text-sm text-muted-foreground">Photo originale</p>
+                    <p className="text-xs text-muted-foreground">{roomType}</p>
+                  </div>
+                )}
               </div>
               <div className="p-3 text-center text-sm font-medium text-muted-foreground">Avant</div>
             </div>
             <div className="rounded-xl border-2 border-primary bg-card overflow-hidden">
               <div className="bg-gradient-to-br from-primary/10 to-primary/5 h-64 flex items-center justify-center">
-                <div className="text-center">
-                  <Sparkles className="h-8 w-8 text-primary mx-auto" />
-                  <p className="mt-2 text-sm font-medium text-foreground">Image générée par l&apos;IA</p>
-                  <p className="text-xs text-muted-foreground">Style {selectedStyle}</p>
-                </div>
+                {generatedImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={generatedImage} alt="Avant/Après IA" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="text-center">
+                    <Sparkles className="h-8 w-8 text-primary mx-auto" />
+                    <p className="mt-2 text-sm font-medium text-foreground">Image générée par l&apos;IA</p>
+                    <p className="text-xs text-muted-foreground">Style {selectedStyle}</p>
+                  </div>
+                )}
               </div>
               <div className="p-3 text-center text-sm font-medium text-primary">Après — généré par IA</div>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-center gap-2 sm:gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              disabled={!generatedImage}
+              onClick={() => {
+                if (!generatedImage) return;
+                const a = document.createElement('a');
+                a.href = generatedImage;
+                a.download = `avant-apres-${selectedStyle}-${Date.now()}.png`;
+                a.click();
+              }}
+            >
               <Download className="h-4 w-4" /> Télécharger HD
             </Button>
             <Button variant="outline" className="gap-2" onClick={reset}>

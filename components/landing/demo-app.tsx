@@ -106,7 +106,6 @@ const navGroups: NavGroup[] = [
     title: 'IA',
     items: [
       { id: 'agents', label: 'Agents IA', emoji: '🤖' },
-      { id: 'rendus', label: 'Avant/Après IA', emoji: '🎨' },
       { id: 'site-web', label: 'Site web IA', emoji: '🌐' },
     ],
   },

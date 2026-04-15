@@ -15,7 +15,6 @@ import {
   EmailSection,
   ComptaSection,
   AvisSection,
-  PlansSection,
   CarteSection,
   HelloPaySection,
   PaiementSection,
@@ -77,7 +76,6 @@ export default function LandingPage() {
       <EmailSection />
       <ComptaSection />
       <AvisSection />
-      <PlansSection />
       <PaiementSection />
       <AbonnementsSection />
       <AgentsSection />

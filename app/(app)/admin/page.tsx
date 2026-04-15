@@ -1011,7 +1011,7 @@ export default function AdminPage() {
                   <Wand2 className="h-4 w-4 text-primary" /> Services IA externes
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Clés API pour la génération Avant/Après (OpenAI/Gemini) et la dictée vocale de devis (Groq).
+                  Clés API pour la génération d&apos;images (OpenAI/Gemini) et la dictée vocale de devis (Groq).
                 </p>
               </div>
               <Button

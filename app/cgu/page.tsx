@@ -64,7 +64,6 @@ export default function CguPage() {
                 <li>Contrats récurrents et facturation automatique</li>
                 <li>Comptabilité et suivi des dépenses</li>
                 <li>Agents IA spécialisés bâtiment</li>
-                <li>Avant/Après IA générés à partir d&apos;une photo</li>
               </ul>
               <p>
                 Les fonctionnalités disponibles dépendent du plan souscrit (Starter, Pro

@@ -632,23 +632,6 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
     ],
     plan: 'business',
   },
-  {
-    slug: 'rendus-ia',
-    title: 'Avant/Après IA',
-    subtitle: 'Vendez le résultat avant même de signer',
-    heroDescription: 'Transformez la photo d\'une pièce ou d\'une façade en projection photoréaliste après travaux. Vos clients voient l\'avant et l\'après côte à côte — l\'argument commercial le plus puissant pour faire signer.',
-    sections: [
-      {
-        title: 'Avant/après photoréalistes',
-        content: 'Une simple photo suffit : façade, salon, cuisine, salle de bain… L\'IA génère l\'image après travaux dans le style que vous choisissez. Vos clients comparent l\'avant et l\'après et se projettent sans effort.',
-      },
-    ],
-    highlights: [
-      'Avant/après photoréalistes en quelques secondes',
-      'Argument de vente décisif pour faire signer',
-    ],
-    plan: 'business',
-  },
 ];
 
 export function getFeatureBySlug(slug: string): FeatureDetail | undefined {

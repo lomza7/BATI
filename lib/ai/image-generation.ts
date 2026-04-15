@@ -21,6 +21,9 @@ export interface ImageGenerationInput {
   sourceImageBase64?: string;
   sourceImageMime?: string; // e.g. 'image/jpeg'
   size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  quality?: 'low' | 'medium' | 'high' | 'auto';
+  // OpenAI gpt-image-1 only: 'high' preserves source geometry/details much better.
+  inputFidelity?: 'low' | 'high';
 }
 
 export interface ImageGenerationResult {
@@ -87,7 +90,8 @@ async function generateWithOpenAI(
   input: ImageGenerationInput,
   config: ImageGenerationConfig
 ): Promise<ImageGenerationResult> {
-  const size = input.size && input.size !== 'auto' ? input.size : '1024x1024';
+  const size = input.size || 'auto';
+  const quality = input.quality || 'auto';
 
   // If we have a source image, use the edits endpoint (image-to-image).
   // Otherwise use the generations endpoint.
@@ -102,6 +106,8 @@ async function generateWithOpenAI(
     form.append('model', config.openaiModel);
     form.append('prompt', input.prompt);
     form.append('size', size);
+    form.append('quality', quality);
+    if (input.inputFidelity) form.append('input_fidelity', input.inputFidelity);
     form.append('n', '1');
 
     const buffer = Buffer.from(input.sourceImageBase64, 'base64');
@@ -124,6 +130,7 @@ async function generateWithOpenAI(
         model: config.openaiModel,
         prompt: input.prompt,
         size,
+        quality,
         n: 1,
       }),
     });
