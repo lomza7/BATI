@@ -29,7 +29,7 @@ export async function getAccessState(userId: string): Promise<AccessState> {
   const { data } = await supabaseAdmin
     .from('profiles')
     .select(
-      'plan, subscription_status, trial_end_at, ai_credits_balance, stripe_customer_id, monthly_credits_allocation, monthly_credits_used, credits_period_start',
+      'plan, subscription_status, trial_end_at, ai_credits_balance, stripe_customer_id, monthly_credits_allocation, monthly_credits_used, credits_period_start, is_admin',
     )
     .eq('id', userId)
     .maybeSingle();
@@ -60,7 +60,8 @@ export async function getAccessState(userId: string): Promise<AccessState> {
     : null;
 
   const trialActive = status === 'trialing' && trialEndAt !== null && trialEndAt.getTime() > now;
-  const hasProAccess = plan === 'pro' && (status === 'active' || trialActive);
+  const isAdmin = (data as { is_admin?: boolean }).is_admin === true;
+  const hasProAccess = isAdmin || (plan === 'pro' && (status === 'active' || trialActive));
 
   const allocation = data.monthly_credits_allocation ?? 0;
   const used = data.monthly_credits_used ?? 0;

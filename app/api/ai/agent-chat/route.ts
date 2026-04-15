@@ -8,13 +8,26 @@ import { apiError } from '@/lib/api-errors';
 
 export const runtime = 'nodejs';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MODEL = 'gpt-4o';
+
+async function loadOpenAiKey(): Promise<string> {
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+  const { data } = await sb
+    .from('platform_secrets')
+    .select('value')
+    .eq('key', 'openai_api_key')
+    .maybeSingle();
+  return data?.value || process.env.OPENAI_API_KEY || '';
+}
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await loadOpenAiKey();
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
+    return NextResponse.json({ error: 'OPENAI_API_KEY manquante' }, { status: 503 });
   }
 
   // Auth
@@ -38,15 +51,29 @@ export async function POST(request: Request) {
   const rl = checkRateLimit(`ai-agent-chat:${user.id}`, 20, 60_000);
   if (!rl.ok) return rateLimitResponse(rl);
 
-  const gate = await consumeAi(user.id, 'agent');
-  if (!gate.ok) {
-    if (gate.reason === 'no_pro_access') {
-      return NextResponse.json({ error: 'Abonnement Pro requis.' }, { status: 403 });
+  // Bypass paywall for admin accounts
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+  const { data: adminProfile } = await adminClient
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .maybeSingle();
+  const isAdmin = adminProfile?.is_admin === true;
+
+  if (!isAdmin) {
+    const gate = await consumeAi(user.id, 'agent');
+    if (!gate.ok) {
+      if (gate.reason === 'no_pro_access') {
+        return NextResponse.json({ error: 'Abonnement Pro requis.' }, { status: 403 });
+      }
+      return NextResponse.json(
+        { error: 'Cr\u00e9dits IA insuffisants.', balance: gate.balance, required: gate.required },
+        { status: 402 },
+      );
     }
-    return NextResponse.json(
-      { error: 'Cr\u00e9dits IA insuffisants.', balance: gate.balance, required: gate.required },
-      { status: 402 },
-    );
   }
 
   // Parse body
@@ -135,32 +162,36 @@ export async function POST(request: Request) {
     '\n\nReponds toujours en francais. Sois precis, concis et utile.',
   ].join('');
 
-  // Build messages array (current user turn can include an image block)
+  // Build messages array for OpenAI (system + history + current user turn with optional image)
   const currentUserContent = image
     ? [
-        { type: 'image' as const, source: { type: 'base64' as const, media_type: image.media_type, data: image.data } },
         { type: 'text' as const, text: message },
+        {
+          type: 'image_url' as const,
+          image_url: { url: `data:${image.media_type};base64,${image.data}` },
+        },
       ]
     : message;
 
   const messages: { role: string; content: unknown }[] = [
+    { role: 'system', content: fullSystemPrompt },
     ...(history || []).map((m) => ({ role: m.role, content: m.content })),
     { role: 'user', content: currentUserContent },
   ];
 
-  // Call Claude
+  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+
+  // Call OpenAI
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
+    const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-        max_tokens: 4096,
-        system: fullSystemPrompt,
+        model,
+        max_tokens: 2048,
         messages,
       }),
     });
@@ -174,10 +205,10 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json() as {
-      content: { type: string; text: string }[];
-      usage?: { input_tokens?: number; output_tokens?: number };
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
-    const reply = data.content?.[0]?.text || '';
+    const reply = data.choices?.[0]?.message?.content || '';
 
     // Save assistant message
     const { data: savedMsg } = await sb
@@ -195,9 +226,9 @@ export async function POST(request: Request) {
     await trackAiUsage({
       user_id: user.id,
       route: 'ai/agent-chat',
-      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-      input_tokens: data.usage?.input_tokens || 0,
-      output_tokens: data.usage?.output_tokens || 0,
+      model,
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
     });
 
     return NextResponse.json({
