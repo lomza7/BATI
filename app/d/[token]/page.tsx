@@ -214,39 +214,25 @@ export default function PublicQuotePage() {
     if (!sendData || signing) return;
     setSigning(true);
 
-    // Convert data URL to blob
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-
-    // Upload to Supabase Storage
-    const filePath = `${sendData.id}.png`;
-    const { error: uploadError } = await anonClient.storage
-      .from('signatures')
-      .upload(filePath, blob, { contentType: 'image/png', upsert: true });
-
-    if (uploadError) {
+    try {
+      const res = await fetch('/api/public/sign-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          signature_data_url: dataUrl,
+          signer_user_agent: navigator.userAgent,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result?.success) {
+        setSigned(true);
+        setSignedAt(new Date().toISOString());
+        setSignatureDisplayUrl(result.signature_url);
+      }
+    } finally {
       setSigning(false);
-      return;
     }
-
-    // Get public URL
-    const { data: urlData } = anonClient.storage.from('signatures').getPublicUrl(filePath);
-    const signatureUrl = urlData.publicUrl;
-
-    // Call RPC
-    const { data: result } = await anonClient.rpc('sign_quote', {
-      p_token: token,
-      p_signature_url: signatureUrl,
-      p_signer_user_agent: navigator.userAgent,
-    });
-
-    if (result?.success) {
-      setSigned(true);
-      setSignedAt(new Date().toISOString());
-      setSignatureDisplayUrl(signatureUrl);
-    }
-
-    setSigning(false);
   }
 
   async function handleDocuSealComplete() {
