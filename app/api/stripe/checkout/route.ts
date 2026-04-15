@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { resolveStripePrice } from '../utils';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -18,10 +19,41 @@ export async function POST(request: Request) {
   const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
 
   try {
-    const { price_id, user_email, user_id, success_url, cancel_url } = await request.json();
+    // Auth serveur: on ne fait jamais confiance au user_id/email du body.
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+    }
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user?.email) {
+      return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+    }
+    const user_id = user.id;
+    const user_email = user.email;
 
-    if (!price_id || !user_email) {
-      return NextResponse.json({ error: 'price_id et user_email requis' }, { status: 400 });
+    const { price_id, success_url, cancel_url } = await request.json();
+
+    if (!price_id) {
+      return NextResponse.json({ error: 'price_id requis' }, { status: 400 });
+    }
+
+    // Anti-tampering : le price_id recu doit correspondre a un des price Stripe
+    // declares dans platform_config (pro/business/starter). Bloque quelqu'un
+    // qui forgerait un price_id a 0.01€.
+    const { data: configRows } = await supabaseAdmin
+      .from('platform_config')
+      .select('key, value')
+      .in('key', ['stripe_price_starter', 'stripe_price_pro', 'stripe_price_business']);
+    const allowedPrices = new Set(
+      (configRows || []).map((r) => r.value).filter(Boolean),
+    );
+    if (allowedPrices.size > 0 && !allowedPrices.has(price_id)) {
+      return NextResponse.json({ error: 'price_id non autorise' }, { status: 403 });
     }
 
     const resolvedPrice = await resolveStripePrice(stripe, price_id);
@@ -29,30 +61,26 @@ export async function POST(request: Request) {
     // Look up referral state and accumulated credit months for the buyer
     let trialDays = 0;
     let referralCode: string | null = null;
-    if (user_id) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('pending_referral_code, referral_credit_months')
-        .eq('id', user_id)
-        .maybeSingle();
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('pending_referral_code, referral_credit_months')
+      .eq('id', user_id)
+      .maybeSingle();
 
-      if (profile) {
-        // 2 months for the referred user (only if not already granted)
-        if (profile.pending_referral_code) {
-          const { data: signup } = await supabaseAdmin
-            .from('referral_signups')
-            .select('id, referred_credit_granted')
-            .eq('referred_user_id', user_id)
-            .maybeSingle();
-          if (signup && !signup.referred_credit_granted) {
-            trialDays += 60;
-            referralCode = profile.pending_referral_code;
-          }
+    if (profile) {
+      if (profile.pending_referral_code) {
+        const { data: signup } = await supabaseAdmin
+          .from('referral_signups')
+          .select('id, referred_credit_granted')
+          .eq('referred_user_id', user_id)
+          .maybeSingle();
+        if (signup && !signup.referred_credit_granted) {
+          trialDays += 60;
+          referralCode = profile.pending_referral_code;
         }
-        // Plus any accumulated months earned as referrer (30 days per month)
-        if (profile.referral_credit_months && profile.referral_credit_months > 0) {
-          trialDays += profile.referral_credit_months * 30;
-        }
+      }
+      if (profile.referral_credit_months && profile.referral_credit_months > 0) {
+        trialDays += profile.referral_credit_months * 30;
       }
     }
 
@@ -72,7 +100,7 @@ export async function POST(request: Request) {
         ? { subscription_data: { trial_period_days: trialDays } }
         : {}),
       metadata: {
-        user_id: user_id || '',
+        user_id,
         stripe_input_id: price_id,
         stripe_price_id: resolvedPrice.id,
         referral_code: referralCode || '',

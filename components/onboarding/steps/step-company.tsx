@@ -3,6 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, ArrowRight, Building2, Search, Loader2, Check, SkipForward, Building, MapPin } from 'lucide-react';
 import type { OnboardingData } from '../onboarding-modal';
+import { supabase } from '@/lib/supabase';
+
+async function authHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
 
 interface PappersSearchResult {
   siren: string;
@@ -84,7 +90,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
     setSearchError('');
     setHasSearched(false);
     try {
-      const res = await fetch(`/api/pappers/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/pappers/search?q=${encodeURIComponent(q)}`, { headers: await authHeaders() });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'La recherche Pappers est indisponible pour le moment.');
@@ -129,7 +135,7 @@ export function StepCompany({ data, onChange, onNext, onBack, onSkip }: Props) {
 
     // Fetch full details from Pappers
     try {
-      const res = await fetch(`/api/pappers/company?siren=${encodeURIComponent(result.siren)}`);
+      const res = await fetch(`/api/pappers/company?siren=${encodeURIComponent(result.siren)}`, { headers: await authHeaders() });
       const company: PappersCompanyData = await res.json();
 
       if (!company.siren) throw new Error('No data');

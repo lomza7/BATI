@@ -53,7 +53,7 @@ export default function DevisAiPage() {
 
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
-      const validUntilStr = validUntil.toISOString().split('T')[0];
+      const validUntilStr = validUntil.toLocaleDateString('fr-CA');
 
       // Match a client by name if the assistant didn't already have one
       // selected explicitly.

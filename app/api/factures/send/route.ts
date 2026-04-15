@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { randomBytes } from 'crypto';
 import { buildInvoicePaymentEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 
 export const runtime = 'nodejs';
 
 function generateToken(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return randomBytes(24).toString('base64url');
 }
 
 export async function POST(request: Request) {
@@ -62,6 +58,7 @@ export async function POST(request: Request) {
         .from('invoices')
         .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, invoice_type, deposit_percentage, quote_id, clients(name, email)')
         .eq('id', invoice_id)
+        .eq('user_id', user.id)
         .single(),
       admin
         .from('profiles')

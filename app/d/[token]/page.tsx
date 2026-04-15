@@ -258,7 +258,7 @@ export default function PublicQuotePage() {
       fetch('/api/docuseal/sync-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submission_id: sendData.docuseal_submission_id }),
+        body: JSON.stringify({ submission_id: sendData.docuseal_submission_id, token }),
       }).catch(() => {});
     }
 
@@ -275,7 +275,7 @@ export default function PublicQuotePage() {
         await fetch('/api/docuseal/sync-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ submission_id: sendData.docuseal_submission_id }),
+          body: JSON.stringify({ submission_id: sendData.docuseal_submission_id, token }),
         }).catch(() => {});
       }
       const { data: fresh } = await anonClient

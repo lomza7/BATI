@@ -174,7 +174,7 @@ const emptyForm: FormState = {
   description: '',
   notes: '',
   autoSend: false,
-  startDate: new Date().toISOString().split('T')[0],
+  startDate: new Date().toLocaleDateString('fr-CA'),
   endDate: '',
   lineItems: [],
 };
@@ -252,7 +252,7 @@ export default function ContratsPage() {
       auto_send: form.autoSend,
       start_date: form.startDate || null,
       end_date: form.endDate || null,
-      next_billing: form.startDate || new Date().toISOString().split('T')[0],
+      next_billing: form.startDate || new Date().toLocaleDateString('fr-CA'),
       updated_at: new Date().toISOString(),
       line_items: validLineItems.length > 0 ? validLineItems : [],
     };
@@ -319,7 +319,7 @@ export default function ContratsPage() {
           total_ht: totalHt,
           total_ttc: totalTtc,
           tva_rate: tvaRate,
-          due_date: dueDate.toISOString().split('T')[0],
+          due_date: dueDate.toLocaleDateString('fr-CA'),
           status: 'creee',
           issued_at: new Date().toISOString(),
         })
@@ -361,7 +361,7 @@ export default function ContratsPage() {
       }
 
       // Link contract to invoice
-      const billingStart = contract.next_billing || new Date().toISOString().split('T')[0];
+      const billingStart = contract.next_billing || new Date().toLocaleDateString('fr-CA');
       const periodEnd = new Date(billingStart);
       if (contract.frequency === 'mensuel') periodEnd.setMonth(periodEnd.getMonth() + 1);
       else if (contract.frequency === 'trimestriel') periodEnd.setMonth(periodEnd.getMonth() + 3);
@@ -373,7 +373,7 @@ export default function ContratsPage() {
         contract_id: contract.id,
         invoice_id: invoice.id,
         billing_period_start: billingStart,
-        billing_period_end: periodEnd.toISOString().split('T')[0],
+        billing_period_end: periodEnd.toLocaleDateString('fr-CA'),
       });
 
       // Advance billing date
@@ -419,7 +419,7 @@ export default function ContratsPage() {
         total_ht: totalHt,
         tva_rate: tvaRate,
         total_ttc: totalTtc,
-        valid_until: validUntil.toISOString().split('T')[0],
+        valid_until: validUntil.toLocaleDateString('fr-CA'),
         status: 'brouillon',
       })
       .select('id')

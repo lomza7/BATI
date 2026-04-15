@@ -39,6 +39,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
   }
 
+  // Idempotence: Stripe peut renvoyer un event plusieurs fois (retries,
+  // double webhooks). On enregistre event.id dans stripe_webhook_events
+  // via INSERT conditionnel; si la ligne existe deja, on skippe.
+  const { error: eventInsertErr } = await supabaseAdmin
+    .from('stripe_webhook_events')
+    .insert({ event_id: event.id, event_type: event.type });
+  if (eventInsertErr) {
+    // 23505 = unique violation -> deja traite, safe skip.
+    if ((eventInsertErr as { code?: string }).code === '23505') {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+    console.error('[stripe/webhook] idempotence insert error', eventInsertErr);
+  }
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -69,10 +83,8 @@ export async function POST(request: Request) {
           stripeCustomerId: customerId,
           stripeSubscriptionId: subscriptionId,
         });
-        await applyReferralReward({
-          referredUserId: session.metadata.user_id,
-          referralCode: session.metadata?.referral_code || '',
-        });
+        // Note: applyReferralReward est desormais declenche sur
+        // invoice.payment_succeeded (premier paiement reel, pas pendant le trial).
       }
       break;
     }
@@ -98,6 +110,47 @@ export async function POST(request: Request) {
           .from('profiles')
           .update({ subscription_status: 'past_due' })
           .eq('stripe_customer_id', customerId);
+      }
+      break;
+    }
+
+    case 'invoice.payment_succeeded': {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId = typeof invoice.customer === 'string' ? invoice.customer : null;
+      if (!customerId) break;
+
+      // Re-activer l'abonnement si l'artisan a regularise apres past_due.
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, pending_referral_code, subscription_status, referral_credit_months')
+        .eq('stripe_customer_id', customerId)
+        .maybeSingle();
+
+      if (!profile) break;
+
+      if (profile.subscription_status === 'past_due') {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ subscription_status: 'active' })
+          .eq('id', profile.id);
+      }
+
+      // Referral : on credite le parrain uniquement quand l'artisan paie
+      // reellement (pas pendant le trial gratuit).
+      if (profile.pending_referral_code) {
+        await applyReferralReward({
+          referredUserId: profile.id,
+          referralCode: profile.pending_referral_code,
+        });
+      }
+
+      // Decrementer les mois de credit referral du parrain a chaque mois
+      // paye (un mois de gratuite consomme = -1).
+      if (profile.referral_credit_months && profile.referral_credit_months > 0) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ referral_credit_months: Math.max(0, profile.referral_credit_months - 1) })
+          .eq('id', profile.id);
       }
       break;
     }

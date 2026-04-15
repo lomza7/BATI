@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+  }
+  const sb = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+
   const apiKey = process.env.PAPPERS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'PAPPERS_API_KEY manquante' }, { status: 503 });

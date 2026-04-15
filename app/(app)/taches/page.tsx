@@ -173,7 +173,7 @@ export default function TachesPage() {
     setForm({ title: '', description: '', priority: 'moyenne', category: 'autre', due_date: '', client_id: null, time_spent: 0 });
   }
 
-  const today = new Date(new Date().toDateString()).toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('fr-CA');
 
   const filtered = useMemo(() => {
     let result = todos;

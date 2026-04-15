@@ -8,9 +8,9 @@ export const runtime = 'nodejs';
 // Appele cote client apres onComplete comme fallback au webhook
 export async function POST(request: Request) {
   try {
-    const { submission_id } = await request.json();
-    if (!submission_id) {
-      return NextResponse.json({ error: 'submission_id requis' }, { status: 400 });
+    const { submission_id, token } = await request.json();
+    if (!submission_id || !token) {
+      return NextResponse.json({ error: 'submission_id et token requis' }, { status: 400 });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -23,11 +23,13 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verifier que ce submission_id existe en base
-    const { data: send, error: queryError } = await admin
+    // Verifier que ce submission_id existe en base ET correspond bien au token fourni
+    // (empeche un tiers de forcer une synchro en devinant un submission_id).
+    const { data: send } = await admin
       .from('quote_sends')
       .select('id, signed_at, docuseal_submission_id')
       .eq('docuseal_submission_id', submission_id)
+      .eq('token', token)
       .maybeSingle();
 
     if (!send) {

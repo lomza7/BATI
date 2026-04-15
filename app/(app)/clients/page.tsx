@@ -434,7 +434,7 @@ export default function ClientsPage() {
                         {clientTodos.map(todo => {
                           const priority = TODO_PRIORITIES[todo.priority] || TODO_PRIORITIES.moyenne;
                           const category = TODO_CATEGORIES[todo.category] || TODO_CATEGORIES.autre;
-                          const isOverdue = todo.due_date && !todo.completed && todo.due_date < new Date().toISOString().split('T')[0];
+                          const isOverdue = todo.due_date && !todo.completed && todo.due_date < new Date().toLocaleDateString('fr-CA');
                           return (
                             <div key={todo.id} className={cn(
                               'flex items-start gap-3 rounded-lg border border-border p-3 transition-all',

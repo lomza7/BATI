@@ -378,7 +378,7 @@ export default function ProspectionPage() {
           status: 'brouillon',
           total_ht: totalHt,
           total_ttc: totalHt * 1.2,
-          valid_until: validUntil.toISOString().split('T')[0],
+          valid_until: validUntil.toLocaleDateString('fr-CA'),
         })
         .select('id')
         .single();
@@ -506,7 +506,7 @@ export default function ProspectionPage() {
           description: lead.work_details || lead.notes || '',
           total_ht: totalHt,
           total_ttc: totalHt * 1.2,
-          valid_until: validUntil.toISOString().split('T')[0],
+          valid_until: validUntil.toLocaleDateString('fr-CA'),
         })
         .select('id')
         .single();

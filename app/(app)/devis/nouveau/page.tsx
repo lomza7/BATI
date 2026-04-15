@@ -443,7 +443,7 @@ export default function NouveauDevisPage() {
           .maybeSingle();
 
         if (!existingContract) {
-          const startDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date().toLocaleDateString('fr-CA');
 
           if (isRecurringQuote) {
             // Whole-quote recurring contract with line items
@@ -658,7 +658,7 @@ export default function NouveauDevisPage() {
                     type="date"
                     className="h-9 flex-1 sm:flex-none sm:w-auto sm:max-w-[180px]"
                     value={validUntil}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={new Date().toLocaleDateString('fr-CA')}
                     onChange={e => setValidUntil(e.target.value || getDefaultValidUntil())}
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">30 j.</span>

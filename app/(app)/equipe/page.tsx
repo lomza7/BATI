@@ -156,7 +156,7 @@ export default function EquipePage() {
   // Assignment form
   const [showAddHours, setShowAddHours] = useState(false);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [hoursForm, setHoursForm] = useState({ project_id: '', date: new Date().toISOString().split('T')[0], hours: 0, description: '' });
+  const [hoursForm, setHoursForm] = useState({ project_id: '', date: new Date().toLocaleDateString('fr-CA'), hours: 0, description: '' });
 
   useEffect(() => { loadMembers(); loadProjects(); }, []);
 
@@ -285,7 +285,7 @@ export default function EquipePage() {
       description: hoursForm.description,
     });
     setShowAddHours(false);
-    setHoursForm({ project_id: '', date: new Date().toISOString().split('T')[0], hours: 0, description: '' });
+    setHoursForm({ project_id: '', date: new Date().toLocaleDateString('fr-CA'), hours: 0, description: '' });
     loadMemberDetails(selectedId);
   }
 

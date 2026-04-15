@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { randomBytes } from 'crypto';
 import { docusealFetch, buildQuoteHtml } from '@/lib/docuseal';
 import { buildQuoteSignatureEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
@@ -8,12 +9,7 @@ import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 export const runtime = 'nodejs';
 
 function generateToken(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return randomBytes(24).toString('base64url');
 }
 
 export async function POST(request: Request) {
@@ -60,7 +56,7 @@ export async function POST(request: Request) {
 
     // Fetch quote + lines + client + artisan profile
     const [quoteRes, linesRes, profileRes] = await Promise.all([
-      admin.from('quotes').select('*, clients(*)').eq('id', quote_id).is('deleted_at', null).single(),
+      admin.from('quotes').select('*, clients(*)').eq('id', quote_id).eq('user_id', user.id).is('deleted_at', null).single(),
       admin.from('quote_lines').select('*').eq('quote_id', quote_id).order('position'),
       admin.from('profiles').select('company_name, full_name, siret, company_address, company_postal_code, company_city, company_phone, tva_number, logo_url, document_config').eq('id', user.id).single(),
     ]);

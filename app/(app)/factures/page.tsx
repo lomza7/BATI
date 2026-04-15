@@ -376,7 +376,7 @@ export default function FacturesPage() {
       total_ttc: tva.total_ttc,
       tva_rate: tva.primary_rate,
       tva_breakdown: tva.tva_breakdown,
-      due_date: dueDate.toISOString().split('T')[0],
+      due_date: dueDate.toLocaleDateString('fr-CA'),
     }).select('id').single();
 
     // Crée une ligne unique pour que le PDF / la preview / la compta aient un breakdown cohérent

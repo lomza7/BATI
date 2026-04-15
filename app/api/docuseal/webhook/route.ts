@@ -2,11 +2,38 @@ import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
+import { docusealFetch } from '@/lib/docuseal';
+import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
 
+// DocuSeal n'offre pas de HMAC natif sur les webhooks. On authentifie le
+// payload avec deux couches:
+//   1. Un secret partage fourni en header X-Docuseal-Secret (ou en query
+//      ?secret=...) — l'artisan configure ce secret dans l'URL webhook cote
+//      DocuSeal. Comparaison en temps constant.
+//   2. On re-fetch la submission sur l'API DocuSeal avec la cle API pour
+//      confirmer que l'etat reel est bien 'completed'.
+function verifyWebhookSecret(request: Request): boolean {
+  const expected = process.env.DOCUSEAL_WEBHOOK_SECRET;
+  if (!expected) return false;
+  const url = new URL(request.url);
+  const received =
+    request.headers.get('x-docuseal-secret') ||
+    url.searchParams.get('secret') ||
+    '';
+  if (!received) return false;
+  const a = Buffer.from(received);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export async function POST(request: Request) {
   try {
+    if (!verifyWebhookSecret(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const eventType = body.event_type;
@@ -32,10 +59,29 @@ export async function POST(request: Request) {
     // Extraire les donnees DocuSeal
     const submissionId = data.submission_id as number;
     const submitterId = data.id as number | undefined;
-    const auditLogUrl = (data.audit_log_url as string) || '';
-    const documents = (data.documents as { name: string; url: string }[]) || [];
-    const signedDocumentUrl = documents[0]?.url || '';
-    const signerIp = (data.ip as string) || '';
+
+    // Double-check serveur: on verifie aupres de DocuSeal que la submission
+    // est reellement completee avant de la marquer signee en base.
+    interface DocuSealSubmission {
+      id: number;
+      status: string;
+      audit_log_url?: string;
+      submitters: {
+        id: number;
+        status: string;
+        ip?: string;
+        documents?: { name: string; url: string }[];
+      }[];
+    }
+    const verified = await docusealFetch<DocuSealSubmission>(`/submissions/${submissionId}`).catch(() => null);
+    if (!verified || verified.status !== 'completed') {
+      return NextResponse.json({ ok: true, skipped: 'status_not_completed' });
+    }
+
+    const verifiedSubmitter = verified.submitters?.find(s => s.id === submitterId) || verified.submitters?.[0];
+    const auditLogUrl = verified.audit_log_url || '';
+    const signedDocumentUrl = verifiedSubmitter?.documents?.[0]?.url || '';
+    const signerIp = verifiedSubmitter?.ip || '';
 
     // Appeler la RPC sign_quote_docuseal
     const { data: rpcResult, error: rpcError } = await admin.rpc('sign_quote_docuseal', {

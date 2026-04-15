@@ -576,7 +576,7 @@ export default function ComptabilitePage() {
       if (lines.length > 1) {
         setOcrReviewData({
           supplier: ex.supplier || '',
-          date: ex.date || new Date().toISOString().split('T')[0],
+          date: ex.date || new Date().toLocaleDateString('fr-CA'),
           payment_method: ex.payment_method || null,
           is_autoliquidation: Boolean(ex.is_autoliquidation),
           confidence: ex.confidence ?? 0.5,
@@ -595,7 +595,7 @@ export default function ComptabilitePage() {
       const initial: Partial<ExpenseFormValues> = {
         description: ex.description || '',
         supplier: ex.supplier || '',
-        date: ex.date || new Date().toISOString().split('T')[0],
+        date: ex.date || new Date().toLocaleDateString('fr-CA'),
         amount_ht: Number(ex.amount_ht || 0),
         tva_rate: ex.tva_breakdown?.[0]?.rate ?? 20,
         tva_amount: Number(ex.tva_total || 0),
@@ -1136,7 +1136,7 @@ export default function ComptabilitePage() {
 
   const flux = useMemo<FluxRow[]>(() => {
     const rows: FluxRow[] = [];
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('fr-CA');
 
     for (const e of expenses) {
       const catName =
@@ -2370,7 +2370,7 @@ export default function ComptabilitePage() {
                   {pagedFlux.map((f) => {
                     const isSelected = fluxSelected.has(f.key);
                     const isOverdueDeadline =
-                      f.deadline && f.deadline < new Date().toISOString().split('T')[0] && f.statusKey !== 'paid';
+                      f.deadline && f.deadline < new Date().toLocaleDateString('fr-CA') && f.statusKey !== 'paid';
                     return (
                       <tr
                         key={f.key}
@@ -2605,7 +2605,7 @@ export default function ComptabilitePage() {
                             · Échéance{' '}
                             <span
                               className={cn(
-                                f.deadline < new Date().toISOString().split('T')[0] &&
+                                f.deadline < new Date().toLocaleDateString('fr-CA') &&
                                   f.statusKey !== 'paid' &&
                                   'font-semibold text-red-600',
                               )}

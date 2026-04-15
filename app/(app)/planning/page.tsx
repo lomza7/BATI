@@ -66,7 +66,7 @@ const HALF_DAY_LABELS: Record<HalfDay, string> = {
 };
 
 function toDateStr(d: Date) {
-  return d.toISOString().split('T')[0];
+  return d.toLocaleDateString('fr-CA');
 }
 
 function addDays(d: Date, n: number) {

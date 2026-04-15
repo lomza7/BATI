@@ -84,7 +84,8 @@ export async function POST(request: Request) {
         payment_stripe_account_id: connection.stripe_account_id,
         payment_publishable_key: publishableKey,
       })
-      .eq('id', invoice_id);
+      .eq('id', invoice_id)
+      .eq('user_id', user.id);
 
     if (updateError) {
       console.error('invoice update error', JSON.stringify(updateError));

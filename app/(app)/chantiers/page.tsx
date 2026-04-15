@@ -378,7 +378,7 @@ export default function ChantiersPage() {
       let d = new Date(pe.start_date);
       const end = new Date(pe.end_date);
       while (d <= end) {
-        const ds = d.toISOString().split('T')[0];
+        const ds = d.toLocaleDateString('fr-CA');
         entry.days.add(ds);
         entry.hours += hPerDay;
         d.setDate(d.getDate() + 1);
@@ -642,7 +642,7 @@ export default function ChantiersPage() {
       let d = new Date(pe.start_date);
       const end = new Date(pe.end_date);
       while (d <= end) {
-        const ds = d.toISOString().split('T')[0];
+        const ds = d.toLocaleDateString('fr-CA');
         // Only add if not already tracked via team_assignments
         if (!entry.dates.includes(ds)) {
           entry.total_hours += hPerDay;

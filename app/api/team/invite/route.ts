@@ -9,6 +9,15 @@ export const runtime = 'nodejs';
 
 const ALLOWED_ROLES = new Set(WORKSPACE_ROLE_OPTIONS.map((option) => option.value));
 
+function esc(s: string): string {
+  if (!s) return '';
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -150,16 +159,16 @@ export async function POST(request: Request) {
           <div style="font-family:Arial,sans-serif;padding:24px;background:#f7f4ef;color:#18120f">
             <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #eadfd3;border-radius:18px;padding:28px">
               <p style="margin:0 0 12px;font-size:14px;color:#8a6a55">Invitation d'equipe</p>
-              <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25">Vous etes invite a rejoindre l'espace ${companyName}</h1>
+              <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25">Vous etes invite a rejoindre l'espace ${esc(companyName)}</h1>
               <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#5f4a3d">
-                Role propose : <strong>${WORKSPACE_ROLE_LABELS[role]}</strong>${note ? `<br/>Note : ${note}` : ''}
+                Role propose : <strong>${esc(WORKSPACE_ROLE_LABELS[role])}</strong>${note ? `<br/>Note : ${esc(note)}` : ''}
               </p>
               <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#5f4a3d">
                 Si vous avez deja un compte, connectez-vous avec cet email. Sinon, creez votre acces en quelques secondes.
               </p>
               <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:24px">
-                <a href="${loginUrl}" style="background:#d96526;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600">Se connecter</a>
-                <a href="${signupUrl}" style="background:#fff;color:#d96526;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;border:1px solid #f0d2bf">Creer mon acces</a>
+                <a href="${esc(loginUrl)}" style="background:#d96526;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600">Se connecter</a>
+                <a href="${esc(signupUrl)}" style="background:#fff;color:#d96526;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;border:1px solid #f0d2bf">Creer mon acces</a>
               </div>
             </div>
           </div>

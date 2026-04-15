@@ -28,11 +28,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Utilisateur non authentifie' }, { status: 401 });
   }
 
-  // Restrict to admin or local dev
+  // Restrict to admin, gated by env flag in prod to eviter tout effet de bord public.
   const isAdmin = user.email === 'louis@maaza.pro';
   const isDev = process.env.NODE_ENV !== 'production';
+  const enabled = process.env.ENABLE_REFERRAL_TEST === '1';
   if (!isAdmin && !isDev) {
     return NextResponse.json({ error: 'Action reservee aux administrateurs' }, { status: 403 });
+  }
+  if (!isDev && !enabled) {
+    return NextResponse.json({ error: 'Endpoint desactive en production' }, { status: 404 });
   }
 
   const body = await request.json().catch(() => ({}));

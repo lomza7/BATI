@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import type { GmailMessageHeader, GmailMessageFull } from '@/lib/gmail';
+import DOMPurify from 'isomorphic-dompurify';
 
 // ---------------------------------------------------------------------------
 
@@ -406,7 +407,7 @@ export default function MailPage() {
               </div>
               <div
                 className="mt-6 text-sm text-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: selectedMessage.body }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedMessage.body, { USE_PROFILES: { html: true } }) }}
               />
               <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
                 <Button variant="outline" onClick={() => startReply(selectedMessage)} className="gap-2">
