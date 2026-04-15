@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { Resend } from 'resend';
 import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { docusealFetch } from '@/lib/docuseal';
+import { buildContractSignedClientEmail, buildContractSignedArtisanEmail } from '@/lib/email-templates';
 import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
@@ -107,12 +109,112 @@ export async function POST(request: Request) {
       } catch (err) {
         console.error('Auto deposit invoice error:', err);
       }
+      try {
+        await maybeSendSignedContractEmail(admin, submissionId, signedDocumentUrl);
+      } catch (err) {
+        console.error('Signed contract email error:', err);
+      }
     }
 
     return NextResponse.json({ ok: true, result: rpcResult });
   } catch (err) {
     console.error('DocuSeal webhook error:', err);
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 });
+  }
+}
+
+async function maybeSendSignedContractEmail(
+  admin: SupabaseClient,
+  docusealSubmissionId: number,
+  signedDocumentUrl: string,
+) {
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey || !signedDocumentUrl) return;
+
+  const { data: send } = await admin
+    .from('quote_sends')
+    .select('user_id, recurring_contract_id, document_kind, client_email, client_name')
+    .eq('docuseal_submission_id', docusealSubmissionId)
+    .single();
+
+  if (!send || send.document_kind !== 'contract' || !send.recurring_contract_id) return;
+
+  const [{ data: contract }, { data: profile }, { data: authUser }] = await Promise.all([
+    admin
+      .from('recurring_contracts')
+      .select('contract_number, title, clients(name, email)')
+      .eq('id', send.recurring_contract_id)
+      .single(),
+    admin
+      .from('profiles')
+      .select('company_name, full_name, document_config')
+      .eq('id', send.user_id)
+      .single(),
+    admin.auth.admin.getUserById(send.user_id),
+  ]);
+
+  if (!contract) return;
+
+  // Fetch signed PDF as base64
+  let pdfBase64: string | null = null;
+  try {
+    const pdfRes = await fetch(signedDocumentUrl);
+    if (pdfRes.ok) {
+      const buf = Buffer.from(await pdfRes.arrayBuffer());
+      pdfBase64 = buf.toString('base64');
+    }
+  } catch (e) {
+    console.error('Signed PDF fetch failed:', e);
+  }
+
+  const resend = new Resend(resendKey);
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
+  const dc = ((profile?.document_config as Record<string, string>) || {});
+  const accentColor = dc.primary_color || '#d35400';
+  const companyName = profile?.company_name || profile?.full_name || 'Artisan';
+  const contractNumber = contract.contract_number || '—';
+  const contractTitle = contract.title || '';
+  const signedAt = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const filename = `Contrat-${contractNumber}-signe.pdf`;
+  const attachments = pdfBase64 ? [{ filename, content: pdfBase64 }] : undefined;
+
+  const clientRel = Array.isArray(contract.clients) ? contract.clients[0] : contract.clients;
+  const clientEmail = (send.client_email || (clientRel as { email?: string } | null)?.email || '').trim();
+  const clientName = (send.client_name || (clientRel as { name?: string } | null)?.name || 'Client').trim();
+
+  if (clientEmail) {
+    await resend.emails.send({
+      from: fromEmail,
+      to: clientEmail,
+      subject: `Votre contrat signé — ${contractNumber}`,
+      html: buildContractSignedClientEmail({
+        clientName,
+        artisanName: companyName,
+        contractNumber,
+        contractTitle,
+        signedAt,
+        accentColor,
+      }),
+      attachments,
+    }).catch((e) => console.error('Client signed-contract email failed:', e));
+  }
+
+  const artisanEmail = authUser?.user?.email;
+  if (artisanEmail) {
+    await resend.emails.send({
+      from: fromEmail,
+      to: artisanEmail,
+      subject: `${clientName} a signé le contrat ${contractNumber}`,
+      html: buildContractSignedArtisanEmail({
+        artisanName: companyName,
+        clientName,
+        contractNumber,
+        contractTitle,
+        signedAt,
+        accentColor,
+      }),
+      attachments,
+    }).catch((e) => console.error('Artisan signed-contract email failed:', e));
   }
 }
 

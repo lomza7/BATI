@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ClientPicker } from '@/components/shared/client-picker';
+import { supabase } from '@/lib/supabase';
 import {
   CONTRACT_CATEGORIES,
   FREQUENCY_LABELS,
@@ -132,6 +133,26 @@ export function ContractWizard({
       setStep(0);
     }
   }, [open, initial]);
+
+  // Auto-remplit l'adresse d'intervention avec celle du client sélectionné
+  // (sauf si l'utilisateur a déjà saisi quelque chose).
+  useEffect(() => {
+    if (!values.clientId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('clients')
+        .select('address, postal_code, city')
+        .eq('id', values.clientId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const composed = [data.address, [data.postal_code, data.city].filter(Boolean).join(' ')]
+        .filter((s) => s && String(s).trim())
+        .join(', ');
+      setValues((v) => (v.siteAddress.trim() ? v : { ...v, siteAddress: composed }));
+    })();
+    return () => { cancelled = true; };
+  }, [values.clientId]);
 
   const selectedCategory = getContractCategory(values.categoryKey);
 
@@ -263,6 +284,16 @@ export function ContractWizard({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Adresse d&apos;intervention</label>
+                <Input
+                  className="mt-1"
+                  placeholder="Reprise automatique de l'adresse du client"
+                  value={values.siteAddress}
+                  onChange={(e) => setValues({ ...values, siteAddress: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">Pré-remplie depuis la fiche client. Modifiable si le chantier est ailleurs.</p>
               </div>
               <div>
                 <label className="text-sm font-medium">Accès / particularités</label>

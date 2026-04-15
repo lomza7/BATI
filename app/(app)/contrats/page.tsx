@@ -31,7 +31,7 @@ import {
   YAxis,
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
-import { getNextInvoiceNumber, getNextQuoteNumber } from '@/lib/document-numbers';
+import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate, INVOICE_STATUSES, QUOTE_STATUSES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
@@ -42,6 +42,7 @@ import { ClientPicker } from '@/components/shared/client-picker';
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
 import { ContractWizard, type ContractWizardValues } from '@/components/contrats/contract-wizard';
 import { SendContractDialog } from '@/components/contrats/send-contract-dialog';
+import { ContractDetailDialog } from '@/components/contrats/contract-detail-dialog';
 import { getContractCategory, type ContractCategoryKey, type ContractFrequency } from '@/lib/contract-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -199,6 +200,7 @@ export default function ContratsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardInitial, setWizardInitial] = useState<Partial<ContractWizardValues> | undefined>(undefined);
   const [sendTarget, setSendTarget] = useState<Contract | null>(null);
+  const [detailContract, setDetailContract] = useState<Contract | null>(null);
 
   useEffect(() => { loadContracts(); }, []);
 
@@ -215,13 +217,35 @@ export default function ContratsPage() {
     }
   }, []);
 
+  // Ouvre automatiquement le dialog de detail si ?highlight=<id>
+  useEffect(() => {
+    if (typeof window === 'undefined' || contracts.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const highlight = params.get('highlight');
+    if (!highlight) return;
+    const target = contracts.find((c) => c.id === highlight);
+    if (target) {
+      setDetailContract(target);
+      params.delete('highlight');
+      const query = params.toString();
+      window.history.replaceState({}, '', `/contrats${query ? `?${query}` : ''}`);
+    }
+  }, [contracts]);
+
   async function loadContracts() {
     const { data } = await supabase
       .from('recurring_contracts')
       .select(`
         id, contract_number, title, description, contract_type, amount, frequency, tva_rate, status,
         start_date, end_date, next_billing, auto_send, notes, created_at, last_billed_at,
-        quote_id, line_items, quotes(id, quote_number, status, deleted_at),
+        quote_id, line_items,
+        category_key, client_type, contract_channel, site_address, site_access_notes,
+        visits_per_year, weather_dependent, included_operations, excluded_operations,
+        intervention_hours, emergency_phone, response_time,
+        duration_mode, initial_term_months, renewal_term_months, auto_renewal, notice_period_months,
+        breach_cure_period_days, payment_method, payment_timing, payment_terms_days,
+        late_penalty_rate, recovery_fee,
+        quotes(id, quote_number, status, deleted_at),
         clients(id, name, email, deleted_at),
         contract_invoices(id, invoice_id, billing_period_start, billing_period_end, created_at, invoices(id, invoice_number, title, status, total_ttc, paid_at))
       `)
@@ -501,60 +525,6 @@ export default function ContratsPage() {
     }
   }
 
-  async function generateQuote(contract: Contract) {
-    if (!user) return;
-
-    const quoteNumber = await getNextQuoteNumber(supabase, user.id);
-
-    const totalHt = contract.amount;
-    const tvaRate = contract.tva_rate ?? 20;
-    const totalTtc = Math.round(totalHt * (1 + tvaRate / 100) * 100) / 100;
-
-    // Compute validity date (30 days)
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 30);
-
-    const { data: quote } = await supabase
-      .from('quotes')
-      .insert({
-        user_id: user.id,
-        quote_number: quoteNumber,
-        client_id: contract.clients?.id || null,
-        title: `${contract.title} — Contrat ${FREQ_LABELS[contract.frequency] ? contract.frequency : ''}`,
-        description: contract.description || '',
-        total_ht: totalHt,
-        tva_rate: tvaRate,
-        total_ttc: totalTtc,
-        valid_until: validUntil.toLocaleDateString('fr-CA'),
-        status: 'brouillon',
-      })
-      .select('id')
-      .single();
-
-    if (!quote) return;
-
-    // Create quote line
-    await supabase.from('quote_lines').insert({
-      user_id: user.id,
-      quote_id: quote.id,
-      description: contract.title,
-      detail: contract.description || null,
-      quantity: 1,
-      unit: 'forfait',
-      unit_price: totalHt,
-      total: totalHt,
-      position: 0,
-    });
-
-    // Link contract to quote
-    await supabase.from('recurring_contracts').update({
-      quote_id: quote.id,
-      updated_at: new Date().toISOString(),
-    }).eq('id', contract.id);
-
-    await loadContracts();
-  }
-
   // Computed data
   const activeContracts = contracts.filter(c => c.status === 'actif');
 
@@ -818,16 +788,9 @@ export default function ContratsPage() {
                             {billingContractId === c.id ? 'Génération…' : 'Facturer maintenant'}
                           </DropdownMenuItem>
                         )}
-                        {!c.quote_id && (
-                          <DropdownMenuItem onClick={() => generateQuote(c)}>
-                            <FileText className="mr-2 h-4 w-4" /> Générer un devis
-                          </DropdownMenuItem>
-                        )}
-                        {c.quotes && (
-                          <DropdownMenuItem onClick={() => window.location.href = '/devis'}>
-                            <FileText className="mr-2 h-4 w-4" /> Voir le devis {c.quotes.quote_number}
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem onClick={() => setDetailContract(c)}>
+                          <FileText className="mr-2 h-4 w-4" /> Voir le contrat
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setSendTarget(c)}>
                           <Send className="mr-2 h-4 w-4" /> Envoyer pour signature
                         </DropdownMenuItem>
@@ -868,15 +831,13 @@ export default function ContratsPage() {
                         <p className="font-medium text-foreground">{c.last_billed_at ? formatDate(c.last_billed_at) : 'Jamais'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Devis</p>
+                        <p className="text-xs text-muted-foreground">Devis lié</p>
                         {c.quotes ? (
                           <a href="/devis" className="font-medium text-primary hover:underline">
                             {c.quotes.quote_number} — {(QUOTE_STATUSES[c.quotes.status as keyof typeof QUOTE_STATUSES])?.label || c.quotes.status}
                           </a>
                         ) : (
-                          <button onClick={() => generateQuote(c)} className="font-medium text-primary hover:underline">
-                            Générer un devis
-                          </button>
+                          <p className="text-sm text-muted-foreground">Aucun</p>
                         )}
                       </div>
                     </div>
@@ -1001,6 +962,18 @@ export default function ContratsPage() {
           }}
           onClose={() => setSendTarget(null)}
           onSent={() => loadContracts()}
+        />
+      )}
+
+      {detailContract && (
+        <ContractDetailDialog
+          contract={detailContract as unknown as import('@/components/contrats/contract-detail-dialog').ContractDetail}
+          onClose={() => setDetailContract(null)}
+          onEdit={() => {
+            const c = detailContract;
+            setDetailContract(null);
+            openEdit(c);
+          }}
         />
       )}
 

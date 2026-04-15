@@ -385,6 +385,10 @@ export default function DevisPage() {
     <div className="space-y-6">
       <PageHeader title="Devis" description="Créez, gérez et envoyez vos devis">
         <ImportCsvButton type="quotes" onImported={loadQuotes} />
+        <Button variant="outline" onClick={() => router.push('/contrats?new=1')} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nouveau contrat récurrent
+        </Button>
         <Button onClick={openCreateOptions} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis

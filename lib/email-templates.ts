@@ -184,6 +184,107 @@ export function buildQuoteSentConfirmationEmail(data: QuoteSentConfirmationData)
 </html>`.trim();
 }
 
+interface ContractSignedClientEmailData {
+  clientName: string;
+  artisanName: string;
+  contractNumber: string;
+  contractTitle: string;
+  signedAt: string;
+  accentColor?: string;
+}
+
+export function buildContractSignedClientEmail(data: ContractSignedClientEmailData): string {
+  const accent = data.accentColor || '#d35400';
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Contrat signé</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+        <tr><td style="background-color:${accent};padding:28px 32px;text-align:center">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">Contrat signé ✓</p>
+        </td></tr>
+        <tr><td style="padding:32px 32px 24px">
+          <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a">Bonjour <strong>${escHtml(data.clientName)}</strong>,</p>
+          <p style="margin:0 0 20px;font-size:14px;color:#6b6560;line-height:1.6">
+            Votre contrat avec <strong>${escHtml(data.artisanName)}</strong> a bien été signé le <strong>${escHtml(data.signedAt)}</strong>. Vous trouverez en pièce jointe une copie du contrat signé à conserver.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da;margin-bottom:8px">
+            <tr><td style="padding:18px 22px">
+              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Contrat</p>
+              <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.contractTitle || data.contractNumber)}</p>
+              <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.contractNumber)}</p>
+            </td></tr>
+          </table>
+          <p style="margin:18px 0 0;font-size:12px;color:#999;line-height:1.5">
+            Pour toute question, répondez directement à cet email — votre artisan en sera notifié.
+          </p>
+        </td></tr>
+        <tr><td style="padding:0 32px 24px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e1da;padding-top:16px">
+            <tr><td><p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+              <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
+            </p></td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+interface ContractSignedArtisanEmailData {
+  artisanName: string;
+  clientName: string;
+  contractNumber: string;
+  contractTitle: string;
+  signedAt: string;
+  accentColor?: string;
+}
+
+export function buildContractSignedArtisanEmail(data: ContractSignedArtisanEmailData): string {
+  const accent = data.accentColor || '#d35400';
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Contrat signé</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+        <tr><td style="background-color:${accent};padding:28px 32px;text-align:center">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">${escHtml(data.clientName)} a signé ✓</p>
+        </td></tr>
+        <tr><td style="padding:32px 32px 24px">
+          <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a">Bonjour,</p>
+          <p style="margin:0 0 20px;font-size:14px;color:#6b6560;line-height:1.6">
+            Le contrat <strong>${escHtml(data.contractNumber)}</strong> a été signé par <strong>${escHtml(data.clientName)}</strong> le ${escHtml(data.signedAt)}. Le contrat est désormais actif et la facturation récurrente démarrera selon le calendrier prévu. Une copie signée est jointe à cet email.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da">
+            <tr><td style="padding:18px 22px">
+              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Contrat</p>
+              <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.contractTitle || data.contractNumber)}</p>
+              <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.contractNumber)}</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:0 32px 24px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e1da;padding-top:16px">
+            <tr><td><p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+              <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
+            </p></td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 interface InvoiceEmailData {
   clientName: string;
   artisanName: string;

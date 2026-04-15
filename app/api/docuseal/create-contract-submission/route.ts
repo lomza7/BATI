@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 
     const submitterEmail = client_email?.trim() || cl.email || `${contract_id}@placeholder.hellobat.app`;
 
-    interface DocuSealTemplate { id: number; slug: string; name: string; }
+    interface DocuSealTemplate { id: number; slug: string; name: string; documents?: { url: string }[]; }
 
     const template = await docusealFetch<DocuSealTemplate>('/templates/html', {
       method: 'POST',
@@ -128,6 +128,21 @@ export async function POST(request: Request) {
 
     if (!template?.id) {
       return NextResponse.json({ error: 'Erreur creation template DocuSeal' }, { status: 502 });
+    }
+
+    const contractPdfUrl = template.documents?.[0]?.url;
+    let contractPdfBase64: string | null = null;
+    const contractPdfFilename = `Contrat-${contract.contract_number || contract.id.slice(0, 8)}.pdf`;
+    if (contractPdfUrl) {
+      try {
+        const pdfRes = await fetch(contractPdfUrl);
+        if (pdfRes.ok) {
+          const buf = Buffer.from(await pdfRes.arrayBuffer());
+          contractPdfBase64 = buf.toString('base64');
+        }
+      } catch (e) {
+        console.error('[create-contract-submission] PDF fetch failed:', e);
+      }
     }
 
     interface DocuSealSubmitter { id: number; slug: string; submission_id: number; }
@@ -216,16 +231,18 @@ export async function POST(request: Request) {
         { excludeIds: excluded_attachment_ids },
       );
 
+      const clientAttachments = [
+        ...companyAttachments.map((att) => ({ filename: att.name, content: att.content_base64 })),
+        ...(contractPdfBase64 ? [{ filename: contractPdfFilename, content: contractPdfBase64 }] : []),
+      ];
+
       try {
         const result = await resend.emails.send({
           from: fromEmail,
           to: recipientEmail,
           subject: `Contrat ${contract.contract_number || ''} — ${companyName}`,
           html: emailHtml,
-          attachments: companyAttachments.map((att) => ({
-            filename: att.name,
-            content: att.content_base64,
-          })),
+          attachments: clientAttachments,
         });
 
         if (user.email) {
@@ -243,6 +260,9 @@ export async function POST(request: Request) {
             to: user.email,
             subject: `Confirmation d'envoi — Contrat ${contract.contract_number || ''}`,
             html: confirmationHtml,
+            attachments: contractPdfBase64
+              ? [{ filename: contractPdfFilename, content: contractPdfBase64 }]
+              : undefined,
           }).catch((e) => console.error('[create-contract-submission] Artisan confirmation failed:', e));
         }
 
