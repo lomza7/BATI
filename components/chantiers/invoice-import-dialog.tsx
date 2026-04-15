@@ -352,7 +352,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
             <div className="rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30 p-6 text-center">
               <UploadCloud className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-sm text-muted-foreground mb-3">
-                L'IA analysera chaque facture pour extraire le client, l'adresse et les montants.
+                L&apos;IA analysera chaque facture pour extraire le client, l&apos;adresse et les montants.
               </p>
               <label className="cursor-pointer">
                 <Button variant="outline" asChild>
@@ -400,7 +400,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
               className="w-full gap-2"
             >
               <Sparkles className="h-4 w-4" />
-              Lancer l'analyse IA
+              Lancer l&apos;analyse IA
             </Button>
           </div>
         )}
@@ -455,7 +455,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
             {allReviewable.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">Aucune facture n'a pu être extraite.</p>
+                <p className="text-sm">Aucune facture n&apos;a pu être extraite.</p>
               </div>
             ) : (
               <>

@@ -247,7 +247,7 @@ function HubView({
               <Paintbrush className="w-6 h-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-bold text-foreground mb-1">L'utiliser moi-même</h3>
+              <h3 className="text-base sm:text-lg font-bold text-foreground mb-1">L&apos;utiliser moi-même</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Générez des avant/après pour vos propres présentations commerciales. Idéal pour préparer un
                 rendez-vous client ou enrichir un devis avec un visuel projeté.

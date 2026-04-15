@@ -167,7 +167,6 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(new Uint8Array(arrayBuffer));
 
     // Build OpenAI messages
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userContent: any[] = [];
 
     if (isPdf) {

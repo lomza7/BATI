@@ -546,7 +546,6 @@ export default function ComptabilitePage() {
       });
 
       // Parse response safely (Vercel can return HTML on 413/500)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
       try {
         data = await res.json();

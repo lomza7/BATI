@@ -90,7 +90,7 @@ export function SiteWebInteractiveDemo() {
           <Sparkles className="w-2.5 h-2.5" /> Contenu généré par Claude
         </span>
         <span className="text-[9px] text-[var(--landing-muted)]">
-          87 % du contenu rédigé par l'IA
+          87 % du contenu rédigé par l&apos;IA
         </span>
       </div>
 
