@@ -110,6 +110,18 @@ interface ProjectInvoice {
   issued_at: string | null;
 }
 
+interface OrphanInvoice {
+  id: string;
+  invoice_number: string;
+  title: string | null;
+  status: string;
+  total_ttc: number;
+  issued_at: string | null;
+  paid_at: string | null;
+  client_id: string | null;
+  clients: { name: string | null; address: string | null; city: string | null; postal_code: string | null } | null;
+}
+
 interface CompletedPhase {
   key: string;
   completed_at: string;
@@ -273,6 +285,11 @@ export default function ChantiersPage() {
   const [publishProject, setPublishProject] = useState<Project | null>(null);
   const [orphanCount, setOrphanCount] = useState(0);
   const [backfilling, setBackfilling] = useState(false);
+  const [showOrphanDialog, setShowOrphanDialog] = useState(false);
+  const [orphanInvoices, setOrphanInvoices] = useState<OrphanInvoice[]>([]);
+  const [orphanLoading, setOrphanLoading] = useState(false);
+  const [orphanActionId, setOrphanActionId] = useState<string | null>(null);
+  const [associatingInvoiceId, setAssociatingInvoiceId] = useState<string | null>(null);
 
   // Synthese financiere du chantier ouvert (boussole de marge)
   const projectFinance = useMemo(() => {
@@ -472,6 +489,96 @@ export default function ChantiersPage() {
       }
     } finally {
       setBackfilling(false);
+    }
+  }
+
+  async function loadOrphanInvoices() {
+    setOrphanLoading(true);
+    const { data } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, title, status, total_ttc, issued_at, paid_at, client_id, clients(name, address, city, postal_code)')
+      .is('project_id', null)
+      .or('invoice_type.eq.standard,invoice_type.is.null')
+      .order('issued_at', { ascending: false });
+    setOrphanInvoices((data as unknown as OrphanInvoice[]) || []);
+    setOrphanCount((data || []).length);
+    setOrphanLoading(false);
+  }
+
+  function openOrphanDialog() {
+    setShowOrphanDialog(true);
+    loadOrphanInvoices();
+  }
+
+  async function createChantierForInvoice(inv: OrphanInvoice) {
+    if (!user) return;
+    setOrphanActionId(inv.id);
+    try {
+      const isCompleted = inv.status === 'payee';
+      const projectName = inv.title || `Chantier — ${inv.clients?.name || 'Client'}`;
+      const { data: project, error } = await supabase
+        .from('projects')
+        .insert({
+          user_id: user.id,
+          name: projectName,
+          client_id: inv.client_id,
+          address: inv.clients?.address || '',
+          city: inv.clients?.city || '',
+          postal_code: inv.clients?.postal_code || '',
+          status: isCompleted ? 'termine' : 'en_cours',
+          progress: isCompleted ? 100 : 0,
+          budget: inv.total_ttc || 0,
+          start_date: inv.issued_at || null,
+          end_date: isCompleted ? (inv.paid_at || inv.issued_at || null) : null,
+          notes: inv.invoice_number ? `Importé depuis facture ${inv.invoice_number}` : 'Importé depuis facture',
+          is_public: isCompleted,
+          published_at: isCompleted ? new Date().toISOString() : null,
+        })
+        .select('id')
+        .single();
+      if (error || !project) {
+        alert(`Erreur : ${error?.message || 'impossible de créer le chantier'}`);
+        return;
+      }
+      await supabase.from('invoices').update({ project_id: project.id }).eq('id', inv.id);
+      setOrphanInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+      setOrphanCount((c) => Math.max(0, c - 1));
+      loadProjects();
+    } finally {
+      setOrphanActionId(null);
+    }
+  }
+
+  async function associateInvoice(invoiceId: string, projectId: string) {
+    setOrphanActionId(invoiceId);
+    try {
+      const { error } = await supabase.from('invoices').update({ project_id: projectId }).eq('id', invoiceId);
+      if (error) {
+        alert(`Erreur : ${error.message}`);
+        return;
+      }
+      setOrphanInvoices((prev) => prev.filter((i) => i.id !== invoiceId));
+      setOrphanCount((c) => Math.max(0, c - 1));
+      setAssociatingInvoiceId(null);
+    } finally {
+      setOrphanActionId(null);
+    }
+  }
+
+  async function deleteOrphanInvoice(inv: OrphanInvoice) {
+    if (!confirm(`Supprimer définitivement la facture ${inv.invoice_number} ? Cette action est irréversible.`)) return;
+    setOrphanActionId(inv.id);
+    try {
+      await supabase.from('invoice_lines').delete().eq('invoice_id', inv.id);
+      const { error } = await supabase.from('invoices').delete().eq('id', inv.id);
+      if (error) {
+        alert(`Erreur : ${error.message}`);
+        return;
+      }
+      setOrphanInvoices((prev) => prev.filter((i) => i.id !== inv.id));
+      setOrphanCount((c) => Math.max(0, c - 1));
+    } finally {
+      setOrphanActionId(null);
     }
   }
 
@@ -1093,18 +1200,22 @@ export default function ChantiersPage() {
       </PageHeader>
 
       {orphanCount > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <button
+            type="button"
+            onClick={openOrphanDialog}
+            className="flex items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity"
+          >
             <Receipt className="h-5 w-5 text-amber-600 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-amber-900">
                 {orphanCount} facture{orphanCount > 1 ? 's' : ''} sans chantier associé
               </p>
               <p className="text-xs text-amber-700">
-                Créez automatiquement les chantiers correspondants pour les voir ici et sur la carte.
+                Cliquez pour voir, associer, créer ou supprimer chaque facture.
               </p>
             </div>
-          </div>
+          </button>
           <Button
             size="sm"
             variant="outline"
@@ -1115,7 +1226,7 @@ export default function ChantiersPage() {
             {backfilling ? (
               <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Création...</>
             ) : (
-              <><Plus className="h-3.5 w-3.5 mr-1.5" /> Créer les chantiers</>
+              <><Plus className="h-3.5 w-3.5 mr-1.5" /> Tout créer</>
             )}
           </Button>
         </div>
@@ -2660,6 +2771,122 @@ export default function ChantiersPage() {
         onOpenChange={setShowImportDialog}
         onComplete={loadProjects}
       />
+
+      <Dialog open={showOrphanDialog} onOpenChange={(open) => { setShowOrphanDialog(open); if (!open) setAssociatingInvoiceId(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Factures sans chantier</DialogTitle>
+            <DialogDescription>
+              Pour chaque facture, créez un nouveau chantier, associez-la à un chantier existant ou supprimez-la.
+            </DialogDescription>
+          </DialogHeader>
+
+          {orphanLoading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+              Chargement…
+            </div>
+          ) : orphanInvoices.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Aucune facture orpheline.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {orphanInvoices.map((inv) => {
+                const busy = orphanActionId === inv.id;
+                const isAssociating = associatingInvoiceId === inv.id;
+                return (
+                  <div key={inv.id} className="rounded-lg border border-border bg-card p-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-foreground">{inv.invoice_number}</span>
+                          <StatusBadge
+                            label={INVOICE_STATUSES[inv.status as keyof typeof INVOICE_STATUSES]?.label || inv.status}
+                            color={INVOICE_STATUSES[inv.status as keyof typeof INVOICE_STATUSES]?.color || 'gray'}
+                          />
+                        </div>
+                        {inv.title && <p className="text-sm text-foreground mt-0.5 truncate">{inv.title}</p>}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {inv.clients?.name || 'Sans client'}
+                          {inv.clients?.city && ` • ${inv.clients.city}`}
+                          {inv.issued_at && ` • ${formatDate(inv.issued_at)}`}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground mt-1">{formatCurrency(inv.total_ttc)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => router.push(`/factures?highlight=${inv.id}`)}
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1.5" /> Voir
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => createChantierForInvoice(inv)}
+                        >
+                          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                          Créer
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy || projects.length === 0}
+                          onClick={() => setAssociatingInvoiceId(isAssociating ? null : inv.id)}
+                        >
+                          <HardHat className="h-3.5 w-3.5 mr-1.5" /> Associer
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busy}
+                          onClick={() => deleteOrphanInvoice(inv)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Supprimer
+                        </Button>
+                      </div>
+                    </div>
+                    {isAssociating && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">Choisir un chantier existant :</p>
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {projects
+                            .filter((p) => !inv.client_id || p.client_id === inv.client_id || true)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                disabled={busy}
+                                onClick={() => associateInvoice(inv.id, p.id)}
+                                className="w-full text-left rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                              >
+                                <div className="font-medium text-foreground">{p.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {p.clients?.name || 'Sans client'}
+                                  {p.city && ` • ${p.city}`}
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOrphanDialog(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
