@@ -29,7 +29,8 @@ export async function POST(request: Request) {
   }
 
   // Restrict to admin, gated by env flag in prod to eviter tout effet de bord public.
-  const isAdmin = user.email === 'louis@maaza.pro';
+  const { data: profile } = await userClient.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+  const isAdmin = Boolean(profile?.is_admin);
   const isDev = process.env.NODE_ENV !== 'production';
   const enabled = process.env.ENABLE_REFERRAL_TEST === '1';
   if (!isAdmin && !isDev) {

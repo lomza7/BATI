@@ -372,7 +372,16 @@ export default function AvisPage() {
             <Store className="h-4 w-4" /> Connexion Google en cours
           </Button>
         ) : (
-          <Button className="gap-2" onClick={() => (window.location.href = '/api/google-business/connect')}>
+          <Button className="gap-2" onClick={async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+            const res = await fetch('/api/google-business/connect', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            const json = await res.json();
+            if (json.redirect_url) window.location.href = json.redirect_url;
+          }}>
             <Store className="h-4 w-4" /> Connecter Google
           </Button>
         )}
@@ -454,7 +463,16 @@ export default function AvisPage() {
 
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               {!googleAccessPending && (
-                <Button onClick={() => (window.location.href = '/api/google-business/connect')} className="gap-2">
+                <Button onClick={async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+            const res = await fetch('/api/google-business/connect', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            const json = await res.json();
+            if (json.redirect_url) window.location.href = json.redirect_url;
+          }} className="gap-2">
                   <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
                 </Button>
               )}

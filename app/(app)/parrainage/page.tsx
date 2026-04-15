@@ -67,7 +67,12 @@ export default function ParrainagePage() {
   const [sending, setSending] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
 
-  const isAdmin = user?.email === 'louis@maaza.pro';
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
+  }, [user]);
 
   const loadAll = useCallback(async () => {
     if (!user) return;

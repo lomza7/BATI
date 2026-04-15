@@ -1,25 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { verifyAdminRequest } from '@/lib/admin';
 
 export const runtime = 'nodejs';
-
-const ADMIN_EMAIL = 'louis@maaza.pro';
-
-async function verifyAdmin(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return null;
-  return user;
-}
 
 function getStripe() {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -29,7 +12,7 @@ function getStripe() {
 
 // GET — list all promotion codes
 export async function GET(request: Request) {
-  const user = await verifyAdmin(request);
+  const user = await verifyAdminRequest(request);
   if (!user) return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
 
   const stripe = getStripe();
@@ -70,7 +53,7 @@ export async function GET(request: Request) {
 
 // POST — create a new promotion code
 export async function POST(request: Request) {
-  const user = await verifyAdmin(request);
+  const user = await verifyAdminRequest(request);
   if (!user) return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
 
   const stripe = getStripe();
@@ -140,7 +123,7 @@ export async function POST(request: Request) {
 
 // DELETE — deactivate a promotion code
 export async function DELETE(request: Request) {
-  const user = await verifyAdmin(request);
+  const user = await verifyAdminRequest(request);
   if (!user) return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
 
   const stripe = getStripe();

@@ -1,26 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const ADMIN_EMAIL = 'louis@maaza.pro';
+import { verifyAdminRequest } from '@/lib/admin';
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) {
-    return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+  const admin = await verifyAdminRequest(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-  // Verify the caller is admin
-  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
-  }
 
   // Use service role to bypass RLS
   const adminClient = createClient(supabaseUrl, serviceRoleKey);

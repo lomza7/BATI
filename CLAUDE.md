@@ -353,6 +353,6 @@ RESEND_FROM_EMAIL=
 - Les dates doivent utiliser l'heure locale (pas `toISOString()` qui convertit en UTC et décale d'un jour en France)
 - Les tokens Google (Calendar, Gmail, Business) sont stockés en DB, pas en cookies — car ils doivent persister entre sessions
 - Le pattern OAuth Google passe le userId via un cookie httpOnly temporaire entre connect et callback
-- Admin restreint à `louis@maaza.pro` (hardcoded)
+- Admin via `profiles.is_admin` (booléen) + fonction SQL `is_admin()` — remplace l'ancien hardcode `louis@maaza.pro`
 - Le dashboard a par défaut le filtre "année" sélectionné
 - Le planning inclut le dirigeant (owner) comme membre virtuel (ID `__owner__`, `team_member_id = null` en DB)

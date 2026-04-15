@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_EMAIL = 'louis@maaza.pro';
+import { verifyAdminRequest } from '@/lib/admin';
 
 // Buckets dont les objets sont range's sous le prefixe `{user_id}/`
 const USER_SCOPED_BUCKETS = [
@@ -13,20 +13,6 @@ const USER_SCOPED_BUCKETS = [
   'bank-statements',
   'site-assets',
 ];
-
-async function verifyAdmin(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return null;
-
-  const userClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return null;
-  return user;
-}
 
 function getAdminClient() {
   return createClient(
@@ -48,7 +34,7 @@ function getAdminClient() {
  * Apres cette operation, l'adresse email est libre et peut etre reutilisee pour un nouveau compte.
  */
 export async function DELETE(request: Request) {
-  const admin = await verifyAdmin(request);
+  const admin = await verifyAdminRequest(request);
   if (!admin) {
     return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
   }
@@ -83,10 +69,15 @@ export async function DELETE(request: Request) {
 
   const targetEmail = targetData.user.email?.toLowerCase() || '';
 
-  // Empecher la suppression du compte admin
-  if (targetEmail === ADMIN_EMAIL.toLowerCase()) {
+  // Empecher la suppression d'un compte admin
+  const { data: targetProfile } = await sb
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .maybeSingle();
+  if (targetProfile?.is_admin) {
     return NextResponse.json(
-      { error: "Impossible de supprimer le compte administrateur" },
+      { error: "Impossible de supprimer un compte administrateur" },
       { status: 403 }
     );
   }

@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { buildGoogleConnectUrl, createGoogleState, setGoogleStateCookie } from '@/lib/google-business';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) {
+      return NextResponse.json({ error: 'Session utilisateur requise' }, { status: 401 });
+    }
+
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } },
+    );
+    const { data: { user }, error } = await sb.auth.getUser(token);
+    if (error || !user) {
+      return NextResponse.json({ error: 'Session utilisateur introuvable' }, { status: 401 });
+    }
+
     const state = createGoogleState();
-    const response = NextResponse.redirect(buildGoogleConnectUrl(request, state));
+    const response = NextResponse.json({ redirect_url: buildGoogleConnectUrl(request, state) });
     setGoogleStateCookie(response, request, state);
     return response;
   } catch (error) {
-    const url = new URL('/avis', request.url);
-    url.searchParams.set('google_error', error instanceof Error ? error.message : 'Configuration Google manquante');
-    return NextResponse.redirect(url);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Configuration Google manquante' },
+      { status: 500 },
+    );
   }
 }

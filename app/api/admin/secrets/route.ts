@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const ADMIN_EMAIL = 'louis@maaza.pro';
+import { verifyAdminRequest } from '@/lib/admin';
 
 // Keys safe to expose to admin client (we mask the value if too long)
 const ALLOWED_KEYS = new Set([
@@ -13,20 +12,6 @@ const ALLOWED_KEYS = new Set([
   'groq_api_key',
 ]);
 
-async function verifyAdmin(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return null;
-
-  const userClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return null;
-  return user;
-}
-
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +20,7 @@ function getAdminClient() {
 }
 
 export async function GET(request: Request) {
-  const admin = await verifyAdmin(request);
+  const admin = await verifyAdminRequest(request);
   if (!admin) {
     return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
   }
@@ -63,7 +48,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = await verifyAdmin(request);
+  const admin = await verifyAdminRequest(request);
   if (!admin) {
     return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
   }

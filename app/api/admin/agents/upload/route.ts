@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { extractPdfText } from '@/lib/ai/pdf-extract';
+import { verifyAdminRequest } from '@/lib/admin';
 
 export const runtime = 'nodejs';
 
-const ADMIN_EMAIL = 'louis@maaza.pro';
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-
-async function verifyAdmin(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader) return null;
-
-  const userClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
-  const { data: { user } } = await userClient.auth.getUser();
-  if (!user || user.email !== ADMIN_EMAIL) return null;
-  return user;
-}
 
 function getAdminClient() {
   return createClient(
@@ -29,7 +15,7 @@ function getAdminClient() {
 }
 
 export async function POST(request: Request) {
-  const admin = await verifyAdmin(request);
+  const admin = await verifyAdminRequest(request);
   if (!admin) {
     return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
   }

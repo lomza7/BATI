@@ -39,11 +39,11 @@ export async function verifyTurnstile(
 ): Promise<TurnstileResult> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
 
-  // Pas de clé → on n'a pas configuré Turnstile, on laisse passer.
-  // Visible dans les logs Vercel pour qu'on sache que la protection n'est pas active.
+  // Pas de clé : en prod on refuse (fail-closed), en dev on laisse passer.
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {
-      console.warn('[turnstile] TURNSTILE_SECRET_KEY missing — verification skipped');
+      console.error('[turnstile] TURNSTILE_SECRET_KEY missing in production — rejecting');
+      return { ok: false, errorCodes: ['missing-secret'] };
     }
     return { ok: true, skipped: true };
   }

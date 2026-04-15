@@ -26,7 +26,6 @@ import {
 } from '@/lib/pricing-plans';
 import AdminAgentsSection from '@/components/admin/admin-agents-section';
 
-const ADMIN_EMAIL = 'louis@maaza.pro';
 
 type Period = 'day' | 'week' | 'month' | 'year';
 
@@ -66,6 +65,7 @@ interface AdminUser {
   invoice_count: number;
   project_count: number;
   client_count: number;
+  is_admin?: boolean;
 }
 
 interface AiUsageUser {
@@ -235,7 +235,17 @@ export default function AdminPage() {
   const [promoError, setPromoError] = useState('');
   const [promoCopied, setPromoCopied] = useState<string | null>(null);
 
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
+  }, [user]);
 
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
@@ -637,10 +647,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user || user.email !== ADMIN_EMAIL) {
+    if (!user) {
       router.replace('/dashboard');
       return;
     }
+    if (!isAdmin) return;
     loadData();
     loadConfig();
     loadSites();
@@ -648,7 +659,7 @@ export default function AdminPage() {
     loadImageSecrets();
     loadReferrals();
     loadPromoCodes();
-  }, [authLoading, user, router, loadData, loadConfig, loadSites, loadAiUsage, loadImageSecrets, loadReferrals, loadPromoCodes]);
+  }, [authLoading, user, isAdmin, router, loadData, loadConfig, loadSites, loadAiUsage, loadImageSecrets, loadReferrals, loadPromoCodes]);
 
   if (authLoading || !isAdmin) {
     return (
@@ -1786,7 +1797,7 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {u.email === ADMIN_EMAIL ? (
+                          {u.is_admin ? (
                             <span className="text-[10px] text-muted-foreground italic">admin</span>
                           ) : (
                             <button

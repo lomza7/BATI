@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Star, ChevronDown, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 import { useWorkspace } from '@/hooks/use-workspace';
 import { useAccessState } from '@/hooks/use-access-state';
 import { cn } from '@/lib/utils';
@@ -148,7 +149,12 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
   const { hasPermission } = useWorkspace();
   const { state: accessState } = useAccessState();
-  const isAdmin = user?.email === 'louis@maaza.pro';
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(Boolean(data?.is_admin)));
+  }, [user]);
   const showLock = accessState ? !accessState.hasProAccess : false;
 
   const [favorites, setFavorites] = useState<string[]>([]);
