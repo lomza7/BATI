@@ -87,6 +87,8 @@ export function QuoteBillingCard({
 
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [showFinalDialog, setShowFinalDialog] = useState(false);
+  const [localStatus, setLocalStatus] = useState(quote.status);
+  const [acceptingQuote, setAcceptingQuote] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -210,7 +212,25 @@ export function QuoteBillingCard({
   }
 
   const hasDeposits = billing.invoices.some((i) => i.invoice_type === 'acompte');
-  const isQuoteAccepted = quote.status === 'accepte';
+  const isQuoteAccepted = localStatus === 'accepte';
+
+  async function markQuoteAccepted() {
+    setAcceptingQuote(true);
+    setError('');
+    try {
+      const { error: updErr } = await supabase
+        .from('quotes')
+        .update({ status: 'accepte', updated_at: new Date().toISOString() })
+        .eq('id', quote.id);
+      if (updErr) throw updErr;
+      setLocalStatus('accepte');
+      onBillingChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Impossible de marquer le devis accepté.');
+    } finally {
+      setAcceptingQuote(false);
+    }
+  }
 
   return (
     <>
@@ -329,9 +349,24 @@ export function QuoteBillingCard({
         )}
 
         {!isQuoteAccepted && (
-          <p className="text-xs text-muted-foreground rounded-lg bg-muted/40 p-2">
-            Le devis doit être accepté avant d&apos;émettre des factures.
-          </p>
+          <div className="rounded-lg bg-muted/40 p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Le devis doit être accepté avant d&apos;émettre des factures.
+            </p>
+            <Button
+              size="sm"
+              className="gap-2 w-full"
+              disabled={acceptingQuote}
+              onClick={markQuoteAccepted}
+            >
+              {acceptingQuote ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              Le devis a été accepté
+            </Button>
+          </div>
         )}
       </div>
 
