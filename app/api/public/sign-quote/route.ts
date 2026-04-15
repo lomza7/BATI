@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -7,6 +8,9 @@ const MAX_SIGNATURE_BYTES = 500_000;
 
 export async function POST(request: NextRequest) {
   try {
+    const rl = checkRateLimit(`sign-quote:${getClientIp(request)}`, 10, 60_000);
+    if (!rl.ok) return rateLimitResponse(rl) as unknown as NextResponse;
+
     const body = await request.json();
     const { token, signature_data_url, signer_user_agent } = body ?? {};
 
