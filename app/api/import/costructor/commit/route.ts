@@ -1,5 +1,5 @@
 /**
- * POST /api/import/constructeur/commit
+ * POST /api/import/costructor/commit
  *
  * Takes the same multipart payload as the preview route, but actually inserts
  * the parsed rows into the user's Supabase tables. Wraps everything in a
@@ -29,7 +29,7 @@ import {
   type MappedQuote,
   type MappedInvoice,
   type MappedService,
-} from '@/lib/import/constructeur';
+} from '@/lib/import/costructor';
 import {
   getNextQuoteNumber,
   getNextInvoiceNumber,
@@ -172,8 +172,8 @@ async function insertQuotes(
         client_id: clientId,
         title: row.title,
         description: row.description
-          ? `${row.description}\n\n— Importé depuis Constructeur (${row.source_number})`
-          : `Importé depuis Constructeur (${row.source_number})`,
+          ? `${row.description}\n\n— Importé depuis Costructor (${row.source_number})`
+          : `Importé depuis Costructor (${row.source_number})`,
         status: row.status,
         total_ht: row.total_ht,
         tva_rate: row.tva_rate,

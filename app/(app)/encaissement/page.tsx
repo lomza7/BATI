@@ -500,9 +500,13 @@ export default function EncaissementPage() {
             size="lg"
             onClick={async () => {
               const { data: { session } } = await supabase.auth.getSession();
-              if (session) {
-                window.location.href = `/api/stripe/connect?token=${session.access_token}`;
-              }
+              if (!session) return;
+              const res = await fetch('/api/stripe/connect', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              const json = await res.json();
+              if (json.redirect_url) window.location.href = json.redirect_url;
             }}
           >
             <Zap className="mr-2 h-4 w-4" />

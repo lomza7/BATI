@@ -7,21 +7,23 @@ export const runtime = 'nodejs';
 
 const COOKIE_NAME = 'hellobat_stripe_uid';
 
-export async function GET(request: NextRequest) {
-  const errorUrl = new URL('/paiements', request.url);
-
+export async function POST(request: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
-    errorUrl.searchParams.set('stripe_error', 'Configuration Stripe manquante');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json({ error: 'Configuration Stripe manquante' }, { status: 500 });
   }
 
-  const token = request.nextUrl.searchParams.get('token');
-  const returnTo = request.nextUrl.searchParams.get('return_to') || '/paiements';
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
-    errorUrl.searchParams.set('stripe_error', 'Session utilisateur requise');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json({ error: 'Session utilisateur requise' }, { status: 401 });
   }
+
+  let returnTo = '/paiements';
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (body && typeof body.return_to === 'string') returnTo = body.return_to;
+  } catch {}
 
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +33,12 @@ export async function GET(request: NextRequest) {
   const { data: { user }, error: authError } = await sb.auth.getUser(token);
 
   if (authError || !user) {
-    errorUrl.searchParams.set('stripe_error', 'Session utilisateur introuvable');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json({ error: 'Session utilisateur introuvable' }, { status: 401 });
   }
 
   try {
     const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
 
-    // Check if user already has a stripe connection
     const { data: existing } = await supabaseAdmin
       .from('stripe_connections')
       .select('stripe_account_id')
@@ -50,7 +50,6 @@ export async function GET(request: NextRequest) {
     if (existing?.stripe_account_id) {
       accountId = existing.stripe_account_id;
     } else {
-      // Create new Standard account
       const account = await stripe.accounts.create({
         type: 'standard',
         country: 'FR',
@@ -69,26 +68,27 @@ export async function GET(request: NextRequest) {
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${siteUrl}/api/stripe/connect?token=${token}`,
+      refresh_url: `${siteUrl}${returnTo}?stripe_refresh=1`,
       return_url: `${siteUrl}/api/stripe/connect/callback?return_to=${encodeURIComponent(returnTo)}`,
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });
 
-    const response = NextResponse.redirect(accountLink.url);
+    const response = NextResponse.json({ redirect_url: accountLink.url });
 
-    // Store userId in a secure cookie so callback can read it
     response.cookies.set(COOKIE_NAME, user.id, {
       httpOnly: true,
       sameSite: 'lax',
       secure: request.nextUrl.protocol === 'https:',
       path: '/',
-      maxAge: 60 * 30, // 30 min
+      maxAge: 60 * 30,
     });
 
     return response;
   } catch (error) {
-    errorUrl.searchParams.set('stripe_error', error instanceof Error ? error.message : 'Erreur Stripe');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erreur Stripe' },
+      { status: 500 },
+    );
   }
 }

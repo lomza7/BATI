@@ -112,7 +112,15 @@ export default function PaiementsPage() {
     setConnecting(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      window.location.href = `/api/stripe/connect?token=${session.access_token}`;
+      const res = await fetch('/api/stripe/connect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json();
+      if (json.redirect_url) window.location.href = json.redirect_url;
+      else setConnecting(false);
+    } else {
+      setConnecting(false);
     }
   }
 

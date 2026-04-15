@@ -364,7 +364,7 @@ export default function ParametresPage() {
   const [creatingSource, setCreatingSource] = useState(false);
   const [creatingStage, setCreatingStage] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [importSoftware, setImportSoftware] = useState<'constructeur' | 'excel' | 'other' | null>(null);
+  const [importSoftware, setImportSoftware] = useState<'costructor' | 'excel' | 'other' | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveReminderSuccess, setSaveReminderSuccess] = useState(false);
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
@@ -2296,11 +2296,11 @@ export default function ParametresPage() {
           <ImportShowcase
             onLaunch={(sourceId: SourceId) => {
               // Map any of the 12 showcase tiles onto the 3 modal flows:
-              // Constructeur has its own tailored instructions, Excel/CSV is
+              // Costructor has its own tailored instructions, Excel/CSV is
               // its own bucket, everything else falls into "other".
               const mapped =
-                sourceId === 'constructeur'
-                  ? 'constructeur'
+                sourceId === 'costructor'
+                  ? 'costructor'
                   : sourceId === 'excel'
                     ? 'excel'
                     : 'other';

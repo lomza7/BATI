@@ -524,7 +524,12 @@ export default function CalendrierPage() {
             <Button variant="outline" size="sm" className="gap-2" onClick={async () => {
               const { data: { session } } = await supabase.auth.getSession();
               if (!session?.access_token) return;
-              window.location.href = `/api/google-calendar/connect?token=${session.access_token}`;
+              const res = await fetch('/api/google-calendar/connect', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              const json = await res.json();
+              if (json.redirect_url) window.location.href = json.redirect_url;
             }}>
               <CalendarCheck className="h-4 w-4" />
               <span className="hidden sm:inline">Google Calendar</span>

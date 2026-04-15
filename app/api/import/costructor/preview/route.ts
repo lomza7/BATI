@@ -1,5 +1,5 @@
 /**
- * POST /api/import/constructeur/preview
+ * POST /api/import/costructor/preview
  *
  * Accepts up to 3 CSV files (clients, quotes, invoices) as multipart form
  * fields and returns a parsed preview without writing anything to the
@@ -19,12 +19,12 @@ import {
   mapQuotesCSV,
   mapInvoicesCSV,
   mapServicesCSV,
-} from '@/lib/import/constructeur';
+} from '@/lib/import/costructor';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-// Cap at 5MB per file — Constructeur exports for a typical artisan are well
+// Cap at 5MB per file — Costructor exports for a typical artisan are well
 // under 1MB, this leaves plenty of headroom while preventing abuse.
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 

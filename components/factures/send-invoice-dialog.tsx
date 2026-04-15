@@ -351,9 +351,17 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
                       className="gap-1.5 bg-[#d35400] hover:bg-[#b84800] text-white"
                       onClick={async () => {
                         const { data: { session } } = await supabase.auth.getSession();
-                        if (session?.access_token) {
-                          window.location.href = `/api/stripe/connect?token=${session.access_token}&return_to=/factures`;
-                        }
+                        if (!session?.access_token) return;
+                        const res = await fetch('/api/stripe/connect', {
+                          method: 'POST',
+                          headers: {
+                            Authorization: `Bearer ${session.access_token}`,
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ return_to: '/factures' }),
+                        });
+                        const json = await res.json();
+                        if (json.redirect_url) window.location.href = json.redirect_url;
                       }}
                     >
                       <CreditCard className="h-3.5 w-3.5" />

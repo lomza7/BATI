@@ -6,7 +6,7 @@
  * - Detect the delimiter (comma, semicolon, tab) from the header line.
  * - Detect encoding: try UTF-8 strict first, fall back to Windows-1252 (Latin-1)
  *   when the bytes don't decode cleanly. This catches the mojibake-prone CSVs
- *   that French desktop software (Constructeur, Excel on Windows) tend to emit.
+ *   that French desktop software (Costructor, Excel on Windows) tend to emit.
  *
  * No external dependency: shipping a 50KB papaparse for two import flows would
  * be wasteful, and a hand-rolled parser is easier to audit.

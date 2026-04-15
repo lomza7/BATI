@@ -79,7 +79,7 @@ export function StepImport({ data, onChange, onNext, onBack, onSkip }: Props) {
       <div className="mt-6 space-y-3 flex-1">
         {!imported && (
           <>
-            {/* Visual featuring Constructeur as the primary path */}
+            {/* Visual featuring Costructor as the primary path */}
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-xl bg-white border border-primary/20 flex items-center justify-center flex-shrink-0">
@@ -90,7 +90,7 @@ export function StepImport({ data, onChange, onNext, onBack, onSkip }: Props) {
                     Migrez sans rien perdre
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Constructeur, Excel, Obat, EBP, Sage, Henrri… tout ce qui
+                    Costructor, Excel, Obat, EBP, Sage, Henrri… tout ce qui
                     s&apos;exporte en CSV.
                   </p>
                 </div>

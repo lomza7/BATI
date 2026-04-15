@@ -11,7 +11,7 @@
  *     software tile *is* the call to action — clicking it opens the import
  *     modal pre-loaded with that source.
  *   - "Autre" was replaced by Excel, which is highlighted as the universal
- *     fallback alongside Constructeur (the most-used BTP tool).
+ *     fallback alongside Costructor (the most-used BTP tool).
  *   - The bibliothèque-de-prix slot is now fully supported, so the "Bientôt"
  *     badge has been removed from the entities list.
  *
@@ -37,7 +37,7 @@ interface Props {
 }
 
 export type SourceId =
-  | 'constructeur'
+  | 'costructor'
   | 'obat'
   | 'tolteck'
   | 'mediabat'
@@ -52,7 +52,7 @@ export type SourceId =
 
 // ── Catalogue of supported sources ──────────────────────────────────────────
 // Each entry carries the brand-ish color combo we use to fake a logo tile
-// (we don't ship third-party trademarked artwork). Constructeur and Excel get
+// (we don't ship third-party trademarked artwork). Costructor and Excel get
 // a featured badge so users instantly spot the two most-likely paths.
 
 interface Source {
@@ -73,8 +73,8 @@ interface Source {
 
 const SUPPORTED_SOURCES: Source[] = [
   {
-    id: 'constructeur',
-    name: 'Constructeur',
+    id: 'costructor',
+    name: 'Costructor',
     wordmark: 'C',
     badge: 'Le plus utilisé',
     bg: 'bg-gradient-to-br from-orange-500 to-orange-600',

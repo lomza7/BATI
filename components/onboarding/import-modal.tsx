@@ -2,11 +2,11 @@
 
 /**
  * ImportModal — multi-step modal that lets a user migrate data from
- * Constructeur (or any compatible CSV/Excel export) into Hellobat.
+ * Costructor (or any compatible CSV/Excel export) into Hellobat.
  *
  * Flow:
- *   1. Software picker — Constructeur (featured), other software, generic CSV.
- *   2. Instructions — explains how to export each file from Constructeur.
+ *   1. Software picker — Costructor (featured), other software, generic CSV.
+ *   2. Instructions — explains how to export each file from Costructor.
  *   3. Dropzones — one per entity (clients, devis, factures, bibliothèque).
  *   4. Preview — shows the parsed counts + per-row errors.
  *   5. Confirm — actual import call, then a success state with counts.
@@ -46,7 +46,7 @@ import { supabase } from '@/lib/supabase';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Software = 'constructeur' | 'excel' | 'other';
+type Software = 'costructor' | 'excel' | 'other';
 type Step = 'pick' | 'instructions' | 'upload' | 'preview' | 'done';
 
 interface ImportFiles {
@@ -81,7 +81,7 @@ interface CommitResponse {
   };
 }
 
-// ── Software catalogue (Constructeur featured) ──────────────────────────────
+// ── Software catalogue (Costructor featured) ──────────────────────────────
 
 const SOFTWARE_OPTIONS: {
   id: Software;
@@ -91,8 +91,8 @@ const SOFTWARE_OPTIONS: {
   icon: typeof FileSpreadsheet;
 }[] = [
   {
-    id: 'constructeur',
-    name: 'Constructeur',
+    id: 'costructor',
+    name: 'Costructor',
     badge: 'Le plus utilisé',
     description: 'Export CSV de vos clients, devis et factures',
     icon: Sparkles,
@@ -119,7 +119,7 @@ interface ImportModalProps {
   onComplete?: (counts: CommitResponse['counts']) => void;
   /**
    * When set, the modal skips the software-picker step and starts directly at
-   * the relevant entry point. `'constructeur'` → instructions screen,
+   * the relevant entry point. `'costructor'` → instructions screen,
    * everything else → upload screen.
    */
   initialSoftware?: Software | null;
@@ -145,7 +145,7 @@ export function ImportModal({
   const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
-    setStep(initialSoftware ? (initialSoftware === 'constructeur' ? 'instructions' : 'upload') : 'pick');
+    setStep(initialSoftware ? (initialSoftware === 'costructor' ? 'instructions' : 'upload') : 'pick');
     setSoftware(initialSoftware);
     setFiles({ clients: null, quotes: null, invoices: null, services: null });
     setPreview(null);
@@ -159,7 +159,7 @@ export function ImportModal({
   useEffect(() => {
     if (open && initialSoftware) {
       setSoftware(initialSoftware);
-      setStep(initialSoftware === 'constructeur' ? 'instructions' : 'upload');
+      setStep(initialSoftware === 'costructor' ? 'instructions' : 'upload');
     } else if (open && !initialSoftware) {
       setStep('pick');
     }
@@ -173,8 +173,8 @@ export function ImportModal({
 
   function handleSoftwarePick(id: Software) {
     setSoftware(id);
-    // Constructeur has tailored instructions; the others go straight to upload.
-    setStep(id === 'constructeur' ? 'instructions' : 'upload');
+    // Costructor has tailored instructions; the others go straight to upload.
+    setStep(id === 'costructor' ? 'instructions' : 'upload');
   }
 
   function setFile(key: keyof ImportFiles, file: File | null) {
@@ -200,7 +200,7 @@ export function ImportModal({
       const accessToken = session?.access_token;
       if (!accessToken) throw new Error('Session expirée. Reconnectez-vous.');
 
-      const res = await fetch('/api/import/constructeur/preview', {
+      const res = await fetch('/api/import/costructor/preview', {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
         body: formData,
@@ -230,7 +230,7 @@ export function ImportModal({
       const accessToken = session?.access_token;
       if (!accessToken) throw new Error('Session expirée. Reconnectez-vous.');
 
-      const res = await fetch('/api/import/constructeur/commit', {
+      const res = await fetch('/api/import/costructor/commit', {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
         body: formData,
@@ -266,7 +266,7 @@ export function ImportModal({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">
                 {step === 'pick' && 'Importer mes données'}
-                {step === 'instructions' && 'Exporter depuis Constructeur'}
+                {step === 'instructions' && 'Exporter depuis Costructor'}
                 {step === 'upload' && 'Joindre vos fichiers'}
                 {step === 'preview' && 'Vérification'}
                 {step === 'done' && 'Import terminé'}
@@ -337,7 +337,7 @@ export function ImportModal({
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Comment exporter depuis Constructeur
+                      Comment exporter depuis Costructor
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       Suivez ces étapes pour récupérer vos fichiers CSV.
@@ -349,8 +349,8 @@ export function ImportModal({
               <ol className="space-y-2.5">
                 {[
                   {
-                    title: 'Connectez-vous à Constructeur',
-                    detail: 'Ouvrez votre compte sur app.constructeur.fr',
+                    title: 'Connectez-vous à Costructor',
+                    detail: 'Ouvrez votre compte sur app.costructor.fr',
                   },
                   {
                     title: 'Allez dans Paramètres → Exports',
@@ -537,7 +537,7 @@ export function ImportModal({
                 return initialSoftware ? close() : setStep('pick');
               }
               if (step === 'upload') {
-                if (software === 'constructeur') return setStep('instructions');
+                if (software === 'costructor') return setStep('instructions');
                 return initialSoftware ? close() : setStep('pick');
               }
               if (step === 'preview') return setStep('upload');

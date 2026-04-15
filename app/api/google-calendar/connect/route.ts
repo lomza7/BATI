@@ -10,15 +10,12 @@ export const runtime = 'nodejs';
 
 const GCAL_USER_COOKIE = 'hellobat_gcal_uid';
 
-export async function GET(request: NextRequest) {
-  const errorUrl = new URL('/calendrier', request.url);
-
+export async function POST(request: NextRequest) {
   try {
-    // Get user from the access token passed as query param
-    const token = request.nextUrl.searchParams.get('token');
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
-      errorUrl.searchParams.set('google_error', 'Session utilisateur requise');
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.json({ error: 'Session utilisateur requise' }, { status: 401 });
     }
 
     const sb = createClient(
@@ -29,15 +26,14 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error } = await sb.auth.getUser(token);
 
     if (error || !user) {
-      errorUrl.searchParams.set('google_error', 'Session utilisateur introuvable. Veuillez vous reconnecter.');
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.json({ error: 'Session utilisateur introuvable' }, { status: 401 });
     }
 
     const state = createCalendarState();
-    const response = NextResponse.redirect(buildCalendarConnectUrl(request, state));
+    const redirectUrl = buildCalendarConnectUrl(request, state);
+    const response = NextResponse.json({ redirect_url: redirectUrl });
     setCalendarStateCookie(response, request, state);
 
-    // Store userId in a secure cookie so callback can read it
     response.cookies.set(GCAL_USER_COOKIE, user.id, {
       httpOnly: true,
       sameSite: 'lax',
@@ -48,7 +44,9 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    errorUrl.searchParams.set('google_error', error instanceof Error ? error.message : 'Configuration Google manquante');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Configuration Google manquante' },
+      { status: 500 },
+    );
   }
 }

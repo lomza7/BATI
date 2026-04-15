@@ -290,7 +290,12 @@ export default function MailPage() {
             onClick={async () => {
               const { data: { session } } = await supabase.auth.getSession();
               if (!session?.access_token) return;
-              window.location.href = `/api/gmail/connect?token=${session.access_token}`;
+              const res = await fetch('/api/gmail/connect', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              const json = await res.json();
+              if (json.redirect_url) window.location.href = json.redirect_url;
             }}
           >
             <Mail className="h-4 w-4" />

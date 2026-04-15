@@ -1,7 +1,7 @@
 /**
- * Constructeur (and generic CSV) mapper for the Hellobat import flow.
+ * Costructor (and generic CSV) mapper for the Hellobat import flow.
  *
- * This module turns the CSV exports from Constructeur — and any other software
+ * This module turns the CSV exports from Costructor — and any other software
  * that follows similar conventions — into rows that match our Supabase schema
  * for `clients`, `quotes` (+ `quote_lines`), and `invoices` (+ `invoice_lines`).
  *
@@ -90,7 +90,7 @@ export interface ImportSummary<T> {
 // ── Mojibake repair ──────────────────────────────────────────────────────────
 
 /**
- * Repair the most common French mojibake patterns. Constructeur, Excel/Windows
+ * Repair the most common French mojibake patterns. Costructor, Excel/Windows
  * and similar tools often emit UTF-8 bytes that *originally* encoded a
  * Windows-1252 string — i.e. each Latin-1 byte was UTF-8-re-encoded once. The
  * result decodes as valid UTF-8 but reads as `Ã©` instead of `é`.
@@ -261,7 +261,7 @@ export function splitAddress(value: string): {
   city: string;
 } {
   if (!value) return { address: '', postal_code: '', city: '' };
-  // Constructeur sometimes packs multiple addresses with a newline separator —
+  // Costructor sometimes packs multiple addresses with a newline separator —
   // keep only the first.
   const first = value.split(/\r?\n/)[0].trim();
   const m = first.match(/^(.+?)\s+(\d{5})\s+(.+)$/);

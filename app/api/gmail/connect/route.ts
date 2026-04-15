@@ -9,14 +9,12 @@ import {
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
-  const errorUrl = new URL('/mail', request.url);
-
+export async function POST(request: NextRequest) {
   try {
-    const token = request.nextUrl.searchParams.get('token');
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) {
-      errorUrl.searchParams.set('gmail_error', 'Session utilisateur requise');
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.json({ error: 'Session utilisateur requise' }, { status: 401 });
     }
 
     const sb = createClient(
@@ -27,12 +25,12 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error } = await sb.auth.getUser(token);
 
     if (error || !user) {
-      errorUrl.searchParams.set('gmail_error', 'Session utilisateur introuvable. Veuillez vous reconnecter.');
-      return NextResponse.redirect(errorUrl);
+      return NextResponse.json({ error: 'Session utilisateur introuvable' }, { status: 401 });
     }
 
     const state = createGmailState();
-    const response = NextResponse.redirect(buildGmailConnectUrl(request, state));
+    const redirectUrl = buildGmailConnectUrl(request, state);
+    const response = NextResponse.json({ redirect_url: redirectUrl });
     setGmailStateCookie(response, request, state);
 
     response.cookies.set(GMAIL_USER_COOKIE, user.id, {
@@ -45,7 +43,9 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    errorUrl.searchParams.set('gmail_error', error instanceof Error ? error.message : 'Configuration Google manquante');
-    return NextResponse.redirect(errorUrl);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Configuration Google manquante' },
+      { status: 500 },
+    );
   }
 }
