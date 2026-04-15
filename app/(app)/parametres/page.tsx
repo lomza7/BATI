@@ -67,6 +67,7 @@ import {
   PRICING_PLAN_DEFAULTS,
   type PricingPlanKey,
 } from '@/lib/pricing-plans';
+import { ttcToHt } from '@/lib/tva-utils';
 import {
   DEFAULT_LEAD_SOURCES,
   normalizeLeadSourceSlug,
@@ -369,6 +370,7 @@ export default function ParametresPage() {
   const [saveSourceSuccess, setSaveSourceSuccess] = useState(false);
   const [error, setError] = useState('');
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
+  const [showTtcPrices, setShowTtcPrices] = useState(false);
   const [billingInvoices, setBillingInvoices] = useState<Array<{
     id: string; number: string | null; date: number; period_start: number; period_end: number;
     amount: number; currency: string; status: string | null; pdf_url: string | null;
@@ -658,7 +660,10 @@ export default function ParametresPage() {
     setError('');
 
     try {
-      const response = await fetch(`/api/pappers/company?siren=${encodeURIComponent(profile.siren)}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`/api/pappers/company?siren=${encodeURIComponent(profile.siren)}`, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
       const company: PappersCompanyPayload & { error?: string } = await response.json();
 
       if (!response.ok || company.error || !company.siren) {
@@ -937,13 +942,18 @@ export default function ParametresPage() {
     setError('');
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Session expiree, reconnectez-vous.');
+      }
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           price_id: priceId,
-          user_email: user.email,
-          user_id: user.id,
           success_url: `${window.location.origin}/parametres?tab=abonnement&checkout=success`,
           cancel_url: `${window.location.origin}/parametres?tab=abonnement&checkout=cancel`,
         }),
@@ -2653,10 +2663,23 @@ export default function ParametresPage() {
           <UsageWidget />
           <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-xl">Mon abonnement</CardTitle>
-              <CardDescription>
-                Retrouvez votre plan actuel, comparez les offres et gérez votre abonnement Stripe.
-              </CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-xl">Mon abonnement</CardTitle>
+                  <CardDescription>
+                    Retrouvez votre plan actuel, comparez les offres et gérez votre abonnement Stripe.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1.5 text-xs font-medium">
+                  <span className={showTtcPrices ? 'text-muted-foreground' : 'text-foreground'}>HT</span>
+                  <Switch
+                    checked={showTtcPrices}
+                    onCheckedChange={setShowTtcPrices}
+                    aria-label="Basculer entre HT et TTC"
+                  />
+                  <span className={showTtcPrices ? 'text-foreground' : 'text-muted-foreground'}>TTC</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between">
@@ -2667,7 +2690,9 @@ export default function ParametresPage() {
                       {currentPlan.name}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {currentPlan.key === 'free' ? 'Gratuit' : `${currentPlan.price} EUR / mois`}
+                      {currentPlan.key === 'free'
+                        ? 'Gratuit'
+                        : `${showTtcPrices ? currentPlan.price : ttcToHt(currentPlan.price)} EUR ${showTtcPrices ? 'TTC' : 'HT'} / mois`}
                     </span>
                   </div>
                   {profile?.plan_started_at && (
@@ -2732,10 +2757,14 @@ export default function ParametresPage() {
                   <CardContent className="space-y-5">
                     <div>
                       <p className="text-3xl font-semibold text-foreground">
-                        {plan.key === 'free' ? 'Gratuit' : `${plan.price} EUR`}
+                        {plan.key === 'free'
+                          ? 'Gratuit'
+                          : `${showTtcPrices ? plan.price : ttcToHt(plan.price)} EUR`}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {plan.key === 'free' ? 'Sans carte bancaire' : 'par mois'}
+                        {plan.key === 'free'
+                          ? 'Sans carte bancaire'
+                          : `par mois ${showTtcPrices ? 'TTC' : 'HT'}`}
                       </p>
                     </div>
 
