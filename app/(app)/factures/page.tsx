@@ -792,11 +792,6 @@ export default function FacturesPage() {
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
         <ImportCsvButton type="invoices" onImported={loadData} />
-        <Button asChild variant="outline" className="gap-2">
-          <Link href="/contrats?new=1">
-            <RefreshCw className="h-4 w-4" /> Nouveau contrat d&apos;entretien
-          </Link>
-        </Button>
         <Button onClick={handleOpenCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>

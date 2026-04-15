@@ -385,10 +385,6 @@ export default function DevisPage() {
     <div className="space-y-6">
       <PageHeader title="Devis" description="Créez, gérez et envoyez vos devis">
         <ImportCsvButton type="quotes" onImported={loadQuotes} />
-        <Button variant="outline" onClick={() => router.push('/contrats?new=1')} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nouveau contrat récurrent
-        </Button>
         <Button onClick={openCreateOptions} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis
@@ -791,7 +787,7 @@ export default function DevisPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <button
               type="button"
               onClick={openManualCreate}
@@ -833,6 +829,23 @@ export default function DevisPage() {
                   Analyse IA
                 </span>
               </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateOptions(false);
+                router.push('/contrats?new=1');
+              }}
+              className="rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                <RefreshCw className="h-5 w-5 text-foreground" />
+              </div>
+              <p className="mt-4 text-base font-semibold text-foreground">Devis contrat récurrent</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Créer un contrat d&apos;entretien qui génère des devis ou factures automatiquement.
+              </p>
             </button>
           </div>
         </DialogContent>
