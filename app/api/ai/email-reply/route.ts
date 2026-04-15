@@ -3,16 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
 import { consumeAi } from '@/lib/credits';
+import { callOpenAI, OpenAIError } from '@/lib/ai/openai';
 
 export const runtime = 'nodejs';
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
-
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OPENAI_API_KEY manquante' }, { status: 503 });
   }
 
   // Auth
@@ -190,30 +187,11 @@ Redige une reponse appropriee a cet email.`;
   // ─── Call Claude ──────────────────────────────────────────────────
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
+    const data = await callOpenAI({
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return apiError('AI_FAILED', {
-        cause: err,
-        context: { route: 'ai/email-reply', user_id: user.id, status: response.status },
-      });
-    }
-
-    const data = await response.json() as { content: { type: string; text: string }[] };
     const reply = data.content?.[0]?.text || '';
 
     return NextResponse.json({
@@ -222,6 +200,12 @@ Redige une reponse appropriee a cet email.`;
       senderEmail,
     });
   } catch (error) {
+    if (error instanceof OpenAIError) {
+      return apiError('AI_FAILED', {
+        cause: error.body,
+        context: { route: 'ai/email-reply', user_id: user.id, status: error.status },
+      });
+    }
     return apiError('INTERNAL', {
       cause: error,
       context: { route: 'ai/email-reply', user_id: user.id },

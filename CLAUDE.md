@@ -13,7 +13,7 @@ Hellobat est un SaaS tout-en-un pour les artisans du bâtiment en France. Interf
 - **Formulaires** : React Hook Form + Zod
 - **Graphiques** : Recharts
 - **Cartes** : Leaflet 1.9 + react-leaflet 4 (compatible React 18)
-- **IA** : Anthropic Claude API (routes API server-side) + Web Speech Recognition (voix navigateur)
+- **IA** : OpenAI API (routes API server-side, gpt-4o-mini par défaut) + Web Speech Recognition (voix navigateur)
 - **Paiements** : Stripe (checkout, portal, subscriptions)
 - **Emails** : Resend (transactionnel)
 - **Signature électronique** : DocuSeal
@@ -241,7 +241,7 @@ Exceptions : `catalog_sends` (accès anon magic link), `artisan_sites` (lecture 
 
 ## Intégrations externes
 
-### Anthropic Claude
+### OpenAI
 - Génération devis (voix + photos)
 - Réponse email IA (avec contexte client : devis, factures, chantiers)
 - Génération contenu site web
@@ -282,8 +282,8 @@ NEXT_PUBLIC_SITE_URL=               # Défaut: https://hellobat.app
 
 # Secret (server-side)
 SUPABASE_SERVICE_ROLE_KEY=
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=                    # Optionnel, défaut: claude-sonnet-4-20250514
+OPENAI_API_KEY=
+OPENAI_MODEL=                       # Optionnel, défaut: gpt-4o-mini
 STRIPE_SECRET_KEY=
 DOCUSEAL_API_KEY=
 DOCUSEAL_API_URL=                   # Défaut: https://api.docuseal.eu

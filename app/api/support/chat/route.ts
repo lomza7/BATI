@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkAiLimit, trackAiUsage } from '@/lib/ai-usage';
+import { callOpenAI, OpenAIError, DEFAULT_OPENAI_MODEL, type AnthropicMessage } from '@/lib/ai/openai';
 
 export const runtime = 'nodejs';
-
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 const SYSTEM_PROMPT = `Tu es l'assistant support de Hellobat, un SaaS tout-en-un pour les artisans du batiment en France. Tu reponds toujours en francais, de maniere chaleureuse, claire et concise.
 
@@ -43,9 +41,8 @@ interface ChatMessage {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OPENAI_API_KEY manquante' }, { status: 503 });
   }
 
   const authHeader = request.headers.get('authorization');
@@ -75,48 +72,32 @@ export async function POST(request: Request) {
   }
 
   const history: ChatMessage[] = Array.isArray(body.history) ? body.history.slice(-20) : [];
-  const messages = [
+  const messages: AnthropicMessage[] = [
     ...history.map(m => ({ role: m.role, content: m.content })),
-    { role: 'user', content: body.message },
+    { role: 'user' as const, content: body.message },
   ];
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages,
-      }),
+    const data = await callOpenAI({
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages,
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: `Erreur API IA: ${err}` }, { status: 502 });
-    }
-
-    const data = await response.json() as {
-      content: { type: string; text: string }[];
-      usage?: { input_tokens?: number; output_tokens?: number };
-    };
     const reply = data.content?.[0]?.text || '';
 
     await trackAiUsage({
       user_id: user.id,
       route: 'support/chat',
-      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
       input_tokens: data.usage?.input_tokens || 0,
       output_tokens: data.usage?.output_tokens || 0,
     });
 
     return NextResponse.json({ response: reply });
   } catch (error) {
+    if (error instanceof OpenAIError) {
+      return NextResponse.json({ error: `Erreur API IA: ${error.body}` }, { status: 502 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erreur generation IA' },
       { status: 500 },

@@ -4,11 +4,9 @@ import { trackAiUsage } from '@/lib/ai-usage';
 import { requireProAccess } from '@/lib/credits';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
+import { callOpenAI, OpenAIError, DEFAULT_OPENAI_MODEL } from '@/lib/ai/openai';
 
 export const runtime = 'nodejs';
-
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 const SYSTEM_PROMPT = `Tu es un architecte specialise dans la lecture de croquis et esquisses a main levee.
 On te donne la photo d'un croquis/esquisse dessine par un artisan du batiment.
@@ -51,9 +49,8 @@ wall = "north" (haut), "south" (bas), "east" (droite), "west" (gauche).
 width = largeur de la porte/fenetre en metres.`;
 
 export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY manquante' }, { status: 503 });
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OPENAI_API_KEY manquante' }, { status: 503 });
   }
 
   const authHeader = request.headers.get('authorization');
@@ -98,49 +95,23 @@ export async function POST(request: Request) {
     : 'Voici le croquis a analyser.';
 
   try {
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-        max_tokens: 4096,
-        temperature: 0.1,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mediaType, data: base64 },
-              },
-              { type: 'text', text: userMessage },
-            ],
-          },
-        ],
-      }),
+    const data = await callOpenAI({
+      max_tokens: 4096,
+      temperature: 0.1,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: userMessage },
+          ],
+        },
+      ],
     });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return apiError('AI_FAILED', {
-        cause: err,
-        context: { route: 'ai/plan', user_id: user.id, status: response.status },
-      });
-    }
-
-    const data = await response.json() as {
-      content: { type: string; text: string }[];
-      usage?: { input_tokens?: number; output_tokens?: number };
-    };
 
     const rawText = data.content?.[0]?.text || '';
 
-    // Extract JSON from response
     let plan;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -155,13 +126,19 @@ export async function POST(request: Request) {
     await trackAiUsage({
       user_id: user.id,
       route: 'ai/plan',
-      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      model: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
       input_tokens: data.usage?.input_tokens || 0,
       output_tokens: data.usage?.output_tokens || 0,
     });
 
     return NextResponse.json({ plan });
   } catch (error) {
+    if (error instanceof OpenAIError) {
+      return apiError('AI_FAILED', {
+        cause: error.body,
+        context: { route: 'ai/plan', user_id: user.id, status: error.status },
+      });
+    }
     return apiError('INTERNAL', {
       cause: error,
       context: { route: 'ai/plan', user_id: user.id },
