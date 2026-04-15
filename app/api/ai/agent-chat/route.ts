@@ -55,11 +55,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'agent_id et message requis' }, { status: 400 });
   }
 
-  const { agent_id, message, conversation_id } = body as {
+  const { agent_id, message, conversation_id, image } = body as {
     agent_id: string;
     message: string;
     conversation_id?: string;
+    image?: { media_type: string; data: string } | null;
   };
+
+  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (image && !ALLOWED_IMAGE_TYPES.includes(image.media_type)) {
+    return NextResponse.json({ error: 'Format image non supporté (jpeg, png, webp, gif uniquement).' }, { status: 400 });
+  }
+  if (image && image.data.length > 7_500_000) {
+    return NextResponse.json({ error: 'Image trop volumineuse (max ~5 Mo).' }, { status: 400 });
+  }
 
   const sb = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -105,12 +114,13 @@ export async function POST(request: Request) {
     .order('created_at', { ascending: true })
     .limit(20);
 
-  // Insert user message
+  // Insert user message (image presence noted in text for history context)
+  const storedUserContent = image ? `[Image jointe]\n${message}` : message;
   await sb.from('ai_messages').insert({
     conversation_id: convId,
     user_id: user.id,
     role: 'user',
-    content: message,
+    content: storedUserContent,
   });
 
   // Build context
@@ -121,13 +131,21 @@ export async function POST(request: Request) {
     documentContext
       ? `\n\nTu disposes de la base de connaissances suivante. Utilise-la pour repondre avec precision :\n${documentContext}`
       : '',
+    "\n\nMethode de dialogue : avant de donner une reponse definitive, pose systematiquement 1 a 3 questions ciblees pour bien cerner la situation de l'artisan (contexte du chantier, materiaux, contraintes, budget, delais, localisation, etc. selon la pertinence). Attends ses reponses, puis formule une reponse precise et actionnable qui s'appuie sur les elements fournis. Si la demande est deja tres precise et ne necessite aucune clarification, reponds directement.",
     '\n\nReponds toujours en francais. Sois precis, concis et utile.',
   ].join('');
 
-  // Build messages array
-  const messages = [
-    ...(history || []).map(m => ({ role: m.role, content: m.content })),
-    { role: 'user', content: message },
+  // Build messages array (current user turn can include an image block)
+  const currentUserContent = image
+    ? [
+        { type: 'image' as const, source: { type: 'base64' as const, media_type: image.media_type, data: image.data } },
+        { type: 'text' as const, text: message },
+      ]
+    : message;
+
+  const messages: { role: string; content: unknown }[] = [
+    ...(history || []).map((m) => ({ role: m.role, content: m.content })),
+    { role: 'user', content: currentUserContent },
   ];
 
   // Call Claude
