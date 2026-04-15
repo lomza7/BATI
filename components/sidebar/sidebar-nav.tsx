@@ -29,7 +29,6 @@ const PRO_ONLY_PATHS = new Set([
   '/prospection',
   '/contrats',
   '/agents',
-  '/rendus',
   '/site-web',
   '/comptabilite',
 ]);
@@ -52,13 +51,14 @@ const navGroups: NavGroup[] = [
       { label: 'Mes prestations', href: '/prestations', emoji: '🛠️' },
       { label: 'Mes documents', href: '/documents', emoji: '📁' },
       { label: 'HelloPay', href: '/encaissement', emoji: '⚡' },
+      { label: 'Agents IA', href: '/agents', emoji: '🤖' },
+      { label: 'Site web IA', href: '/site-web', emoji: '🌐' },
     ],
   },
   {
     title: 'Chantiers',
     items: [
       { label: 'Mes chantiers', href: '/chantiers', emoji: '🏗️' },
-      { label: 'Planning', href: '/planning', emoji: '🗓️' },
       { label: 'Carte', href: '/carte', emoji: '🗺️' },
       { label: 'Équipe', href: '/equipe', emoji: '👷' },
     ],
@@ -75,14 +75,6 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Boîte mail', href: '/mail', emoji: '📧' },
       { label: 'Avis Google', href: '/avis', emoji: '⭐' },
-    ],
-  },
-  {
-    title: 'IA',
-    items: [
-      { label: 'Agents IA', href: '/agents', emoji: '🤖' },
-      { label: 'Avant/Après IA', href: '/rendus', emoji: '🎨' },
-      { label: 'Site web IA', href: '/site-web', emoji: '🌐' },
     ],
   },
   {

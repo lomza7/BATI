@@ -79,7 +79,6 @@ function SidebarNavCollapsed() {
         { emoji: '🧾', href: '/factures', label: 'Factures' },
         { emoji: '🛠️', href: '/prestations', label: 'Mes prestations' },
         { emoji: '🏗️', href: '/chantiers', label: 'Mes chantiers' },
-        { emoji: '🗓️', href: '/planning', label: 'Planning' },
         { emoji: '🗺️', href: '/carte', label: 'Carte' },
         { emoji: '👷', href: '/equipe', label: 'Équipe' },
         { emoji: '📧', href: '/mail', label: 'Boîte mail' },
