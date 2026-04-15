@@ -125,6 +125,65 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
 </html>`.trim();
 }
 
+interface QuoteSentConfirmationData {
+  artisanName: string;
+  clientName: string;
+  clientEmail: string;
+  quoteNumber: string;
+  quoteTitle: string;
+  totalTtc: string;
+  accentColor?: string;
+}
+
+export function buildQuoteSentConfirmationEmail(data: QuoteSentConfirmationData): string {
+  const accent = data.accentColor || '#d35400';
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Devis envoyé</title></head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+        <tr><td style="background-color:${accent};padding:28px 32px;text-align:center">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">Devis envoyé ✓</p>
+        </td></tr>
+        <tr><td style="padding:32px 32px 24px">
+          <p style="margin:0 0 16px;font-size:15px;color:#1a1a1a">Bonjour,</p>
+          <p style="margin:0 0 24px;font-size:14px;color:#6b6560;line-height:1.6">
+            Votre devis a bien été envoyé à <strong>${escHtml(data.clientName)}</strong> (${escHtml(data.clientEmail)}).
+            Vous recevrez une notification dès qu'il sera ouvert ou signé.
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da">
+            <tr><td style="padding:20px 24px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td>
+                  <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Devis</p>
+                  <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.quoteTitle || data.quoteNumber)}</p>
+                  <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.quoteNumber)}</p>
+                </td>
+                <td style="text-align:right;vertical-align:top">
+                  <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Montant TTC</p>
+                  <p style="margin:0;font-size:22px;font-weight:700;color:${accent}">${escHtml(data.totalTtc)}</p>
+                </td>
+              </tr></table>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:0 32px 24px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e1da;padding-top:16px">
+            <tr><td><p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+              <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
+            </p></td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 interface InvoiceEmailData {
   clientName: string;
   artisanName: string;

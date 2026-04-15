@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { docusealFetch, buildQuoteHtml } from '@/lib/docuseal';
-import { buildQuoteSignatureEmail } from '@/lib/email-templates';
+import { buildQuoteSignatureEmail, buildQuoteSentConfirmationEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 
 export const runtime = 'nodejs';
@@ -249,7 +249,6 @@ export async function POST(request: Request) {
         const result = await resend.emails.send({
           from: fromEmail,
           to: recipientEmail,
-          ...(user.email ? { cc: user.email } : {}),
           subject: `Devis ${quote.quote_number} — ${companyName}`,
           html: emailHtml,
           attachments: companyAttachments.map(att => ({
@@ -257,6 +256,27 @@ export async function POST(request: Request) {
             content: att.content_base64,
           })),
         });
+
+        // Confirmation d'envoi à l'artisan — sans lien de signature, pour éviter
+        // qu'il signe lui-même à la place du client. Fire-and-forget : une erreur
+        // sur la confirmation ne doit pas faire échouer l'envoi au client.
+        if (user.email) {
+          const confirmationHtml = buildQuoteSentConfirmationEmail({
+            artisanName: companyName,
+            clientName: client_name.trim(),
+            clientEmail: recipientEmail,
+            quoteNumber: quote.quote_number,
+            quoteTitle: quote.title || '',
+            totalTtc: fmtTtc,
+            accentColor: dc.primary_color || '#d35400',
+          });
+          resend.emails.send({
+            from: fromEmail,
+            to: user.email,
+            subject: `Confirmation d'envoi — Devis ${quote.quote_number}`,
+            html: confirmationHtml,
+          }).catch((e) => console.error('[create-submission] Artisan confirmation failed:', e));
+        }
 
         if (result.error) {
           emailStatus = 'failed';
