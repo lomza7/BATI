@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { buildAgentContext } from '@/lib/ai/agent-chat';
+import { buildAgentContext, buildUserDataContext } from '@/lib/ai/agent-chat';
 import { trackAiUsage } from '@/lib/ai-usage';
 import { consumeAi } from '@/lib/credits';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
@@ -151,14 +151,21 @@ export async function POST(request: Request) {
   });
 
   // Build context
-  const { systemPrompt, documentContext } = await buildAgentContext(agent_id);
+  const [{ systemPrompt, documentContext }, userDataContext] = await Promise.all([
+    buildAgentContext(agent_id),
+    buildUserDataContext(user.id),
+  ]);
 
   const fullSystemPrompt = [
     systemPrompt,
     documentContext
       ? `\n\nTu disposes de la base de connaissances suivante. Utilise-la pour repondre avec precision :\n${documentContext}`
       : '',
+    userDataContext
+      ? `\n\nVoici les donnees CRM de l'artisan avec qui tu discutes. Utilise-les pour personnaliser tes reponses (citer un client, un chantier, une tache par son nom quand c'est pertinent). Ne les invente jamais.${userDataContext}`
+      : '',
     "\n\nMethode de dialogue : avant de donner une reponse definitive, pose systematiquement 1 a 3 questions ciblees pour bien cerner la situation de l'artisan (contexte du chantier, materiaux, contraintes, budget, delais, localisation, etc. selon la pertinence). Attends ses reponses, puis formule une reponse precise et actionnable qui s'appuie sur les elements fournis. Si la demande est deja tres precise et ne necessite aucune clarification, reponds directement.",
+    "\n\nCadre de competence : tu reponds UNIQUEMENT aux demandes qui relevent (1) de ta specialite d'agent telle que definie plus haut, ou (2) des donnees CRM de l'artisan (ses clients, chantiers, taches). Si la question sort de ce cadre (culture generale, autre metier, sujet personnel, code informatique, actualite, etc.), n'y reponds pas : explique brievement pourquoi c'est hors de ton perimetre, puis indique concretement quoi faire pour obtenir une reponse (ex : utiliser un autre agent Hellobat plus adapte, consulter un professionnel du domaine concerne, faire une recherche web, contacter le support Hellobat). Reste bref et bienveillant, ne tente pas de repondre quand meme.",
     '\n\nReponds toujours en francais. Sois precis, concis et utile.',
   ].join('');
 

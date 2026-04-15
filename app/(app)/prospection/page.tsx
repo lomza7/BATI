@@ -679,30 +679,7 @@ export default function ProspectionPage() {
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.7fr_1fr] gap-4">
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">CRM chantier</p>
-              <h2 className="mt-3 text-2xl font-semibold text-foreground">
-                Un pipeline fait pour signer plus vite et préparer le terrain avant le devis.
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Adresse chantier, nature des travaux, urgence et prochaine action au même endroit. On reste simple, mais utile.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
-              <p className="text-xs font-medium text-primary">Prochaine action critique</p>
-              <p className="mt-1 text-sm font-semibold text-foreground">
-                {nextDueLead
-                  ? `${getLeadDisplayName(nextDueLead)} - ${formatDate(nextDueLead.next_action_date || new Date())}`
-                  : 'Aucune relance urgente'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <KpiCard
             icon={Euro}
             label="Pipeline actif"
@@ -730,7 +707,6 @@ export default function ProspectionPage() {
             hint="Adresse + travaux renseignés"
             accent="blue"
           />
-        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
