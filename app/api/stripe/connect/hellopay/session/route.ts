@@ -27,12 +27,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
   }
 
-  const { amount_cents, description, invoice_id } = await request.json();
-  if (!amount_cents || amount_cents <= 0) {
-    return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
-  }
+  const { description, invoice_id } = await request.json();
   if (!invoice_id) {
     return NextResponse.json({ error: 'invoice_id requis' }, { status: 400 });
+  }
+
+  // Montant source de vérité : DB, pas le body. Empêche la fraude par
+  // requête forgée avec un amount_cents arbitraire.
+  const { data: invoice } = await supabaseAdmin
+    .from('invoices')
+    .select('id, total_ttc, status')
+    .eq('id', invoice_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!invoice) {
+    return NextResponse.json({ error: 'Facture introuvable' }, { status: 404 });
+  }
+  if (invoice.status === 'payee' || invoice.status === 'annulee') {
+    return NextResponse.json({ error: 'Facture déjà payée ou annulée' }, { status: 400 });
+  }
+
+  const amount_cents = Math.round(Number(invoice.total_ttc) * 100);
+  if (!amount_cents || amount_cents <= 0) {
+    return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
   }
 
   // Fetch artisan's Stripe connection

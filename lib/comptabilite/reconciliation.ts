@@ -198,7 +198,7 @@ export async function applyMatch(
       if (tx?.transaction_date) {
         await sb
           .from('invoices')
-          .update({ paid_at: tx.transaction_date, status: 'paid' })
+          .update({ paid_at: tx.transaction_date, status: 'payee' })
           .eq('id', targetId);
       }
     }

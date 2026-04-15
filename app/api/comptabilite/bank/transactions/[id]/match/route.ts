@@ -39,14 +39,28 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'target_id requis' }, { status: 400 });
   }
 
-  // Vérifie que la transaction est bien accessible (RLS)
+  // Vérifie que la transaction appartient à l'utilisateur
   const { data: tx } = await sb
     .from('bank_transactions')
     .select('id, user_id')
     .eq('id', params.id)
+    .eq('user_id', user.id)
     .maybeSingle();
   if (!tx) {
     return NextResponse.json({ error: 'Transaction introuvable' }, { status: 404 });
+  }
+
+  // Vérifie que la cible (expense ou invoice) appartient aussi à l'utilisateur.
+  // Empêche un cross-tenant write via un target_id forgé.
+  const targetTable = body.kind === 'expense' ? 'expenses' : 'invoices';
+  const { data: target } = await supabaseAdmin
+    .from(targetTable)
+    .select('id')
+    .eq('id', body.target_id)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!target) {
+    return NextResponse.json({ error: 'Cible introuvable' }, { status: 404 });
   }
 
   const method = (body.method === 'ai' || body.method === 'auto' ? body.method : 'manual') as

@@ -466,24 +466,58 @@ export default function AgentsPage() {
             <Menu className="h-5 w-5" />
           </Button>
           {selectedAgent ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-lg">{getAgentIcon(selectedAgent)}</span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h2 className="text-sm font-semibold text-foreground truncate">
-                    {selectedAgent.name}
-                  </h2>
-                  {selectedAgent.is_global && (
-                    <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
-                      Plateforme
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {selectedAgent.description}
-                </p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 min-w-0 flex-1 rounded-lg px-2 py-1 -mx-1 hover:bg-muted transition-colors md:cursor-default md:hover:bg-transparent"
+                >
+                  <span className="text-lg">{getAgentIcon(selectedAgent)}</span>
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="text-sm font-semibold text-foreground truncate">
+                        {selectedAgent.name}
+                      </h2>
+                      {selectedAgent.is_global && (
+                        <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                          Plateforme
+                        </span>
+                      )}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 md:hidden" />
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {selectedAgent.description}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[260px]">
+                {agents.map((agent) => (
+                  <DropdownMenuItem
+                    key={agent.id}
+                    onClick={() => {
+                      setSelectedAgent(agent);
+                      startNewConversation();
+                    }}
+                    className="gap-2"
+                  >
+                    <span className="text-base">{getAgentIcon(agent)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium truncate">{agent.name}</span>
+                        {agent.is_global && (
+                          <span className="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded-full">
+                            Plateforme
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{agent.description}</p>
+                    </div>
+                    {selectedAgent?.id === agent.id && <Check className="h-4 w-4 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <h2 className="text-sm font-semibold">Agents IA</h2>
           )}
