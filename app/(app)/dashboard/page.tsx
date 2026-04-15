@@ -19,6 +19,8 @@ import {
   CalendarClock,
   CircleAlert,
   Compass,
+  CreditCard,
+  Clock,
   Euro,
   FileText,
   FolderKanban,
@@ -728,6 +730,8 @@ export default function DashboardPage() {
   const [revenueUnit, setRevenueUnit] = useState<'ttc' | 'ht'>('ttc');
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState<boolean | null>(null);
+  const [stripeKpis, setStripeKpis] = useState<{ totalPaid: number; totalPending: number; paidCount: number }>({ totalPaid: 0, totalPending: 0, paidCount: 0 });
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -929,6 +933,38 @@ export default function DashboardPage() {
 
     void loadDashboard();
   }, [authLoading, user, loadDashboard]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      try {
+        const res = await fetch('/api/stripe/connect/status', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const status = await res.json();
+        if (cancelled) return;
+        const connected = Boolean(status?.connected && status?.onboarding_completed);
+        setStripeConnected(connected);
+        if (!connected) return;
+        const { data: sendsData } = await supabase
+          .from('invoice_sends')
+          .select('paid_at, expires_at, invoices(total_ttc)');
+        if (cancelled) return;
+        const sends = (sendsData as unknown as Array<{ paid_at: string | null; expires_at: string; invoices: { total_ttc: number } | null }>) || [];
+        const now = new Date();
+        const totalPaid = sends.filter(s => s.paid_at).reduce((sum, s) => sum + (s.invoices?.total_ttc || 0), 0);
+        const totalPending = sends.filter(s => !s.paid_at && new Date(s.expires_at) > now).reduce((sum, s) => sum + (s.invoices?.total_ttc || 0), 0);
+        const paidCount = sends.filter(s => s.paid_at).length;
+        setStripeKpis({ totalPaid, totalPending, paidCount });
+      } catch {
+        if (!cancelled) setStripeConnected(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   const dashboardData = useMemo(() => {
     const now = new Date();
@@ -1858,6 +1894,56 @@ export default function DashboardPage() {
               />
             </Link>
           </div>
+
+          {stripeConnected === true && (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <Link href="/factures?tab=sent" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+                <KpiCard
+                  title="Encaissé en ligne"
+                  value={formatCurrency(stripeKpis.totalPaid)}
+                  subtitle="Paiements reçus via Stripe"
+                  icon={Euro}
+                />
+              </Link>
+              <Link href="/factures?tab=sent" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+                <KpiCard
+                  title="En attente de paiement"
+                  value={formatCurrency(stripeKpis.totalPending)}
+                  subtitle="Liens Stripe non encore réglés"
+                  icon={Clock}
+                />
+              </Link>
+              <Link href="/factures?tab=sent" className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+                <KpiCard
+                  title="Paiements reçus"
+                  value={String(stripeKpis.paidCount)}
+                  subtitle={stripeKpis.paidCount > 0 ? 'Factures payées en ligne' : 'Aucun paiement pour l’instant'}
+                  icon={CreditCard}
+                />
+              </Link>
+            </div>
+          )}
+
+          {stripeConnected === false && (
+            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 flex-shrink-0">
+                    <CreditCard className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">Activer les paiements en ligne</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Connectez Stripe pour que vos clients règlent leurs factures par carte directement depuis l’email d’envoi.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/parametres?tab=finance">Connecter Stripe</Link>
+                </Button>
+              </div>
+            </div>
+          )}
 
           {dashboardData.activeContractsCount > 0 && (
             <div className="rounded-xl border border-border bg-card p-4 sm:p-6">

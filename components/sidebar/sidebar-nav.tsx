@@ -29,6 +29,7 @@ const PRO_ONLY_PATHS = new Set([
   '/prospection',
   '/contrats',
   '/agents',
+  '/assistant-email',
   '/site-web',
   '/comptabilite',
 ]);
@@ -52,6 +53,7 @@ const navGroups: NavGroup[] = [
       { label: 'Mes documents', href: '/documents', emoji: '📁' },
       { label: 'HelloPay', href: '/encaissement', emoji: '⚡' },
       { label: 'Agents IA', href: '/agents', emoji: '🤖' },
+      { label: 'Assistant email IA', href: '/assistant-email', emoji: '✉️' },
       { label: 'Site web IA', href: '/site-web', emoji: '🌐' },
     ],
   },
@@ -73,14 +75,12 @@ const navGroups: NavGroup[] = [
   {
     title: 'Communication',
     items: [
-      { label: 'Boîte mail', href: '/mail', emoji: '📧' },
-      { label: 'Avis Google', href: '/avis', emoji: '⭐' },
+      { label: 'Avis clients', href: '/avis', emoji: '⭐' },
     ],
   },
   {
     title: 'Finance',
     items: [
-      { label: 'Paiement Stripe', href: '/paiements', emoji: '💳' },
       { label: 'Contrats récurrents', href: '/contrats', emoji: '🔄' },
       { label: 'Comptabilité IA', href: '/comptabilite', emoji: '🧮' },
     ],

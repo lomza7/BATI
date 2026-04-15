@@ -98,14 +98,14 @@ const navGroups: NavGroup[] = [
   {
     title: 'Communication',
     items: [
-      { id: 'mail', label: 'Boîte mail', emoji: '📧' },
-      { id: 'avis', label: 'Avis Google', emoji: '⭐' },
+      { id: 'avis', label: 'Avis clients', emoji: '⭐' },
     ],
   },
   {
     title: 'IA',
     items: [
       { id: 'agents', label: 'Agents IA', emoji: '🤖' },
+      { id: 'assistant-email', label: 'Assistant email IA', emoji: '✉️' },
       { id: 'site-web', label: 'Site web IA', emoji: '🌐' },
     ],
   },
@@ -128,7 +128,7 @@ const flatItems: NavItem[] = navGroups.flatMap((g) => g.items);
 // state to persist here.
 const favoriteItems: NavItem[] = [
   { id: 'carte', label: 'Carte', emoji: '🗺️' },
-  { id: 'mail', label: 'Boîte mail', emoji: '📧' },
+  { id: 'assistant-email', label: 'Assistant email IA', emoji: '✉️' },
   { id: 'site-web', label: 'Site web IA', emoji: '🌐' },
   { id: 'comptabilite', label: 'Comptabilité IA', emoji: '🧮' },
 ];
@@ -722,11 +722,11 @@ function CalendrierView() {
     <div>
       <LandingPageHeader
         title="Calendrier"
-        description="Vos rendez-vous et événements synchronisés avec Google Calendar"
+        description="Vos rendez-vous et événements synchronisés avec iCloud"
       >
         <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200">
           <CheckCircle2 className="w-3 h-3" />
-          Google Calendar synchronisé
+          Synchronisation iCloud
         </span>
       </LandingPageHeader>
 
@@ -2341,8 +2341,8 @@ function AvisView() {
   return (
     <div>
       <LandingPageHeader
-        title="Avis Google"
-        description="Gérez vos avis Google Business Profile"
+        title="Avis clients"
+        description="Centralisez vos avis et demandez-en par SMS après chantier"
       >
         <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200">
           <CheckCircle2 className="w-3 h-3" />

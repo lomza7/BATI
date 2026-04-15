@@ -44,6 +44,7 @@ import { UsageWidget } from '@/components/credits/usage-widget';
 import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
 import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
 import { PaymentReminderSettingsCard } from '@/components/parametres/payment-reminder-settings-card';
+import { StripeConnectCard } from '@/components/parametres/stripe-connect-card';
 import { ImportShowcase, type SourceId } from '@/components/parametres/import-showcase';
 import { ImportModal } from '@/components/onboarding/import-modal';
 import { Button } from '@/components/ui/button';
@@ -411,7 +412,7 @@ export default function ParametresPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres' || tab === 'chantier' || tab === 'equipe') {
+    if (tab === 'abonnement' || tab === 'securite' || tab === 'parametres' || tab === 'chantier' || tab === 'equipe' || tab === 'finance' || tab === 'documents' || tab === 'import') {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -2316,6 +2317,7 @@ export default function ParametresPage() {
         </TabsContent>
 
         <TabsContent value="finance" className="space-y-6">
+          <StripeConnectCard />
           <BankAccountsCard />
           <PaymentReminderSettingsCard />
         </TabsContent>

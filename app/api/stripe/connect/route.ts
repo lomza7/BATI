@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Session utilisateur requise' }, { status: 401 });
   }
 
-  let returnTo = '/paiements';
+  let returnTo = '/parametres?tab=finance';
   try {
     const body = await request.json().catch(() => ({}));
     if (body && typeof body.return_to === 'string') returnTo = body.return_to;
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
         country: 'FR',
         email: user.email,
         default_currency: 'eur',
-      });
+        preferred_locales: ['fr-FR'],
+      } as Stripe.AccountCreateParams);
       accountId = account.id;
 
       await supabaseAdmin.from('stripe_connections').upsert({

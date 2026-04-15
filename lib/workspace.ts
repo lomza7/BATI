@@ -44,7 +44,6 @@ export type WorkspacePermissionKey =
   | 'catalogues'
   | 'prospection'
   | 'site_web'
-  | 'mail'
   | 'avis'
   | 'plans_rendus'
   | 'agents'
@@ -71,7 +70,6 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
   catalogues: true,
   prospection: true,
   site_web: true,
-  mail: true,
   avis: true,
   plans_rendus: true,
   agents: true,
@@ -97,8 +95,7 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
   catalogues: 'Catalogues',
   prospection: 'Prospection',
   site_web: 'Site web IA',
-  mail: 'Boîte mail',
-  avis: 'Avis Google',
+  avis: 'Avis clients',
   plans_rendus: 'Avant/Après IA',
   agents: 'Agents IA',
   paiements: 'Paiements',
@@ -111,7 +108,7 @@ export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermis
   { title: 'Principal', keys: ['dashboard', 'calendrier', 'taches', 'clients', 'devis', 'factures', 'prestations', 'documents'] },
   { title: 'Chantiers', keys: ['chantiers', 'planning', 'carte', 'equipe'] },
   { title: 'Commercial', keys: ['catalogues', 'prospection'] },
-  { title: 'Communication', keys: ['mail', 'avis'] },
+  { title: 'Communication', keys: ['avis'] },
   { title: 'IA', keys: ['agents', 'plans_rendus', 'site_web'] },
   { title: 'Finance', keys: ['paiements', 'contrats', 'comptabilite'] },
   { title: 'Système', keys: ['parametres'] },
@@ -134,11 +131,9 @@ const ROUTE_PERMISSION_MAP: Record<string, WorkspacePermissionKey> = {
   '/catalogues': 'catalogues',
   '/prospection': 'prospection',
   '/site-web': 'site_web',
-  '/mail': 'mail',
   '/avis': 'avis',
   '/rendus': 'plans_rendus',
   '/agents': 'agents',
-  '/paiements': 'paiements',
   '/contrats': 'contrats',
   '/comptabilite': 'comptabilite',
   '/parametres': 'parametres',
@@ -186,8 +181,7 @@ export function formatWorkspacePathLabel(path: string | null | undefined) {
     '/prospection': 'Prospection',
     '/equipe': 'Équipe',
     '/parametres': 'Paramètres',
-    '/mail': 'Boîte mail',
-    '/avis': 'Avis Google',
+    '/avis': 'Avis clients',
   };
 
   if (labels[cleaned]) {

@@ -1,23 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowUpRight,
-  BadgeCheck,
   Copy,
+  ExternalLink,
   Eye,
   EyeOff,
-  ExternalLink,
-  Globe2,
   Link2,
-  Mail,
   MessageSquare,
-  Send,
-  Sparkles,
+  Pencil,
+  Plus,
   Star,
-  Store,
-  Unplug,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -35,813 +29,501 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-const GOOGLE_CREATE_PROFILE_URL = 'https://business.google.com/add';
-
-interface GoogleLocation {
-  accountName: string;
-  accountDisplayName: string;
-  locationName: string;
-  reviewParent: string;
-  title: string;
-  websiteUri: string;
-  mapsUri: string;
-  newReviewUri: string;
-  placeId: string;
-}
-
-interface GoogleReview {
-  name: string;
-  reviewerName: string;
+interface LocalReview {
+  id: string;
+  client_name: string;
+  rating: number;
   comment: string;
-  starRating: number;
-  updateTime: string;
-  createTime: string;
-  reviewReplyComment: string;
-  reviewReplyUpdateTime: string;
-}
-
-interface ReviewRequestForm {
-  clientName: string;
-  email: string;
-  phone: string;
-}
-
-interface GoogleStatusPayload {
-  connected: boolean;
-  locations: GoogleLocation[];
-  selectedLocation: GoogleLocation | null;
-  reviews: GoogleReview[];
-  averageRating: number;
-  totalReviewCount: number;
-  error?: string;
+  response: string;
+  status: string;
+  review_date: string | null;
+  created_at: string;
+  is_published_on_site: boolean;
 }
 
 function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg' }) {
-  const s = size === 'lg' ? 'h-5 w-5' : 'h-3.5 w-3.5';
+  const s = size === 'lg' ? 'h-5 w-5' : 'h-4 w-4';
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
-        <Star key={i} className={cn(s, i <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+        <Star
+          key={i}
+          className={cn(s, i <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')}
+        />
       ))}
     </div>
   );
 }
 
-function buildReviewMessage(clientName: string, businessName: string, reviewLink: string) {
+function buildSmsMessage(clientName: string, companyName: string, reviewLink: string) {
   const recipient = clientName.trim() || 'bonjour';
-  return `Bonjour ${recipient}, merci encore pour votre confiance. Si vous avez 30 secondes, pourriez-vous laisser un avis sur Google pour ${businessName} ? Voici le lien direct : ${reviewLink}`;
-}
-
-function normalizePhone(phone: string) {
-  return phone.replace(/[^\d+]/g, '');
-}
-
-interface LocalReviewRow {
-  id: string;
-  external_id: string | null;
-  is_published_on_site: boolean;
+  return `Bonjour ${recipient}, merci pour votre confiance. Si vous avez 30 secondes, pourriez-vous laisser un avis pour ${companyName} ? Voici le lien : ${reviewLink}`;
 }
 
 export default function AvisPage() {
   const { user, loading: authLoading } = useAuth();
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState<GoogleStatusPayload>({
-    connected: false,
-    locations: [],
-    selectedLocation: null,
-    reviews: [],
-    averageRating: 0,
-    totalReviewCount: 0,
-  });
-  const [showRequest, setShowRequest] = useState(false);
-  const [showRespond, setShowRespond] = useState<GoogleReview | null>(null);
-  const [requestForm, setRequestForm] = useState<ReviewRequestForm>({ clientName: '', email: '', phone: '' });
-  const [responseText, setResponseText] = useState('');
-  const [copiedState, setCopiedState] = useState<'link' | 'message' | null>(null);
-  const [replyLoading, setReplyLoading] = useState(false);
-  // Map external_id -> { id local, is_published_on_site } pour toggle publication sur le site
-  const [localReviewsMap, setLocalReviewsMap] = useState<Map<string, LocalReviewRow>>(new Map());
-  const [togglingReview, setTogglingReview] = useState<string | null>(null);
-  const [siteSlug, setSiteSlug] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<LocalReview[]>([]);
+  const [companyName, setCompanyName] = useState('');
+  const [googleReviewLink, setGoogleReviewLink] = useState('');
+  const [copied, setCopied] = useState<'link' | 'message' | null>(null);
 
-  const loadLocalReviews = useCallback(async () => {
+  // Edit Google URL dialog
+  const [showEditUrl, setShowEditUrl] = useState(false);
+  const [urlDraft, setUrlDraft] = useState('');
+  const [savingUrl, setSavingUrl] = useState(false);
+
+  // Review CRUD
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<LocalReview | null>(null);
+  const [form, setForm] = useState({ client_name: '', rating: 5, comment: '', response: '' });
+
+  // Ask for review
+  const [showAsk, setShowAsk] = useState(false);
+  const [askClientName, setAskClientName] = useState('');
+
+  const loadProfile = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('company_name, google_review_link')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (data) {
+      setCompanyName(data.company_name || '');
+      setGoogleReviewLink(data.google_review_link || '');
+    }
+  }, [user]);
+
+  const loadReviews = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('reviews')
-      .select('id, external_id, is_published_on_site')
+      .select('id, client_name, rating, comment, response, status, review_date, created_at, is_published_on_site')
       .eq('user_id', user.id)
-      .eq('external_source', 'google');
-    const map = new Map<string, LocalReviewRow>();
-    for (const row of (data || []) as LocalReviewRow[]) {
-      if (row.external_id) map.set(row.external_id, row);
-    }
-    setLocalReviewsMap(map);
+      .order('created_at', { ascending: false });
+    setReviews((data || []) as LocalReview[]);
   }, [user]);
 
-  const loadSiteSlug = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('artisan_sites')
-      .select('slug, status')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data && data.status === 'published') {
-      setSiteSlug(data.slug);
-    } else {
-      setSiteSlug(null);
-    }
-  }, [user]);
-
-  const syncGoogleReviews = useCallback(async () => {
-    // Sync les avis Google vers la table reviews locale pour que l'artisan
-    // puisse les publier/masquer sur son site vitrine.
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-      await fetch('/api/reviews/sync-google', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch {
-      // best-effort, ne bloque pas la page
-    }
-    await loadLocalReviews();
-  }, [loadLocalReviews]);
-
-  const loadGoogleData = useCallback(async () => {
+  useEffect(() => {
+    if (authLoading || !user) return;
     setLoading(true);
-    setError('');
+    Promise.all([loadProfile(), loadReviews()]).finally(() => setLoading(false));
+  }, [authLoading, user, loadProfile, loadReviews]);
 
-    try {
-      const response = await fetch('/api/google-business/status', { cache: 'no-store' });
-      const data = (await response.json()) as GoogleStatusPayload;
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Impossible de récupérer Google Business Profile');
-      }
-
-      setStatus(data);
-
-      // Si Google est connecté, on sync vers la table locale pour les toggles publish/hide.
-      if (data.connected && data.reviews.length > 0) {
-        await syncGoogleReviews();
-      }
-    } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Impossible de charger Google Business Profile');
-    } finally {
-      setLoading(false);
+  async function saveGoogleUrl() {
+    if (!user) return;
+    setSavingUrl(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ google_review_link: urlDraft.trim() })
+      .eq('id', user.id);
+    setSavingUrl(false);
+    if (!error) {
+      setGoogleReviewLink(urlDraft.trim());
+      setShowEditUrl(false);
     }
-  }, [syncGoogleReviews]);
+  }
 
-  useEffect(() => {
-    if (authLoading) return;
-    loadSiteSlug();
-    loadLocalReviews();
-    loadGoogleData();
-  }, [authLoading, loadGoogleData, loadLocalReviews, loadSiteSlug]);
-
-  async function toggleReviewPublished(review: GoogleReview) {
-    if (togglingReview) return;
-    setTogglingReview(review.name);
-    try {
-      const existing = localReviewsMap.get(review.name);
-      if (!existing) {
-        // Pas encore synchronisé : on force un sync puis on réouvre
-        await syncGoogleReviews();
-        setTogglingReview(null);
-        return;
-      }
-      const nextValue = !existing.is_published_on_site;
-      const { error: updateError } = await supabase
+  async function saveReview() {
+    if (!user || !form.client_name.trim()) return;
+    if (editing) {
+      await supabase
         .from('reviews')
-        .update({ is_published_on_site: nextValue })
-        .eq('id', existing.id);
-      if (updateError) throw updateError;
-
-      // Mise à jour locale optimiste
-      const nextMap = new Map(localReviewsMap);
-      nextMap.set(review.name, { ...existing, is_published_on_site: nextValue });
-      setLocalReviewsMap(nextMap);
-
-      // Revalidate le site publié (ISR) pour que le changement apparaisse en ligne
-      if (siteSlug) {
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session) {
-            await fetch('/api/site/revalidate', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ slug: siteSlug }),
-            });
-          }
-        } catch {
-          // silencieux : le toggle en DB est déjà fait, ISR régénérera dans l'heure
-        }
-      }
-    } catch (toggleError) {
-      setError(
-        toggleError instanceof Error
-          ? toggleError.message
-          : 'Impossible de modifier la publication de cet avis'
-      );
-    } finally {
-      setTogglingReview(null);
-    }
-  }
-
-  useEffect(() => {
-    const googleError = searchParams.get('google_error');
-    if (googleError) {
-      setError(googleError);
-    }
-  }, [searchParams]);
-
-  async function copyText(value: string, kind: 'link' | 'message') {
-    if (!value) return;
-    await navigator.clipboard.writeText(value);
-    setCopiedState(kind);
-    window.setTimeout(() => setCopiedState(null), 1800);
-  }
-
-  async function changeLocation(locationName: string) {
-    setSyncing(true);
-    try {
-      const response = await fetch('/api/google-business/select-location', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locationName }),
+        .update({
+          client_name: form.client_name,
+          rating: form.rating,
+          comment: form.comment,
+          response: form.response,
+        })
+        .eq('id', editing.id);
+    } else {
+      await supabase.from('reviews').insert({
+        user_id: user.id,
+        client_name: form.client_name,
+        rating: form.rating,
+        comment: form.comment,
+        response: form.response,
+        status: 'publie',
+        review_date: new Date().toISOString(),
+        external_source: 'manual',
       });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || 'Impossible de changer de fiche');
-      }
-      await loadGoogleData();
-    } catch (changeError) {
-      setError(changeError instanceof Error ? changeError.message : 'Impossible de changer de fiche');
-    } finally {
-      setSyncing(false);
     }
+    setShowForm(false);
+    setEditing(null);
+    setForm({ client_name: '', rating: 5, comment: '', response: '' });
+    loadReviews();
   }
 
-  async function disconnectGoogle() {
-    setSyncing(true);
-    try {
-      await fetch('/api/google-business/disconnect', { method: 'POST' });
-      await loadGoogleData();
-    } finally {
-      setSyncing(false);
-    }
+  async function deleteReview(id: string) {
+    if (!confirm('Supprimer cet avis ?')) return;
+    await supabase.from('reviews').delete().eq('id', id);
+    loadReviews();
   }
 
-  async function publishReply() {
-    if (!showRespond || !responseText.trim()) return;
-    setReplyLoading(true);
-    try {
-      const response = await fetch('/api/google-business/reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewName: showRespond.name, comment: responseText.trim() }),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || 'Impossible de publier la réponse');
-      }
-      setShowRespond(null);
-      setResponseText('');
-      await loadGoogleData();
-    } catch (replyError) {
-      setError(replyError instanceof Error ? replyError.message : 'Impossible de publier la réponse');
-    } finally {
-      setReplyLoading(false);
-    }
+  async function togglePublishOnSite(id: string, current: boolean) {
+    await supabase.from('reviews').update({ is_published_on_site: !current }).eq('id', id);
+    loadReviews();
   }
 
-  const selectedLocation = status.selectedLocation;
-  const isConnected = status.connected && !!selectedLocation;
-  const googleAccessPending =
-    /quota exceeded|requests per minute|quota of 0|mybusinessaccountmanagement/i.test(error);
-  const pendingReplies = status.reviews.filter((review) => !review.reviewReplyComment).length;
-  const requestMessage = isConnected
-    ? buildReviewMessage(requestForm.clientName, selectedLocation.title, selectedLocation.newReviewUri)
-    : '';
-  const googleApprovalProgress = googleAccessPending ? 78 : 0;
+  function openEdit(r: LocalReview) {
+    setEditing(r);
+    setForm({
+      client_name: r.client_name,
+      rating: r.rating,
+      comment: r.comment,
+      response: r.response,
+    });
+    setShowForm(true);
+  }
 
-  const ratingDistribution = useMemo(
-    () =>
-      [5, 4, 3, 2, 1].map((rating) => {
-        const count = status.reviews.filter((review) => review.starRating === rating).length;
-        return {
-          stars: rating,
-          count,
-          pct: status.reviews.length > 0 ? (count / status.reviews.length) * 100 : 0,
-        };
-      }),
-    [status.reviews]
-  );
+  function openCreate() {
+    setEditing(null);
+    setForm({ client_name: '', rating: 5, comment: '', response: '' });
+    setShowForm(true);
+  }
+
+  async function copyText(text: string, kind: 'link' | 'message') {
+    await navigator.clipboard.writeText(text);
+    setCopied(kind);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  function openSms(clientPhone?: string) {
+    if (!googleReviewLink) return;
+    const msg = buildSmsMessage(askClientName, companyName || 'notre entreprise', googleReviewLink);
+    const phone = clientPhone ? `&phone=${encodeURIComponent(clientPhone)}` : '';
+    window.location.href = `sms:${clientPhone || ''}?&body=${encodeURIComponent(msg)}`;
+  }
+
+  const averageRating = reviews.length
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : 0;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Avis Google"
-        description="Connectez votre fiche Google, gérez les avis réels et partagez le lien officiel en un clic."
+        title="Avis clients"
+        description="Collectez, publiez et répondez aux avis de vos clients."
       >
-        {isConnected ? (
-          <>
-            <Button variant="outline" className="gap-2" onClick={() => window.open(selectedLocation.mapsUri || GOOGLE_CREATE_PROFILE_URL, '_blank')}>
-              <Globe2 className="h-4 w-4" /> Ouvrir ma fiche
+        <div className="flex flex-wrap gap-2">
+          {googleReviewLink && (
+            <Button
+              variant="outline"
+              onClick={() => setShowAsk(true)}
+              className="gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Demander un avis
             </Button>
-            <Button onClick={() => setShowRequest(true)} className="gap-2">
-              <Send className="h-4 w-4" /> Demander un avis
-            </Button>
-          </>
-        ) : googleAccessPending ? (
-          <Button className="gap-2" variant="secondary" disabled>
-            <Store className="h-4 w-4" /> Connexion Google en cours
+          )}
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter un avis
           </Button>
-        ) : (
-          <Button className="gap-2" onClick={async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.access_token) return;
-            const res = await fetch('/api/google-business/connect', {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            const json = await res.json();
-            if (json.redirect_url) window.location.href = json.redirect_url;
-          }}>
-            <Store className="h-4 w-4" /> Connecter Google
-          </Button>
-        )}
+        </div>
       </PageHeader>
 
-      {error && (
-        googleAccessPending ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
-            <p className="text-sm font-semibold text-amber-900">Connexion Google réussie</p>
-            <p className="mt-1 text-sm text-amber-800">
-              Votre compte Google est bien connecté à Hellobat.
+      {/* ─── Google Review URL card ───────────────────────────────── */}
+      <div className="rounded-xl border bg-card p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Lien Google Avis</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Collez ici le lien public de votre fiche Google Business. Vos clients pourront
+              cliquer dessus pour laisser un avis directement sur Google.
             </p>
-            <p className="mt-1 text-sm text-amber-800">
-              Nous attendons maintenant l&apos;autorisation officielle de Google pour importer et gérer votre fiche et vos avis depuis l&apos;application.
-            </p>
-            <p className="mt-1 text-sm text-amber-800">
-              Dès que Google valide cet accès, votre fiche apparaîtra ici automatiquement.
-            </p>
-            <div className="mt-4 rounded-xl border border-amber-200 bg-white/90 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">Validation Google en cours</p>
-                <span className="text-xs font-medium text-amber-700">{googleApprovalProgress}%</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-100">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-primary transition-all duration-500"
-                  style={{ width: `${googleApprovalProgress}%` }}
-                />
-              </div>
-              <p className="mt-3 text-xs text-amber-700">
-                Votre connexion est terminée. Il ne reste plus que l&apos;autorisation officielle de Google.
-              </p>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-amber-700">Connexion Google</p>
-                <p className="mt-1 text-sm font-medium text-foreground">Réussie</p>
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-amber-700">Autorisation Google</p>
-                <p className="mt-1 text-sm font-medium text-foreground">En attente</p>
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-amber-700">Import de la fiche</p>
-                <p className="mt-1 text-sm font-medium text-foreground">En attente de validation</p>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-amber-700">
-              Vous n&apos;avez rien d&apos;autre à faire pour le moment. Nous finaliserons automatiquement l&apos;accès dès que Google aura validé notre demande.
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )
-      )}
-
-      {!isConnected ? (
-        <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <BadgeCheck className="h-3.5 w-3.5" /> Avis Google
-            </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-              {googleAccessPending
-                ? 'Votre compte Google est bien relié. Nous attendons maintenant la validation de Google.'
-                : status.connected
-                  ? 'Votre compte Google est bien relié, mais aucune fiche n\u2019a encore été trouvée.'
-                  : 'Connectez votre fiche Google pour envoyer votre lien d\u2019avis en un clic.'}
-              </h2>
-              <p className="mt-3 text-sm text-muted-foreground">
-              {googleAccessPending
-                ? 'Dès que Google nous autorise officiellement à importer et gérer votre fiche, elle apparaîtra automatiquement ici.'
-                : status.connected
-                  ? 'Si votre fiche vient juste d\u2019être créée, reconnectez Google dans quelques minutes.'
-                  : 'Une fois connecté, vous pourrez copier votre lien d\u2019avis, voir les avis clients et y répondre depuis Hellobat.'}
-              </p>
-
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {!googleAccessPending && (
-                <Button onClick={async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.access_token) return;
-            const res = await fetch('/api/google-business/connect', {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            const json = await res.json();
-            if (json.redirect_url) window.location.href = json.redirect_url;
-          }} className="gap-2">
-                  <Link2 className="h-4 w-4" /> {status.connected ? 'Reconnecter Google' : 'Connecter ma fiche Google'}
+            {googleReviewLink ? (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+                <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="flex-1 truncate font-mono">{googleReviewLink}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 px-2"
+                  onClick={() => copyText(googleReviewLink, 'link')}
+                >
+                  <Copy className="h-3 w-3" />
+                  {copied === 'link' ? 'Copié' : 'Copier'}
                 </Button>
-              )}
-              <Button variant="outline" className="gap-2" onClick={() => window.open(GOOGLE_CREATE_PROFILE_URL, '_blank')}>
-                <ExternalLink className="h-4 w-4" /> Créer ma fiche Google
-              </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 px-2"
+                  asChild
+                >
+                  <a href={googleReviewLink} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-amber-700">
+                Aucun lien configuré. Ajoutez-le pour pouvoir demander des avis Google à vos clients.
+              </p>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => {
+              setUrlDraft(googleReviewLink);
+              setShowEditUrl(true);
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {googleReviewLink ? 'Modifier' : 'Ajouter'}
+          </Button>
+        </div>
+      </div>
+
+      {/* ─── Stats ─────────────────────────────────────────────── */}
+      {reviews.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border bg-card p-4">
+            <div className="text-xs text-muted-foreground">Note moyenne</div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-2xl font-bold">{averageRating.toFixed(1)}</span>
+              <StarRating rating={Math.round(averageRating)} />
+            </div>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <div className="text-xs text-muted-foreground">Total avis</div>
+            <div className="mt-1 text-2xl font-bold">{reviews.length}</div>
+          </div>
+          <div className="rounded-xl border bg-card p-4">
+            <div className="text-xs text-muted-foreground">Publiés sur le site</div>
+            <div className="mt-1 text-2xl font-bold">
+              {reviews.filter((r) => r.is_published_on_site).length}
             </div>
           </div>
         </div>
-      ) : (
-        <>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
-                    <BadgeCheck className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{selectedLocation.title}</p>
-                    <p className="text-xs text-muted-foreground">Fiche Google connectée</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" className="gap-1.5" onClick={disconnectGoogle} disabled={syncing}>
-                  <Unplug className="h-3.5 w-3.5" /> Déconnecter
-                </Button>
-              </div>
-
-              {status.locations.length > 1 && (
-                <div className="mt-4">
-                  <label className="text-xs font-medium text-muted-foreground">Fiche sélectionnée</label>
-                  <select
-                    className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={selectedLocation.locationName}
-                    onChange={(event) => changeLocation(event.target.value)}
-                    disabled={syncing}
-                  >
-                    {status.locations.map((location) => (
-                      <option key={location.locationName} value={location.locationName}>
-                        {location.title} · {location.accountDisplayName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Avis suivis</span>
-                  <span className="font-medium text-foreground">{status.totalReviewCount}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Réponses à faire</span>
-                  <span className="font-medium text-foreground">{pendingReplies}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Place ID</span>
-                  <span className="font-medium text-foreground">{selectedLocation.placeId || 'Indisponible'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-sm font-semibold text-foreground">Lien officiel d&apos;avis</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Google fournit ce lien pour demander un avis sur la fiche sélectionnée.
-              </p>
-              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground break-all">
-                {selectedLocation.newReviewUri || 'Aucun lien d\u2019avis fourni par Google pour cette fiche'}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => copyText(selectedLocation.newReviewUri, 'link')}
-                  disabled={!selectedLocation.newReviewUri}
-                >
-                  <Copy className="h-3.5 w-3.5" /> {copiedState === 'link' ? 'Lien copié' : 'Copier le lien'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => window.open(selectedLocation.newReviewUri || selectedLocation.mapsUri, '_blank')}
-                >
-                  <ArrowUpRight className="h-3.5 w-3.5" /> Ouvrir
-                </Button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="text-sm font-semibold text-foreground">Demande d&apos;avis rapide</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Prépare un message client pré-rempli avec le vrai lien Google de la fiche sélectionnée.
-              </p>
-              <Button onClick={() => setShowRequest(true)} className="mt-4 w-full gap-2">
-                <Send className="h-4 w-4" /> Ouvrir la demande client
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <div className="text-center">
-                <p className="text-3xl sm:text-4xl font-bold text-foreground">{status.averageRating.toFixed(1)}</p>
-                <div className="mt-2 flex justify-center">
-                  <StarRating rating={Math.round(status.averageRating)} size="lg" />
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{status.totalReviewCount} avis Google</p>
-              </div>
-              <div className="mt-6 space-y-2">
-                {ratingDistribution.map((item) => (
-                  <div key={item.stars} className="flex items-center gap-2">
-                    <span className="w-3 text-xs text-muted-foreground">{item.stars}</span>
-                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${item.pct}%` }} />
-                    </div>
-                    <span className="w-6 text-right text-xs text-muted-foreground">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="lg:col-span-2 rounded-xl border border-border bg-card p-6">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Avis réels remontés depuis Google</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Répondez depuis Hellobat sans sortir du logiciel.
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-2" onClick={loadGoogleData} disabled={syncing}>
-                  <Sparkles className="h-3.5 w-3.5" /> Actualiser
-                </Button>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                {loading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((index) => (
-                      <div key={index} className="h-24 animate-pulse rounded-xl bg-muted" />
-                    ))}
-                  </div>
-                ) : status.reviews.length === 0 ? (
-                  <EmptyState
-                    icon={Star}
-                    title="Aucun avis pour l'instant"
-                    description="La connexion Google est active. Dès qu&apos;un avis remonte sur cette fiche, il apparaîtra ici."
-                  >
-                    <Button onClick={() => setShowRequest(true)} className="gap-2">
-                      <Send className="h-4 w-4" /> Demander un avis
-                    </Button>
-                  </EmptyState>
-                ) : (
-                  status.reviews.map((review) => {
-                    const localRow = localReviewsMap.get(review.name);
-                    const isPublishedOnSite = localRow?.is_published_on_site ?? true;
-                    const isToggling = togglingReview === review.name;
-                    return (
-                    <div key={review.name} className="rounded-xl border border-border bg-background p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                              {review.reviewerName.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{review.reviewerName}</p>
-                              <StarRating rating={review.starRating} />
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-xs font-medium',
-                              isPublishedOnSite
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-muted text-muted-foreground'
-                            )}
-                            title={
-                              isPublishedOnSite
-                                ? 'Cet avis est affiché sur votre site vitrine'
-                                : 'Cet avis est masqué de votre site vitrine'
-                            }
-                          >
-                            {isPublishedOnSite ? 'Sur le site' : 'Masqué'}
-                          </span>
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-xs font-medium',
-                              review.reviewReplyComment ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                            )}
-                          >
-                            {review.reviewReplyComment ? 'Répondu' : 'En attente'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {review.comment && <p className="mt-3 text-sm text-foreground">{review.comment}</p>}
-
-                      {review.reviewReplyComment && (
-                        <div className="mt-3 rounded-lg bg-muted/50 p-3">
-                          <p className="mb-1 text-xs font-medium text-muted-foreground">Votre réponse</p>
-                          <p className="text-sm text-foreground">{review.reviewReplyComment}</p>
-                        </div>
-                      )}
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {!review.reviewReplyComment && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => {
-                                setShowRespond(review);
-                                setResponseText('');
-                              }}
-                            >
-                              <MessageSquare className="h-3 w-3" /> Répondre
-                            </Button>
-                            <Button variant="outline" size="sm" className="gap-1">
-                              <Sparkles className="h-3 w-3" /> Réponse IA
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => toggleReviewPublished(review)}
-                          disabled={isToggling || !siteSlug}
-                          title={
-                            !siteSlug
-                              ? 'Publiez d\u2019abord votre site vitrine pour gérer la visibilité des avis'
-                              : undefined
-                          }
-                        >
-                          {isPublishedOnSite ? (
-                            <>
-                              <EyeOff className="h-3 w-3" />{' '}
-                              {isToggling ? 'Masquage…' : 'Masquer du site'}
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-3 w-3" />{' '}
-                              {isToggling ? 'Publication…' : 'Afficher sur le site'}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </>
       )}
 
-      <Dialog open={showRequest} onOpenChange={setShowRequest}>
-        <DialogContent className="sm:max-w-2xl">
+      {/* ─── Reviews list ──────────────────────────────────────── */}
+      {loading ? (
+        <div className="h-60 animate-pulse rounded-xl bg-muted" />
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          icon={Star}
+          title="Aucun avis pour l'instant"
+          description="Ajoutez un avis manuellement ou demandez à vos clients de laisser leur avis."
+        >
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter un avis
+          </Button>
+        </EmptyState>
+      ) : (
+        <div className="space-y-3">
+          {reviews.map((r) => (
+            <div key={r.id} className="rounded-xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold">{r.client_name}</span>
+                    <StarRating rating={r.rating} />
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(r.review_date || r.created_at).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                  {r.comment && <p className="mt-2 text-sm text-foreground/80">{r.comment}</p>}
+                  {r.response && (
+                    <div className="mt-3 rounded-lg border-l-2 border-primary bg-muted/30 px-3 py-2 text-sm">
+                      <div className="text-[10px] font-semibold uppercase text-muted-foreground">
+                        Votre réponse
+                      </div>
+                      <p className="mt-1 text-foreground/80">{r.response}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1 px-2"
+                    onClick={() => togglePublishOnSite(r.id, r.is_published_on_site)}
+                    title={
+                      r.is_published_on_site ? 'Masquer du site vitrine' : 'Publier sur le site vitrine'
+                    }
+                  >
+                    {r.is_published_on_site ? (
+                      <Eye className="h-3.5 w-3.5 text-green-600" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1 px-2"
+                    onClick={() => openEdit(r)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1 px-2 text-destructive hover:text-destructive"
+                    onClick={() => deleteReview(r.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─── Dialog: Edit Google URL ───────────────────────────── */}
+      <Dialog open={showEditUrl} onOpenChange={setShowEditUrl}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Préparer une demande d&apos;avis</DialogTitle>
+            <DialogTitle>Lien Google Avis</DialogTitle>
             <DialogDescription>
-              Remplissez juste le nom du client, puis copiez le message.
+              Dans Google Maps ou votre fiche Google Business, copiez le lien « Laisser un avis »
+              et collez-le ci-dessous.
             </DialogDescription>
           </DialogHeader>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium">Nom du client</label>
-              <Input
-                className="mt-1"
-                placeholder="Ex : Mme Martin"
-                value={requestForm.clientName}
-                onChange={(event) => setRequestForm((prev) => ({ ...prev, clientName: event.target.value }))}
-              />
+          <div className="space-y-3 mt-2">
+            <Input
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              placeholder="https://g.page/r/..."
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowEditUrl(false)}>
+                Annuler
+              </Button>
+              <Button onClick={saveGoogleUrl} disabled={savingUrl}>
+                {savingUrl ? 'Enregistrement…' : 'Enregistrer'}
+              </Button>
             </div>
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                className="mt-1"
-                type="email"
-                placeholder="client@email.com"
-                value={requestForm.email}
-                onChange={(event) => setRequestForm((prev) => ({ ...prev, email: event.target.value }))}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-sm font-medium">Téléphone / WhatsApp (optionnel)</label>
-              <Input
-                className="mt-1"
-                placeholder="06 12 34 56 78"
-                value={requestForm.phone}
-                onChange={(event) => setRequestForm((prev) => ({ ...prev, phone: event.target.value }))}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-sm font-medium">Message prêt à envoyer</label>
-              <Textarea className="mt-1 min-h-[160px]" value={requestMessage} readOnly />
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button onClick={() => copyText(requestMessage, 'message')} disabled={!requestMessage} className="gap-2">
-              <Copy className="h-4 w-4" /> {copiedState === 'message' ? 'Message copié' : 'Copier le message'}
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              disabled={!requestForm.email || !requestMessage}
-              onClick={() => {
-                const subject = encodeURIComponent(`Votre avis pour ${selectedLocation?.title || 'notre entreprise'}`);
-                const body = encodeURIComponent(requestMessage);
-                window.open(`mailto:${requestForm.email}?subject=${subject}&body=${body}`, '_blank');
-              }}
-            >
-              <Mail className="h-4 w-4" /> Ouvrir l&apos;email
-            </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              disabled={!requestForm.phone || !requestMessage}
-              onClick={() => {
-                const phone = normalizePhone(requestForm.phone);
-                const body = encodeURIComponent(requestMessage);
-                window.open(`https://wa.me/${phone}?text=${body}`, '_blank');
-              }}
-            >
-              <Send className="h-4 w-4" /> Ouvrir WhatsApp
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showRespond} onOpenChange={() => setShowRespond(null)}>
-        <DialogContent>
+      {/* ─── Dialog: Ask for review ────────────────────────────── */}
+      <Dialog open={showAsk} onOpenChange={setShowAsk}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Répondre à {showRespond?.reviewerName}</DialogTitle>
+            <DialogTitle>Demander un avis Google</DialogTitle>
+            <DialogDescription>
+              Personnalisez le message puis copiez-le ou envoyez-le par SMS à votre client.
+            </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 space-y-4">
-            {showRespond && (
-              <div className="rounded-lg bg-muted/50 p-3">
-                <StarRating rating={showRespond.starRating} />
-                <p className="mt-2 text-sm text-foreground">{showRespond.comment}</p>
-              </div>
-            )}
-            <Textarea
-              className="min-h-[140px]"
-              placeholder="Votre réponse…"
-              value={responseText}
-              onChange={(event) => setResponseText(event.target.value)}
-            />
-            <div className="flex items-center justify-between">
-              <Button variant="outline" className="gap-2">
-                <Sparkles className="h-4 w-4" /> Générer avec l&apos;IA
+          <div className="space-y-3 mt-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Nom du client (optionnel)
+              </label>
+              <Input
+                value={askClientName}
+                onChange={(e) => setAskClientName(e.target.value)}
+                placeholder="ex : Jean"
+                className="mt-1"
+              />
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+              <div className="font-medium text-muted-foreground">Message :</div>
+              <p className="mt-1 text-foreground/80">
+                {buildSmsMessage(askClientName, companyName || 'notre entreprise', googleReviewLink)}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  copyText(
+                    buildSmsMessage(askClientName, companyName || 'notre entreprise', googleReviewLink),
+                    'message',
+                  )
+                }
+              >
+                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                {copied === 'message' ? 'Copié' : 'Copier'}
               </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowRespond(null)}>
-                  Annuler
-                </Button>
-                <Button onClick={publishReply} disabled={!responseText.trim() || replyLoading}>
-                  {replyLoading ? 'Publication…' : 'Publier'}
-                </Button>
+              <Button onClick={() => openSms()}>
+                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                Ouvrir SMS
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog: Review form ───────────────────────────────── */}
+      <Dialog
+        open={showForm}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowForm(false);
+            setEditing(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Modifier l’avis' : 'Nouvel avis'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nom du client</label>
+              <Input
+                value={form.client_name}
+                onChange={(e) => setForm({ ...form, client_name: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Note</label>
+              <div className="mt-1 flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setForm({ ...form, rating: n })}
+                    className="p-0.5 transition-transform hover:scale-110"
+                  >
+                    <Star
+                      className={cn(
+                        'h-6 w-6',
+                        n <= form.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30',
+                      )}
+                    />
+                  </button>
+                ))}
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Commentaire</label>
+              <Textarea
+                value={form.comment}
+                onChange={(e) => setForm({ ...form, comment: e.target.value })}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Votre réponse (optionnelle)
+              </label>
+              <Textarea
+                value={form.response}
+                onChange={(e) => setForm({ ...form, response: e.target.value })}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowForm(false)}>
+                Annuler
+              </Button>
+              <Button onClick={saveReview} disabled={!form.client_name.trim()}>
+                Enregistrer
+              </Button>
             </div>
           </div>
         </DialogContent>

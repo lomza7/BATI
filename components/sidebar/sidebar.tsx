@@ -81,7 +81,6 @@ function SidebarNavCollapsed() {
         { emoji: '🏗️', href: '/chantiers', label: 'Mes chantiers' },
         { emoji: '🗺️', href: '/carte', label: 'Carte' },
         { emoji: '👷', href: '/equipe', label: 'Équipe' },
-        { emoji: '📧', href: '/mail', label: 'Boîte mail' },
         { emoji: '🤖', href: '/agents', label: 'Agents IA' },
       ].map(({ emoji, href, label }) => (
         <a

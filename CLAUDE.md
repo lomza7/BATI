@@ -34,7 +34,7 @@ app/
 ├── (app)/                      # Routes protégées (avec sidebar)
 │   ├── layout.tsx              # Layout app (sidebar + main)
 │   ├── dashboard/              # Tableau de bord (KPIs, graphiques, pipeline)
-│   ├── calendrier/             # Calendrier personnel + Google Calendar sync
+│   ├── calendrier/             # Calendrier personnel (sync iCloud via ICS)
 │   ├── taches/                 # Gestion des tâches (todos)
 │   ├── clients/                # Contacts (clients, prospects, prestataires)
 │   ├── devis/                  # Devis (+ assistant IA voix/photo + signature DocuSeal)
@@ -47,8 +47,8 @@ app/
 │   ├── catalogues/             # Catalogues produits (magic link partage)
 │   ├── prospection/            # CRM / Leads pipeline
 │   ├── site-web/               # Générateur de site web IA
-│   ├── mail/                   # Boîte mail Gmail intégrée
-│   ├── avis/                   # Avis Google Business
+│   ├── assistant-email/        # Assistant IA pour rédiger des réponses email (paste-based)
+│   ├── avis/                   # Avis clients (manuels + demande par SMS)
 │   ├── rendus/                 # Avant/Après IA (route slug historique)
 │   ├── agents/                 # Agents IA (pannes, DTU, chiffrage, juridique, RGE/CEE)
 │   ├── paiements/              # Paiements Stripe
@@ -61,29 +61,8 @@ app/
 │   │   ├── quote/route.ts      # Génération devis IA (Claude + voix + photos)
 │   │   ├── email-reply/route.ts# Réponse email IA (contexte client)
 │   │   └── site-content/route.ts# Génération contenu site web IA
-│   ├── google-calendar/        # OAuth + sync bidirectionnelle Google Calendar
-│   │   ├── connect/            # GET — redirige vers Google OAuth
-│   │   ├── callback/           # GET — échange code, stocke tokens en DB
-│   │   ├── status/             # GET — statut connexion
-│   │   ├── sync/               # POST — push event vers Google Calendar
-│   │   ├── pull/               # POST — pull events depuis Google Calendar
-│   │   └── disconnect/         # POST — déconnexion + révocation
-│   ├── gmail/                  # OAuth + lecture/envoi Gmail
-│   │   ├── connect/            # GET — redirige vers Google OAuth
-│   │   ├── callback/           # GET — échange code, stocke tokens en DB
-│   │   ├── status/             # GET — statut connexion + email
-│   │   ├── messages/           # GET — liste messages (inbox/sent/starred)
-│   │   ├── messages/[id]/      # GET — message complet + marque lu
-│   │   ├── send/               # POST — envoi/réponse email
-│   │   ├── modify/             # POST — star/archive/trash/read
-│   │   └── disconnect/         # POST — déconnexion
-│   ├── google-business/        # OAuth + gestion avis Google
-│   │   ├── connect/            # POST — OAuth
-│   │   ├── callback/           # GET — callback
-│   │   ├── status/             # GET — statut
-│   │   ├── select-location/    # POST — sélection établissement
-│   │   ├── reply/              # POST — répondre à un avis
-│   │   └── disconnect/         # POST — déconnexion
+│   ├── carte/share/            # POST — partage carte par email (Resend)
+│   ├── icloud-calendar/        # Export ICS pour abonnement iCloud/Apple Calendar
 │   ├── docuseal/               # Signature électronique
 │   │   ├── create-submission/  # POST — créer demande signature
 │   │   ├── webhook/            # POST — webhook fin de signature
@@ -135,9 +114,7 @@ lib/
 ├── pricing-plans.ts            # Définitions plans (Starter, Pro, Business)
 ├── lead-pipeline.ts            # Stages CRM et couleurs
 ├── lead-sources.ts             # Types et labels sources leads
-├── google-calendar.ts          # OAuth + sync Google Calendar (tokens DB)
-├── gmail.ts                    # OAuth + API Gmail (tokens DB, parsing, envoi RFC 2822)
-├── google-business.ts          # OAuth + API Google Business (avis)
+├── icloud-calendar.ts          # Génération feed ICS pour abonnement Apple Calendar
 ├── docuseal.ts                 # API DocuSeal (signature électronique)
 ├── email-templates.ts          # Templates HTML emails transactionnels
 ├── document-templates.ts       # Templates documents (devis, factures)
@@ -156,7 +133,7 @@ hooks/
 1. **Principal** : Tableau de bord, Calendrier, Mes tâches, Contacts, Devis, Factures, Mes prestations
 2. **Chantiers** : Mes chantiers, Planning, Carte, Équipe
 3. **Commercial** : Catalogues, Prospection, Site web IA
-4. **Communication** : Boîte mail, Avis Google
+4. **Communication** : Assistant email IA, Avis clients
 5. **Créativité** : Avant/Après IA
 6. **Agents IA** : Mes Agents
 7. **Finance** : Paiement Stripe, Contrats récurrents, Comptabilité IA
@@ -234,15 +211,6 @@ const sb = createClient(url, anonKey, { global: { headers: { Authorization: auth
 const { data: { user } } = await sb.auth.getUser(token);
 ```
 
-### Intégrations Google — pattern OAuth
-```tsx
-// Même pattern pour Calendar, Gmail, Business :
-// 1. Client passe le token Supabase en query param
-// 2. /connect vérifie l'user, stocke userId dans un cookie, redirige vers Google
-// 3. /callback lit le cookie userId, échange le code, stocke tokens en DB
-// 4. Les tokens sont en DB (pas cookies) pour persistance cross-session
-```
-
 ## Base de données (tables principales)
 
 | Table | Usage |
@@ -255,12 +223,10 @@ const { data: { user } } = await sb.auth.getUser(token);
 | `projects` / `project_photos` | Chantiers avec géolocalisation + flag `is_public` |
 | `team_members` / `team_notes` | Équipe (salariés, sous-traitants, intérimaires) |
 | `planning_events` | Planning équipe (chantier, congé, réunion, autre) |
-| `calendar_events` | Calendrier personnel (sync Google Calendar) |
-| `google_calendar_connections` | Tokens OAuth Google Calendar |
-| `gmail_connections` | Tokens OAuth Gmail + email |
+| `calendar_events` | Calendrier personnel (export ICS vers iCloud) |
 | `todos` | Tâches avec catégories et priorités |
 | `leads` / `lead_sources` / `lead_stages` | CRM pipeline (custom par user) |
-| `reviews` | Avis Google Business |
+| `reviews` | Avis clients (manuels, affichables sur site vitrine) |
 | `catalogs` / `catalog_collections` / `catalog_products` | Système catalogues |
 | `catalog_sends` / `catalog_client_selections` | Envoi catalogues (magic link) |
 | `ai_agents` / `ai_conversations` / `ai_messages` | Agents IA conversationnels |
@@ -275,11 +241,6 @@ Toutes les tables ont RLS activé. Politique : `auth.uid() IS NOT NULL`.
 Exceptions : `catalog_sends` (accès anon magic link), `artisan_sites` (lecture publique).
 
 ## Intégrations externes
-
-### Google APIs (même credentials OAuth pour les 3)
-- **Google Calendar** : sync bidirectionnelle événements (push + pull avec syncToken)
-- **Gmail** : lecture inbox, envoi, réponse, star/archive/trash + réponse IA
-- **Google Business** : gestion avis, réponses
 
 ### Anthropic Claude
 - Génération devis (voix + photos)
@@ -324,8 +285,6 @@ NEXT_PUBLIC_SITE_URL=               # Défaut: https://hellobat.app
 SUPABASE_SERVICE_ROLE_KEY=
 ANTHROPIC_API_KEY=
 ANTHROPIC_MODEL=                    # Optionnel, défaut: claude-sonnet-4-20250514
-GOOGLE_CLIENT_ID=                   # Partagé Calendar + Gmail + Business
-GOOGLE_CLIENT_SECRET=
 STRIPE_SECRET_KEY=
 DOCUSEAL_API_KEY=
 DOCUSEAL_API_URL=                   # Défaut: https://api.docuseal.eu
@@ -351,8 +310,6 @@ RESEND_FROM_EMAIL=
 - L'assistant IA devis utilise Web Speech Recognition (Chrome/Edge uniquement) pour la dictée vocale
 - Les catalogues utilisent un système de magic link (token) pour le partage public sans auth
 - Les dates doivent utiliser l'heure locale (pas `toISOString()` qui convertit en UTC et décale d'un jour en France)
-- Les tokens Google (Calendar, Gmail, Business) sont stockés en DB, pas en cookies — car ils doivent persister entre sessions
-- Le pattern OAuth Google passe le userId via un cookie httpOnly temporaire entre connect et callback
 - Admin via `profiles.is_admin` (booléen) + fonction SQL `is_admin()` — remplace l'ancien hardcode `louis@maaza.pro`
 - Le dashboard a par défaut le filtre "année" sélectionné
 - Le planning inclut le dirigeant (owner) comme membre virtuel (ID `__owner__`, `team_member_id = null` en DB)

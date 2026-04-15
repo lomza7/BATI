@@ -120,11 +120,10 @@ export const featureCards: FeatureCard[] = [
   },
   {
     icon: Mail,
-    title: 'Emails & avis clients',
-    desc: 'Gérez vos emails, votre agenda et collectez vos avis clients, tout connecté à Google.',
-    special: 'google',
+    title: 'Assistant email IA & avis clients',
+    desc: 'Rédigez vos réponses emails avec l\'IA et centralisez vos avis clients pour votre site vitrine.',
     sectionId: 'email',
-    slug: 'emails-avis-clients',
+    slug: 'assistant-email-ia',
   },
   {
     icon: CreditCard,

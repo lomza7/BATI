@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SignatureCanvas } from '@/components/devis/signature-canvas';
 import { DocusealSigning } from '@/components/devis/docuseal-signing';
+import { ContractPublicView, type ContractRecord, type ContractSendData, type ContractArtisanProfile } from '@/components/contracts/contract-public-view';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 import { formatIban } from '@/lib/banks';
@@ -157,6 +158,7 @@ export default function PublicQuotePage() {
   const [signed, setSigned] = useState(false);
   const [signedAt, setSignedAt] = useState<string | null>(null);
   const [signatureDisplayUrl, setSignatureDisplayUrl] = useState<string | null>(null);
+  const [contractPayload, setContractPayload] = useState<{ contract: ContractRecord; send: ContractSendData; artisan: ContractArtisanProfile | null } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -171,6 +173,18 @@ export default function PublicQuotePage() {
       }
 
       if (!payload) {
+        // Fallback: le token correspond peut-etre a un contrat recurrent
+        const { data: contractPayloadRaw } = await anonClient
+          .rpc('get_public_contract_by_token', { p_token: token });
+        if (contractPayloadRaw) {
+          setContractPayload({
+            contract: contractPayloadRaw.contract as ContractRecord,
+            send: contractPayloadRaw.send as ContractSendData,
+            artisan: (contractPayloadRaw.artisan as ContractArtisanProfile) || null,
+          });
+          setLoading(false);
+          return;
+        }
         setError('Ce lien est invalide ou a expiré.');
         setLoading(false);
         return;
@@ -302,6 +316,17 @@ export default function PublicQuotePage() {
           <p className="text-sm text-[#6b6560] mt-2">{error}</p>
         </div>
       </div>
+    );
+  }
+
+  if (contractPayload) {
+    return (
+      <ContractPublicView
+        contract={contractPayload.contract}
+        send={contractPayload.send}
+        artisan={contractPayload.artisan}
+        onSigned={() => fetchData()}
+      />
     );
   }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Plus, ChevronLeft, ChevronRight, Trash2, Clock,
-  RefreshCw, Unplug, CalendarCheck, Edit2, Apple, Cloud,
+  RefreshCw, Unplug, Edit2, Apple, Cloud,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -118,10 +118,6 @@ export function CalendrierView() {
   const [view, setView] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Google Calendar state
-  const [gcalConnected, setGcalConnected] = useState(false);
-  const [gcalPulling, setGcalPulling] = useState(false);
-
   // iCloud Calendar state
   const [icloudConnected, setIcloudConnected] = useState(false);
   const [icloudPulling, setIcloudPulling] = useState(false);
@@ -187,79 +183,9 @@ export function CalendrierView() {
     setLoading(false);
   }
 
-  // ─── Google Calendar ──────────────────────────────────────────────
-  useEffect(() => {
-    async function checkGcal() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
-        const res = await fetch('/api/google-calendar/status', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setGcalConnected(data.connected);
-        }
-      } catch { /* silent */ }
-    }
-    checkGcal();
-
-    // Detect callback params
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('google_calendar_connected') === '1') {
-      setGcalConnected(true);
-      window.history.replaceState({}, '', window.location.pathname);
-      // Auto-pull on first connect
-      pullFromGoogle();
-    }
-    if (params.get('google_error')) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
-
   async function getAccessToken() {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || '';
-  }
-
-  async function syncToGoogle(eventId: string, action: 'create' | 'update' | 'delete') {
-    if (!gcalConnected) return;
-    try {
-      const token = await getAccessToken();
-      const res = await fetch('/api/google-calendar/sync', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, action }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('[GCal sync]', action, err);
-      }
-    } catch (e) { console.error('[GCal sync error]', e); }
-  }
-
-  async function pullFromGoogle() {
-    setGcalPulling(true);
-    try {
-      const token = await getAccessToken();
-      const res = await fetch('/api/google-calendar/pull', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) await loadData();
-    } catch { /* silent */ }
-    setGcalPulling(false);
-  }
-
-  async function disconnectGcal() {
-    try {
-      const token = await getAccessToken();
-      await fetch('/api/google-calendar/disconnect', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setGcalConnected(false);
-    } catch { /* silent */ }
   }
 
   // ─── iCloud Calendar ────────────────────────────────────────────────
@@ -394,7 +320,6 @@ export function CalendrierView() {
           color: form.color,
           client_id: form.clientId,
         }).eq('id', editingEvent.id);
-        syncToGoogle(editingEvent.id, 'update');
         syncToIcloud(editingEvent.id, 'update');
       }
     } else {
@@ -412,7 +337,6 @@ export function CalendrierView() {
         client_id: form.clientId,
       }).select('id');
       if (inserted?.[0]) {
-        syncToGoogle(inserted[0].id, 'create');
         syncToIcloud(inserted[0].id, 'create');
       }
 
@@ -437,7 +361,6 @@ export function CalendrierView() {
     if (evt?.source === 'planning') {
       await supabase.from('planning_events').delete().eq('id', id);
     } else {
-      syncToGoogle(id, 'delete');
       syncToIcloud(id, 'delete');
       await supabase.from('calendar_events').delete().eq('id', id);
       // Also delete matching planning_event
@@ -507,36 +430,8 @@ export function CalendrierView() {
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <PageHeader title="Calendrier" description="Votre agenda personnel, Google Calendar et iCloud">
+      <PageHeader title="Calendrier" description="Votre agenda personnel avec synchronisation iCloud">
         <div className="flex flex-wrap gap-2">
-          {/* Google Calendar */}
-          {gcalConnected ? (
-            <>
-              <Button variant="outline" size="sm" onClick={pullFromGoogle} disabled={gcalPulling} className="gap-1.5">
-                <RefreshCw className={cn('h-4 w-4', gcalPulling && 'animate-spin')} />
-                <span className="hidden sm:inline">Google</span>
-              </Button>
-              <Button variant="ghost" size="sm" onClick={disconnectGcal} className="gap-1.5 text-muted-foreground" title="Déconnecter Google Calendar">
-                <Unplug className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" size="sm" className="gap-2" onClick={async () => {
-              const { data: { session } } = await supabase.auth.getSession();
-              if (!session?.access_token) return;
-              const res = await fetch('/api/google-calendar/connect', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${session.access_token}` },
-              });
-              const json = await res.json();
-              if (json.redirect_url) window.location.href = json.redirect_url;
-            }}>
-              <CalendarCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Google Calendar</span>
-              <span className="sm:hidden">Google</span>
-            </Button>
-          )}
-
           {/* iCloud Calendar */}
           {icloudConnected ? (
             <>
@@ -563,14 +458,8 @@ export function CalendrierView() {
       </PageHeader>
 
       {/* Calendar status banners */}
-      {(gcalConnected || icloudConnected) && (
+      {icloudConnected && (
         <div className="flex flex-col gap-1.5">
-          {gcalConnected && (
-            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-              <CalendarCheck className="h-3.5 w-3.5" />
-              Google Calendar connecté — vos événements sont synchronisés
-            </div>
-          )}
           {icloudConnected && (
             <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
               <Cloud className="h-3.5 w-3.5" />
@@ -652,7 +541,6 @@ export function CalendrierView() {
                   <div className="space-y-1">
                     {dayEvents.map(evt => {
                       const isStart = evt.start_date === ds;
-                      const isGoogle = evt.source === 'google_calendar';
                       const isIcloud = evt.source === 'icloud_calendar';
                       const isPlanning = evt.source === 'planning';
                       return (
@@ -674,9 +562,6 @@ export function CalendrierView() {
                           }}
                         >
                           <div className="flex items-center gap-1">
-                            {isGoogle && (
-                              <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-blue-500 text-white text-[7px] font-bold shrink-0">G</span>
-                            )}
                             {isIcloud && (
                               <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-purple-500 text-white shrink-0"><Cloud className="h-2 w-2" /></span>
                             )}
@@ -740,7 +625,6 @@ export function CalendrierView() {
                     </span>
                     <div className="mt-0.5 space-y-0.5">
                       {dayEvents.slice(0, 3).map(evt => {
-                        const isGoogle = evt.source === 'google_calendar';
                         const isIcloud = evt.source === 'icloud_calendar';
                         return (
                           <div
@@ -753,9 +637,6 @@ export function CalendrierView() {
                               color: evt.color,
                             }}
                           >
-                            {isGoogle && (
-                              <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-blue-500 text-white text-[7px] font-bold mr-0.5 -mt-px">G</span>
-                            )}
                             {isIcloud && (
                               <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-purple-500 text-white mr-0.5 -mt-px"><Cloud className="h-1.5 w-1.5" /></span>
                             )}
@@ -789,12 +670,6 @@ export function CalendrierView() {
             {cat.label}
           </div>
         ))}
-        {gcalConnected && (
-          <div className="flex items-center gap-1.5 border-l border-border pl-3">
-            <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-blue-500 text-white text-[7px] font-bold">G</span>
-            Google Calendar
-          </div>
-        )}
         {icloudConnected && (
           <div className="flex items-center gap-1.5 border-l border-border pl-3">
             <span className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-purple-500 text-white"><Cloud className="h-2 w-2" /></span>
@@ -810,12 +685,6 @@ export function CalendrierView() {
             <DialogTitle className="flex items-center gap-2">
               {editingEvent ? <Edit2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {editingEvent ? 'Modifier' : 'Nouvel'} événement
-              {editingEvent?.source === 'google_calendar' && (
-                <span className="inline-flex items-center gap-1 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full ml-2">
-                  <span className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-blue-500 text-white text-[7px] font-bold">G</span>
-                  Google
-                </span>
-              )}
               {editingEvent?.source === 'icloud_calendar' && (
                 <span className="inline-flex items-center gap-1 text-xs font-normal text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full ml-2">
                   <Cloud className="h-3 w-3" />

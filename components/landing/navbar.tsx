@@ -28,7 +28,7 @@ const features = [
   { icon: MapPin, label: 'Carte interactive', href: '/fonctionnalites/carte-interactive' },
   { icon: Globe, label: 'Site vitrine IA', href: '/fonctionnalites/site-vitrine' },
   { icon: Target, label: 'Prospection CRM', href: '/fonctionnalites/prospection-crm' },
-  { icon: Mail, label: 'Emails & avis clients', href: '/fonctionnalites/gmail-integre' },
+  { icon: Mail, label: 'Assistant email IA', href: '/fonctionnalites/assistant-email-ia' },
   { icon: CreditCard, label: 'Paiement en ligne & abonnements', href: '/fonctionnalites/paiements-stripe' },
   { icon: Calculator, label: 'Maurice — Comptable IA', href: '/fonctionnalites/comptabilite-ia' },
   { icon: Bot, label: 'Agents IA', href: '/fonctionnalites/agents-ia' },

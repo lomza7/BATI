@@ -34,6 +34,14 @@ export default function middleware(request: NextRequest) {
     }
   }
 
+  // Legacy: ancienne page "Paiement Stripe" → désormais dans Paramètres > Finance
+  if (pathname === '/paiements') {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/parametres';
+    redirectUrl.searchParams.set('tab', 'finance');
+    return NextResponse.redirect(redirectUrl);
+  }
+
   if (publicPaths.includes(pathname) || publicPrefixes.some(p => pathname.startsWith(p))) {
     return NextResponse.next();
   }

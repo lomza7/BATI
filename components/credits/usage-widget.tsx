@@ -39,7 +39,7 @@ export function UsageWidget() {
     <>
       <div className="space-y-5 rounded-xl border bg-card p-5 shadow-sm">
         {/* ─── Solde global ──────────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <div className="text-sm text-muted-foreground">Solde de crédits IA</div>
             <div className="mt-1 flex items-baseline gap-2">
@@ -50,10 +50,10 @@ export function UsageWidget() {
           </div>
           <Button
             onClick={() => setBuyOpen(true)}
-            className="gap-2 bg-[#D35400] text-white hover:bg-[#B84400]"
+            className="w-full gap-2 bg-[#D35400] text-white hover:bg-[#B84400] sm:w-auto"
           >
             <ShoppingCart className="h-4 w-4" />
-            Acheter
+            Acheter des crédits
           </Button>
         </div>
 

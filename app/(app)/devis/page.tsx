@@ -57,6 +57,7 @@ interface Quote {
   recurring_contract_id: string | null;
   is_recurring: boolean;
   recurring_frequency: string | null;
+  kind?: 'quote' | 'contract';
 }
 
 export default function DevisPage() {
@@ -118,7 +119,7 @@ export default function DevisPage() {
   }, []);
 
   async function loadQuotes() {
-    const [quotesRes, sendsRes] = await Promise.all([
+    const [quotesRes, sendsRes, contractsRes] = await Promise.all([
       supabase
         .from('quotes')
         .select('id, quote_number, title, status, total_ttc, valid_until, created_at, is_recurring, recurring_frequency, clients(name, email, deleted_at), recurring_contracts(id)')
@@ -128,9 +129,14 @@ export default function DevisPage() {
         .from('quote_sends')
         .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_submission_id, docuseal_signed_document_url')
         .order('created_at', { ascending: false }),
+      supabase
+        .from('recurring_contracts')
+        .select('id, contract_number, title, status, amount, tva_rate, frequency, end_date, created_at, quote_id, clients(name, email, deleted_at)')
+        .is('quote_id', null)
+        .order('created_at', { ascending: false }),
     ]);
 
-    setQuotes(((quotesRes.data as unknown as Array<Record<string, unknown>>) || []).map(q => {
+    const quoteRows: Quote[] = ((quotesRes.data as unknown as Array<Record<string, unknown>>) || []).map(q => {
       const contracts = Array.isArray(q.recurring_contracts) ? q.recurring_contracts as Array<{ id: string }> : [];
       const clientValue = Array.isArray(q.clients) ? q.clients[0] : q.clients;
       return {
@@ -142,8 +148,43 @@ export default function DevisPage() {
             }
           : null,
         recurring_contract_id: contracts[0]?.id || null,
+        kind: 'quote',
       } as Quote;
-    }));
+    });
+
+    const contractStatusMap: Record<string, keyof typeof QUOTE_STATUSES> = {
+      brouillon: 'brouillon',
+      en_attente: 'envoye',
+      actif: 'accepte',
+      suspendu: 'envoye',
+      resilie: 'refuse',
+    };
+    const contractRows: Quote[] = ((contractsRes.data as unknown as Array<Record<string, unknown>>) || []).map(c => {
+      const clientValue = Array.isArray(c.clients) ? c.clients[0] : c.clients;
+      const amount = Number(c.amount) || 0;
+      const tva = Number(c.tva_rate) || 0;
+      return {
+        id: String(c.id),
+        quote_number: String(c.contract_number || '—'),
+        title: String(c.title || 'Contrat'),
+        status: contractStatusMap[String(c.status)] || 'brouillon',
+        total_ttc: +(amount * (1 + tva / 100)).toFixed(2),
+        valid_until: (c.end_date as string | null) || null,
+        created_at: String(c.created_at),
+        clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
+          ? {
+              name: String((clientValue as { name?: string }).name || ''),
+              email: (clientValue as { email?: string | null }).email || null,
+            }
+          : null,
+        recurring_contract_id: String(c.id),
+        is_recurring: true,
+        recurring_frequency: (c.frequency as string | null) || null,
+        kind: 'contract',
+      };
+    });
+
+    setQuotes([...quoteRows, ...contractRows].sort((a, b) => b.created_at.localeCompare(a.created_at)));
 
     // Garder seulement le dernier envoi par devis
     const sendsMap: Record<string, QuoteSend> = {};
@@ -485,7 +526,7 @@ export default function DevisPage() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => setSendQuote(q)}
+                              onClick={() => q.kind === 'contract' ? router.push(`/contrats?highlight=${q.id}`) : setSendQuote(q)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                             >
                               <Send className="h-3 w-3" />
@@ -497,9 +538,11 @@ export default function DevisPage() {
                         <td className="px-4 py-3 text-sm text-muted-foreground">{formatDate(q.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
+                          {q.kind !== 'contract' && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteQuote(q.id)} title="Supprimer">
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -507,6 +550,11 @@ export default function DevisPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {q.kind === 'contract' ? (
+                                <DropdownMenuItem onClick={() => router.push(`/contrats?highlight=${q.id}`)}>
+                                  <ExternalLink className="mr-2 h-4 w-4" /> Ouvrir le contrat
+                                </DropdownMenuItem>
+                              ) : (<>
                               <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                                 <Eye className="mr-2 h-4 w-4" /> Visualiser
                               </DropdownMenuItem>
@@ -564,6 +612,7 @@ export default function DevisPage() {
                                   <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                                 </DropdownMenuItem>
                               )}
+                              </>)}
                             </DropdownMenuContent>
                           </DropdownMenu>
                           </div>
@@ -588,9 +637,11 @@ export default function DevisPage() {
                       <p className="text-xs text-muted-foreground">{q.clients?.name || '-'} &middot; {q.quote_number}</p>
                     </div>
                     <div className="flex items-center gap-0.5">
+                    {q.kind !== 'contract' && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 text-muted-foreground hover:text-destructive" onClick={() => deleteQuote(q.id)} title="Supprimer">
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
@@ -598,6 +649,11 @@ export default function DevisPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {q.kind === 'contract' ? (
+                          <DropdownMenuItem onClick={() => router.push(`/contrats?highlight=${q.id}`)}>
+                            <ExternalLink className="mr-2 h-4 w-4" /> Ouvrir le contrat
+                          </DropdownMenuItem>
+                        ) : (<>
                         <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                           <Eye className="mr-2 h-4 w-4" /> Visualiser
                         </DropdownMenuItem>
@@ -653,6 +709,7 @@ export default function DevisPage() {
                             <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                           </DropdownMenuItem>
                         )}
+                        </>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
@@ -677,11 +734,11 @@ export default function DevisPage() {
                   </div>
                   {!send && (q.status === 'brouillon' || q.status === 'envoye') && (
                     <button
-                      onClick={() => setSendQuote(q)}
+                      onClick={() => q.kind === 'contract' ? router.push(`/contrats?highlight=${q.id}`) : setSendQuote(q)}
                       className="mt-3 w-full h-9 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5"
                     >
                       <Send className="h-3 w-3" />
-                      Envoyer pour signature
+                      {q.kind === 'contract' ? 'Ouvrir le contrat' : 'Envoyer pour signature'}
                     </button>
                   )}
                   {send && !send.signed_at && (

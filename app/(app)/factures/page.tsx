@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,6 +168,19 @@ export default function FacturesPage() {
   const [paymentTermsOnInvoices, setPaymentTermsOnInvoices] = useState<boolean>(true);
   const [terminalInvoice, setTerminalInvoice] = useState<Invoice | null>(null);
   const [stripeChargesEnabled, setStripeChargesEnabled] = useState(false);
+  const [invoiceView, setInvoiceView] = useState<'all' | 'sent' | 'recurring'>('all');
+  const [sends, setSends] = useState<Array<{
+    id: string;
+    invoice_id: string;
+    client_name: string;
+    client_email: string;
+    token: string;
+    expires_at: string;
+    viewed_at: string | null;
+    paid_at: string | null;
+    created_at: string;
+    invoices: { invoice_number: string; title: string; total_ttc: number; status: keyof typeof INVOICE_STATUSES; payment_method: string } | null;
+  }>>([]);
 
   useEffect(() => {
     loadData();
@@ -177,6 +191,11 @@ export default function FacturesPage() {
     const paramProjectId = params.get('project_id');
     // ?billing=<quote_id> → ouvre directement le dialog de facturation pour ce devis
     const paramBilling = params.get('billing');
+
+    const paramTab = params.get('tab');
+    if (paramTab === 'sent' || paramTab === 'recurring' || paramTab === 'all') {
+      setInvoiceView(paramTab);
+    }
 
     if (paramBilling) {
       // On charge le devis dans le state "pending" pour qu'il soit ouvert une
@@ -298,6 +317,13 @@ export default function FacturesPage() {
 
     setQuotes(nextQuotes);
     setLoading(false);
+
+    // Charge la liste des envois (liens Stripe) pour l'onglet Envoyées
+    const { data: sendsData } = await supabase
+      .from('invoice_sends')
+      .select('id, invoice_id, client_name, client_email, token, expires_at, viewed_at, paid_at, created_at, invoices(invoice_number, title, total_ttc, status, payment_method)')
+      .order('created_at', { ascending: false });
+    setSends((sendsData as unknown as typeof sends) || []);
 
     // Vérifie la présence d'un RIB pour la modale de première facture.
     const { data: bankRows } = await supabase
@@ -766,6 +792,11 @@ export default function FacturesPage() {
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
         <ImportCsvButton type="invoices" onImported={loadData} />
+        <Button asChild variant="outline" className="gap-2">
+          <Link href="/contrats?new=1">
+            <RefreshCw className="h-4 w-4" /> Nouveau contrat d&apos;entretien
+          </Link>
+        </Button>
         <Button onClick={handleOpenCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>
@@ -905,6 +936,138 @@ export default function FacturesPage() {
             </div>
           </div>
 
+          <Tabs value={invoiceView} onValueChange={(v) => setInvoiceView(v as typeof invoiceView)} className="space-y-4">
+            <TabsList className="grid h-auto grid-cols-3 w-full sm:w-auto sm:inline-flex rounded-xl bg-muted/60 p-1">
+              <TabsTrigger value="all" className="rounded-lg py-2 text-xs sm:text-sm">Toutes</TabsTrigger>
+              <TabsTrigger value="sent" className="rounded-lg py-2 text-xs sm:text-sm gap-1.5">
+                <Send className="h-3.5 w-3.5" /> Envoyées
+              </TabsTrigger>
+              <TabsTrigger value="recurring" className="rounded-lg py-2 text-xs sm:text-sm gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" /> Récurrentes
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="sent" className="space-y-3">
+              {loading ? (
+                <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>
+              ) : sends.length === 0 ? (
+                <EmptyState
+                  icon={Send}
+                  title="Aucune facture envoyée"
+                  description="Envoyez une facture à un client pour la retrouver ici avec son statut de paiement Stripe."
+                />
+              ) : (
+                <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
+                  {sends.map((send) => {
+                    const isPaid = !!send.paid_at;
+                    const isExpired = !isPaid && new Date(send.expires_at) < new Date();
+                    const isViewed = !!send.viewed_at;
+                    const inv = send.invoices;
+                    return (
+                      <div key={send.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 hover:bg-muted/20 transition-colors">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-full flex-shrink-0 ${isPaid ? 'bg-emerald-50' : isExpired ? 'bg-slate-100' : 'bg-blue-50'}`}>
+                            {isPaid ? (
+                              <CheckCircle className="h-5 w-5 text-emerald-600" />
+                            ) : isExpired ? (
+                              <Clock className="h-5 w-5 text-slate-400" />
+                            ) : (
+                              <Send className="h-5 w-5 text-blue-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {inv?.title || 'Facture'} — {send.client_name}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">{inv?.invoice_number}</span>
+                              {send.client_email && <span className="text-xs text-muted-foreground truncate">{send.client_email}</span>}
+                              {isViewed && !isPaid && (
+                                <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+                                  <Eye className="h-3 w-3" /> Vue
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 sm:gap-4 justify-between sm:justify-end shrink-0">
+                          <span className="text-sm font-semibold text-foreground">{formatCurrency(inv?.total_ttc || 0)}</span>
+                          {isPaid ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                              Payée
+                            </span>
+                          ) : isExpired ? (
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                              Expiré
+                            </span>
+                          ) : inv ? (
+                            <StatusBadge label={(INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon).label} color={(INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon).color} />
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                              En attente
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground hidden sm:inline">{formatDate(send.created_at)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="recurring" className="space-y-3">
+              {loading ? (
+                <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted" />)}</div>
+              ) : activeInvoices.filter(i => i.recurring_contract_id).length === 0 ? (
+                <EmptyState
+                  icon={RefreshCw}
+                  title="Aucune facture récurrente"
+                  description="Les factures générées automatiquement par vos contrats d'entretien apparaîtront ici."
+                >
+                  <Button asChild className="gap-2">
+                    <Link href="/contrats?new=1"><Plus className="h-4 w-4" /> Nouveau contrat d&apos;entretien</Link>
+                  </Button>
+                </EmptyState>
+              ) : (
+                <>
+                  <div className="hidden sm:block rounded-xl border border-border bg-card overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Numéro</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Client</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Titre</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origine</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Statut</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Montant</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Dates</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Échéance</th>
+                            <th className="px-4 py-3 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {activeInvoices.filter(i => i.recurring_contract_id).map(inv => renderInvoiceRow(inv, false))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="sm:hidden space-y-3">
+                    {activeInvoices.filter(i => i.recurring_contract_id).map(inv => renderInvoiceCard(inv, false))}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                      <Link href="/contrats">
+                        Gérer les contrats <ArrowRightLeft className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="all" className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               <Button variant={invoiceStatusFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('all')}>
@@ -1032,6 +1195,8 @@ export default function FacturesPage() {
               )}
             </div>
           )}
+            </TabsContent>
+          </Tabs>
         </section>
       </div>
 

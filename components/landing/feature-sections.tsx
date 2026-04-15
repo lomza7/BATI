@@ -249,36 +249,35 @@ export function EmailSection() {
   return (
     <FeatureSection
       id="email"
-      slug="gmail-integre"
-      badge="Gmail intégré"
-      title="Votre Gmail,"
-      titleAccent="dans Hellobat"
-      description="Connectez votre compte Gmail en un clic via OAuth. Envoyez, recevez et répondez à vos emails directement dans Hellobat, avec réponse IA contextuelle."
+      slug="assistant-email-ia"
+      badge="Assistant email IA"
+      title="Vos réponses emails,"
+      titleAccent="rédigées par l'IA"
+      description="Collez l'email d'un client dans Hellobat, l'IA génère une réponse professionnelle en tenant compte de son historique (devis, factures, chantiers). Vous copiez, vous collez — c'est tout."
       bulletPoints={[
-        'Synchronisation Gmail bidirectionnelle (OAuth sécurisé)',
-        'Réponse IA avec contexte client : devis, factures, chantiers',
-        'Envoi de devis et factures par email en un clic',
-        'Historique complet par client et recherche rapide',
+        'Réponse IA contextualisée avec l\'historique client',
+        'Plusieurs tons : professionnel, chaleureux, direct',
+        'Aucune connexion de boîte mail requise',
+        'Copier-coller depuis/vers votre messagerie',
       ]}
       visual={
-        <MockBrowser>
-          <div className="space-y-2">
-            {[
-              { from: 'M. Dupont', subject: 'Re: Devis salle de bain', time: '10:32' },
-              { from: 'Mme Bernard', subject: 'Demande de devis toiture', time: '09:15' },
-              { from: 'SAS Martin', subject: 'Commande matériaux', time: 'Hier' },
-            ].map((email) => (
-              <div key={email.subject} className="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--landing-off)] border border-transparent hover:border-[var(--landing-border)] transition-colors">
-                <div className="w-8 h-8 rounded-full bg-[var(--landing-stone)] flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-[var(--landing-muted)]">{email.from[0]}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-[var(--landing-text)] truncate">{email.from}</div>
-                  <div className="text-[11px] text-[var(--landing-muted)] truncate">{email.subject}</div>
-                </div>
-                <span className="text-[10px] text-[var(--landing-muted)] shrink-0">{email.time}</span>
+        <MockBrowser url="hellobat.app/assistant-email">
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg bg-[var(--landing-off)] border border-[var(--landing-border)]">
+              <div className="text-[10px] font-semibold text-[var(--landing-muted)] mb-1">Email reçu</div>
+              <div className="text-[11px] text-[var(--landing-text)] leading-relaxed">
+                Bonjour, pouvez-vous me dire où en est mon chantier de salle de bain ? Merci.
               </div>
-            ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--landing-accent-light)] text-[var(--landing-accent)] font-medium">Contact identifié : M. Dupont</span>
+            </div>
+            <div className="p-3 rounded-lg bg-white border-2 border-[var(--landing-accent)]/30">
+              <div className="text-[10px] font-semibold text-[var(--landing-accent)] mb-1">Réponse IA</div>
+              <div className="text-[11px] text-[var(--landing-text)] leading-relaxed">
+                Bonjour M. Dupont, votre chantier avance très bien. La faïence a été posée hier, et la robinetterie sera installée vendredi comme prévu. Livraison le 20 avril. Bien cordialement.
+              </div>
+            </div>
           </div>
         </MockBrowser>
       }
@@ -438,24 +437,24 @@ export function AvisSection() {
   return (
     <FeatureSection
       id="avis"
-      slug="avis-google"
-      badge="Avis Google"
-      title="Des avis 5 étoiles,"
-      titleAccent="automatiquement"
-      description="Envoyez des demandes d'avis automatiques après chaque chantier et gérez votre e-réputation depuis Hellobat."
+      slug="avis-clients"
+      badge="Avis clients"
+      title="Vos avis clients,"
+      titleAccent="votre vitrine"
+      description="Centralisez vos avis clients, publiez vos meilleurs témoignages sur votre site vitrine et envoyez des demandes d'avis par SMS après chaque chantier."
       bulletPoints={[
-        'Envoi automatique post-chantier',
-        'Suivi de votre note Google',
-        'Réponses aux avis en un clic',
-        'Widget avis pour votre site',
+        'Gestion manuelle de vos avis clients',
+        'Publication sur votre site vitrine',
+        'Demande d\'avis par SMS après chantier',
+        'Lien Google Reviews personnalisable',
       ]}
       visual={
-        <MockBrowser>
+        <MockBrowser url="hellobat.app/avis">
           <div className="space-y-3">
             <div className="text-center p-4">
               <div className="text-3xl font-bold text-[var(--landing-text)]">4.9</div>
               <div className="text-amber-500 text-sm">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-              <div className="text-[10px] text-[var(--landing-muted)]">127 avis Google</div>
+              <div className="text-[10px] text-[var(--landing-muted)]">127 avis clients</div>
             </div>
             {[
               { name: 'Pierre L.', text: 'Travail impeccable, je recommande !', stars: 5 },

@@ -40,6 +40,9 @@ import { KpiCard } from '@/components/dashboard/kpi-card';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { SendInvoiceDialog } from '@/components/factures/send-invoice-dialog';
+import { ContractWizard, type ContractWizardValues } from '@/components/contrats/contract-wizard';
+import { SendContractDialog } from '@/components/contrats/send-contract-dialog';
+import { getContractCategory, type ContractCategoryKey, type ContractFrequency } from '@/lib/contract-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -89,6 +92,7 @@ interface ContractInvoice {
 
 interface Contract {
   id: string;
+  contract_number: string | null;
   title: string;
   description: string;
   contract_type: string;
@@ -192,14 +196,30 @@ export default function ContratsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [billingContractId, setBillingContractId] = useState<string | null>(null);
   const [sendInvoice, setSendInvoice] = useState<{ id: string; invoice_number: string; title: string; total_ttc: number; status: string; clients?: { name: string; email?: string | null } | null } | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitial, setWizardInitial] = useState<Partial<ContractWizardValues> | undefined>(undefined);
+  const [sendTarget, setSendTarget] = useState<Contract | null>(null);
 
   useEffect(() => { loadContracts(); }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+      setEditingId(null);
+      setWizardInitial(undefined);
+      setWizardOpen(true);
+      params.delete('new');
+      const query = params.toString();
+      window.history.replaceState({}, '', `/contrats${query ? `?${query}` : ''}`);
+    }
+  }, []);
 
   async function loadContracts() {
     const { data } = await supabase
       .from('recurring_contracts')
       .select(`
-        id, title, description, contract_type, amount, frequency, tva_rate, status,
+        id, contract_number, title, description, contract_type, amount, frequency, tva_rate, status,
         start_date, end_date, next_billing, auto_send, notes, created_at, last_billed_at,
         quote_id, line_items, quotes(id, quote_number, status, deleted_at),
         clients(id, name, email, deleted_at),
@@ -271,21 +291,107 @@ export default function ContratsPage() {
 
   function openEdit(c: Contract) {
     setEditingId(c.id);
-    setForm({
+    const cAny = c as unknown as Record<string, unknown>;
+    setWizardInitial({
       title: c.title,
       clientId: c.clients?.id || null,
-      contractType: c.contract_type,
-      amount: c.amount,
-      frequency: c.frequency,
+      categoryKey: ((cAny.category_key as ContractCategoryKey) || 'autre'),
+      clientType: (cAny.client_type as 'b2b' | 'b2c') || 'b2c',
+      contractChannel: (cAny.contract_channel as 'sur_site' | 'a_distance' | 'hors_etablissement') || 'sur_site',
+      siteAddress: (cAny.site_address as string) || '',
+      siteAccessNotes: (cAny.site_access_notes as string) || '',
+      frequency: (c.frequency as ContractFrequency) || 'mensuel',
+      visitsPerYear: Number(cAny.visits_per_year) || 1,
+      weatherDependent: Boolean(cAny.weather_dependent),
+      includedOperations: Array.isArray(cAny.included_operations) ? (cAny.included_operations as string[]) : [],
+      excludedOperations: Array.isArray(cAny.excluded_operations) ? (cAny.excluded_operations as string[]) : [],
+      interventionHours: (cAny.intervention_hours as string) || 'Du lundi au vendredi, 8h-18h',
+      emergencyPhone: (cAny.emergency_phone as string) || '',
+      responseTime: (cAny.response_time as string) || '48h ouvrées',
+      lineItems: Array.isArray(c.line_items) ? c.line_items : [],
+      amountHt: c.amount,
       tvaRate: c.tva_rate ?? 20,
-      description: c.description || '',
-      notes: c.notes || '',
-      autoSend: c.auto_send,
+      durationMode: (cAny.duration_mode as 'determinee' | 'indeterminee') || 'determinee',
+      initialTermMonths: Number(cAny.initial_term_months) || 12,
+      renewalTermMonths: Number(cAny.renewal_term_months) || 12,
+      autoRenewal: cAny.auto_renewal !== false,
+      noticePeriodMonths: Number(cAny.notice_period_months) || 2,
+      breachCurePeriodDays: Number(cAny.breach_cure_period_days) || 30,
+      paymentMethod: (cAny.payment_method as 'virement' | 'sepa' | 'cb' | 'cheque' | 'especes') || 'virement',
+      paymentTiming: (cAny.payment_timing as 'terme_a_echoir' | 'terme_echu') || 'terme_echu',
+      paymentTermsDays: Number(cAny.payment_terms_days) || 30,
+      latePenaltyRate: Number(cAny.late_penalty_rate) || 10,
+      recoveryFee: Number(cAny.recovery_fee) || 40,
       startDate: c.start_date || '',
       endDate: c.end_date || '',
-      lineItems: Array.isArray(c.line_items) ? c.line_items : [],
+      notes: c.notes || '',
+      autoSend: c.auto_send,
     });
-    setShowForm(true);
+    setWizardOpen(true);
+  }
+
+  async function saveFromWizard(v: ContractWizardValues) {
+    if (!user) return;
+    const cat = getContractCategory(v.categoryKey);
+    const validLineItems = v.lineItems.filter((l) => l.description.trim());
+    const amount = validLineItems.length > 0
+      ? validLineItems.reduce((s, l) => s + l.quantity * l.unit_price, 0)
+      : v.amountHt;
+
+    const payload: Record<string, unknown> = {
+      user_id: user.id,
+      title: v.title.trim() || cat.label,
+      client_id: v.clientId,
+      contract_type: v.categoryKey,
+      category_key: v.categoryKey,
+      client_type: v.clientType,
+      contract_channel: v.contractChannel,
+      site_address: v.siteAddress,
+      site_access_notes: v.siteAccessNotes,
+      amount,
+      frequency: v.frequency,
+      visits_per_year: v.visitsPerYear,
+      weather_dependent: v.weatherDependent,
+      included_operations: v.includedOperations,
+      excluded_operations: v.excludedOperations,
+      intervention_hours: v.interventionHours,
+      emergency_phone: v.emergencyPhone,
+      response_time: v.responseTime,
+      tva_rate: v.tvaRate,
+      line_items: validLineItems,
+      duration_mode: v.durationMode,
+      initial_term_months: v.initialTermMonths,
+      renewal_term_months: v.renewalTermMonths,
+      auto_renewal: v.autoRenewal,
+      notice_period_months: v.noticePeriodMonths,
+      breach_cure_period_days: v.breachCurePeriodDays,
+      payment_method: v.paymentMethod,
+      payment_timing: v.paymentTiming,
+      payment_terms_days: v.paymentTermsDays,
+      late_penalty_rate: v.latePenaltyRate,
+      recovery_fee: v.recoveryFee,
+      start_date: v.startDate || null,
+      end_date: v.endDate || null,
+      next_billing: v.startDate || new Date().toLocaleDateString('fr-CA'),
+      notes: v.notes,
+      auto_send: v.autoSend,
+      updated_at: new Date().toISOString(),
+      status: editingId ? undefined : 'brouillon',
+    };
+
+    const { error } = editingId
+      ? await supabase.from('recurring_contracts').update((() => { delete payload.status; return payload; })()).eq('id', editingId)
+      : await supabase.from('recurring_contracts').insert(payload);
+
+    if (error) {
+      console.error('[saveFromWizard] supabase error:', error);
+      alert(`Erreur sauvegarde contrat : ${error.message}`);
+      return;
+    }
+
+    setWizardOpen(false);
+    setEditingId(null);
+    loadContracts();
   }
 
   async function updateStatus(id: string, status: string) {
@@ -512,7 +618,7 @@ export default function ContratsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Contrats récurrents" description="Abonnements et contrats d&apos;entretien">
-        <Button onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }} className="gap-2">
+        <Button onClick={() => { setEditingId(null); setWizardInitial(undefined); setWizardOpen(true); }} className="gap-2">
           <Plus className="h-4 w-4" /> Nouveau contrat
         </Button>
       </PageHeader>
@@ -621,7 +727,7 @@ export default function ContratsPage() {
       ) : filtered.length === 0 ? (
         contracts.length === 0 ? (
           <EmptyState icon={RefreshCw} title="Aucun contrat" description="Créez des contrats d&apos;entretien récurrents pour générer du revenu prévisible.">
-            <Button onClick={() => { setEditingId(null); setForm(emptyForm); setShowForm(true); }} className="gap-2"><Plus className="h-4 w-4" /> Créer un contrat</Button>
+            <Button onClick={() => { setEditingId(null); setWizardInitial(undefined); setWizardOpen(true); }} className="gap-2"><Plus className="h-4 w-4" /> Créer un contrat</Button>
           </EmptyState>
         ) : (
           <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
@@ -644,8 +750,8 @@ export default function ContratsPage() {
                   onClick={() => setExpandedId(isExpanded ? null : c.id)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', c.status === 'actif' || c.status === 'en_attente' ? 'bg-primary/10' : 'bg-muted')}>
-                      <Icon className={cn('h-5 w-5', c.status === 'actif' || c.status === 'en_attente' ? 'text-primary' : 'text-muted-foreground')} />
+                    <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', c.status === 'actif' || c.status === 'en_attente' || c.status === 'brouillon' ? 'bg-primary/10' : 'bg-muted')}>
+                      <Icon className={cn('h-5 w-5', c.status === 'actif' || c.status === 'en_attente' || c.status === 'brouillon' ? 'text-primary' : 'text-muted-foreground')} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -683,14 +789,24 @@ export default function ContratsPage() {
                         <p className="text-xs text-muted-foreground">Proch. : {formatDate(c.next_billing)}</p>
                       )}
                     </div>
-                    <span className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-medium',
-                      c.status === 'en_attente' ? 'bg-blue-50 text-blue-700' :
-                      c.status === 'actif' ? 'bg-emerald-50 text-emerald-700' :
-                      c.status === 'suspendu' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
-                    )}>
-                      {c.status === 'en_attente' ? 'En attente' : c.status === 'actif' ? 'Actif' : c.status === 'suspendu' ? 'Suspendu' : 'Résilié'}
-                    </span>
+                    {c.status === 'brouillon' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSendTarget(c); }}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        <Send className="h-3 w-3" /> Envoyer pour signature
+                      </button>
+                    ) : (
+                      <span className={cn(
+                        'rounded-full px-2 py-0.5 text-xs font-medium',
+                        c.status === 'en_attente' ? 'bg-blue-50 text-blue-700' :
+                        c.status === 'actif' ? 'bg-emerald-50 text-emerald-700' :
+                        c.status === 'suspendu' ? 'bg-amber-50 text-amber-700' :
+                        c.status === 'resilie' ? 'bg-red-50 text-red-700' : 'bg-muted text-muted-foreground'
+                      )}>
+                        {c.status === 'en_attente' ? 'En attente de signature' : c.status === 'actif' ? 'Actif' : c.status === 'suspendu' ? 'Suspendu' : c.status === 'resilie' ? 'Résilié' : c.status}
+                      </span>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -712,6 +828,9 @@ export default function ContratsPage() {
                             <FileText className="mr-2 h-4 w-4" /> Voir le devis {c.quotes.quote_number}
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem onClick={() => setSendTarget(c)}>
+                          <Send className="mr-2 h-4 w-4" /> Envoyer pour signature
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(c)}>
                           <Edit className="mr-2 h-4 w-4" /> Modifier
                         </DropdownMenuItem>
@@ -872,7 +991,29 @@ export default function ContratsPage() {
         />
       )}
 
-      {/* Create/Edit Dialog */}
+      {sendTarget && (
+        <SendContractDialog
+          contract={{
+            id: sendTarget.id,
+            contract_number: sendTarget.contract_number,
+            title: sendTarget.title,
+            clients: sendTarget.clients ? { name: sendTarget.clients.name, email: sendTarget.clients.email } : null,
+          }}
+          onClose={() => setSendTarget(null)}
+          onSent={() => loadContracts()}
+        />
+      )}
+
+      {/* Wizard de creation/edition */}
+      <ContractWizard
+        open={wizardOpen}
+        onOpenChange={(v) => { setWizardOpen(v); if (!v) setEditingId(null); }}
+        initial={wizardInitial}
+        onSubmit={saveFromWizard}
+        editing={Boolean(editingId)}
+      />
+
+      {/* Ancienne modale — conservee pour compat mais inutilisee */}
       <Dialog open={showForm} onOpenChange={v => { if (!v) { setShowForm(false); setEditingId(null); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

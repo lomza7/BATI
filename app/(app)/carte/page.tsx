@@ -151,30 +151,12 @@ export default function CartePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
-      const link = getShareLink();
       const companyName = profile.company_name || 'notre entreprise';
       const clientName = shareClient?.name || '';
-      const greeting = clientName ? `Bonjour ${clientName},` : 'Bonjour,';
-      await fetch('/api/gmail/send', {
+      await fetch('/api/carte/share', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: email,
-          subject: `Découvrez nos chantiers — ${companyName}`,
-          body: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-            <h2 style="color:#D35400;">Nos réalisations</h2>
-            <p>${greeting}</p>
-            <p>${companyName} vous partage la carte interactive de ses chantiers et réalisations.</p>
-            <p style="margin:24px 0;">
-              <a href="${link}" style="background:#D35400;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
-                Voir la carte des chantiers
-              </a>
-            </p>
-            <p style="color:#666;font-size:14px;">Vous pouvez consulter la localisation, l'avancement et les détails de nos projets.</p>
-            <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-            <p style="color:#999;font-size:12px;">Envoyé depuis <a href="https://hellobat.app" style="color:#D35400;">Hellobat</a></p>
-          </div>`,
-        }),
+        body: JSON.stringify({ to: email, companyName, clientName }),
       });
       setShareSent(true);
       setTimeout(() => {
