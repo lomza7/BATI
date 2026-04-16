@@ -46,6 +46,7 @@ interface QuoteLine {
   total: number;
   position: number;
   section?: string | null;
+  subsection?: string | null;
 }
 
 interface CardQuote {
@@ -168,6 +169,7 @@ export function QuoteBillingCard({
             unit_price: line.unit_price,
             tva_rate: line.tva_rate ?? 20,
             section: line.section || null,
+            subsection: line.subsection || null,
             total: line.total || line.quantity * line.unit_price,
             position: typeof line.position === 'number' ? line.position : idx,
           })),

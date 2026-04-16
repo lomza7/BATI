@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -19,11 +19,13 @@ import {
   Layers,
   Pencil,
   Trash2,
+  GripVertical,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { QUOTE_UNITS, formatCurrency } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { SECTION_LABELS } from '@/lib/quote-sections';
 import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { ClientPicker } from '@/components/shared/client-picker';
@@ -55,6 +57,7 @@ interface QuoteLine {
   unit_price: number;
   tva_rate: number;
   section?: string;
+  subsection?: string;
   is_recurring?: boolean;
   frequency?: string;
   _savedAsPrestation?: boolean;
@@ -158,6 +161,12 @@ export default function NouveauDevisPage() {
   const [addedServiceIds, setAddedServiceIds] = useState<Set<string>>(new Set());
   const [showServicePanel, setShowServicePanel] = useState(true);
   const [sectionDialog, setSectionDialog] = useState<{ mode: 'create' | 'rename'; oldName?: string; value: string } | null>(null);
+  const [subsectionDialog, setSubsectionDialog] = useState<{
+    mode: 'create' | 'rename';
+    parentSection: string;
+    oldName?: string;
+    value: string;
+  } | null>(null);
   const [showDesktopPanel, setShowDesktopPanel] = useState(true);
   const [isRecurringQuote, setIsRecurringQuote] = useState(false);
   const [recurringFrequency, setRecurringFrequency] = useState('annuel');
@@ -165,6 +174,12 @@ export default function NouveauDevisPage() {
   const serviceSearchRef = useRef<HTMLInputElement>(null);
   const [autocompleteIndex, setAutocompleteIndex] = useState<number | null>(null);
   const autocompleteRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const [draggingSub, setDraggingSub] = useState<{ section: string; subsection: string } | null>(null);
+  type DragOverTarget =
+    | { kind: 'section-top'; section: string }
+    | { kind: 'subsection'; section: string; subsection: string }
+    | { kind: 'line'; lineIndex: number };
+  const [dragOverTarget, setDragOverTarget] = useState<DragOverTarget | null>(null);
 
   // Prefill from URL params
   useEffect(() => {
@@ -224,9 +239,21 @@ export default function NouveauDevisPage() {
   }
 
   function addLine() {
-    // Inherit section from the last line (or none)
-    const lastSection = lines.length > 0 ? lines[lines.length - 1].section : undefined;
-    setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: lastSection }]);
+    // Inherit section AND subsection from the last line so the user keeps
+    // typing inside the same group without re-selecting it.
+    const last = lines.length > 0 ? lines[lines.length - 1] : null;
+    setLines([
+      ...lines,
+      {
+        description: '',
+        quantity: 1,
+        unit: 'u',
+        unit_price: 0,
+        tva_rate: 20,
+        section: last?.section,
+        subsection: last?.subsection,
+      },
+    ]);
   }
 
   function addSection() {
@@ -242,6 +269,8 @@ export default function NouveauDevisPage() {
     const name = sectionDialog.value.trim();
     if (!name) return;
     if (sectionDialog.mode === 'create') {
+      // New section starts with no subsection so the artisan can either
+      // start typing lines, or click "Sous-section" to nest one.
       setLines([...lines, { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: name }]);
     } else if (sectionDialog.mode === 'rename' && sectionDialog.oldName && name !== sectionDialog.oldName) {
       setLines(lines.map(l => l.section === sectionDialog.oldName ? { ...l, section: name } : l));
@@ -250,8 +279,165 @@ export default function NouveauDevisPage() {
   }
 
   function deleteSection(sectionName: string) {
-    // Remove the section assignment — lines keep their content but lose the section
-    setLines(lines.map(l => l.section === sectionName ? { ...l, section: undefined } : l));
+    // Remove the section assignment — lines keep their content but lose
+    // the section AND any subsection (a subsection without a parent section
+    // would be orphaned in the rendering).
+    setLines(lines.map(l => l.section === sectionName ? { ...l, section: undefined, subsection: undefined } : l));
+  }
+
+  function addSubsection(parentSection: string) {
+    setSubsectionDialog({ mode: 'create', parentSection, value: '' });
+  }
+
+  // Toolbar "Sous-section" button: target the most recent section in use.
+  function addSubsectionFromToolbar() {
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].section) {
+        setSubsectionDialog({ mode: 'create', parentSection: lines[i].section!, value: '' });
+        return;
+      }
+    }
+  }
+
+  function renameSubsection(parentSection: string, oldName: string) {
+    setSubsectionDialog({ mode: 'rename', parentSection, oldName, value: oldName });
+  }
+
+  function confirmSubsectionDialog() {
+    if (!subsectionDialog) return;
+    const name = subsectionDialog.value.trim();
+    if (!name) return;
+    if (subsectionDialog.mode === 'create') {
+      // If the parent section already contains an empty placeholder line with
+      // no subsection (typically the line auto-created when the section was
+      // added), reuse it instead of inserting a new one — otherwise the editor
+      // shows a phantom no-subsection block above the new subsection that
+      // looks like a duplicated section.
+      let reuseIdx = -1;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const l = lines[i];
+        if (
+          l.section === subsectionDialog.parentSection &&
+          !l.subsection &&
+          !l.description.trim() &&
+          !l.unit_price
+        ) {
+          reuseIdx = i;
+          break;
+        }
+      }
+      if (reuseIdx !== -1) {
+        setLines(lines.map((l, i) => (i === reuseIdx ? { ...l, subsection: name } : l)));
+      } else {
+        const newLine: QuoteLine = {
+          description: '',
+          quantity: 1,
+          unit: 'u',
+          unit_price: 0,
+          tva_rate: 20,
+          section: subsectionDialog.parentSection,
+          subsection: name,
+        };
+        let lastIdx = -1;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].section === subsectionDialog.parentSection) lastIdx = i;
+        }
+        if (lastIdx === -1) {
+          setLines([...lines, newLine]);
+        } else {
+          setLines([...lines.slice(0, lastIdx + 1), newLine, ...lines.slice(lastIdx + 1)]);
+        }
+      }
+    } else if (
+      subsectionDialog.mode === 'rename' &&
+      subsectionDialog.oldName &&
+      name !== subsectionDialog.oldName
+    ) {
+      setLines(
+        lines.map((l) =>
+          l.section === subsectionDialog.parentSection && l.subsection === subsectionDialog.oldName
+            ? { ...l, subsection: name }
+            : l,
+        ),
+      );
+    }
+    setSubsectionDialog(null);
+  }
+
+  function deleteSubsection(parentSection: string, name: string) {
+    setLines(
+      lines.map((l) =>
+        l.section === parentSection && l.subsection === name ? { ...l, subsection: undefined } : l,
+      ),
+    );
+  }
+
+  // Move an entire subsection block (header + its lines) to a new position.
+  // dst.subsection === null → place at TOP of dst.section (just under header).
+  function moveSubsection(
+    src: { section: string; subsection: string },
+    dst: { section: string; subsection: string | null },
+  ) {
+    if (src.section === dst.section && src.subsection === dst.subsection) return;
+
+    const moved: QuoteLine[] = [];
+    const remaining: QuoteLine[] = [];
+    for (const l of lines) {
+      if (l.section === src.section && l.subsection === src.subsection) {
+        moved.push({ ...l, section: dst.section });
+      } else {
+        remaining.push(l);
+      }
+    }
+    if (moved.length === 0) return;
+
+    let insertAt: number;
+    if (dst.subsection !== null) {
+      insertAt = remaining.findIndex(
+        (l) => l.section === dst.section && l.subsection === dst.subsection,
+      );
+      if (insertAt === -1) insertAt = remaining.length;
+    } else {
+      // Top of section: insert before the first line of dst.section
+      insertAt = remaining.findIndex((l) => l.section === dst.section);
+      if (insertAt === -1) insertAt = remaining.length;
+    }
+
+    setLines([...remaining.slice(0, insertAt), ...moved, ...remaining.slice(insertAt)]);
+  }
+
+  // Move a subsection block right BEFORE a specific line. The dragged
+  // subsection inherits the target line's section so it lands inside the
+  // section the user is hovering, regardless of where it came from.
+  function moveSubsectionToLineIndex(
+    src: { section: string; subsection: string },
+    targetLineIndex: number,
+  ) {
+    const target = lines[targetLineIndex];
+    if (!target) return;
+    if (target.section === src.section && target.subsection === src.subsection) return;
+    const dstSection = target.section ?? src.section;
+
+    const moved: QuoteLine[] = [];
+    const remaining: { line: QuoteLine; origIdx: number }[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.section === src.section && l.subsection === src.subsection) {
+        moved.push({ ...l, section: dstSection });
+      } else {
+        remaining.push({ line: l, origIdx: i });
+      }
+    }
+    if (moved.length === 0) return;
+
+    const newTargetIdx = remaining.findIndex((r) => r.origIdx === targetLineIndex);
+    const insertAt = newTargetIdx === -1 ? remaining.length : newTargetIdx;
+
+    setLines([
+      ...remaining.slice(0, insertAt).map((r) => r.line),
+      ...moved,
+      ...remaining.slice(insertAt).map((r) => r.line),
+    ]);
   }
 
   function updateLine(index: number, field: keyof QuoteLine, value: string | number) {
@@ -272,14 +458,20 @@ export default function NouveauDevisPage() {
 
   function applySuggestion(lineIndex: number, s: Service) {
     const updated = [...lines];
+    const current = updated[lineIndex];
+    // Preserve the line's existing section/subsection — picking a prestation
+    // suggestion must not yank the line out of the section the user just
+    // created. Only fall back to the prestation's default when the line has
+    // no section yet.
     updated[lineIndex] = {
-      ...updated[lineIndex],
+      ...current,
       description: s.name,
-      detail: s.description || updated[lineIndex].detail || '',
+      detail: s.description || current.detail || '',
       unit: s.unit,
       unit_price: s.unit_price,
       tva_rate: s.tva_rate ?? 20,
-      section: s.section || 'materiel',
+      section: current.section ?? s.section ?? 'materiel',
+      subsection: current.subsection,
       is_recurring: s.is_recurring,
       frequency: s.frequency,
       _savedAsPrestation: true,
@@ -307,6 +499,15 @@ export default function NouveauDevisPage() {
   }
 
   function pickService(s: Service) {
+    // Picking a prestation must drop the line into the section the artisan is
+    // currently editing, not force-move it to the prestation's stored section
+    // — otherwise creating a custom section and then picking a prestation
+    // would reshuffle the line into "materiel" and make the custom section
+    // look like it disappeared.
+    const last = lines.length > 0 ? lines[lines.length - 1] : null;
+    const targetSection = last?.section ?? s.section ?? 'materiel';
+    const inheritedSubsection =
+      last && last.section === targetSection ? last.subsection : undefined;
     const newLine: QuoteLine = {
       description: s.name,
       detail: s.description || '',
@@ -314,7 +515,8 @@ export default function NouveauDevisPage() {
       unit: s.unit,
       unit_price: s.unit_price,
       tva_rate: s.tva_rate ?? 20,
-      section: s.section || 'materiel',
+      section: targetSection,
+      subsection: inheritedSubsection,
       is_recurring: s.is_recurring,
       frequency: s.frequency,
       _savedAsPrestation: true,
@@ -365,6 +567,11 @@ export default function NouveauDevisPage() {
       }
 
       const validLines = lines.filter(l => l.description.trim());
+      // Structural lines: keep placeholders that carry section/subsection so the
+      // editor's organization is preserved on reload (WYSIWYG with the preview).
+      const persistedLines = lines.filter(
+        l => l.description.trim() || l.section || l.subsection,
+      );
       const tva = computeTvaBreakdown(validLines);
       const totalHt = tva.total_ht;
       const totalTva = tva.total_tva;
@@ -394,9 +601,9 @@ export default function NouveauDevisPage() {
           .eq('id', draftId.current);
 
         await supabase.from('quote_lines').delete().eq('quote_id', draftId.current);
-        if (validLines.length > 0) {
+        if (persistedLines.length > 0) {
           await supabase.from('quote_lines').insert(
-            validLines.map((l, i) => ({
+            persistedLines.map((l, i) => ({
               user_id: user.id,
               quote_id: draftId.current!,
               description: l.description,
@@ -406,6 +613,7 @@ export default function NouveauDevisPage() {
               unit_price: l.unit_price,
               tva_rate: l.tva_rate,
               section: l.section || null,
+              subsection: l.subsection || null,
               total: l.quantity * l.unit_price,
               position: i,
             }))
@@ -466,9 +674,9 @@ export default function NouveauDevisPage() {
 
         if (quote) savedQuoteId = quote.id;
 
-        if (quote && validLines.length > 0) {
+        if (quote && persistedLines.length > 0) {
           await supabase.from('quote_lines').insert(
-            validLines.map((l, i) => ({
+            persistedLines.map((l, i) => ({
               user_id: user.id,
               quote_id: quote.id,
               description: l.description,
@@ -478,6 +686,7 @@ export default function NouveauDevisPage() {
               unit_price: l.unit_price,
               tva_rate: l.tva_rate,
               section: l.section || null,
+              subsection: l.subsection || null,
               total: l.quantity * l.unit_price,
               position: i,
             }))
@@ -577,6 +786,9 @@ export default function NouveauDevisPage() {
       const id = draftId.current;
       if (!id) return;
       const validLines = lines.filter(l => l.description.trim());
+      const persistedLines = lines.filter(
+        l => l.description.trim() || l.section || l.subsection,
+      );
       const tva = computeTvaBreakdown(validLines);
       if (gen !== autosaveGenRef.current) return;
       await supabase
@@ -595,9 +807,9 @@ export default function NouveauDevisPage() {
       if (gen !== autosaveGenRef.current) return;
       await supabase.from('quote_lines').delete().eq('quote_id', id);
       if (gen !== autosaveGenRef.current) return;
-      if (validLines.length > 0) {
+      if (persistedLines.length > 0) {
         await supabase.from('quote_lines').insert(
-          validLines.map((l, i) => ({
+          persistedLines.map((l, i) => ({
             user_id: user.id,
             quote_id: id,
             description: l.description,
@@ -607,6 +819,7 @@ export default function NouveauDevisPage() {
             unit_price: l.unit_price,
             tva_rate: l.tva_rate,
             section: l.section || null,
+            subsection: l.subsection || null,
             total: l.quantity * l.unit_price,
             position: i,
           }))
@@ -641,6 +854,43 @@ export default function NouveauDevisPage() {
   }
 
   const linesTotals = computeTvaBreakdown(lines.filter(l => l.description.trim()));
+
+  // Per-run subtotals keyed by the index of the FIRST line in each run.
+  // Matches the per-run grouping used by the preview so the editor's running
+  // totals stay consistent with what the client will see.
+  const runSubtotals = useMemo(() => {
+    const sectionByStart = new Map<number, { ht: number; ttc: number }>();
+    const subsectionByStart = new Map<number, { ht: number; ttc: number }>();
+    let secStart = -1;
+    let subStart = -1;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const sKey = l.section ?? null;
+      const subKey = l.subsection ?? null;
+      const prev = i > 0 ? lines[i - 1] : null;
+      const prevSection = prev ? prev.section ?? null : Symbol() as unknown as string | null;
+      const prevSub = prev ? prev.subsection ?? null : Symbol() as unknown as string | null;
+
+      if (sKey !== prevSection) {
+        secStart = i;
+        sectionByStart.set(secStart, { ht: 0, ttc: 0 });
+      }
+      if (sKey !== prevSection || subKey !== prevSub) {
+        subStart = i;
+        subsectionByStart.set(subStart, { ht: 0, ttc: 0 });
+      }
+
+      const ht = (l.quantity || 0) * (l.unit_price || 0);
+      const ttc = ht * (1 + (l.tva_rate ?? 20) / 100);
+      const sec = sectionByStart.get(secStart)!;
+      sec.ht += ht;
+      sec.ttc += ttc;
+      const sub = subsectionByStart.get(subStart)!;
+      sub.ht += ht;
+      sub.ttc += ttc;
+    }
+    return { sectionByStart, subsectionByStart };
+  }, [lines]);
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8 -my-5 lg:-my-8 flex flex-col min-h-[100dvh] sm:h-screen">
@@ -764,6 +1014,20 @@ export default function NouveauDevisPage() {
                   <Button variant="outline" size="sm" onClick={addSection} className="gap-1 text-xs">
                     <Layers className="h-3 w-3" /> Section
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addSubsectionFromToolbar}
+                    disabled={!lines.some((l) => l.section)}
+                    className="gap-1 text-xs"
+                    title={
+                      lines.some((l) => l.section)
+                        ? 'Ajouter une sous-section dans la dernière section'
+                        : 'Créez d\u2019abord une section'
+                    }
+                  >
+                    <Layers className="h-3 w-3 opacity-60" /> Sous-section
+                  </Button>
                   <Button variant="outline" size="sm" onClick={addLine} className="gap-1 text-xs">
                     <Plus className="h-3 w-3" /> Ligne
                   </Button>
@@ -775,20 +1039,167 @@ export default function NouveauDevisPage() {
                   <Fragment key={i}>
                   {/* Section header — shown when this line starts a new section */}
                   {line.section && (i === 0 || lines[i - 1].section !== line.section) && (
-                    <div className="flex items-center gap-2 pt-2 first:pt-0">
-                      <div className="flex-1 flex items-center gap-2 rounded-lg bg-muted/70 border border-border px-3 py-2">
+                    <div
+                      className="flex items-center gap-2 pt-2 first:pt-0"
+                      onDragOver={(e) => {
+                        if (!draggingSub) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverTarget({ kind: 'section-top', section: line.section! });
+                      }}
+                      onDragLeave={(e) => {
+                        if (!draggingSub) return;
+                        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                        setDragOverTarget(null);
+                      }}
+                      onDrop={(e) => {
+                        if (!draggingSub) return;
+                        e.preventDefault();
+                        moveSubsection(draggingSub, { section: line.section!, subsection: null });
+                        setDraggingSub(null);
+                        setDragOverTarget(null);
+                      }}
+                    >
+                      <div
+                        className={cn(
+                          'flex-1 flex items-center gap-2 rounded-lg bg-muted/70 border border-border px-3 py-2 transition-all',
+                          draggingSub &&
+                            dragOverTarget?.kind === 'section-top' &&
+                            dragOverTarget.section === line.section &&
+                            'border-b-2 border-b-[#d35400] shadow-[0_4px_0_-2px_#d35400]',
+                        )}
+                      >
                         <Layers className="h-3.5 w-3.5 text-[#d35400]" />
-                        <span className="text-sm font-semibold text-foreground">{line.section}</span>
+                        <span className="text-sm font-semibold text-foreground">{SECTION_LABELS[line.section!] || line.section}</span>
+                        {runSubtotals.sectionByStart.has(i) && (
+                          <span className="ml-auto text-xs font-medium tabular-nums text-[#d35400]">
+                            {formatCurrency(runSubtotals.sectionByStart.get(i)!.ht)} HT · {formatCurrency(runSubtotals.sectionByStart.get(i)!.ttc)} TTC
+                          </span>
+                        )}
                       </div>
-                      <button type="button" onClick={() => renameSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                      <button type="button" onClick={() => renameSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Renommer la section">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => deleteSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive">
+                      <button type="button" onClick={() => deleteSection(line.section!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive" title="Supprimer la section">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   )}
-                  <div key={i} className="rounded-lg border border-border bg-card p-2.5 sm:p-3">
+                  {/* Subsection header — shown when this line starts a new subsection within the current section */}
+                  {line.section && line.subsection && (
+                    i === 0 ||
+                    lines[i - 1].section !== line.section ||
+                    lines[i - 1].subsection !== line.subsection
+                  ) && (
+                    <div
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggingSub({ section: line.section!, subsection: line.subsection! });
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', line.subsection!);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingSub(null);
+                        setDragOverTarget(null);
+                      }}
+                      onDragOver={(e) => {
+                        if (!draggingSub) return;
+                        if (
+                          draggingSub.section === line.section &&
+                          draggingSub.subsection === line.subsection
+                        ) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverTarget({
+                          kind: 'subsection',
+                          section: line.section!,
+                          subsection: line.subsection!,
+                        });
+                      }}
+                      onDragLeave={(e) => {
+                        if (!draggingSub) return;
+                        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                        setDragOverTarget(null);
+                      }}
+                      onDrop={(e) => {
+                        if (!draggingSub) return;
+                        e.preventDefault();
+                        moveSubsection(draggingSub, {
+                          section: line.section!,
+                          subsection: line.subsection!,
+                        });
+                        setDraggingSub(null);
+                        setDragOverTarget(null);
+                      }}
+                      className={cn(
+                        'flex items-center gap-2 pl-4 group/sub transition-opacity',
+                        draggingSub?.section === line.section &&
+                          draggingSub?.subsection === line.subsection &&
+                          'opacity-40',
+                        dragOverTarget?.kind === 'subsection' &&
+                          dragOverTarget.section === line.section &&
+                          dragOverTarget.subsection === line.subsection &&
+                          'border-t-2 border-[#d35400] -mt-0.5 pt-0.5',
+                      )}
+                    >
+                      <div className="flex-1 flex items-center gap-2 rounded-lg bg-[#d35400]/[0.06] border border-[#d35400]/15 border-l-[3px] border-l-[#d35400] pl-2.5 pr-3 py-2 hover:bg-[#d35400]/[0.09] transition-colors">
+                        <button
+                          type="button"
+                          className="cursor-grab active:cursor-grabbing text-[#d35400]/60 hover:text-[#d35400] touch-none"
+                          title="Glisser pour déplacer la sous-section"
+                          aria-label="Déplacer la sous-section"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                        <span className="text-sm font-semibold text-foreground tracking-tight">{line.subsection}</span>
+                        {runSubtotals.subsectionByStart.has(i) && (
+                          <span className="ml-auto text-xs font-medium tabular-nums text-[#d35400]">
+                            {formatCurrency(runSubtotals.subsectionByStart.get(i)!.ht)} HT · {formatCurrency(runSubtotals.subsectionByStart.get(i)!.ttc)} TTC
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <button type="button" onClick={() => renameSubsection(line.section!, line.subsection!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Renommer la sous-section">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => deleteSubsection(line.section!, line.subsection!)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive" title="Supprimer la sous-section">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div
+                    key={i}
+                    onDragOver={(e) => {
+                      if (!draggingSub) return;
+                      if (
+                        line.section === draggingSub.section &&
+                        line.subsection === draggingSub.subsection
+                      ) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverTarget({ kind: 'line', lineIndex: i });
+                    }}
+                    onDragLeave={(e) => {
+                      if (!draggingSub) return;
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      setDragOverTarget(null);
+                    }}
+                    onDrop={(e) => {
+                      if (!draggingSub) return;
+                      e.preventDefault();
+                      moveSubsectionToLineIndex(draggingSub, i);
+                      setDraggingSub(null);
+                      setDragOverTarget(null);
+                    }}
+                    className={cn(
+                      'rounded-lg border border-border bg-card p-2.5 sm:p-3 transition-all',
+                      line.subsection && 'ml-4',
+                      dragOverTarget?.kind === 'line' &&
+                        dragOverTarget.lineIndex === i &&
+                        'border-t-2 border-t-[#d35400] -mt-0.5',
+                    )}
+                  >
                     {/* Mobile: stacked layout */}
                     <div className="sm:hidden space-y-2">
                       <div className="flex items-start gap-2">
@@ -1237,6 +1648,68 @@ export default function NouveauDevisPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSectionDialog(null)}>Annuler</Button>
             <Button onClick={confirmSectionDialog} style={{ backgroundColor: '#D35400' }}>Valider</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!subsectionDialog} onOpenChange={(o) => !o && setSubsectionDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {subsectionDialog?.mode === 'rename' ? 'Renommer la sous-section' : 'Nouvelle sous-section'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {subsectionDialog && (() => {
+              const distinctSections = Array.from(
+                new Set(lines.map((l) => l.section).filter((s): s is string => !!s)),
+              );
+              const showPicker = subsectionDialog.mode === 'create' && distinctSections.length > 1;
+              if (showPicker) {
+                return (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="subsection-parent">Section parente</Label>
+                    <Select
+                      value={subsectionDialog.parentSection}
+                      onValueChange={(val) =>
+                        setSubsectionDialog(
+                          subsectionDialog ? { ...subsectionDialog, parentSection: val } : null,
+                        )
+                      }
+                    >
+                      <SelectTrigger id="subsection-parent" className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {distinctSections.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              }
+              return (
+                <p className="text-xs text-muted-foreground">
+                  Dans la section <span className="font-medium text-foreground">{subsectionDialog.parentSection}</span>
+                </p>
+              );
+            })()}
+            <div className="space-y-1.5">
+              <Label htmlFor="subsection-name">Nom de la sous-section</Label>
+              <Input
+                id="subsection-name"
+                value={subsectionDialog?.value ?? ''}
+                onChange={(e) => setSubsectionDialog(subsectionDialog ? { ...subsectionDialog, value: e.target.value } : null)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmSubsectionDialog(); } }}
+                placeholder="Ex. Matériel ou Main d'œuvre"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubsectionDialog(null)}>Annuler</Button>
+            <Button onClick={confirmSubsectionDialog} style={{ backgroundColor: '#D35400' }}>Valider</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -96,6 +96,7 @@ interface QuoteLine {
   total: number;
   position: number;
   section?: string | null;
+  subsection?: string | null;
 }
 
 interface QuoteCandidate {
@@ -252,7 +253,7 @@ export default function FacturesPage() {
           project_id,
           deposit_percentage,
           clients(name, email, deleted_at),
-          quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position, section),
+          quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position, section, subsection),
           invoices(id)
         `)
         .is('deleted_at', null)
