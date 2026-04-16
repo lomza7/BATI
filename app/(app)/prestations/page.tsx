@@ -22,6 +22,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { DetailTextarea } from '@/components/devis/detail-textarea';
+import { generateQuoteDetail } from '@/lib/ai/generate-quote-detail';
+import { savePrestationDetail } from '@/lib/prestation-details';
+import { useToast } from '@/hooks/use-toast';
 
 interface Service {
   id: string;
@@ -86,6 +90,7 @@ const emptyForm = {
 
 export default function PrestationsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -95,6 +100,17 @@ export default function PrestationsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+
+  async function handleGenerateDescription(): Promise<string> {
+    return generateQuoteDetail({
+      description: form.name,
+      existingDetail: form.description || undefined,
+    });
+  }
+
+  function handleAiError(message: string) {
+    toast({ title: 'Génération IA impossible', description: message, variant: 'destructive' });
+  }
 
   useEffect(() => { if (user) loadServices(); }, [user]);
 
@@ -169,6 +185,10 @@ export default function PrestationsPage() {
         ...form,
         user_id: user.id,
       });
+    }
+
+    if (form.description.trim()) {
+      savePrestationDetail(form.name, form.description).catch(() => {});
     }
 
     setShowForm(false);
@@ -396,13 +416,15 @@ export default function PrestationsPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Description</label>
-              <textarea
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                rows={2}
-                placeholder="Détails, références, marque…"
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-              />
+              <div className="mt-1">
+                <DetailTextarea
+                  placeholder="Détails, références, marque… — appuyez sur Entrée pour créer une puce"
+                  value={form.description}
+                  onChange={(val) => setForm({ ...form, description: val })}
+                  onAiGenerate={form.name.trim() ? handleGenerateDescription : undefined}
+                  onAiError={handleAiError}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
