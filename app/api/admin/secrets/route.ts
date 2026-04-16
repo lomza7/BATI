@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAdminRequest } from '@/lib/admin';
 
+// Stockage des clés API de providers IA (OpenAI, Gemini, Groq).
+// Choix : stockage en clair dans la table `platform_secrets` pour permettre
+// rotation sans redéploiement et (à terme) configuration par workspace.
+// Risque acceptable : si la DB fuite, l'env fuite aussi — pas de multiplication
+// du risque. Amélioration defense-in-depth possible : chiffrement applicatif
+// côté serveur (KMS ou pgcrypto) pour qu'une lecture DB brute ne suffise pas.
+// Non prioritaire. Voir audit §1.4.
+
 // Keys safe to expose to admin client (we mask the value if too long)
 const ALLOWED_KEYS = new Set([
   'image_provider',

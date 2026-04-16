@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  audit-public-routes:
+    name: Audit routes publiques
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Mode warn-only tant que les 12 routes non conformes
+      # (portail comptable, rendus publics, sign-quote) n'ont pas
+      # été migrées vers le contrat @/lib/public-access.
+      # Passer à `audit:public-routes:strict` quand la migration est finie.
+      - run: npm run audit:public-routes
+
+  e2e:
+    name: E2E Playwright
+    runs-on: ubuntu-latest
+    # Tant que les secrets TEST_SUPABASE_* ne sont pas configurés, les
+    # specs passent automatiquement en mode `test.skip` (voir specs).
+    # continue-on-error évite de bloquer les merges sur ce job.
+    continue-on-error: true
+    env:
+      CI: 'true'
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      TEST_SUPABASE_SERVICE_ROLE: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE }}
+      TEST_STRIPE_SECRET_KEY: ${{ secrets.TEST_STRIPE_SECRET_KEY }}
+      TEST_STRIPE_PUBLISHABLE_KEY: ${{ secrets.TEST_STRIPE_PUBLISHABLE_KEY }}
+      TEST_DOCUSEAL_API_KEY: ${{ secrets.TEST_DOCUSEAL_API_KEY }}
+      TEST_RESEND_API_KEY: ${{ secrets.TEST_RESEND_API_KEY }}
+      # L'app a besoin de ses propres vars d'env pour builder + tourner.
+      # Réutilise les mêmes credentials de test quand c'est pertinent.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

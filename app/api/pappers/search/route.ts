@@ -48,8 +48,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `https://api.pappers.fr/v2/recherche?api_token=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(q)}&par_page=5&precision=standard`;
-    const res = await fetch(url, { cache: 'no-store' });
+    // Auth via header `api-key` plutôt que query string pour éviter la fuite
+    // de la clé dans les logs proxy/CDN/navigateur.
+    const url = `https://api.pappers.fr/v2/recherche?q=${encodeURIComponent(q)}&par_page=5&precision=standard`;
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'api-key': apiKey },
+    });
 
     if (!res.ok) {
       const text = await res.text();

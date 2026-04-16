@@ -28,6 +28,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
   }
 
+  // Idempotence: Stripe peut rejouer un event (retries, double webhook).
+  // On insère event.id dans stripe_webhook_events avec unique constraint;
+  // si la ligne existe déjà (code 23505), on skip l'event.
+  const { error: eventInsertErr } = await supabaseAdmin
+    .from('stripe_webhook_events')
+    .insert({ event_id: event.id, event_type: event.type });
+  if (eventInsertErr) {
+    if ((eventInsertErr as { code?: string }).code === '23505') {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+    console.error('[stripe/hellopay/webhook] idempotence insert error', eventInsertErr);
+  }
+
   if (event.type === 'payment_intent.succeeded') {
     const pi = event.data.object as Stripe.PaymentIntent;
 

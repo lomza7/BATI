@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
-import { Mail, MapPin, Calendar, Send, CheckCircle2 } from 'lucide-react';
+import { Mail, MapPin, Calendar, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import { Turnstile, type TurnstileHandle } from '@/components/shared/turnstile';
 
 const SUBJECTS = [
   'Question sur Hellobat',
@@ -15,12 +16,52 @@ const SUBJECTS = [
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [honeypot, setHoneypot] = useState('');
   const [form, setForm] = useState({ name: '', email: '', subject: SUBJECTS[0], message: '' });
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: wire to API / Resend
-    setSent(true);
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          turnstile_token: turnstileToken,
+          company_website: honeypot,
+        }),
+      });
+
+      if (res.status === 429) {
+        setError('Trop de tentatives. Réessayez dans quelques instants.');
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error || 'Envoi impossible. Réessayez plus tard.');
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+        return;
+      }
+
+      setSent(true);
+    } catch (err) {
+      console.warn('[contact] submit failed', err);
+      setError('Erreur réseau. Vérifiez votre connexion.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -181,12 +222,44 @@ export default function ContactPage() {
                       />
                     </div>
 
+                    {/* Honeypot : champ invisible — les bots le remplissent, les humains non */}
+                    <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}>
+                      <label>
+                        Ne pas remplir
+                        <input
+                          type="text"
+                          tabIndex={-1}
+                          autoComplete="off"
+                          value={honeypot}
+                          onChange={(e) => setHoneypot(e.target.value)}
+                        />
+                      </label>
+                    </div>
+
+                    <Turnstile ref={turnstileRef} onVerify={setTurnstileToken} />
+
+                    {error && (
+                      <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                        {error}
+                      </div>
+                    )}
+
                     <button
                       type="submit"
-                      className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-[var(--landing-accent)] text-white text-sm font-medium hover:bg-[#b94800] transition-colors"
+                      disabled={submitting}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-full bg-[var(--landing-accent)] text-white text-sm font-medium hover:bg-[#b94800] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      <Send className="w-4 h-4" />
-                      Envoyer le message
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Envoi en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Envoyer le message
+                        </>
+                      )}
                     </button>
                   </form>
                 )}

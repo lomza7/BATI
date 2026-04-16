@@ -29,8 +29,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `https://api.pappers.fr/v2/entreprise?api_token=${encodeURIComponent(apiKey)}&siren=${encodeURIComponent(siren)}`;
-    const res = await fetch(url);
+    // Auth via header `api-key` plutôt que query string pour éviter la fuite
+    // de la clé dans les logs proxy/CDN/navigateur.
+    const url = `https://api.pappers.fr/v2/entreprise?siren=${encodeURIComponent(siren)}`;
+    const res = await fetch(url, {
+      headers: { 'api-key': apiKey },
+    });
 
     if (!res.ok) {
       const text = await res.text();

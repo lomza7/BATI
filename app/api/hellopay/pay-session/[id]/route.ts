@@ -1,26 +1,26 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateInvoicePaySession } from '@/lib/public-access';
 
 export const runtime = 'nodejs';
 
+// Politique d'accès : l'UUID v4 de la facture sert de token de paiement
+// public (~122 bits d'entropie). Même principe que les liens de partage
+// Google Docs / Calendly. Rien d'exploitable ne fuite sans l'UUID : le
+// client_secret Stripe est public par design, et il ne permet que de
+// *payer* cette facture, pas d'en détourner les fonds.
+// Amélioration defense-in-depth possible (non prioritaire) : ajouter une
+// colonne `public_pay_token` dédiée + double-routing pour ne pas casser
+// les liens déjà envoyés. Voir audit §1.2.
 export async function GET(
   _request: Request,
   { params }: { params: { id: string } },
 ) {
-  const { id } = params;
-  if (!id) return NextResponse.json({ error: 'id requis' }, { status: 400 });
-
-  const { data, error } = await supabaseAdmin
-    .from('invoices')
-    .select(
-      'id, title, total_ttc, status, payment_client_secret, payment_stripe_account_id, payment_publishable_key',
-    )
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error || !data) {
-    return NextResponse.json({ error: 'Lien invalide' }, { status: 404 });
+  // Contrat public-access : validation AVANT toute requête DB. Voir §1.3.
+  const access = await validateInvoicePaySession(params.id);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  const data = access.data;
 
   if (data.status === 'payee') {
     return NextResponse.json({
