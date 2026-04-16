@@ -26,6 +26,7 @@ import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
+import { DetailTextarea } from '@/components/devis/detail-textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -571,12 +571,10 @@ export default function ModifierDevisPage() {
                               </div>
                             )}
                           </div>
-                          <textarea
-                            placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
+                          <DetailTextarea
+                            placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
                             value={line.detail || ''}
-                            onChange={e => updateLine(i, 'detail', e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                            rows={1}
+                            onChange={(val) => updateLine(i, 'detail', val)}
                           />
                         </div>
                         <div className="flex items-center gap-1 pt-1.5 shrink-0">
@@ -621,7 +619,9 @@ export default function ModifierDevisPage() {
                         </div>
                       </div>
                       {line.description.trim() && line.unit_price > 0 && (
-                        <p className="text-right text-xs text-muted-foreground">{formatCurrency(line.quantity * line.unit_price)} HT</p>
+                        <p className="text-right text-xs text-muted-foreground">
+                          {formatCurrency(line.quantity * line.unit_price)} HT · <span className="font-medium text-foreground">{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))} TTC</span>
+                        </p>
                       )}
                     </div>
 
@@ -668,12 +668,10 @@ export default function ModifierDevisPage() {
                               </div>
                             )}
                           </div>
-                          <textarea
-                            placeholder="Detail (optionnel) — ex: marque, couleur, specifications..."
+                          <DetailTextarea
+                            placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
                             value={line.detail || ''}
-                            onChange={e => updateLine(i, 'detail', e.target.value)}
-                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                            rows={1}
+                            onChange={(val) => updateLine(i, 'detail', val)}
                           />
                         </div>
                         <div className="col-span-1">
@@ -713,7 +711,9 @@ export default function ModifierDevisPage() {
                       </div>
                       {line.description.trim() && line.unit_price > 0 && (
                         <div className="flex justify-end mt-1.5">
-                          <span className="text-xs text-muted-foreground">{formatCurrency(line.quantity * line.unit_price)} HT</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatCurrency(line.quantity * line.unit_price)} HT · <span className="font-medium text-foreground">{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))} TTC</span>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -814,38 +814,6 @@ export default function ModifierDevisPage() {
                 )}
               </div>
 
-              {/* Recurring contract toggle */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between rounded-xl border border-border p-3">
-                  <div className="flex items-center gap-2.5">
-                    <RefreshCw className="h-4 w-4 text-[#d35400]" />
-                    <div>
-                      <p className="text-sm font-medium">Contrat récurrent</p>
-                      <p className="text-xs text-muted-foreground">Ce devis créera un contrat avec facturation automatique</p>
-                    </div>
-                  </div>
-                  <Switch checked={isRecurringQuote} onCheckedChange={setIsRecurringQuote} />
-                </div>
-                {isRecurringQuote && (
-                  <div className="rounded-lg bg-orange-50/70 border border-orange-200/60 p-3 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs font-medium text-orange-800 whitespace-nowrap">Fréquence :</label>
-                      <select
-                        value={recurringFrequency}
-                        onChange={e => setRecurringFrequency(e.target.value)}
-                        className="h-8 rounded-md border border-orange-200 bg-white px-2 text-xs text-orange-900"
-                      >
-                        <option value="mensuel">Mensuel</option>
-                        <option value="trimestriel">Trimestriel</option>
-                        <option value="annuel">Annuel</option>
-                      </select>
-                    </div>
-                    <p className="text-[11px] text-orange-700 leading-relaxed">
-                      Une fois signé par le client, un contrat récurrent sera créé et des factures seront générées automatiquement à chaque échéance.
-                    </p>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Bottom actions (mobile) */}
