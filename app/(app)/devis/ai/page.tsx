@@ -9,10 +9,12 @@ import { computeTvaBreakdown } from '@/lib/tva';
 import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
 
-// Direct-save path: the assistant now persists the quote itself and jumps
-// straight back to the list. No more handoff through sessionStorage + a
-// pre-filled create dialog (that path was racy — the lines state would
-// sometimes arrive empty at saveQuote time, producing 0€ ghost drafts).
+// The assistant persists the quote itself, then hands off to the full
+// manual editor (/devis/[id]/modifier) so the artisan can fine-tune
+// sections, RIB, acompte, etc. before sending. Earlier versions passed the
+// draft via sessionStorage into /devis/nouveau and that was racy (lines
+// arrived empty → 0€ ghost drafts); inserting first, editing second avoids
+// that entirely.
 export default function DevisAiPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -146,9 +148,10 @@ export default function DevisAiPage() {
         notes: description,
       });
 
-      // Success → jump back to the list with a query param the list page
-      // picks up to show a confirmation banner.
-      router.push(`/devis?ai_created=${encodeURIComponent(finalNumber)}`);
+      // Success → open the quote in the full manual editor, prefilled,
+      // so the user can add sections, RIB, acompte, extra lines, etc.
+      // before saving or sending.
+      router.push(`/devis/${quoteId}/modifier`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur inconnue.';
       setSaveError(message);
