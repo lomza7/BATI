@@ -140,7 +140,7 @@ export default function CguPage() {
               <p>
                 Hellobat utilise l&apos;intelligence artificielle (Claude d&apos;Anthropic) pour
                 certaines fonctionnalités : génération de devis, réponse aux emails,
-                contenu de site web, agents spécialisés, comptabilité et avant/après visuels.
+                contenu de site web, agents spécialisés et comptabilité.
               </p>
               <p>
                 Les contenus générés par l&apos;IA sont des suggestions et ne constituent pas

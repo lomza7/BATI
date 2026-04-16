@@ -35,7 +35,6 @@ import { LandingMap } from './landing-map';
 import { DevisInteractiveDemo } from './devis-demo';
 import { SiteWebInteractiveDemo } from './site-web-demo';
 import { ProspectionInteractiveDemo } from './prospection-demo';
-import { RendusInteractiveDemo } from './rendus-demo';
 import { HelloPayInteractiveDemo } from './hellopay-demo';
 
 interface FeatureSectionProps {
@@ -472,31 +471,6 @@ export function AvisSection() {
               </div>
             ))}
           </div>
-        </MockBrowser>
-      }
-    />
-  );
-}
-
-export function PlansSection() {
-  return (
-    <FeatureSection
-      id="rendus"
-      slug="rendus-ia"
-      badge="Avant/Après IA"
-      title="Vos avant/après,"
-      titleAccent="générés par IA"
-      description="Envoyez un lien personnalisé à vos prospects : ils uploadent une photo, l'IA génère le rendu après travaux, et vous récupérez automatiquement leurs coordonnées."
-      bulletPoints={[
-        'Lien white-label à votre image (logo, nom, couleurs)',
-        'Avant/après photoréalistes par IA en quelques secondes',
-        '6 styles disponibles (moderne, classique, zen…)',
-        'Capture automatique des leads (email obligatoire)',
-      ]}
-      reversed
-      visual={
-        <MockBrowser url="hellobat.app/rendus">
-          <RendusInteractiveDemo />
         </MockBrowser>
       }
     />

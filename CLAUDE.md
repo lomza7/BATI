@@ -49,7 +49,6 @@ app/
 │   ├── site-web/               # Générateur de site web IA
 │   ├── assistant-email/        # Assistant IA pour rédiger des réponses email (paste-based)
 │   ├── avis/                   # Avis clients (manuels + demande par SMS)
-│   ├── rendus/                 # Avant/Après IA (route slug historique)
 │   ├── agents/                 # Agents IA (pannes, DTU, chiffrage, juridique, RGE/CEE)
 │   ├── paiements/              # Paiements Stripe
 │   ├── contrats/               # Contrats récurrents
@@ -133,7 +132,6 @@ hooks/
 1. **Principal** : Tableau de bord, Calendrier, Mes tâches, Contacts, Devis, Factures, Mes prestations
 2. **Chantiers** : Mes chantiers, Planning, Carte, Équipe
 3. **Commercial** : Catalogues, Prospection, Site web IA, Avis clients
-5. **Créativité** : Avant/Après IA
 6. **Agents IA** : Mes Agents
 7. **Finance** : Paiement Stripe, Contrats récurrents, Comptabilité IA
 8. **Admin** : Administration (restreint)

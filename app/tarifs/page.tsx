@@ -61,7 +61,6 @@ const SECTIONS: Section[] = [
         free: false,
         pro: true,
       },
-      { label: 'Photos avant/après générées par l’IA', free: false, pro: true },
       { label: 'Réponses aux emails clients assistées par IA', free: false, pro: true },
       { label: 'Site web professionnel généré par l’IA', free: false, pro: true },
     ],

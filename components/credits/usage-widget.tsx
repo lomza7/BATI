@@ -6,12 +6,11 @@ import { useAccessState, type AiFeature } from '@/hooks/use-access-state';
 import { Button } from '@/components/ui/button';
 import { BuyCreditsModal } from './buy-credits-modal';
 
-const FEATURE_LABELS: Record<AiFeature, string> = {
+const FEATURE_LABELS: Partial<Record<AiFeature, string>> = {
   quote_ai: 'Devis IA',
   agent: 'Agents IA',
   email_ai: 'Réponse email IA',
   accounting_ai: 'Comptabilité IA',
-  before_after: 'Avant/Après IA',
   site_web: 'Site web IA',
 };
 

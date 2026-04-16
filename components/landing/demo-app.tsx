@@ -367,8 +367,6 @@ export function DemoViewContent({ view }: { view: string }) {
       return <AgentsView />;
     case 'assistant-email':
       return <AssistantEmailView />;
-    case 'rendus':
-      return <RendusView />;
     case 'site-web':
       return <SiteWebView />;
     case 'hellopay':
@@ -2598,66 +2596,6 @@ function AssistantEmailView() {
             </button>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   18. AVANT / APRÈS IA (rendus)
-   ════════════════════════════════════════════════════════════════════ */
-
-function RendusView() {
-  const transforms = [
-    { label: 'Cuisine rénovée', style: 'Moderne', color: 'from-orange-200 to-orange-400' },
-    { label: 'Salle de bain', style: 'Contemporaine', color: 'from-blue-200 to-blue-400' },
-    { label: 'Façade repeinte', style: 'Pierre naturelle', color: 'from-amber-200 to-amber-400' },
-  ];
-
-  return (
-    <div>
-      <LandingPageHeader
-        title="Avant/Après IA"
-        description="Transformez vos photos de chantier avec l'IA"
-      >
-        <span className="text-[10px] font-medium text-[var(--landing-muted)]">
-          Générations ce mois : <span className="font-bold text-[var(--landing-text)]">14</span>
-        </span>
-      </LandingPageHeader>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        {transforms.map((t) => (
-          <div
-            key={t.label}
-            className="rounded-xl border border-[var(--landing-border)] bg-white overflow-hidden hover:shadow-md transition-shadow"
-          >
-            <div className="relative aspect-[4/3] overflow-hidden">
-              {/* Before (left) */}
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center">
-                <Camera className="w-8 h-8 text-white/70" />
-              </div>
-              {/* After (right, clipped diagonal) */}
-              <div
-                className={`absolute inset-0 bg-gradient-to-br ${t.color} flex items-center justify-center`}
-                style={{ clipPath: 'polygon(50% 0, 100% 0, 100% 100%, 40% 100%)' }}
-              >
-                <Wand2 className="w-8 h-8 text-white drop-shadow" />
-              </div>
-              {/* Labels */}
-              <div className="absolute bottom-2 left-2 text-[9px] font-bold text-white bg-black/50 px-1.5 py-0.5 rounded">
-                AVANT
-              </div>
-              <div className="absolute top-2 right-2 text-[9px] font-bold text-white bg-[var(--landing-accent)] px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Sparkles className="w-2 h-2" />
-                APRÈS
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-xs font-semibold text-[var(--landing-text)]">{t.label}</div>
-              <div className="text-[10px] text-[var(--landing-muted)] mt-0.5">Style : {t.style}</div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

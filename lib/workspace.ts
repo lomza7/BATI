@@ -45,7 +45,6 @@ export type WorkspacePermissionKey =
   | 'prospection'
   | 'site_web'
   | 'avis'
-  | 'plans_rendus'
   | 'agents'
   | 'paiements'
   | 'contrats'
@@ -71,7 +70,6 @@ export const DEFAULT_WORKSPACE_PERMISSIONS: WorkspacePermissions = {
   prospection: true,
   site_web: true,
   avis: true,
-  plans_rendus: true,
   agents: true,
   paiements: true,
   contrats: true,
@@ -96,7 +94,6 @@ export const WORKSPACE_PERMISSION_LABELS: Record<WorkspacePermissionKey, string>
   prospection: 'Prospection',
   site_web: 'Site web IA',
   avis: 'Avis clients',
-  plans_rendus: 'Avant/Après IA',
   agents: 'Agents IA',
   paiements: 'Paiements',
   contrats: 'Contrats récurrents',
@@ -109,7 +106,7 @@ export const WORKSPACE_PERMISSION_GROUPS: { title: string; keys: WorkspacePermis
   { title: 'Chantiers', keys: ['chantiers', 'planning', 'carte', 'equipe'] },
   { title: 'Commercial', keys: ['catalogues', 'prospection'] },
   { title: 'Communication', keys: ['avis'] },
-  { title: 'IA', keys: ['agents', 'plans_rendus', 'site_web'] },
+  { title: 'IA', keys: ['agents', 'site_web'] },
   { title: 'Finance', keys: ['paiements', 'contrats', 'comptabilite'] },
   { title: 'Système', keys: ['parametres'] },
 ];
@@ -132,7 +129,6 @@ const ROUTE_PERMISSION_MAP: Record<string, WorkspacePermissionKey> = {
   '/prospection': 'prospection',
   '/site-web': 'site_web',
   '/avis': 'avis',
-  '/rendus': 'plans_rendus',
   '/agents': 'agents',
   '/contrats': 'contrats',
   '/comptabilite': 'comptabilite',
