@@ -170,11 +170,15 @@ export function Sidebar() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="flex items-center gap-2">
+        <Link
+          href="/dashboard"
+          aria-label="Retour au tableau de bord"
+          className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="Hellobat" width={28} height={28} />
           <span className="font-serif font-medium tracking-tight text-foreground text-base">Hellobat</span>
-        </div>
+        </Link>
       </div>
 
       <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
