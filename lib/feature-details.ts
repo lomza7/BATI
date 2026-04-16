@@ -635,6 +635,48 @@ export const FEATURE_DETAILS: FeatureDetail[] = [
     ],
     plan: 'business',
   },
+  {
+    slug: 'mes-prestations',
+    title: 'Mes prestations',
+    subtitle: 'Votre bibliothèque de services — le cœur de vos devis',
+    heroDescription: 'Créez votre catalogue de prestations une seule fois, puis réutilisez-le à chaque devis. Vos tarifs, vos unités, vos marges — l\'IA s\'en sert pour chiffrer à votre place. Une fois en place, votre bibliothèque devient votre meilleur atout pour devis et factures éclair.',
+    sections: [
+      {
+        title: 'Une bibliothèque qui vous ressemble',
+        content: 'Chaque artisan a ses propres prestations, ses propres prix et ses propres unités (m², ml, unité, forfait, heure, jour...). Hellobat vous permet de constituer votre bibliothèque exactement comme vous travaillez. Ajoutez une prestation en quelques secondes : libellé, description, prix HT, TVA, unité, catégorie. Organisez-les par corps de métier : plomberie, électricité, carrelage, peinture, maintenance. Vous êtes maître de votre catalogue.',
+      },
+      {
+        title: 'Réutilisables en un clic dans vos devis',
+        content: 'Quand vous créez un devis, sélectionnez les prestations dans votre bibliothèque et ajustez les quantités. Les libellés, descriptions, prix et TVA sont repris automatiquement. Plus besoin de retaper trois fois la même ligne ou de retrouver le prix d\'une prestation dans un ancien devis. Vous gagnez jusqu\'à 80 % du temps de saisie d\'un devis classique.',
+      },
+      {
+        title: 'Le carburant de l\'IA devis',
+        content: 'Votre bibliothèque est ce qui permet à l\'IA devis de Hellobat de chiffrer à votre place avec vos tarifs. Quand vous dictez un devis à la voix, l\'IA identifie les prestations correspondantes dans votre catalogue et applique vos prix — pas des moyennes de marché, pas des prix devinés. Plus votre bibliothèque est riche, plus vos devis IA sont fidèles à votre façon de travailler.',
+      },
+      {
+        title: 'Enrichissement automatique',
+        content: 'Pas besoin de tout saisir d\'un coup. Au fil de vos devis, Hellobat vous propose d\'enregistrer les nouvelles prestations que vous ajoutez manuellement. Votre bibliothèque grandit avec vous, sans effort. Vous pouvez aussi importer un catalogue existant au format Excel ou CSV.',
+      },
+      {
+        title: 'Prestations récurrentes pour les contrats d\'entretien',
+        content: 'Marquez une prestation comme récurrente (mensuelle, trimestrielle, annuelle) et elle devient éligible aux contrats d\'entretien automatiques : entretien chaudière, maintenance climatisation, visite piscine... Hellobat génère les factures à la bonne fréquence, sans que vous ayez à y penser.',
+      },
+      {
+        title: 'Prix publics ou privés',
+        content: 'Vos prestations peuvent rester privées (utilisées uniquement dans vos devis) ou être rendues publiques sur votre site vitrine Hellobat et dans vos catalogues partagés. Vos prospects voient vos tarifs indicatifs, ils se projettent, ils demandent un devis en confiance.',
+      },
+    ],
+    highlights: [
+      'Bibliothèque de services 100 % personnalisable',
+      'Vos prix, vos unités, vos catégories',
+      'Réutilisation en un clic dans les devis',
+      'Carburant de l\'IA devis — chiffrage fidèle à votre tarification',
+      'Prestations récurrentes pour contrats d\'entretien',
+      'Import Excel / CSV + enrichissement automatique',
+      'Visibles sur le site vitrine et les catalogues partagés',
+    ],
+    plan: 'starter',
+  },
 ];
 
 export function getFeatureBySlug(slug: string): FeatureDetail | undefined {

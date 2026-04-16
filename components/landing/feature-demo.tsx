@@ -4,14 +4,15 @@ import { Hexagon } from 'lucide-react';
 import { DemoViewContent } from './demo-app';
 import { SiteWebInteractiveDemo } from './site-web-demo';
 import { ProspectionInteractiveDemo } from './prospection-demo';
-import { RendusInteractiveDemo } from './rendus-demo';
 import { HelloPayInteractiveDemo } from './hellopay-demo';
+import { PrestationsInteractiveDemo } from './prestations-demo';
 
 const SLUG_TO_VIEW: Record<string, string> = {
   'devis-ia': 'devis',
   'devis-factures': 'devis',
   'facture-electronique': 'factures',
   'prestations': 'prestations',
+  'mes-prestations': 'prestations',
   'contacts': 'contacts',
   'signature-electronique': 'devis',
   'suivi-chantiers': 'chantiers',
@@ -27,7 +28,6 @@ const SLUG_TO_VIEW: Record<string, string> = {
   'contrats-recurrents': 'contrats',
   'comptabilite-ia': 'comptabilite',
   'agents-ia': 'agents',
-  'rendus-ia': 'rendus',
 };
 
 const SLUG_TO_PATH: Record<string, string> = {
@@ -35,6 +35,7 @@ const SLUG_TO_PATH: Record<string, string> = {
   'devis-factures': 'hellobat.app/devis',
   'facture-electronique': 'hellobat.app/factures',
   'prestations': 'hellobat.app/prestations',
+  'mes-prestations': 'hellobat.app/prestations',
   'contacts': 'hellobat.app/clients',
   'signature-electronique': 'hellobat.app/devis',
   'suivi-chantiers': 'hellobat.app/chantiers',
@@ -50,14 +51,13 @@ const SLUG_TO_PATH: Record<string, string> = {
   'contrats-recurrents': 'hellobat.app/contrats',
   'comptabilite-ia': 'hellobat.app/comptabilite',
   'agents-ia': 'hellobat.app/agents',
-  'rendus-ia': 'hellobat.app/rendus',
 };
 
 const INTERACTIVE_DEMOS: Record<string, React.ComponentType> = {
   'site-vitrine': SiteWebInteractiveDemo,
   'prospection-crm': ProspectionInteractiveDemo,
-  'rendus-ia': RendusInteractiveDemo,
   'hellopay': HelloPayInteractiveDemo,
+  'mes-prestations': PrestationsInteractiveDemo,
 };
 
 export function FeatureDemo({ slug }: { slug: string }) {

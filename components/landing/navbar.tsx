@@ -14,6 +14,7 @@ import {
   CreditCard,
   Bot,
   Calculator,
+  Package,
   Zap,
   Menu,
   X,
@@ -23,6 +24,7 @@ import {
 const features = [
   { icon: Zap, label: 'HelloPay', href: '/fonctionnalites/hellopay' },
   { icon: FileText, label: 'Devis & Factures', href: '/fonctionnalites/devis-factures' },
+  { icon: Package, label: 'Mes prestations', href: '/fonctionnalites/mes-prestations' },
   { icon: HardHat, label: 'Suivi chantiers', href: '/fonctionnalites/suivi-chantiers' },
   { icon: CalendarDays, label: 'Planning & équipe', href: '/fonctionnalites/planning-equipe' },
   { icon: MapPin, label: 'Carte interactive', href: '/fonctionnalites/carte-interactive' },
