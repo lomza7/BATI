@@ -32,6 +32,7 @@ import { QuotaMeter } from '@/components/paywall/quota-meter';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
+import { AttachPdfsButton } from '@/components/shared/attach-pdfs-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -792,6 +793,7 @@ export default function FacturesPage() {
     <div className="space-y-6">
       <PageHeader title="Factures" description="Transformez vos devis en factures et suivez les paiements">
         <ImportCsvButton type="invoices" onImported={loadData} />
+        <AttachPdfsButton type="invoices" onAttached={loadData} />
         <Button onClick={handleOpenCreate} className="gap-2">
           <Plus className="h-4 w-4" /> Nouvelle facture
         </Button>

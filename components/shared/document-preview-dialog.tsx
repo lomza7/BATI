@@ -150,6 +150,10 @@ export function DocumentPreviewDialog({
   const [linkedQuoteNumber, setLinkedQuoteNumber] = useState<string | null>(null);
   const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
 
+  // PDF d'origine (devis/facture importes depuis l'ancien logiciel) — si present,
+  // on l'affiche dans un iframe au lieu de reconstruire la mise en page.
+  const [importPdfUrl, setImportPdfUrl] = useState<string | null>(null);
+
   // Keep in-memory props in sync when the dialog is used without documentId.
   useEffect(() => {
     if (documentId) return;
@@ -164,7 +168,29 @@ export function DocumentPreviewDialog({
     setDepositPercentage(depositPercentageProp ?? null);
     setLinkedQuoteNumber(null);
     setLinkedDeposits([]);
+    setImportPdfUrl(null);
   }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp, depositPercentageProp]);
+
+  async function fetchImportPdfUrl(path: string): Promise<string | null> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) return null;
+      const res = await fetch('/api/import/attach-pdfs/signed-url', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path }),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { url?: string };
+      return json.url || null;
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
     if (!open || !user) return;
@@ -189,7 +215,7 @@ export function DocumentPreviewDialog({
         if (mode === 'quote') {
           const { data: quote } = await supabase
             .from('quotes')
-            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id')
+            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id, import_pdf_path')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -202,6 +228,13 @@ export function DocumentPreviewDialog({
             setResolvedCreatedAt(new Date(quote.created_at));
             resolvedBankAccountId = quote.bank_account_id || null;
             setDepositPercentage(null);
+
+            if (quote.import_pdf_path) {
+              const url = await fetchImportPdfUrl(quote.import_pdf_path);
+              if (!cancelled) setImportPdfUrl(url);
+            } else if (!cancelled) {
+              setImportPdfUrl(null);
+            }
 
             const { data: linesData, error: linesErr } = await supabase
               .from('quote_lines')
@@ -228,7 +261,7 @@ export function DocumentPreviewDialog({
         } else {
           const { data: invoice } = await supabase
             .from('invoices')
-            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id, import_pdf_path')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -240,6 +273,13 @@ export function DocumentPreviewDialog({
             setResolvedDueDate(invoice.due_date);
             setResolvedCreatedAt(new Date(invoice.issued_at || invoice.created_at));
             resolvedBankAccountId = invoice.bank_account_id || null;
+
+            if (invoice.import_pdf_path) {
+              const url = await fetchImportPdfUrl(invoice.import_pdf_path);
+              if (!cancelled) setImportPdfUrl(url);
+            } else if (!cancelled) {
+              setImportPdfUrl(null);
+            }
 
             const invType = (invoice.invoice_type || 'standard') as PreviewInvoiceType;
             setInvoiceType(invType);
@@ -384,6 +424,41 @@ export function DocumentPreviewDialog({
   // si un acompte est annulé après émission du solde).
   const deductedTtc = linkedDeposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0);
   const finalRemainingTtc = Math.max(0, totalTtc - deductedTtc);
+
+  // Si un PDF d'origine est attache (document importe depuis l'ancien logiciel),
+  // on l'affiche tel quel dans un iframe plutot que de reconstruire la mise en
+  // page a partir de lignes inexistantes en DB.
+  if (importPdfUrl) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <DialogContent className="max-w-4xl h-[90vh] p-0 gap-0 bg-[#faf9f7] flex flex-col">
+          <DialogTitle className="sr-only">
+            {isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
+          </DialogTitle>
+          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-[#e5e1da]">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
+              <span className="text-xs font-medium text-[#6b6560] truncate">
+                PDF d&apos;origine — {documentLabel.toLowerCase()} importé{!isInvoice ? '' : 'e'} {displayNumber}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-[#6b6560] hover:bg-[#f5f3f0] transition-colors flex-shrink-0"
+              aria-label="Fermer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <iframe
+            src={importPdfUrl}
+            title={`${documentLabel} ${displayNumber}`}
+            className="flex-1 w-full border-0 bg-white"
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -582,13 +657,14 @@ export function DocumentPreviewDialog({
                     <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unité</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>P.U. HT</th>
                     <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>TVA</th>
-                    <th className="px-8 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
+                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
+                    <th className="px-8 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total TTC</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e5e1da]">
                   {validLines.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-8 py-8 text-center text-sm text-[#6b6560] italic">
+                      <td colSpan={7} className="px-8 py-8 text-center text-sm text-[#6b6560] italic">
                         Aucune ligne saisie
                       </td>
                     </tr>
@@ -599,21 +675,23 @@ export function DocumentPreviewDialog({
                           <td colSpan={5} className="px-8 py-2.5 text-sm font-semibold" style={{ color: accent }}>
                             {group.label}
                           </td>
-                          <td className="px-8 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
+                          <td className="px-3 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
                             {formatCurrency(group.subtotalHt)}
                           </td>
+                          <td className="px-8 py-2.5" />
                         </tr>
                         {group.lines.map((line, idx) => (
                           <tr key={idx}>
                             <td className="px-8 py-3.5 text-sm pl-10" style={{ color: textColor }}>
                               {line.description}
-                              {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                              {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed whitespace-pre-wrap">{line.detail}</p>}
                             </td>
                             <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
                             <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
                             <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
                             <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? 20)}</td>
-                            <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
+                            <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
+                            <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))}</td>
                           </tr>
                         ))}
                       </React.Fragment>
@@ -623,13 +701,14 @@ export function DocumentPreviewDialog({
                       <tr key={idx}>
                         <td className="px-8 py-3.5 text-sm" style={{ color: textColor }}>
                           {line.description}
-                          {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed">{line.detail}</p>}
+                          {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 leading-relaxed whitespace-pre-wrap">{line.detail}</p>}
                         </td>
                         <td className="px-3 py-3.5 text-sm text-center" style={{ color: textColor }}>{line.quantity}</td>
                         <td className="px-3 py-3.5 text-sm text-[#6b6560] text-center">{QUOTE_UNIT_LABELS[line.unit] || line.unit}</td>
                         <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.unit_price)}</td>
                         <td className="px-3 py-3.5 text-xs text-center text-[#6b6560]">{formatTvaRate(line.tva_rate ?? 20)}</td>
-                        <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
+                        <td className="px-3 py-3.5 text-sm text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</td>
+                        <td className="px-8 py-3.5 text-sm font-medium text-right" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))}</td>
                       </tr>
                     ))
                   )}
@@ -653,12 +732,15 @@ export function DocumentPreviewDialog({
                     {group.lines.map((line, idx) => (
                       <div key={idx} className="px-5 py-4">
                         <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
-                        {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-[#6b6560]">
+                        {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 whitespace-pre-wrap">{line.detail}</p>}
+                        <div className="flex items-start justify-between gap-3 mt-2">
+                          <span className="text-xs text-[#6b6560] flex-1 min-w-0">
                             {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? 20)}
                           </span>
-                          <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</span>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-[#6b6560]">{formatCurrency(line.quantity * line.unit_price)} HT</p>
+                            <p className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))} TTC</p>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -668,12 +750,15 @@ export function DocumentPreviewDialog({
                 validLines.map((line, idx) => (
                   <div key={idx} className="px-5 py-4">
                     <p className="text-sm font-medium" style={{ color: textColor }}>{line.description}</p>
-                    {line.detail && <p className="text-xs text-[#6b6560] mt-0.5">{line.detail}</p>}
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-[#6b6560]">
+                    {line.detail && <p className="text-xs text-[#6b6560] mt-0.5 whitespace-pre-wrap">{line.detail}</p>}
+                    <div className="flex items-start justify-between gap-3 mt-2">
+                      <span className="text-xs text-[#6b6560] flex-1 min-w-0">
                         {line.quantity} {QUOTE_UNIT_LABELS[line.unit] || line.unit} × {formatCurrency(line.unit_price)} · TVA {formatTvaRate(line.tva_rate ?? 20)}
                       </span>
-                      <span className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price)}</span>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-[#6b6560]">{formatCurrency(line.quantity * line.unit_price)} HT</p>
+                        <p className="text-sm font-semibold" style={{ color: textColor }}>{formatCurrency(line.quantity * line.unit_price * (1 + (line.tva_rate ?? 20) / 100))} TTC</p>
+                      </div>
                     </div>
                   </div>
                 ))
