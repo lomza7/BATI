@@ -22,8 +22,10 @@ import {
   Users,
   FileText,
   Receipt,
+  Paperclip,
 } from 'lucide-react';
 import { ImportModal } from '../import-modal';
+import { AttachPdfsButton } from '@/components/shared/attach-pdfs-button';
 import type { OnboardingData } from '../onboarding-modal';
 
 interface ImportedCounts {
@@ -91,7 +93,8 @@ export function StepImport({ data, onChange, onNext, onBack, onSkip }: Props) {
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     Costructor, Excel, Obat, EBP, Sage, Henrri… tout ce qui
-                    s&apos;exporte en CSV.
+                    s&apos;exporte en CSV. Vous pourrez aussi joindre les PDF
+                    originaux juste après.
                   </p>
                 </div>
               </div>
@@ -161,6 +164,34 @@ export function StepImport({ data, onChange, onNext, onBack, onSkip }: Props) {
                 />
               </div>
             </div>
+
+            {(imported.quotes > 0 || imported.invoices > 0) && (
+              <div className="rounded-2xl border border-border bg-white p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Paperclip className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      Joignez vos PDF d&apos;origine (optionnel)
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Déposez les PDF de vos anciens documents — ils sont
+                      associés automatiquement au numéro présent dans le nom
+                      du fichier.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {imported.quotes > 0 && (
+                    <AttachPdfsButton type="quotes" />
+                  )}
+                  {imported.invoices > 0 && (
+                    <AttachPdfsButton type="invoices" />
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="button"
