@@ -619,7 +619,9 @@ export default function PublicQuotePage() {
               </thead>
               <tbody className="divide-y divide-[#e5e1da]">
                 {hasSections(lines) ? (
-                  groupLinesBySection(lines).map((group) => (
+                  groupLinesBySection(lines).map((group) => {
+                    const subtotalTtc = group.lines.reduce((s, l) => s + l.total * (1 + (l.tva_rate ?? legacyRate) / 100), 0);
+                    return (
                     <React.Fragment key={group.sectionKey ?? '_flat'}>
                       <tr style={{ backgroundColor: accent + '0a' }}>
                         <td colSpan={5} className="px-8 py-2.5 text-sm font-semibold" style={{ color: accent }}>
@@ -628,7 +630,9 @@ export default function PublicQuotePage() {
                         <td className="px-3 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
                           {formatCurrency(group.subtotalHt)}
                         </td>
-                        <td className="px-8 py-2.5" />
+                        <td className="px-8 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
+                          {formatCurrency(subtotalTtc)}
+                        </td>
                       </tr>
                       {group.lines.map((line) => (
                         <tr key={line.id}>
@@ -645,7 +649,8 @@ export default function PublicQuotePage() {
                         </tr>
                       ))}
                     </React.Fragment>
-                  ))
+                    );
+                  })
                 ) : (
                   lines.map((line) => (
                     <tr key={line.id}>
@@ -669,11 +674,16 @@ export default function PublicQuotePage() {
           {/* Lines — Mobile cards */}
           <div className="sm:hidden divide-y divide-[#e5e1da]">
             {hasSections(lines) ? (
-              groupLinesBySection(lines).map((group) => (
+              groupLinesBySection(lines).map((group) => {
+                const subtotalTtc = group.lines.reduce((s, l) => s + l.total * (1 + (l.tva_rate ?? legacyRate) / 100), 0);
+                return (
                 <React.Fragment key={group.sectionKey ?? '_flat'}>
-                  <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: accent + '0a' }}>
+                  <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: accent + '0a' }}>
                     <span className="text-sm font-semibold" style={{ color: accent }}>{group.label}</span>
-                    <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(group.subtotalHt)}</span>
+                    <div className="flex flex-col items-end leading-tight">
+                      <span className="text-[11px] font-medium text-[#6b6560]">{formatCurrency(group.subtotalHt)} HT</span>
+                      <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(subtotalTtc)} TTC</span>
+                    </div>
                   </div>
                   {group.lines.map((line) => (
                     <div key={line.id} className="px-5 py-4">
@@ -691,7 +701,8 @@ export default function PublicQuotePage() {
                     </div>
                   ))}
                 </React.Fragment>
-              ))
+                );
+              })
             ) : (
               lines.map((line) => (
                 <div key={line.id} className="px-5 py-4">

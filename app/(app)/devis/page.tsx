@@ -793,43 +793,38 @@ export default function DevisPage() {
             <button
               type="button"
               onClick={openManualCreate}
-              className="rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm"
+              className="flex h-full flex-row items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm sm:flex-col sm:items-start sm:gap-0 sm:p-5"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted sm:mb-4">
                 <FileText className="h-5 w-5 text-foreground" />
               </div>
-              <p className="mt-4 text-base font-semibold text-foreground">Devis classique</p>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Ouvrir le formulaire habituel et saisir les lignes vous-même.
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-foreground">Devis classique</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Saisir les lignes vous-même dans le formulaire.
+                </p>
+              </div>
             </button>
 
             <button
               type="button"
               onClick={openAiCreate}
-              className="rounded-2xl border border-[#d35400]/20 bg-[#fff7f0] p-5 text-left transition-all hover:border-[#d35400]/35 hover:shadow-sm"
+              className="flex h-full flex-row items-center gap-4 rounded-2xl border border-[#d35400]/25 bg-[#fff7f0] p-4 text-left transition-all hover:border-[#d35400]/40 hover:shadow-sm sm:flex-col sm:items-start sm:gap-0 sm:p-5"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#d35400] text-white">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#d35400] text-white sm:mb-4">
                 <Wand2 className="h-5 w-5" />
               </div>
-              <div className="mt-4 flex items-center gap-2">
-                <p className="text-base font-semibold text-foreground">Devis avec IA</p>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-[#a34700]">
-                  Vocal
-                </span>
-              </div>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Décris ta demande à voix haute et laisse l&apos;assistant rédiger un brouillon prêt à envoyer.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#a34700]">
-                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                  <Mic className="h-3 w-3" />
-                  Vocal
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                  <Wand2 className="h-3 w-3" />
-                  Analyse IA
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold text-foreground">Devis avec IA</p>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-[#a34700]">
+                    <Mic className="h-2.5 w-2.5" />
+                    Vocal
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Décrivez à voix haute, l&apos;IA rédige le brouillon.
+                </p>
               </div>
             </button>
 
@@ -839,15 +834,17 @@ export default function DevisPage() {
                 setShowCreateOptions(false);
                 router.push('/contrats?new=1');
               }}
-              className="rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm"
+              className="flex h-full flex-row items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-all hover:border-[#d35400]/30 hover:shadow-sm sm:flex-col sm:items-start sm:gap-0 sm:p-5"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted sm:mb-4">
                 <RefreshCw className="h-5 w-5 text-foreground" />
               </div>
-              <p className="mt-4 text-base font-semibold text-foreground">Devis contrat récurrent</p>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Créer un contrat d&apos;entretien qui génère des devis ou factures automatiquement.
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-foreground">Contrat récurrent</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  Contrat d&apos;entretien générant devis / factures automatiquement.
+                </p>
+              </div>
             </button>
           </div>
         </DialogContent>

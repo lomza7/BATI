@@ -678,7 +678,9 @@ export function DocumentPreviewDialog({
                           <td className="px-3 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
                             {formatCurrency(group.subtotalHt)}
                           </td>
-                          <td className="px-8 py-2.5" />
+                          <td className="px-8 py-2.5 text-sm font-semibold text-right" style={{ color: accent }}>
+                            {formatCurrency(group.subtotalTtc)}
+                          </td>
                         </tr>
                         {group.lines.map((line, idx) => (
                           <tr key={idx}>
@@ -725,9 +727,12 @@ export function DocumentPreviewDialog({
               ) : sectionGroups ? (
                 sectionGroups.map((group) => (
                   <React.Fragment key={group.sectionKey ?? '_flat'}>
-                    <div className="px-5 py-3 flex items-center justify-between" style={{ backgroundColor: accent + '0a' }}>
+                    <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: accent + '0a' }}>
                       <span className="text-sm font-semibold" style={{ color: accent }}>{group.label}</span>
-                      <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(group.subtotalHt)}</span>
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="text-[11px] font-medium text-[#6b6560]">{formatCurrency(group.subtotalHt)} HT</span>
+                        <span className="text-sm font-semibold" style={{ color: accent }}>{formatCurrency(group.subtotalTtc)} TTC</span>
+                      </div>
                     </div>
                     {group.lines.map((line, idx) => (
                       <div key={idx} className="px-5 py-4">

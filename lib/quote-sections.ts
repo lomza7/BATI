@@ -21,6 +21,7 @@ export interface SectionGroup<T> {
   label: string;
   lines: T[];
   subtotalHt: number;
+  subtotalTtc: number;
 }
 
 /** Returns true when at least one line carries a non-null section. */
@@ -34,7 +35,7 @@ export function hasSections<T extends { section?: string | null }>(lines: T[]): 
  * Returns groups in display order: matériel, main d'oeuvre, then unsectioned.
  */
 export function groupLinesBySection<
-  T extends { section?: string | null; quantity: number; unit_price: number },
+  T extends { section?: string | null; quantity: number; unit_price: number; tva_rate?: number | null },
 >(lines: T[]): SectionGroup<T>[] {
   const buckets = new Map<string | null, T[]>();
 
@@ -48,6 +49,9 @@ export function groupLinesBySection<
     }
   }
 
+  const lineHt = (l: T) => l.quantity * l.unit_price;
+  const lineTtc = (l: T) => lineHt(l) * (1 + (l.tva_rate ?? 20) / 100);
+
   const groups: SectionGroup<T>[] = [];
 
   for (const key of SECTION_ORDER) {
@@ -57,7 +61,8 @@ export function groupLinesBySection<
       sectionKey: key,
       label: key ? SECTION_LABELS[key] || key : '',
       lines: bucket,
-      subtotalHt: bucket.reduce((sum, l) => sum + l.quantity * l.unit_price, 0),
+      subtotalHt: bucket.reduce((sum, l) => sum + lineHt(l), 0),
+      subtotalTtc: bucket.reduce((sum, l) => sum + lineTtc(l), 0),
     });
   }
 
@@ -68,7 +73,8 @@ export function groupLinesBySection<
       sectionKey: key,
       label: key ? SECTION_LABELS[key] || key : '',
       lines: bucket,
-      subtotalHt: bucket.reduce((s: number, l) => s + l.quantity * l.unit_price, 0),
+      subtotalHt: bucket.reduce((s: number, l) => s + lineHt(l), 0),
+      subtotalTtc: bucket.reduce((s: number, l) => s + lineTtc(l), 0),
     });
   });
 
