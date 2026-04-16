@@ -54,6 +54,7 @@ import {
   X,
   Send,
   Loader2,
+  Copy,
 } from 'lucide-react';
 import { ResponsiveContainer, Area, AreaChart, Bar, BarChart } from 'recharts';
 
@@ -364,6 +365,8 @@ export function DemoViewContent({ view }: { view: string }) {
       return <AvisView />;
     case 'agents':
       return <AgentsView />;
+    case 'assistant-email':
+      return <AssistantEmailView />;
     case 'rendus':
       return <RendusView />;
     case 'site-web':
@@ -2477,6 +2480,124 @@ function AgentsView() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   17b. ASSISTANT EMAIL IA
+   ════════════════════════════════════════════════════════════════════ */
+
+function AssistantEmailView() {
+  return (
+    <div>
+      <LandingPageHeader
+        title="Assistant email IA"
+        description="Collez un email reçu, laissez l'IA rédiger la réponse"
+      >
+        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-[#D97706]/10 text-[#D97706] font-semibold">
+          <Sparkles className="w-2.5 h-2.5" /> Contexte client détecté
+        </span>
+      </LandingPageHeader>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {/* Email reçu */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-white p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-[var(--landing-off)] flex items-center justify-center">
+              <Mail className="w-3.5 h-3.5 text-[var(--landing-muted)]" />
+            </div>
+            <div className="text-[11px] font-semibold text-[var(--landing-text)]">
+              Email reçu
+            </div>
+          </div>
+
+          <div className="space-y-2 text-[10px]">
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--landing-muted)] w-14 shrink-0">De</span>
+              <div className="flex-1 rounded-md border border-[var(--landing-border)] bg-[var(--landing-off)] px-2 py-1.5 font-mono text-[var(--landing-text)]">
+                marie.dupont@gmail.com
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--landing-muted)] w-14 shrink-0">Objet</span>
+              <div className="flex-1 rounded-md border border-[var(--landing-border)] bg-[var(--landing-off)] px-2 py-1.5 text-[var(--landing-text)]">
+                Relance devis salle de bain
+              </div>
+            </div>
+            <div>
+              <div className="text-[var(--landing-muted)] mb-1">Message</div>
+              <div className="rounded-md border border-[var(--landing-border)] bg-[var(--landing-off)] p-2.5 text-[var(--landing-text)] leading-relaxed">
+                Bonjour, je reviens vers vous concernant le devis envoyé la semaine dernière pour la rénovation de notre salle de bain. Avez-vous un créneau cette semaine pour en rediscuter ? Merci.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[10px] text-[var(--landing-muted)]">Ton</span>
+            {[
+              { id: 'neutral', label: 'Neutre' },
+              { id: 'friendly', label: 'Chaleureux', active: true },
+              { id: 'formal', label: 'Formel' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                  t.active
+                    ? 'bg-[var(--landing-accent)] text-white border-[var(--landing-accent)]'
+                    : 'bg-white text-[var(--landing-text)] border-[var(--landing-border)]'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <button className="w-full mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--landing-accent)] text-white py-2 text-[11px] font-semibold shadow-sm">
+            <Sparkles className="w-3 h-3" />
+            Générer la réponse
+          </button>
+        </div>
+
+        {/* Réponse IA */}
+        <div className="rounded-xl border border-[var(--landing-border)] bg-[var(--landing-off)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[var(--landing-accent)]/10 flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--landing-accent)]" />
+              </div>
+              <div className="text-[11px] font-semibold text-[var(--landing-text)]">
+                Réponse proposée
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Check className="w-2.5 h-2.5" /> Devis D-2026-042 trouvé
+            </span>
+          </div>
+
+          <div className="rounded-md border border-[var(--landing-border)] bg-white p-3 text-[10px] leading-relaxed text-[var(--landing-text)] space-y-2">
+            <p>Bonjour Marie,</p>
+            <p>
+              Merci pour votre retour concernant le devis D-2026-042 pour votre rénovation de salle de bain. Je suis disponible jeudi à 14h ou vendredi à 10h pour échanger sur les détails et ajuster si besoin.
+            </p>
+            <p>
+              N&apos;hésitez pas à me dire ce qui vous conviendrait le mieux.
+            </p>
+            <p>Bien cordialement,</p>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button className="inline-flex items-center gap-1 rounded-lg bg-white border border-[var(--landing-border)] text-[var(--landing-text)] px-2.5 py-1.5 text-[10px] font-semibold">
+              <Copy className="w-2.5 h-2.5" />
+              Copier
+            </button>
+            <button className="inline-flex items-center gap-1 rounded-lg bg-white border border-[var(--landing-border)] text-[var(--landing-text)] px-2.5 py-1.5 text-[10px] font-semibold">
+              <RefreshCw className="w-2.5 h-2.5" />
+              Régénérer
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

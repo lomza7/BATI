@@ -9,7 +9,7 @@ export function CTA() {
           Prêt à simplifier votre gestion ?
         </h2>
         <p className="text-[#a0a0a0] mb-8 max-w-md mx-auto">
-          Rejoignez 2 400+ artisans qui gèrent leur activité plus efficacement avec Hellobat.
+          Essayez Hellobat gratuitement pendant 30 jours et gagnez du temps sur votre gestion quotidienne.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link

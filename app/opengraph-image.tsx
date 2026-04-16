@@ -156,14 +156,9 @@ export default async function Image() {
               fontWeight: 500,
             }}
           >
-            <span style={{ color: '#F59E0B', fontSize: 28 }}>★★★★★</span>
-            <span style={{ color: '#1a1a1a', fontWeight: 700 }}>4,9/5</span>
+            <span>Essai gratuit 30 jours</span>
             <span style={{ color: '#C9B99A' }}>·</span>
-            <span>
-              <span style={{ color: '#1a1a1a', fontWeight: 700 }}>2 400+</span> artisans
-            </span>
-            <span style={{ color: '#C9B99A' }}>·</span>
-            <span>Essai gratuit 30 j</span>
+            <span>Sans carte bancaire</span>
           </div>
         </div>
       </div>

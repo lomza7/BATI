@@ -88,13 +88,6 @@ export function SchemaOrg() {
           availability: 'https://schema.org/InStock',
           url: `${SITE_URL}/#pricing`,
         },
-        aggregateRating: {
-          '@type': 'AggregateRating',
-          ratingValue: '4.9',
-          reviewCount: '2400',
-          bestRating: '5',
-          worstRating: '1',
-        },
         featureList: [
           'Devis IA vocal',
           'Facture électronique 2026',

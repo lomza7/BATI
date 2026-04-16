@@ -318,9 +318,8 @@ export default function AProposPage() {
       {/* Numbers */}
       <section className="py-12 sm:py-20">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-3 gap-6 text-center">
             {[
-              { value: '2 400+', label: 'Artisans inscrits' },
               { value: '30', label: 'Membres dans l\'équipe' },
               { value: '5', label: 'Pôles métier' },
               { value: '24/7', label: 'Disponibilité' },
