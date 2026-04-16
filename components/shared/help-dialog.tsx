@@ -277,7 +277,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             <div className="text-center text-xs text-muted-foreground">
               Envie de parcourir les guides ?{' '}
               <Link href="/aide" onClick={() => onOpenChange(false)} className="text-primary hover:underline">
-                Voir le centre d'aide
+                Voir le centre d&apos;aide
               </Link>
             </div>
           </>
@@ -376,7 +376,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
                       )}
                     </button>
                     <p className="text-[11px] text-muted-foreground mt-1">
-                      Images, PDF, vidéos courtes. Max 10 Mo par fichier, jusqu'à {MAX_FILES} fichiers.
+                      Images, PDF, vidéos courtes. Max 10 Mo par fichier, jusqu&apos;à {MAX_FILES} fichiers.
                     </p>
                   </div>
                 )}
