@@ -30,6 +30,9 @@ import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 import { DetailTextarea } from '@/components/devis/detail-textarea';
+import { generateQuoteDetail } from '@/lib/ai/generate-quote-detail';
+import { lookupPrestationDetail, savePrestationDetail } from '@/lib/prestation-details';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +85,56 @@ function getDefaultValidUntil(): string {
 
 export default function NouveauDevisPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  async function handleGenerateDetail(idx: number): Promise<string> {
+    const line = lines[idx];
+    const detail = await generateQuoteDetail({
+      description: line.description,
+      existingDetail: line.detail || undefined,
+      quoteTitle: title || undefined,
+      otherLines: lines
+        .filter((_, i) => i !== idx)
+        .map((l) => ({
+          description: l.description,
+          detail: l.detail || null,
+          quantity: l.quantity,
+          unit: l.unit,
+        })),
+    });
+    return detail;
+  }
+
+  function handleAiError(message: string) {
+    toast({ title: 'Génération IA impossible', description: message, variant: 'destructive' });
+  }
+
+  async function handleDescriptionBlur(idx: number) {
+    setTimeout(() => setAutocompleteIndex(null), 150);
+    const current = lines[idx];
+    if (!current || (current.detail || '').trim().length > 0) return;
+    const cached = await lookupPrestationDetail(current.description);
+    if (!cached) return;
+    setLines(prev => {
+      const next = [...prev];
+      const target = next[idx];
+      if (!target) return prev;
+      if ((target.detail || '').trim().length > 0) return prev;
+      if (target.description !== current.description) return prev;
+      next[idx] = { ...target, detail: cached };
+      return next;
+    });
+  }
+
+  function handleDetailBlur(idx: number) {
+    const line = lines[idx];
+    if (!line) return;
+    const title = (line.description || '').trim();
+    const detail = (line.detail || '').trim();
+    if (!title || !detail) return;
+    savePrestationDetail(title, detail).catch(() => {});
+  }
+
   const router = useRouter();
   const draftId = useRef<string | null>(null);
   const draftPromise = useRef<Promise<string | null> | null>(null);
@@ -234,6 +287,17 @@ export default function NouveauDevisPage() {
     setLines(updated);
     setAutocompleteIndex(null);
     setAddedServiceIds(prev => new Set(prev).add(s.id));
+
+    lookupPrestationDetail(s.name).then(cached => {
+      if (!cached) return;
+      setLines(prev => {
+        const next = [...prev];
+        const target = next[lineIndex];
+        if (!target || target.description !== s.name) return prev;
+        next[lineIndex] = { ...target, detail: cached };
+        return next;
+      });
+    }).catch(() => {});
   }
 
   function removeLine(index: number) {
@@ -728,14 +792,14 @@ export default function NouveauDevisPage() {
                     {/* Mobile: stacked layout */}
                     <div className="sm:hidden space-y-2">
                       <div className="flex items-start gap-2">
-                        <div className="flex-1 space-y-1.5">
+                        <div className="flex-1">
                           <div className="relative" ref={el => { autocompleteRefs.current[i] = el; }}>
                             <Input
                               placeholder="Nom de la prestation"
                               value={line.description}
                               onChange={e => updateLine(i, 'description', e.target.value)}
                               onFocus={() => { if (line.description.trim().length >= 1) setAutocompleteIndex(i); }}
-                              onBlur={() => setTimeout(() => setAutocompleteIndex(null), 150)}
+                              onBlur={() => handleDescriptionBlur(i)}
                               className="text-sm"
                             />
                             {autocompleteIndex === i && line.description.trim().length >= 1 && (
@@ -766,11 +830,6 @@ export default function NouveauDevisPage() {
                               </div>
                             )}
                           </div>
-                          <DetailTextarea
-                            placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
-                            value={line.detail || ''}
-                            onChange={(val) => updateLine(i, 'detail', val)}
-                          />
                         </div>
                         <div className="flex items-center gap-1 pt-1.5 shrink-0">
                           {line._savedAsPrestation ? (
@@ -785,6 +844,14 @@ export default function NouveauDevisPage() {
                           </button>
                         </div>
                       </div>
+                      <DetailTextarea
+                        placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
+                        value={line.detail || ''}
+                        onChange={(val) => updateLine(i, 'detail', val)}
+                        onBlur={() => handleDetailBlur(i)}
+                        onAiGenerate={line.description.trim() ? () => handleGenerateDetail(i) : undefined}
+                        onAiError={handleAiError}
+                      />
                       <div className="grid grid-cols-4 gap-2">
                         <div>
                           <label className="text-[10px] text-muted-foreground mb-0.5 block">Qte</label>
@@ -823,14 +890,14 @@ export default function NouveauDevisPage() {
                     {/* Desktop: grid layout */}
                     <div className="hidden sm:block">
                       <div className="grid grid-cols-[1fr_60px_90px_100px_70px_auto] gap-2 items-start">
-                        <div className="space-y-1">
+                        <div>
                           <div className="relative" ref={el => { autocompleteRefs.current[i + 1000] = el; }}>
                             <Input
                               placeholder="Nom de la prestation"
                               value={line.description}
                               onChange={e => updateLine(i, 'description', e.target.value)}
                               onFocus={() => { if (line.description.trim().length >= 1) setAutocompleteIndex(i); }}
-                              onBlur={() => setTimeout(() => setAutocompleteIndex(null), 150)}
+                              onBlur={() => handleDescriptionBlur(i)}
                             />
                             {autocompleteIndex === i && line.description.trim().length >= 1 && (
                               <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border border-border bg-popover shadow-md max-h-52 overflow-y-auto">
@@ -863,11 +930,6 @@ export default function NouveauDevisPage() {
                               </div>
                             )}
                           </div>
-                          <DetailTextarea
-                            placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
-                            value={line.detail || ''}
-                            onChange={(val) => updateLine(i, 'detail', val)}
-                          />
                         </div>
                         <div>
                           <Input type="number" placeholder="Qte" value={line.quantity || ''} onChange={e => updateLine(i, 'quantity', Number(e.target.value))} />
@@ -903,6 +965,16 @@ export default function NouveauDevisPage() {
                             <X className="h-4 w-4" />
                           </button>
                         </div>
+                      </div>
+                      <div className="mt-2">
+                        <DetailTextarea
+                          placeholder="Détail (optionnel) — appuyez sur Entrée pour créer une puce"
+                          value={line.detail || ''}
+                          onChange={(val) => updateLine(i, 'detail', val)}
+                          onBlur={() => handleDetailBlur(i)}
+                          onAiGenerate={line.description.trim() ? () => handleGenerateDetail(i) : undefined}
+                          onAiError={handleAiError}
+                        />
                       </div>
                       {line.description.trim() && line.unit_price > 0 && (
                         <div className="flex justify-end mt-1.5">
