@@ -2346,38 +2346,6 @@ export default function ParametresPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-border bg-muted/20 p-4">
-                  <p className="text-sm text-muted-foreground">Espace courant</p>
-                  <p className="mt-1 font-medium text-foreground">
-                    {isWorkspaceOwner ? 'Votre entreprise' : 'Espace equipe partage'}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {isWorkspaceOwner
-                      ? 'Vous pilotez ici les accès applicatifs de votre entreprise.'
-                      : "Vous travaillez dans l'espace d'un autre dirigeant."}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-muted/20 p-4">
-                  <p className="text-sm text-muted-foreground">Votre rôle</p>
-                  <p className="mt-1 font-medium text-foreground">
-                    {workspaceRole === 'owner' ? 'Dirigeant' : WORKSPACE_ROLE_LABELS[workspaceRole]}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {canManageWorkspaceAccounts
-                      ? 'Vous pouvez inviter et gérer les comptes de connexion.'
-                      : 'Vous avez un accès opérationnel, sans gestion des invitations.'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-muted/20 p-4">
-                  <p className="text-sm text-muted-foreground">Suivi d&apos;activité</p>
-                  <p className="mt-1 font-medium text-foreground">Dernière présence</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Hellobat note la dernière page ouverte et la dernière présence de chaque compte actif.
-                  </p>
-                </div>
-              </div>
-
               {!teamFeatureUnlocked && (
                 <Alert className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-700">
                   <Users className="h-4 w-4" />

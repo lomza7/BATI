@@ -57,11 +57,16 @@ export type ConsumeAiResult =
     };
 
 export async function consumeAi(userId: string, feature: AiFeature): Promise<ConsumeAiResult> {
+  // ⚠ Le nom du param doit matcher exactement la signature SQL
+  // `consume_ai(p_user_id, p_feature, p_credit_cost, p_free_quota)`.
+  // Historiquement on envoyait `p_quota` : l'appel RPC échouait en silence
+  // et le catch retournait `no_pro_access` par défaut — d'où le faux
+  // "Abonnement Pro requis" alors que l'utilisateur avait son quota Free.
   const { data, error } = await supabaseAdmin.rpc('consume_ai', {
     p_user_id: userId,
     p_feature: feature,
-    p_quota: AI_FREE_QUOTAS[feature],
     p_credit_cost: AI_CREDIT_COSTS[feature],
+    p_free_quota: AI_FREE_QUOTAS[feature],
   });
 
   if (error) {

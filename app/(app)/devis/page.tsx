@@ -348,7 +348,9 @@ export default function DevisPage() {
 
 
   function openCreateOptions() {
-    // Premier devis : on force l'ajout d'un RIB avant tout
+    // Premier devis : on propose d'ajouter un RIB, mais l'utilisateur
+    // peut cliquer "Plus tard" — le blocage dur est sur la soumission
+    // finale côté /devis/nouveau (bouton "Créer le devis").
     if (hasBankAccount === false) {
       setShowFirstRibDialog(true);
       return;
@@ -771,6 +773,12 @@ export default function DevisPage() {
         open={showFirstRibDialog}
         onOpenChange={setShowFirstRibDialog}
         context="devis"
+        allowSkip
+        onSkip={() => {
+          // L'utilisateur saute l'étape : on ouvre quand même les options
+          // de création. Le blocage se fera à la soumission du devis.
+          setShowCreateOptions(true);
+        }}
         onSaved={() => {
           setHasBankAccount(true);
           setShowFirstRibDialog(false);

@@ -5,12 +5,21 @@ import { Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift, PanelLeftClose,
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
 import { CreditsBadge } from '@/components/credits/credits-badge';
+import { HelpDialog } from '@/components/shared/help-dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/lib/sidebar-context';
 import { cn } from '@/lib/utils';
 
-function SidebarContent({ onNavigate, collapsed = false }: { onNavigate?: () => void; collapsed?: boolean }) {
+function SidebarContent({
+  onNavigate,
+  collapsed = false,
+  onOpenHelp,
+}: {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+  onOpenHelp: () => void;
+}) {
   return (
     <>
       <div className={cn('flex items-center gap-2.5 py-5', collapsed ? 'justify-center px-2' : 'px-5')}>
@@ -39,7 +48,6 @@ function SidebarContent({ onNavigate, collapsed = false }: { onNavigate?: () => 
           { href: '/parrainage', icon: Gift, label: 'Lien de parrainage' },
           { href: '/parametres', icon: Settings, label: 'Paramètres' },
           { href: '/corbeille', icon: Trash2, label: 'Corbeille' },
-          { href: '/aide', icon: HelpCircle, label: 'Aide' },
         ] as const).map(({ href, icon: Icon, label }) => (
           <a
             key={href}
@@ -55,6 +63,21 @@ function SidebarContent({ onNavigate, collapsed = false }: { onNavigate?: () => 
             {!collapsed && <span>{label}</span>}
           </a>
         ))}
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            onOpenHelp();
+          }}
+          title={collapsed ? 'Aide' : undefined}
+          className={cn(
+            'w-full flex items-center rounded-lg text-[15px] text-muted-foreground transition-colors hover:bg-white/60 hover:text-foreground',
+            collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'
+          )}
+        >
+          <HelpCircle className="h-[18px] w-[18px] shrink-0" />
+          {!collapsed && <span>Aide</span>}
+        </button>
       </div>
 
       {!collapsed && (
@@ -98,6 +121,7 @@ function SidebarNavCollapsed() {
 
 export function Sidebar() {
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const { collapsed, toggle } = useSidebar();
 
   return (
@@ -106,7 +130,7 @@ export function Sidebar() {
         'fixed inset-y-0 left-0 z-30 hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border transition-[width] duration-300 ease-in-out',
         collapsed ? 'w-[60px]' : 'w-[240px]'
       )}>
-        <SidebarContent collapsed={collapsed} />
+        <SidebarContent collapsed={collapsed} onOpenHelp={() => setHelpOpen(true)} />
         <button
           type="button"
           onClick={toggle}
@@ -126,7 +150,7 @@ export function Sidebar() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[260px] p-0 bg-sidebar">
             <div className="flex h-full flex-col">
-              <SidebarContent onNavigate={() => setOpen(false)} />
+              <SidebarContent onNavigate={() => setOpen(false)} onOpenHelp={() => setHelpOpen(true)} />
             </div>
           </SheetContent>
         </Sheet>
@@ -136,6 +160,8 @@ export function Sidebar() {
           <span className="font-serif font-medium tracking-tight text-foreground text-base">Hellobat</span>
         </div>
       </div>
+
+      <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </>
   );
 }

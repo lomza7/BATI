@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Shield, Users, CreditCard, TrendingUp, FileText, HardHat,
   Receipt, Contact, Target, RefreshCw, Crown, Zap, ChevronDown,
@@ -720,6 +721,9 @@ export default function AdminPage() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">
             <Shield className="h-3.5 w-3.5" /> Admin
           </div>
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
+            <Link href="/admin/support">Tickets support</Link>
+          </Button>
           <Button size="sm" variant="outline" onClick={loadData} className="gap-1.5">
             <RefreshCw className="h-3.5 w-3.5" /> Rafraîchir
           </Button>

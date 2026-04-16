@@ -60,6 +60,7 @@ jobs:
     continue-on-error: true
     env:
       CI: 'true'
+      # --- Vars lues par les specs Playwright ---
       TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
       TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
       TEST_SUPABASE_SERVICE_ROLE: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE }}
@@ -67,11 +68,18 @@ jobs:
       TEST_STRIPE_PUBLISHABLE_KEY: ${{ secrets.TEST_STRIPE_PUBLISHABLE_KEY }}
       TEST_DOCUSEAL_API_KEY: ${{ secrets.TEST_DOCUSEAL_API_KEY }}
       TEST_RESEND_API_KEY: ${{ secrets.TEST_RESEND_API_KEY }}
-      # L'app a besoin de ses propres vars d'env pour builder + tourner.
-      # Réutilise les mêmes credentials de test quand c'est pertinent.
+      # --- Vars lues par l'app Next au build + runtime ---
+      # Réutilise les creds de test. IMPORTANT : PAS le projet prod.
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE }}
+      DOCUSEAL_API_KEY: ${{ secrets.TEST_DOCUSEAL_API_KEY }}
+      DOCUSEAL_WEBHOOK_SECRET: ${{ secrets.TEST_DOCUSEAL_WEBHOOK_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.TEST_STRIPE_SECRET_KEY }}
+      STRIPE_HELLOPAY_WEBHOOK_SECRET: ${{ secrets.TEST_STRIPE_HELLOPAY_WEBHOOK_SECRET }}
+      RESEND_API_KEY: ${{ secrets.TEST_RESEND_API_KEY }}
+      # Laisser NEXT_PUBLIC_TURNSTILE_SITE_KEY vide → le captcha s'auto-bypass
+      # (voir components/shared/turnstile.tsx).
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

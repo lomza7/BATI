@@ -30,6 +30,7 @@ import { getNextQuoteNumber } from '@/lib/document-numbers';
 import { computeDepositAmount } from '@/lib/invoices/deposits';
 import { ClientPicker } from '@/components/shared/client-picker';
 import { BankAccountPicker } from '@/components/shared/bank-account-picker';
+import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { DocumentPreviewDialog } from '@/components/shared/document-preview-dialog';
 import { DetailTextarea } from '@/components/devis/detail-textarea';
 import { generateQuoteDetail } from '@/lib/ai/generate-quote-detail';
@@ -147,6 +148,12 @@ export default function NouveauDevisPage() {
   const [description, setDescription] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  // Gate "premier RIB" : bloque la soumission finale tant qu'aucun RIB
+  // n'existe. L'entrée sur la page /devis autorise un "Plus tard".
+  const [hasBankAccount, setHasBankAccount] = useState<boolean | null>(null);
+  const [showFirstRibDialog, setShowFirstRibDialog] = useState(false);
+  // Dès qu'un RIB est créé via la modale bloquante, on relance saveQuote.
+  const pendingSaveAfterRib = useRef(false);
   const [validUntil, setValidUntil] = useState(getDefaultValidUntil());
   const [lines, setLines] = useState<QuoteLine[]>([
     { description: '', quantity: 1, unit: 'u', unit_price: 0, tva_rate: 20, section: 'materiel' },
@@ -194,6 +201,20 @@ export default function NouveauDevisPage() {
   useEffect(() => {
     loadServices();
   }, []);
+
+  // Charge le flag "a au moins un RIB" pour gater la soumission finale.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { count } = await supabase
+        .from('bank_accounts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      if (!cancelled) setHasBankAccount((count ?? 0) > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   async function loadServices() {
     const { data } = await supabase
@@ -558,6 +579,16 @@ export default function NouveauDevisPage() {
 
   async function saveQuote() {
     if (!user || saving) return;
+
+    // Gate "premier RIB" : tant qu'aucun RIB n'est configuré, on bloque la
+    // création effective et on ouvre la modale (sans "Plus tard"). Une fois
+    // le RIB créé, on relance automatiquement saveQuote via l'effet.
+    if (hasBankAccount === false) {
+      pendingSaveAfterRib.current = true;
+      setShowFirstRibDialog(true);
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -1713,6 +1744,26 @@ export default function NouveauDevisPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Gate bloquant : demande du RIB au moment de créer le devis. */}
+      <FirstBankAccountDialog
+        open={showFirstRibDialog}
+        onOpenChange={(open) => {
+          setShowFirstRibDialog(open);
+          if (!open) pendingSaveAfterRib.current = false;
+        }}
+        context="devis"
+        onSaved={(account) => {
+          setHasBankAccount(true);
+          setSelectedBankAccountId(account.id);
+          setShowFirstRibDialog(false);
+          // Relance automatique de la création du devis maintenant que le RIB existe.
+          if (pendingSaveAfterRib.current) {
+            pendingSaveAfterRib.current = false;
+            setTimeout(() => { void saveQuote(); }, 0);
+          }
+        }}
+      />
     </div>
   );
 }

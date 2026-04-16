@@ -1,34 +1,56 @@
 import { test, expect } from '@playwright/test';
+import { hasTestCredentials } from './fixtures/supabase';
+import { createTestUser, deleteTestUser } from './fixtures/user';
+import { loginViaUI } from './fixtures/auth';
 
 /*
- * Flow 1 : inscription → vérification email → onboarding → dashboard.
+ * Flow 1 : signup → onboarding → dashboard.
  *
- * Prérequis runtime (non câblés) :
- *   - TEST_SUPABASE_URL, TEST_SUPABASE_ANON_KEY, TEST_SUPABASE_SERVICE_ROLE
- *     → projet Supabase de test, pour pouvoir créer/nettoyer un user
- *   - TEST_RESEND_API_KEY ou mock pour intercepter le code de vérif
+ * Stratégie :
+ *   - On BYPASS le formulaire /signup (Turnstile + email verification) et
+ *     on crée directement le user via `supabase.auth.admin.createUser`
+ *     avec email_confirm=true. Équivalent fonctionnel côté produit : un
+ *     user qui clique sur le lien de vérif dans son email.
+ *   - Le login passe par l'UI réelle (/login). Le captcha Turnstile
+ *     s'auto-bypass quand NEXT_PUBLIC_TURNSTILE_SITE_KEY n'est pas défini
+ *     (voir components/shared/turnstile.tsx).
  *
- * Stratégie : créer le user via API service_role (bypass email), puis
- *   simuler la connexion + parcourir l'onboarding.
+ * On ne drill pas les 9 étapes du modal onboarding (file uploads, Pappers
+ * API, flaky). On vérifie seulement les deux invariants :
+ *   A. Un user fresh voit bien le modal d'onboarding après login.
+ *   B. Un user dont onboarding_completed=true n'est PAS bloqué par le modal
+ *      et accède au dashboard.
  */
 
-const HAS_CREDENTIALS = Boolean(
-  process.env.TEST_SUPABASE_URL &&
-    process.env.TEST_SUPABASE_ANON_KEY &&
-    process.env.TEST_SUPABASE_SERVICE_ROLE,
-);
-
 test.describe('Flow 1 — Signup → onboarding → dashboard', () => {
-  test.skip(!HAS_CREDENTIALS, 'Credentials de test manquants — voir tests/e2e/README.md');
+  test.skip(!hasTestCredentials(), 'Credentials de test manquants — voir tests/e2e/README.md');
 
-  test('un nouvel utilisateur peut s\'inscrire et accéder au dashboard', async ({ page }) => {
-    // TODO: câbler quand les credentials de test sont fournis
-    //   1. Créer un user via supabaseAdmin (email confirmé)
-    //   2. Se connecter via /login
-    //   3. Remplir l'onboarding (entreprise, métier, plan)
-    //   4. Vérifier redirection /dashboard
-    //   5. Cleanup : supprimer le user
-    await page.goto('/');
-    await expect(page).toHaveTitle(/Hellobat/);
+  test('un user onboardé atteint le dashboard après login', async ({ page }) => {
+    const user = await createTestUser({ onboardingCompleted: true });
+    try {
+      await loginViaUI(page, user.email, user.password);
+      // Assertion dashboard: l'URL change vers /dashboard (déjà vérifié par
+      // loginViaUI), et le modal onboarding ne doit PAS apparaître.
+      const onboardingDialog = page.getByRole('dialog', {
+        name: /configuration de votre compte/i,
+      });
+      await expect(onboardingDialog).toBeHidden({ timeout: 3_000 });
+    } finally {
+      await deleteTestUser(user.id);
+    }
+  });
+
+  test('un user fresh voit le modal onboarding après login', async ({ page }) => {
+    const user = await createTestUser({ onboardingCompleted: false });
+    try {
+      await loginViaUI(page, user.email, user.password);
+      const onboardingDialog = page.getByRole('dialog', {
+        name: /configuration de votre compte/i,
+      });
+      await expect(onboardingDialog).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('#fullName')).toBeVisible();
+    } finally {
+      await deleteTestUser(user.id);
+    }
   });
 });
