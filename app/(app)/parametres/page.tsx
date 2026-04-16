@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_PROJECT_PHASES, formatDate, type ProjectPhase } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { DocumentTemplateSettings } from '@/components/parametres/document-template-settings';
+import { ProfileAvatarUpload } from '@/components/parametres/profile-avatar-upload';
 import { UsageWidget } from '@/components/credits/usage-widget';
 import { CompanyAttachmentsCard } from '@/components/parametres/company-attachments';
 import { BankAccountsCard } from '@/components/parametres/bank-accounts-card';
@@ -100,6 +101,7 @@ type SettingsTab = 'parametres' | 'import' | 'documents' | 'finance' | 'chantier
 interface SettingsProfile {
   id: string;
   full_name: string;
+  avatar_url: string;
   company_name: string;
   company_activity: string;
   company_city: string;
@@ -336,6 +338,7 @@ export default function ParametresPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('parametres');
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<SettingsProfile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [form, setForm] = useState({
     full_name: '',
     company_name: '',
@@ -433,7 +436,7 @@ export default function ParametresPage() {
       supabase
         .from('profiles')
         .select(
-          'id, full_name, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, onboarding_completed, plan, plan_started_at, stripe_customer_id, project_phases_config'
+          'id, full_name, avatar_url, company_name, company_activity, company_city, company_phone, team_size, referral_source, siren, siret, legal_form, naf_code, naf_label, capital, tva_number, company_address, company_postal_code, company_website, rcs, insurance_company, insurance_address, insurance_coverage_zone, insurance_contract_number, insurance_warranty_type, onboarding_completed, plan, plan_started_at, stripe_customer_id, project_phases_config'
         )
         .eq('id', user.id)
         .maybeSingle(),
@@ -503,6 +506,7 @@ export default function ParametresPage() {
     }
 
     setProfile(nextProfile);
+    setAvatarUrl(nextProfile?.avatar_url || '');
     setMyWorkspaceMembership(activeMembership);
     setWorkspaceUserId(nextWorkspaceUserId);
     setWorkspaceRole(nextWorkspaceRole);
@@ -1291,6 +1295,12 @@ export default function ParametresPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <ProfileAvatarUpload
+                  avatarUrl={avatarUrl}
+                  fullName={form.full_name}
+                  onChange={setAvatarUrl}
+                />
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="full_name">Nom complet</Label>

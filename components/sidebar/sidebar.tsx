@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
+import { TrialPill } from './trial-pill';
 import { CreditsBadge } from '@/components/credits/credits-badge';
 import { HelpDialog } from '@/components/shared/help-dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -22,7 +23,12 @@ function SidebarContent({
 }) {
   return (
     <>
-      <div className={cn('flex items-center gap-2.5 py-5', collapsed ? 'justify-center px-2' : 'px-5')}>
+      <div
+        className={cn(
+          'flex items-center gap-2.5 pt-5 pb-2',
+          collapsed ? 'justify-center px-2' : 'pl-5 pr-12 lg:pr-5',
+        )}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
         {!collapsed && (
@@ -36,6 +42,8 @@ function SidebarContent({
           </>
         )}
       </div>
+
+      {!collapsed && <TrialPill />}
 
       {collapsed ? (
         <SidebarNavCollapsed />

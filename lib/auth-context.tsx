@@ -9,6 +9,7 @@ interface Profile {
   full_name: string;
   company_name: string;
   company_activity: string;
+  avatar_url: string;
   onboarding_completed: boolean;
   email_verified: boolean;
 }
@@ -21,6 +22,8 @@ interface AuthContextValue {
   showOnboarding: boolean;
   completeOnboarding: () => void;
   signOut: () => Promise<void>;
+  /** Recharge le profil depuis la DB (utile après upload d'un avatar). */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -31,6 +34,7 @@ const AuthContext = createContext<AuthContextValue>({
   showOnboarding: false,
   completeOnboarding: () => {},
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -73,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, company_name, company_activity, onboarding_completed, email_verified')
+        .select('id, full_name, company_name, company_activity, avatar_url, onboarding_completed, email_verified')
         .eq('id', userId)
         .maybeSingle();
 
@@ -167,6 +171,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    await fetchProfile(user.id);
+  }, [user, fetchProfile]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -177,6 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         showOnboarding,
         completeOnboarding,
         signOut,
+        refreshProfile,
       }}
     >
       {children}
