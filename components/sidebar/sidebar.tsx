@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Settings, CircleHelp as HelpCircle, Menu, Trash2, Gift, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
 import { SidebarUser } from './sidebar-user';
@@ -29,17 +30,24 @@ function SidebarContent({
           collapsed ? 'justify-center px-2' : 'pl-5 pr-12 lg:pr-5',
         )}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
-        {!collapsed && (
-          <>
+        <Link
+          href="/dashboard"
+          onClick={onNavigate}
+          aria-label="Retour au tableau de bord"
+          className="flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="Hellobat" width={32} height={32} />
+          {!collapsed && (
             <span className="font-serif font-medium tracking-tight text-foreground text-lg">
               Hellobat
             </span>
-            <div className="ml-auto">
-              <CreditsBadge />
-            </div>
-          </>
+          )}
+        </Link>
+        {!collapsed && (
+          <div className="ml-auto">
+            <CreditsBadge />
+          </div>
         )}
       </div>
 
