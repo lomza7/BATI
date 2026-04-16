@@ -725,6 +725,7 @@ export default function DashboardPage() {
   const [teamAssignments, setTeamAssignments] = useState<TeamAssignmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [datePreset, setDatePreset] = useState<DatePreset>('annee');
+  const [leadOriginTab, setLeadOriginTab] = useState<'canaux' | 'apporteurs'>('canaux');
   const [revenueView, setRevenueView] = useState<'chart' | 'table'>('chart');
   const [revenueSeries, setRevenueSeries] = useState(() => new Set<'devis' | 'factures' | 'encaisse'>(['factures']));
   const [revenueUnit, setRevenueUnit] = useState<'ttc' | 'ht'>('ttc');
@@ -1985,28 +1986,57 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.7fr_0.7fr]">
-            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Origine de vos leads</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Où vos opportunités entrent vraiment, et dans quel état elles se trouvent</p>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/prospection">Ouvrir le CRM</Link>
-                </Button>
+          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-foreground">Origine & apporteurs de vos leads</h2>
+                <p className="mt-1 text-sm text-muted-foreground">D&apos;où viennent vos opportunités et qui vous en apporte le plus</p>
               </div>
+              <Button asChild variant="outline" size="sm" className="self-start sm:self-auto shrink-0">
+                <Link href={leadOriginTab === 'apporteurs' ? '/parametres?tab=parametres' : '/prospection'}>
+                  {leadOriginTab === 'apporteurs' ? 'Gérer les sources' : 'Ouvrir le CRM'}
+                </Link>
+              </Button>
+            </div>
 
-              {dashboardData.leadSourceChartData.length === 0 ? (
-                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Dès que vos leads seront qualifiés avec une source, vous verrez ici quels canaux performent le mieux.
-                </div>
-              ) : (
-                <div className="mt-6">
-                  <ChartContainer config={leadSourceChartConfig} className="h-[300px] w-full">
-                    <BarChart data={dashboardData.leadSourceChartData} margin={{ left: 12, right: 12, top: 10, bottom: 10 }}>
+            <div className="mt-4 inline-flex w-full sm:w-auto rounded-full bg-muted/60 p-1">
+              <button
+                type="button"
+                onClick={() => setLeadOriginTab('canaux')}
+                className={`flex-1 sm:flex-none rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                  leadOriginTab === 'canaux'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                aria-pressed={leadOriginTab === 'canaux'}
+              >
+                Canaux d&apos;acquisition
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeadOriginTab('apporteurs')}
+                className={`flex-1 sm:flex-none rounded-full px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                  leadOriginTab === 'apporteurs'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                aria-pressed={leadOriginTab === 'apporteurs'}
+              >
+                Top apporteurs
+              </button>
+            </div>
+
+            <div className="mt-5">
+              {leadOriginTab === 'canaux' ? (
+                dashboardData.leadSourceChartData.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                    Dès que vos leads seront qualifiés avec une source, vous verrez ici quels canaux performent le mieux.
+                  </div>
+                ) : (
+                  <ChartContainer config={leadSourceChartConfig} className="h-[260px] sm:h-[300px] w-full">
+                    <BarChart data={dashboardData.leadSourceChartData} margin={{ left: 4, right: 4, top: 10, bottom: 10 }}>
                       <CartesianGrid vertical={false} />
-                      <XAxis dataKey="source" tickLine={false} axisLine={false} tickMargin={8} />
+                      <XAxis dataKey="source" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} interval={0} />
                       <YAxis hide />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <ChartLegend content={<ChartLegendContent />} />
@@ -2015,23 +2045,9 @@ export default function DashboardPage() {
                       <Bar dataKey="lost" stackId="state" radius={[6, 6, 0, 0]} fill="var(--color-lost)" />
                     </BarChart>
                   </ChartContainer>
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Top apporteurs</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">La course de vos meilleurs partenaires</p>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/parametres?tab=parametres">Gérer les sources</Link>
-                </Button>
-              </div>
-
-              {dashboardData.topPartnerSources.length === 0 ? (
-                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                )
+              ) : dashboardData.topPartnerSources.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
                   Ajoutez vos apporteurs d&apos;affaires dans Paramètres pour suivre ceux qui vous envoient les meilleurs leads.
                 </div>
               ) : (() => {
@@ -2044,7 +2060,7 @@ export default function DashboardPage() {
                   'hsl(var(--chart-5))',
                 ];
                 return (
-                  <div className="mt-6 space-y-3">
+                  <div className="space-y-2.5 sm:space-y-3">
                     {dashboardData.topPartnerSources.slice(0, 5).map((source, i) => {
                       const pct = maxValue > 0 ? Math.max((source.wonValue / maxValue) * 100, 8) : 8;
                       const color = barColors[i % barColors.length];
@@ -2052,11 +2068,11 @@ export default function DashboardPage() {
                         <Link
                           key={source.id}
                           href="/prospection"
-                          className="group block rounded-lg p-2.5 -mx-1 transition-colors hover:bg-muted/30"
+                          className="group block rounded-lg p-2 sm:p-2.5 -mx-1 transition-colors hover:bg-muted/30"
                         >
                           <div className="flex items-baseline justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-sm text-muted-foreground w-5 text-right shrink-0">{i + 1}.</span>
+                              <span className="text-xs sm:text-sm text-muted-foreground w-4 sm:w-5 text-right shrink-0">{i + 1}.</span>
                               <p className="text-sm font-medium text-foreground truncate">{source.name}</p>
                             </div>
                             <p className="text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">{formatCurrency(source.wonValue)}</p>
@@ -2081,53 +2097,6 @@ export default function DashboardPage() {
                   </div>
                 );
               })()}
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Lecture par étape</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Visualisez où votre pipe se remplit et où les leads stagnent</p>
-                </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/prospection">Voir le kanban</Link>
-                </Button>
-              </div>
-
-              {dashboardData.stageConversionData.length === 0 ? (
-                <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                  Dès que votre pipe contiendra des leads, vous verrez ici le poids de chaque étape.
-                </div>
-              ) : (
-                <div className="mt-6 space-y-4">
-                  {dashboardData.stageConversionData.slice(0, 6).map((stage) => (
-                    <div key={stage.slug} className="space-y-2 rounded-xl border border-border/70 bg-muted/10 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${stage.color}`}>
-                            {stage.label}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-foreground">{stage.total} lead{stage.total > 1 ? 's' : ''}</p>
-                          <p className="text-xs text-muted-foreground">{stage.conversionRate}% du pipe</p>
-                        </div>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${Math.max(stage.conversionRate, 6)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {stage.slug === 'gagne'
-                          ? `${formatCurrency(stage.wonValue)} signés sur cette étape finale.`
-                          : `Surveillez cette étape si les leads y restent trop longtemps.`}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
