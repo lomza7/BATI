@@ -18,7 +18,6 @@ A propos de Hellobat :
 - Generateur de site web vitrine par IA
 - Assistant email IA (paste-based) : l'utilisateur colle un email recu, l'IA redige une reponse en tenant compte du contexte client (devis, factures, chantiers)
 - Avis clients : import des avis Google via lien Maps, lien public pour recueillir de nouveaux avis, demande par email en masse
-- Avant/Apres IA : transforme une photo de piece ou de facade en projection apres travaux
 - 5 agents IA experts : pannes, DTU, chiffrage, juridique, RGE/CEE
 - Paiements Stripe, contrats recurrents
 - Comptabilite IA avec OCR Maurice (recus, factures fournisseurs) et reconciliation bancaire
