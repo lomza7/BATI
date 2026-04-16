@@ -79,7 +79,7 @@ export function SchemaOrg() {
         operatingSystem: 'Web, iOS, Android',
         url: SITE_URL,
         description:
-          "Logiciel du bâtiment tout-en-un : devis IA vocal, facture électronique 2026, gestion chantiers, CRM, Google Calendar et Gmail intégrés, paiements Stripe, signature électronique, comptabilité par IA. Conçu pour les artisans français.",
+          "Logiciel du bâtiment tout-en-un : devis IA vocal, facture électronique 2026, gestion chantiers, CRM, synchronisation iCloud, assistant email IA, paiements Stripe, signature électronique, comptabilité par IA. Conçu pour les artisans français.",
         offers: {
           '@type': 'Offer',
           price: STARTER_PRICE,
@@ -101,11 +101,11 @@ export function SchemaOrg() {
           'Signature électronique DocuSeal',
           'Gestion des chantiers et planning équipe',
           'CRM et prospection',
-          'Google Calendar et Gmail intégrés',
+          'Synchronisation iCloud et assistant email IA',
           'Paiements Stripe',
           'Comptabilité automatisée par IA',
           'Site web artisan généré par IA',
-          'Avis Google Business',
+          'Avis clients avec import Google',
           'Carte interactive des chantiers',
           'Contrats récurrents',
           '5 agents IA spécialisés BTP',

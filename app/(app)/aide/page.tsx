@@ -149,12 +149,12 @@ const FAQ: FaqCategory[] = [
     color: 'from-cyan-500/15 to-teal-500/5 text-cyan-600',
     items: [
       {
-        q: 'Comment connecter ma boîte Gmail ?',
-        a: "Dans Boîte mail, cliquez sur « Connecter Gmail ». Après autorisation, vos emails s'affichent directement dans Hellobat. L'IA peut générer des réponses contextualisées avec l'historique du client.",
+        q: 'Comment utiliser l\u2019Assistant email IA ?',
+        a: "Dans Assistant email IA, collez l'email reçu de votre client. L'IA récupère automatiquement le contexte (devis, factures, chantiers) et génère une réponse personnalisée que vous pouvez copier-coller dans votre messagerie.",
       },
       {
-        q: 'Comment gérer mes avis Google ?',
-        a: "Dans Avis Google, connectez votre Google Business Profile. Vous voyez tous vos avis et pouvez y répondre directement, avec assistance IA pour les réponses.",
+        q: 'Comment gérer mes avis clients ?',
+        a: "Dans Avis clients, collez le lien de votre fiche Google Maps pour importer vos avis Google automatiquement. Vous pouvez aussi envoyer un lien public à vos clients pour recueillir de nouveaux avis, ou leur demander par email en masse.",
       },
     ],
   },

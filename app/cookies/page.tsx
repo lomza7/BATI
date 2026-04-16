@@ -54,12 +54,6 @@ export default function CookiesPage() {
                       <td className="py-2">Session</td>
                     </tr>
                     <tr className="border-b border-[var(--landing-border)]/50">
-                      <td className="py-2 pr-4 font-mono text-xs">google_oauth_user_id</td>
-                      <td className="py-2 pr-4">Essentiel</td>
-                      <td className="py-2 pr-4">Liaison OAuth Google (Calendar, Gmail, Business)</td>
-                      <td className="py-2">5 min</td>
-                    </tr>
-                    <tr className="border-b border-[var(--landing-border)]/50">
                       <td className="py-2 pr-4 font-mono text-xs">__vercel_live_token</td>
                       <td className="py-2 pr-4">Technique</td>
                       <td className="py-2 pr-4">Prévisualisation Vercel (développement uniquement)</td>
@@ -124,10 +118,8 @@ export default function CookiesPage() {
 
             <Section title="5. Cookies tiers">
               <p>
-                Lorsque vous connectez votre compte Google (Calendar, Gmail ou Business),
-                Google peut déposer ses propres cookies conformément à sa politique de
-                confidentialité. De même, lors d&apos;un paiement via Stripe, Stripe peut
-                utiliser des cookies nécessaires au traitement sécurisé du paiement.
+                Lors d&apos;un paiement via Stripe, Stripe peut utiliser des cookies
+                nécessaires au traitement sécurisé du paiement.
               </p>
             </Section>
 

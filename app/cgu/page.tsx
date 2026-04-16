@@ -56,7 +56,7 @@ export default function CguPage() {
                 <li>Planning d&apos;équipe interactif</li>
                 <li>Carnet de contacts (clients, prospects, prestataires)</li>
                 <li>Carte interactive des chantiers</li>
-                <li>Intégration Gmail, Google Calendar et Google Business</li>
+                <li>Assistant email IA (paste-based) et synchronisation iCloud Calendar</li>
                 <li>Prospection CRM avec pipeline visuel</li>
                 <li>Génération de site vitrine par IA</li>
                 <li>Catalogues produits avec lien de partage</li>

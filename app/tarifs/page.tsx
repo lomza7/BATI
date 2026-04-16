@@ -87,9 +87,9 @@ const SECTIONS: Section[] = [
   {
     title: 'Communication & visibilité',
     rows: [
-      { label: 'Connexion à votre Gmail — gérez vos emails dans Hellobat', free: true, pro: true },
-      { label: 'Demandes d’avis Google My Business', free: true, pro: true },
-      { label: 'Synchronisation Google Calendar', free: true, pro: true },
+      { label: 'Assistant email IA — rédigez vos réponses avec le contexte client', free: true, pro: true },
+      { label: 'Avis clients — import Google + demandes d’avis par email', free: true, pro: true },
+      { label: 'Synchronisation iCloud / Apple Calendar', free: true, pro: true },
     ],
   },
   {

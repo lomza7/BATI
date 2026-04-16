@@ -16,8 +16,8 @@ A propos de Hellobat :
 - Catalogues produits partages aux clients via lien magique
 - Prospection / CRM pipeline avec leads et stages personnalisables
 - Generateur de site web vitrine par IA
-- Boite mail Gmail integree avec reponse IA contextuelle
-- Avis Google Business avec reponse assistee
+- Assistant email IA (paste-based) : l'utilisateur colle un email recu, l'IA redige une reponse en tenant compte du contexte client (devis, factures, chantiers)
+- Avis clients : import des avis Google via lien Maps, lien public pour recueillir de nouveaux avis, demande par email en masse
 - Avant/Apres IA : transforme une photo de piece ou de facade en projection apres travaux
 - 5 agents IA experts : pannes, DTU, chiffrage, juridique, RGE/CEE
 - Paiements Stripe, contrats recurrents

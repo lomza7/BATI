@@ -48,8 +48,8 @@ export default function ConfidentialitePage() {
                 <li>Fourniture et amélioration des services Hellobat (devis, factures, chantiers, planning, etc.)</li>
                 <li>Traitement des paiements via Stripe</li>
                 <li>Signature électronique des documents via DocuSeal</li>
-                <li>Synchronisation avec vos services Google (Calendar, Gmail, Business)</li>
-                <li>Génération de contenu par intelligence artificielle (Claude d&apos;Anthropic)</li>
+                <li>Récupération de vos avis publics Google via l&apos;API Google Places</li>
+                <li>Génération de contenu par intelligence artificielle (OpenAI)</li>
                 <li>Envoi d&apos;emails transactionnels (confirmations, factures, rappels)</li>
                 <li>Recherche d&apos;informations d&apos;entreprise via Pappers</li>
                 <li>Support client et communication</li>
@@ -61,7 +61,7 @@ export default function ConfidentialitePage() {
               <p>Le traitement de vos données repose sur :</p>
               <ul>
                 <li><strong>L&apos;exécution du contrat</strong> : fourniture du service Hellobat auquel vous avez souscrit</li>
-                <li><strong>Le consentement</strong> : pour les cookies non essentiels, l&apos;intégration Google, la newsletter</li>
+                <li><strong>Le consentement</strong> : pour les cookies non essentiels et la newsletter</li>
                 <li><strong>L&apos;intérêt légitime</strong> : amélioration du service, prévention de la fraude, statistiques anonymisées</li>
                 <li><strong>L&apos;obligation légale</strong> : conservation des factures (10 ans), obligations fiscales</li>
               </ul>
@@ -73,10 +73,10 @@ export default function ConfidentialitePage() {
                 <li><strong>Supabase Inc.</strong> — hébergement de la base de données et stockage de fichiers</li>
                 <li><strong>Vercel Inc.</strong> — hébergement de l&apos;application web</li>
                 <li><strong>Stripe Inc.</strong> — traitement des paiements en ligne</li>
-                <li><strong>Anthropic PBC</strong> — traitement IA (génération de devis, réponses email, agents IA)</li>
+                <li><strong>OpenAI</strong> — traitement IA (génération de devis, réponses email, agents IA)</li>
                 <li><strong>DocuSeal</strong> — signature électronique des documents</li>
                 <li><strong>Resend Inc.</strong> — envoi d&apos;emails transactionnels</li>
-                <li><strong>Google LLC</strong> — synchronisation Calendar, Gmail et Business (sur votre consentement), mesure d&apos;audience (Google Analytics)</li>
+                <li><strong>Google LLC</strong> — récupération d&apos;avis publics via Google Places, mesure d&apos;audience (Google Analytics)</li>
                 <li><strong>Pappers SAS</strong> — recherche d&apos;informations d&apos;entreprise</li>
               </ul>
               <p>

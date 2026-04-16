@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: '%s | Hellobat',
   },
   description:
-    'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+    'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, assistant email IA, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
   keywords: [
     'logiciel bâtiment',
     'logiciel BTP',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     siteName: 'Hellobat',
     title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA',
     description:
-      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, assistant email IA, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
     locale: 'fr_FR',
     // OG image generated dynamically by app/opengraph-image.tsx (Next.js file-based convention)
   },
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Hellobat — Jusqu\'à 10h gagnées par semaine grâce à l\'IA',
     description:
-      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, Gmail, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
+      'Jusqu\'à 10h gagnées chaque semaine. Site web offert, devis IA vocal, compta auto (facture 2026), paiement et signature en ligne, assistant email IA, CRM, planning et chantiers — tout le bâtiment dans une seule app. Essai 30 jours, sans carte.',
     creator: '@hellobat',
     // Twitter image generated dynamically by app/twitter-image.tsx (Next.js file-based convention)
   },
