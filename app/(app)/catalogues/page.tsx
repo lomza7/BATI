@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, FolderOpen, Send, Eye, MoveHorizontal as MoreHorizontal, Trash2, Pencil, Package, Layers } from 'lucide-react';
+import { Plus, FolderOpen, Send, Eye, MoveHorizontal as MoreHorizontal, Trash2, Pencil, Package, Layers, FileText, Upload, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
@@ -10,6 +10,7 @@ import { CatalogBuilder } from '@/components/catalogs/catalog-builder';
 import { SendCatalogDialog } from '@/components/catalogs/send-catalog-dialog';
 import { SendsHistory } from '@/components/catalogs/sends-history';
 import { EmojiPicker } from '@/components/catalogs/emoji-picker';
+import { UploadSupplierPdfDialog } from '@/components/catalogs/upload-supplier-pdf-dialog';
 import { formatDate } from '@/lib/constants';
 
 interface Catalog {
@@ -20,6 +21,11 @@ interface Catalog {
   status: string;
   created_at: string;
   collections_count?: number;
+  catalog_type?: 'custom' | 'supplier_pdf';
+  supplier_name?: string | null;
+  pdf_file_url?: string | null;
+  pdf_file_name?: string | null;
+  pdf_file_size?: number | null;
 }
 
 type View = 'list' | 'collections' | 'builder' | 'sends';
@@ -33,6 +39,8 @@ export default function CataloguesPage() {
   const [editingCatalog, setEditingCatalog] = useState<Catalog | null>(null);
   const [sendCatalog, setSendCatalog] = useState<Catalog | null>(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newEmoji, setNewEmoji] = useState('');
@@ -151,39 +159,89 @@ export default function CataloguesPage() {
             <Layers className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Collections</span>
           </button>
-          <button
-            onClick={() => setShowNewDialog(true)}
-            className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Nouveau
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowCreateMenu((v) => !v)}
+              className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nouveau
+            </button>
+            {showCreateMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowCreateMenu(false)} />
+                <div className="absolute right-0 top-10 z-20 w-72 rounded-xl border border-border bg-white shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  <button
+                    onClick={() => { setShowCreateMenu(false); setShowNewDialog(true); }}
+                    className="w-full flex items-start gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Layers className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">Créer un catalogue</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                        Assemblez vos propres produits en collections
+                      </p>
+                    </div>
+                  </button>
+                  <div className="h-px bg-border" />
+                  <button
+                    onClick={() => { setShowCreateMenu(false); setShowImportDialog(true); }}
+                    className="w-full flex items-start gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">Importer un PDF fournisseur</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                        Leroy Merlin, Saint-Gobain, Point P…
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {catalogs.length === 0 && !showNewDialog ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-            <Package className="h-8 w-8 text-primary" />
+        <div className="py-10 sm:py-14">
+          <div className="text-center mb-8">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Package className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Aucun catalogue</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              Créez votre propre catalogue ou importez un PDF de votre fournisseur pour l&apos;envoyer à vos clients.
+            </p>
           </div>
-          <h3 className="text-lg font-semibold text-foreground">Aucun catalogue</h3>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Commencez par créer des collections de produits, puis assemblez-les en catalogues personnalisés pour vos clients.
-          </p>
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={() => setView('collections')}
-              className="h-10 px-5 rounded-lg border border-border bg-white text-sm font-medium text-foreground flex items-center gap-2 hover:bg-muted/50 transition-all"
-            >
-              <Layers className="h-4 w-4" />
-              Créer des collections
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
             <button
               onClick={() => setShowNewDialog(true)}
-              className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
+              className="group rounded-xl border border-border bg-white p-5 text-left hover:border-primary/40 hover:shadow-md transition-all"
             >
-              <Plus className="h-4 w-4" />
-              Créer un catalogue
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                <Layers className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Créer un catalogue</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Composez vos produits en collections et envoyez-les à vos clients pour qu&apos;ils sélectionnent leurs modèles.
+              </p>
+            </button>
+            <button
+              onClick={() => setShowImportDialog(true)}
+              className="group rounded-xl border border-border bg-white p-5 text-left hover:border-primary/40 hover:shadow-md transition-all"
+            >
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                <FileText className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">Importer un PDF fournisseur</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Transmettez les catalogues de Leroy Merlin, Saint-Gobain, Point P et d&apos;autres fournisseurs à vos clients.
+              </p>
             </button>
           </div>
         </div>
@@ -230,74 +288,106 @@ export default function CataloguesPage() {
             </div>
           )}
 
-          {catalogs.map((catalog) => (
-            <div
-              key={catalog.id}
-              className="group rounded-xl border border-border bg-white p-5 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer relative"
-              onClick={() => { setEditingCatalog(catalog); setView('builder'); }}
-            >
-              <div className="flex items-start justify-between">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  {catalog.emoji ? (
-                    <span className="text-xl">{catalog.emoji}</span>
+          {catalogs.map((catalog) => {
+            const isPdf = catalog.catalog_type === 'supplier_pdf';
+            const handleOpen = () => {
+              if (isPdf && catalog.pdf_file_url) {
+                window.open(catalog.pdf_file_url, '_blank', 'noopener,noreferrer');
+              } else {
+                setEditingCatalog(catalog);
+                setView('builder');
+              }
+            };
+            return (
+              <div
+                key={catalog.id}
+                className="group rounded-xl border border-border bg-white p-5 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer relative"
+                onClick={handleOpen}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    {isPdf ? (
+                      <FileText className="h-5 w-5 text-primary" />
+                    ) : catalog.emoji ? (
+                      <span className="text-xl">{catalog.emoji}</span>
+                    ) : (
+                      <FolderOpen className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === catalog.id ? null : catalog.id); }}
+                      className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all sm:opacity-0 sm:group-hover:opacity-100"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    {menuOpen === catalog.id && (
+                      <div className="absolute right-0 top-9 z-10 w-44 rounded-lg border border-border bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        {isPdf ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (catalog.pdf_file_url) window.open(catalog.pdf_file_url, '_blank', 'noopener,noreferrer'); setMenuOpen(null); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" /> Ouvrir le PDF
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingCatalog(catalog); setView('builder'); setMenuOpen(null); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" /> Modifier
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSendCatalog(catalog); setMenuOpen(null); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
+                        >
+                          <Send className="h-3.5 w-3.5" /> Envoyer
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteCatalog(catalog.id); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Supprimer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <h3 className="text-base font-semibold text-foreground mt-3">{catalog.name}</h3>
+                {isPdf && catalog.supplier_name && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Fournisseur · {catalog.supplier_name}</p>
+                )}
+                {catalog.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{catalog.description}</p>
+                )}
+
+                <div className="flex items-center flex-wrap gap-2 mt-4 pt-3 border-t border-border">
+                  {isPdf ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      <FileText className="h-3 w-3" />
+                      PDF fournisseur
+                    </span>
                   ) : (
-                    <FolderOpen className="h-5 w-5 text-primary" />
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+                      catalog.status === 'published'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${
+                        catalog.status === 'published' ? 'bg-emerald-500' : 'bg-slate-400'
+                      }`} />
+                      {catalog.status === 'published' ? 'Publié' : 'Brouillon'}
+                    </span>
                   )}
-                </div>
-                <div className="relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === catalog.id ? null : catalog.id); }}
-                    className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                  {menuOpen === catalog.id && (
-                    <div className="absolute right-0 top-9 z-10 w-40 rounded-lg border border-border bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingCatalog(catalog); setView('builder'); setMenuOpen(null); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Modifier
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSendCatalog(catalog); setMenuOpen(null); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors"
-                      >
-                        <Send className="h-3.5 w-3.5" /> Envoyer
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteCatalog(catalog.id); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Supprimer
-                      </button>
-                    </div>
-                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(catalog.created_at)}
+                  </span>
                 </div>
               </div>
-
-              <h3 className="text-base font-semibold text-foreground mt-3">{catalog.name}</h3>
-              {catalog.description && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{catalog.description}</p>
-              )}
-
-              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-border">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
-                  catalog.status === 'published'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-slate-100 text-slate-600'
-                }`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${
-                    catalog.status === 'published' ? 'bg-emerald-500' : 'bg-slate-400'
-                  }`} />
-                  {catalog.status === 'published' ? 'Publié' : 'Brouillon'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(catalog.created_at)}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -307,6 +397,12 @@ export default function CataloguesPage() {
           onClose={() => setSendCatalog(null)}
         />
       )}
+
+      <UploadSupplierPdfDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onCreated={(cat) => { setCatalogs((prev) => [cat, ...prev]); setShowImportDialog(false); }}
+      />
     </div>
   );
 }

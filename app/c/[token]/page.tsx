@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { Hexagon, Check, Package, ShoppingBag, Send, Loader as Loader2, Clock, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, X, MessageSquare } from 'lucide-react';
+import { Hexagon, Check, Package, ShoppingBag, Send, Loader as Loader2, Clock, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, X, MessageSquare, FileText, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -53,6 +53,10 @@ export default function ClientCatalogPage() {
   const [sendData, setSendData] = useState<SendData | null>(null);
   const [catalogName, setCatalogName] = useState('');
   const [catalogDesc, setCatalogDesc] = useState('');
+  const [catalogType, setCatalogType] = useState<string>('custom');
+  const [supplierName, setSupplierName] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfFileName, setPdfFileName] = useState('');
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selections, setSelections] = useState<Selection[]>([]);
   const [existingSelections, setExistingSelections] = useState<Selection[]>([]);
@@ -74,6 +78,10 @@ export default function ClientCatalogPage() {
     setSendData(payload.send);
     setCatalogName(payload.catalog?.name || '');
     setCatalogDesc(payload.catalog?.description || '');
+    setCatalogType(payload.catalog?.catalog_type || 'custom');
+    setSupplierName(payload.catalog?.supplier_name || '');
+    setPdfUrl(payload.catalog?.pdf_file_url || '');
+    setPdfFileName(payload.catalog?.pdf_file_name || '');
     setCollections((payload.collections || []) as Collection[]);
 
     const existing = (payload.existing_selections || []) as Selection[];
@@ -197,12 +205,15 @@ export default function ClientCatalogPage() {
       </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        <div className="text-center mb-10">
+        <div className="text-center mb-8 sm:mb-10">
           <h1 className="text-2xl sm:text-3xl font-semibold text-[#1a1a1a]">{catalogName}</h1>
+          {catalogType === 'supplier_pdf' && supplierName && (
+            <p className="text-sm text-[#6b6560] mt-2">Fournisseur · {supplierName}</p>
+          )}
           {catalogDesc && (
             <p className="text-sm sm:text-base text-[#6b6560] mt-2 max-w-2xl mx-auto leading-relaxed">{catalogDesc}</p>
           )}
-          {!submitted && (
+          {catalogType !== 'supplier_pdf' && !submitted && (
             <p className="text-xs text-[#6b6560]/60 mt-4">
               Cliquez sur les modeles qui vous interessent, puis validez votre selection.
             </p>
@@ -223,7 +234,52 @@ export default function ClientCatalogPage() {
           </div>
         )}
 
-        {collections.map((collection) => (
+        {catalogType === 'supplier_pdf' && pdfUrl && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-[#d35400]/10 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-5 w-5 text-[#d35400]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#1a1a1a] truncate">{pdfFileName || 'Catalogue.pdf'}</p>
+                  <p className="text-xs text-[#6b6560]">Document PDF</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-10 px-4 rounded-xl border border-[#e5e1da] bg-white text-sm font-medium text-[#1a1a1a] flex items-center justify-center gap-2 hover:bg-[#faf9f7] transition-all"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ouvrir
+                </a>
+                <a
+                  href={pdfUrl}
+                  download={pdfFileName || undefined}
+                  className="h-10 px-4 rounded-xl bg-[#d35400] text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#b94800] transition-all shadow-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  Télécharger
+                </a>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#e5e1da] bg-white overflow-hidden shadow-sm">
+              <iframe
+                src={`${pdfUrl}#view=FitH`}
+                title={catalogName}
+                className="w-full h-[70vh] sm:h-[80vh] min-h-[500px]"
+              />
+            </div>
+            <p className="text-center text-xs text-[#6b6560]/60">
+              Si le PDF ne s&apos;affiche pas, utilisez le bouton Ouvrir ou Télécharger.
+            </p>
+          </div>
+        )}
+
+        {catalogType !== 'supplier_pdf' && collections.map((collection) => (
           <div key={collection.id} className="mb-10">
             <div className="flex items-center gap-3 mb-5">
               <div
