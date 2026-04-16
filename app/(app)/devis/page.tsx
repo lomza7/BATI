@@ -12,7 +12,6 @@ import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
-import { AttachPdfsButton } from '@/components/shared/attach-pdfs-button';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -385,8 +384,7 @@ export default function DevisPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Devis" description="Créez, gérez et envoyez vos devis">
-        <ImportCsvButton type="quotes" onImported={loadQuotes} />
-        <AttachPdfsButton type="quotes" onAttached={loadQuotes} />
+        <ImportCsvButton type="quotes" onImported={loadQuotes} onAttached={loadQuotes} />
         <Button onClick={openCreateOptions} className="gap-2">
           <Plus className="h-4 w-4" />
           Nouveau devis
