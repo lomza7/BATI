@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Eye, EyeOff, ArrowRight, Check, Gift } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ArrowRight, Check, Gift, Sparkles, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Turnstile, type TurnstileHandle } from '@/components/shared/turnstile';
 
@@ -30,6 +30,12 @@ function SignupContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [showPromoField, setShowPromoField] = useState(false);
+  const [promoStatus, setPromoStatus] = useState<
+    | { state: 'idle' }
+    | { state: 'checking' }
+    | { state: 'valid'; code: string; description: string }
+    | { state: 'invalid'; error: string }
+  >({ state: 'idle' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -64,6 +70,50 @@ function SignupContent() {
       setShowPromoField(true);
     }
   }, [promoParam]);
+
+  // Validation live du code promo (debounced 450ms) contre Stripe.
+  useEffect(() => {
+    const trimmed = promoCode.trim().toUpperCase();
+    if (!trimmed) {
+      setPromoStatus({ state: 'idle' });
+      return;
+    }
+    setPromoStatus({ state: 'checking' });
+    const controller = new AbortController();
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch('/api/promo-codes/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: trimmed }),
+          signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (controller.signal.aborted) return;
+        if (data?.valid) {
+          setPromoStatus({
+            state: 'valid',
+            code: data.code || trimmed,
+            description: data.description || 'Code promo appliqué',
+          });
+        } else {
+          setPromoStatus({
+            state: 'invalid',
+            error: data?.error || 'Code inconnu ou expiré',
+          });
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        // Erreur réseau — on ne bloque pas le signup, on passe en idle.
+        setPromoStatus({ state: 'idle' });
+        console.warn('[signup] promo validation failed', err);
+      }
+    }, 450);
+    return () => {
+      controller.abort();
+      window.clearTimeout(handle);
+    };
+  }, [promoCode]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -280,18 +330,56 @@ function SignupContent() {
                   <label htmlFor="promo" className="text-sm font-medium text-foreground">
                     Code promo <span className="text-muted-foreground font-normal">(optionnel)</span>
                   </label>
-                  <input
-                    id="promo"
-                    type="text"
-                    autoComplete="off"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                    placeholder="ARTISAN100"
-                    className="flex h-11 w-full rounded-lg border border-border bg-white px-4 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all uppercase tracking-wide"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Appliqué automatiquement à votre 1<sup>re</sup> souscription à la fin de l&apos;essai gratuit.
-                  </p>
+                  <div className="relative">
+                    <input
+                      id="promo"
+                      type="text"
+                      autoComplete="off"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="ARTISAN100"
+                      className={`flex h-11 w-full rounded-lg border bg-white px-4 pr-10 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 transition-all uppercase tracking-wide ${
+                        promoStatus.state === 'valid'
+                          ? 'border-emerald-300 focus:ring-emerald-200 focus:border-emerald-500'
+                          : promoStatus.state === 'invalid'
+                            ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
+                            : 'border-border focus:ring-primary/20 focus:border-primary'
+                      }`}
+                    />
+                    {promoStatus.state === 'checking' && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                    {promoStatus.state === 'valid' && (
+                      <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
+                    )}
+                    {promoStatus.state === 'invalid' && (
+                      <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+
+                  {promoStatus.state === 'valid' && (
+                    <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                      <Sparkles className="h-4 w-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm leading-tight">
+                        <p className="font-semibold text-emerald-900">
+                          {promoStatus.description}
+                        </p>
+                        <p className="text-xs text-emerald-800/80 mt-0.5">
+                          Appliqué automatiquement à votre souscription, après les 30 jours d&apos;essai.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {promoStatus.state === 'invalid' && (
+                    <p className="text-xs text-red-600">{promoStatus.error}</p>
+                  )}
+
+                  {promoStatus.state === 'idle' && (
+                    <p className="text-xs text-muted-foreground">
+                      Appliqué automatiquement à votre 1<sup>re</sup> souscription à la fin de l&apos;essai gratuit.
+                    </p>
+                  )}
                 </>
               ) : (
                 <button
