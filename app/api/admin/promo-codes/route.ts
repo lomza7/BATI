@@ -97,10 +97,12 @@ export async function POST(request: Request) {
 
     const coupon = await stripe.coupons.create(couponParams);
 
-    // Create the promotion code linked to the coupon
+    // Create the promotion code linked to the coupon.
+    // Note : l'API Stripe 2026-03-25 attend `promotion.coupon` et n'accepte
+    // plus `coupon` à la racine. Ne PAS ajouter `coupon: coupon.id` ici,
+    // sinon Stripe renvoie "Received unknown parameter: coupon".
     const promoParams: Stripe.PromotionCodeCreateParams = {
       promotion: { type: 'coupon', coupon: coupon.id },
-      coupon: coupon.id,
       code: code.toUpperCase(),
       ...(max_redemptions ? { max_redemptions } : {}),
       ...(expires_at ? { expires_at: Math.floor(new Date(expires_at).getTime() / 1000) } : {}),
