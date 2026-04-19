@@ -98,17 +98,21 @@ export async function POST(request: Request) {
     const coupon = await stripe.coupons.create(couponParams);
 
     // Create the promotion code linked to the coupon.
-    // Note : l'API Stripe 2026-03-25 attend `promotion.coupon` et n'accepte
-    // plus `coupon` à la racine. Ne PAS ajouter `coupon: coupon.id` ici,
-    // sinon Stripe renvoie "Received unknown parameter: coupon".
-    const promoParams: Stripe.PromotionCodeCreateParams = {
-      promotion: { type: 'coupon', coupon: coupon.id },
+    // Note : mismatch type/runtime sur cette version du SDK — le typage
+    // `PromotionCodeCreateParams` exige `coupon` à la racine alors que
+    // l'API runtime (`2026-03-25.dahlia`) attend `promotion.coupon` et
+    // rejette `coupon` à la racine avec "Received unknown parameter: coupon".
+    // On bypass le typage avec un cast, le runtime reste la source de vérité.
+    const promoParams = {
+      promotion: { type: 'coupon' as const, coupon: coupon.id },
       code: code.toUpperCase(),
       ...(max_redemptions ? { max_redemptions } : {}),
       ...(expires_at ? { expires_at: Math.floor(new Date(expires_at).getTime() / 1000) } : {}),
     };
 
-    const promoCode = await stripe.promotionCodes.create(promoParams);
+    const promoCode = await stripe.promotionCodes.create(
+      promoParams as unknown as Stripe.PromotionCodeCreateParams,
+    );
 
     return NextResponse.json({
       id: promoCode.id,
