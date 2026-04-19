@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const user_id = user.id;
     const user_email = user.email;
 
-    const { price_id, success_url, cancel_url } = await request.json();
+    const { price_id, success_url, cancel_url, promo_code } = await request.json();
 
     if (!price_id) {
       return NextResponse.json({ error: 'price_id requis' }, { status: 400 });
@@ -84,13 +84,38 @@ export async function POST(request: Request) {
       }
     }
 
+    // Code promo saisi au signup (ou ailleurs) : on résout le code
+    // customer-facing vers son promotionCode.id Stripe, puis on le passe
+    // en `discounts`. Stripe interdit `discounts` + `allow_promotion_codes`
+    // simultanément, donc on switch entre les deux.
+    let resolvedPromotionCodeId: string | null = null;
+    let resolvedPromotionCode: string | null = null;
+    if (typeof promo_code === 'string' && promo_code.trim().length > 0) {
+      try {
+        const list = await stripe.promotionCodes.list({
+          code: promo_code.trim().toUpperCase(),
+          active: true,
+          limit: 1,
+        });
+        if (list.data[0]) {
+          resolvedPromotionCodeId = list.data[0].id;
+          resolvedPromotionCode = list.data[0].code;
+        }
+      } catch {
+        // Silencieux : si le code est invalide/inconnu, on retombe sur
+        // `allow_promotion_codes: true` (champ dans l'UI Stripe).
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       locale: 'fr',
       payment_method_types: ['card'],
       customer_email: user_email,
       line_items: [{ price: resolvedPrice.id, quantity: 1 }],
-      allow_promotion_codes: true,
+      ...(resolvedPromotionCodeId
+        ? { discounts: [{ promotion_code: resolvedPromotionCodeId }] }
+        : { allow_promotion_codes: true }),
       billing_address_collection: 'required',
       tax_id_collection: { enabled: true },
       automatic_tax: { enabled: true },
@@ -105,6 +130,7 @@ export async function POST(request: Request) {
         stripe_price_id: resolvedPrice.id,
         referral_code: referralCode || '',
         referral_trial_days: trialDays > 0 ? String(trialDays) : '',
+        promo_code: resolvedPromotionCode || '',
       },
     });
 

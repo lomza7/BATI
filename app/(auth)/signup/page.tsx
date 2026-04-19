@@ -28,6 +28,8 @@ function SignupContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [showPromoField, setShowPromoField] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -35,6 +37,7 @@ function SignupContent() {
   const teamInvite = searchParams.get('team') === '1';
   const invitedEmail = searchParams.get('email') || '';
   const referralCode = searchParams.get('ref') || '';
+  const promoParam = searchParams.get('promo') || '';
 
   const passwordStrength = getPasswordStrength(password);
 
@@ -53,6 +56,14 @@ function SignupContent() {
       }
     }
   }, [referralCode]);
+
+  // Code promo passé en query (?promo=...) → préremplit le champ et le rend visible.
+  useEffect(() => {
+    if (promoParam) {
+      setPromoCode(promoParam.toUpperCase());
+      setShowPromoField(true);
+    }
+  }, [promoParam]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,6 +107,16 @@ function SignupContent() {
     }
 
     localStorage.setItem('hellobat_signup_email', email);
+    // Mémorise le code promo pour l'appliquer automatiquement à la
+    // 1ère souscription Stripe (fin du trial 30j).
+    const normalizedPromo = promoCode.trim().toUpperCase();
+    if (normalizedPromo) {
+      try {
+        localStorage.setItem('hellobat_promo_code', normalizedPromo);
+      } catch {
+        // ignore
+      }
+    }
     router.push('/verify-email');
   }
 
@@ -249,6 +270,37 @@ function SignupContent() {
                     {passwordStrength.label}
                   </span>
                 </div>
+              )}
+            </div>
+
+            {/* Code promo (optionnel) — pre-rempli si ?promo=... en URL. */}
+            <div className="space-y-2">
+              {showPromoField ? (
+                <>
+                  <label htmlFor="promo" className="text-sm font-medium text-foreground">
+                    Code promo <span className="text-muted-foreground font-normal">(optionnel)</span>
+                  </label>
+                  <input
+                    id="promo"
+                    type="text"
+                    autoComplete="off"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="ARTISAN100"
+                    className="flex h-11 w-full rounded-lg border border-border bg-white px-4 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all uppercase tracking-wide"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Appliqué automatiquement à votre 1<sup>re</sup> souscription à la fin de l&apos;essai gratuit.
+                  </p>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowPromoField(true)}
+                  className="text-sm text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
+                >
+                  J&apos;ai un code promo
+                </button>
               )}
             </div>
 

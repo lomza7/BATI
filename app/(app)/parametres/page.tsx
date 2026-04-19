@@ -951,6 +951,15 @@ export default function ParametresPage() {
       if (!session?.access_token) {
         throw new Error('Session expiree, reconnectez-vous.');
       }
+      // Code promo éventuellement saisi au signup (localStorage). S'il est
+      // reconnu côté Stripe, le checkout l'applique automatiquement.
+      let promoCode: string | null = null;
+      try {
+        promoCode = window.localStorage.getItem('hellobat_promo_code');
+      } catch {
+        promoCode = null;
+      }
+
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: {
@@ -961,6 +970,7 @@ export default function ParametresPage() {
           price_id: priceId,
           success_url: `${window.location.origin}/parametres?tab=abonnement&checkout=success`,
           cancel_url: `${window.location.origin}/parametres?tab=abonnement&checkout=cancel`,
+          promo_code: promoCode || undefined,
         }),
       });
 
