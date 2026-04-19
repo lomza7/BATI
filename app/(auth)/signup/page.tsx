@@ -29,7 +29,6 @@ function SignupContent() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [promoCode, setPromoCode] = useState('');
-  const [showPromoField, setShowPromoField] = useState(false);
   const [promoStatus, setPromoStatus] = useState<
     | { state: 'idle' }
     | { state: 'checking' }
@@ -63,11 +62,10 @@ function SignupContent() {
     }
   }, [referralCode]);
 
-  // Code promo passé en query (?promo=...) → préremplit le champ et le rend visible.
+  // Code promo passé en query (?promo=...) → préremplit le champ.
   useEffect(() => {
     if (promoParam) {
       setPromoCode(promoParam.toUpperCase());
-      setShowPromoField(true);
     }
   }, [promoParam]);
 
@@ -323,72 +321,54 @@ function SignupContent() {
               )}
             </div>
 
-            {/* Code promo (optionnel) — pre-rempli si ?promo=... en URL. */}
+            {/* Code promo (optionnel) — toujours visible, pré-rempli si ?promo=... */}
             <div className="space-y-2">
-              {showPromoField ? (
-                <>
-                  <label htmlFor="promo" className="text-sm font-medium text-foreground">
-                    Code promo <span className="text-muted-foreground font-normal">(optionnel)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="promo"
-                      type="text"
-                      autoComplete="off"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      placeholder="ARTISAN100"
-                      className={`flex h-11 w-full rounded-lg border bg-white px-4 pr-10 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 transition-all uppercase tracking-wide ${
-                        promoStatus.state === 'valid'
-                          ? 'border-emerald-300 focus:ring-emerald-200 focus:border-emerald-500'
-                          : promoStatus.state === 'invalid'
-                            ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
-                            : 'border-border focus:ring-primary/20 focus:border-primary'
-                      }`}
-                    />
-                    {promoStatus.state === 'checking' && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    {promoStatus.state === 'valid' && (
-                      <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
-                    )}
-                    {promoStatus.state === 'invalid' && (
-                      <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
-                    )}
-                  </div>
+              <label htmlFor="promo" className="text-sm font-medium text-foreground">
+                Code promo <span className="text-muted-foreground font-normal">(optionnel)</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="promo"
+                  type="text"
+                  autoComplete="off"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="Entrez votre code promo"
+                  className={`flex h-11 w-full rounded-lg border bg-white px-4 pr-10 text-sm font-mono text-foreground placeholder:font-sans placeholder:normal-case placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 transition-all uppercase tracking-wide ${
+                    promoStatus.state === 'valid'
+                      ? 'border-emerald-300 focus:ring-emerald-200 focus:border-emerald-500'
+                      : promoStatus.state === 'invalid'
+                        ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
+                        : 'border-border focus:ring-primary/20 focus:border-primary'
+                  }`}
+                />
+                {promoStatus.state === 'checking' && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+                {promoStatus.state === 'valid' && (
+                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
+                )}
+                {promoStatus.state === 'invalid' && (
+                  <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+                )}
+              </div>
 
-                  {promoStatus.state === 'valid' && (
-                    <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-                      <Sparkles className="h-4 w-4 text-emerald-700 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm leading-tight">
-                        <p className="font-semibold text-emerald-900">
-                          {promoStatus.description}
-                        </p>
-                        <p className="text-xs text-emerald-800/80 mt-0.5">
-                          Appliqué automatiquement à votre souscription, après les 30 jours d&apos;essai.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {promoStatus.state === 'invalid' && (
-                    <p className="text-xs text-red-600">{promoStatus.error}</p>
-                  )}
-
-                  {promoStatus.state === 'idle' && (
-                    <p className="text-xs text-muted-foreground">
-                      Appliqué automatiquement à votre 1<sup>re</sup> souscription à la fin de l&apos;essai gratuit.
+              {promoStatus.state === 'valid' && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                  <Sparkles className="h-4 w-4 text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm leading-tight">
+                    <p className="font-semibold text-emerald-900">
+                      {promoStatus.description}
                     </p>
-                  )}
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowPromoField(true)}
-                  className="text-sm text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
-                >
-                  J&apos;ai un code promo
-                </button>
+                    <p className="text-xs text-emerald-800/80 mt-0.5">
+                      Appliqué automatiquement à votre souscription, après les 30 jours d&apos;essai.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {promoStatus.state === 'invalid' && (
+                <p className="text-xs text-red-600">{promoStatus.error}</p>
               )}
             </div>
 
