@@ -10,6 +10,7 @@ import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { SendQuoteDialog } from '@/components/devis/send-quote-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { EmailStatusBadge } from '@/components/shared/email-status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
@@ -36,6 +37,7 @@ interface QuoteSend {
   id: string;
   token: string;
   client_name: string;
+  client_email?: string | null;
   expires_at: string;
   viewed_at: string | null;
   signed_at: string | null;
@@ -43,6 +45,9 @@ interface QuoteSend {
   view_count: number;
   docuseal_submission_id: number | null;
   docuseal_signed_document_url: string | null;
+  email_status?: string | null;
+  email_error?: string | null;
+  email_provider_id?: string | null;
 }
 
 interface Quote {
@@ -127,7 +132,7 @@ export default function DevisPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_sends')
-        .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_submission_id, docuseal_signed_document_url')
+        .select('id, quote_id, token, client_name, client_email, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_submission_id, docuseal_signed_document_url, email_status, email_error, email_provider_id')
         .order('created_at', { ascending: false }),
       supabase
         .from('recurring_contracts')
@@ -928,9 +933,15 @@ export default function DevisPage() {
                       <div className="mt-0.5 h-6 w-6 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
                         <Send className="h-3 w-3 text-violet-600" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Lien envoyé</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-foreground">Lien envoyé</p>
+                          <EmailStatusBadge status={send.email_status} error={send.email_error} />
+                        </div>
                         <p className="text-xs text-muted-foreground">{formatDate(send.created_at)} — à {send.client_name}</p>
+                        {send.email_error && (
+                          <p className="text-xs text-red-600 mt-1">{send.email_error}</p>
+                        )}
                       </div>
                     </div>
 

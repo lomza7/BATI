@@ -30,6 +30,7 @@ import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { PageHeader } from '@/components/shared/page-header';
 import { QuotaMeter } from '@/components/paywall/quota-meter';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { EmailStatusBadge } from '@/components/shared/email-status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ImportCsvButton } from '@/components/shared/import-csv-button';
 import { Badge } from '@/components/ui/badge';
@@ -180,6 +181,9 @@ export default function FacturesPage() {
     viewed_at: string | null;
     paid_at: string | null;
     created_at: string;
+    email_status?: string | null;
+    email_error?: string | null;
+    email_provider_id?: string | null;
     invoices: { invoice_number: string; title: string; total_ttc: number; status: keyof typeof INVOICE_STATUSES; payment_method: string } | null;
   }>>([]);
 
@@ -322,7 +326,7 @@ export default function FacturesPage() {
     // Charge la liste des envois (liens Stripe) pour l'onglet Envoyées
     const { data: sendsData } = await supabase
       .from('invoice_sends')
-      .select('id, invoice_id, client_name, client_email, token, expires_at, viewed_at, paid_at, created_at, invoices(invoice_number, title, total_ttc, status, payment_method)')
+      .select('id, invoice_id, client_name, client_email, token, expires_at, viewed_at, paid_at, created_at, email_status, email_error, email_provider_id, invoices(invoice_number, title, total_ttc, status, payment_method)')
       .order('created_at', { ascending: false });
     setSends((sendsData as unknown as typeof sends) || []);
 
@@ -978,6 +982,7 @@ export default function FacturesPage() {
                             <div className="flex flex-wrap items-center gap-2 mt-0.5">
                               <span className="text-xs text-muted-foreground">{inv?.invoice_number}</span>
                               {send.client_email && <span className="text-xs text-muted-foreground truncate">{send.client_email}</span>}
+                              <EmailStatusBadge status={send.email_status} error={send.email_error} compact />
                               {isViewed && !isPaid && (
                                 <span className="inline-flex items-center gap-1 text-xs text-blue-600">
                                   <Eye className="h-3 w-3" /> Vue

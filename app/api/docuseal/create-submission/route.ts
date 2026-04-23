@@ -165,20 +165,25 @@ export async function POST(request: Request) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + (expires_in_days || 14));
 
-    const { error: insertError } = await admin.from('quote_sends').insert({
-      user_id: user.id,
-      quote_id,
-      client_name: client_name.trim(),
-      client_email: client_email?.trim() || null,
-      token,
-      expires_at: expiresAt.toISOString(),
-      docuseal_submission_id: submitter.submission_id,
-      docuseal_slug: submitter.slug,
-    });
+    const { data: sendRow, error: insertError } = await admin
+      .from('quote_sends')
+      .insert({
+        user_id: user.id,
+        quote_id,
+        client_name: client_name.trim(),
+        client_email: client_email?.trim() || null,
+        token,
+        expires_at: expiresAt.toISOString(),
+        docuseal_submission_id: submitter.submission_id,
+        docuseal_slug: submitter.slug,
+      })
+      .select('id')
+      .single();
 
-    if (insertError) {
+    if (insertError || !sendRow) {
       return NextResponse.json({ error: 'Erreur creation du lien' }, { status: 500 });
     }
+    const sendId = sendRow.id as string;
 
     // Passer le devis en "envoye" si brouillon
     if (quote.status === 'brouillon') {
@@ -296,6 +301,18 @@ export async function POST(request: Request) {
         console.error('[create-submission] Resend send exception:', sendErr);
       }
     }
+
+    // Persister le statut dans quote_sends (le webhook Resend complètera
+    // delivered/bounced/complained plus tard).
+    await admin
+      .from('quote_sends')
+      .update({
+        email_status: emailStatus,
+        email_error: emailError,
+        email_provider_id: emailId,
+        email_sent_at: emailStatus === 'sent' ? new Date().toISOString() : null,
+      })
+      .eq('id', sendId);
 
     return NextResponse.json({
       magic_link: magicLink,

@@ -115,19 +115,24 @@ export async function POST(request: Request) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + (expires_in_days || 30));
 
-    const { error: insertError } = await admin.from('invoice_sends').insert({
-      user_id: user.id,
-      invoice_id,
-      client_name: client_name.trim(),
-      client_email: client_email?.trim() || null,
-      token,
-      expires_at: expiresAt.toISOString(),
-      enable_stripe_payment: Boolean(enable_stripe_payment),
-    });
+    const { data: sendRow, error: insertError } = await admin
+      .from('invoice_sends')
+      .insert({
+        user_id: user.id,
+        invoice_id,
+        client_name: client_name.trim(),
+        client_email: client_email?.trim() || null,
+        token,
+        expires_at: expiresAt.toISOString(),
+        enable_stripe_payment: Boolean(enable_stripe_payment),
+      })
+      .select('id')
+      .single();
 
-    if (insertError) {
+    if (insertError || !sendRow) {
       return NextResponse.json({ error: 'Erreur creation du lien' }, { status: 500 });
     }
+    const sendId = sendRow.id as string;
 
     // Passer la facture en envoyee + set issued_at si necessaire
     const updates: Record<string, string | boolean> = {
@@ -252,6 +257,19 @@ export async function POST(request: Request) {
         console.error('[factures/send] Resend send exception:', sendErr);
       }
     }
+
+    // Persister le statut dans invoice_sends pour que l'artisan puisse
+    // voir si l'envoi a abouti (mis à jour par le webhook Resend ensuite :
+    // delivered / bounced / complained).
+    await admin
+      .from('invoice_sends')
+      .update({
+        email_status: emailStatus,
+        email_error: emailError,
+        email_provider_id: emailId,
+        email_sent_at: emailStatus === 'sent' ? new Date().toISOString() : null,
+      })
+      .eq('id', sendId);
 
     return NextResponse.json({
       magic_link: magicLink,
