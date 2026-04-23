@@ -244,7 +244,7 @@ export async function POST(request: Request) {
   if (resendKey && artisanEmail) {
     try {
       const resend = new Resend(resendKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@hellobat.app>';
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@send.hellobat.app>';
       const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
       const quoteLink = quote?.id ? `${origin.replace(/\/$/, '')}/devis` : '';
 

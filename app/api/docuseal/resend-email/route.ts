@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     const resend = new Resend(resendKey);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@send.hellobat.app>';
 
     // Resend SDK v6+ retourne { data, error } — vérifier explicitement pour ne
     // pas avaler silencieusement les échecs de délivrabilité.

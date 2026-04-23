@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
   if (resendKey) {
     const resend = new Resend(resendKey);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@hellobat.app>';
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@send.hellobat.app>';
     try {
       const html = buildReferralInviteEmail({
         senderName,

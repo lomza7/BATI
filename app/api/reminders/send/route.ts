@@ -112,7 +112,7 @@ export async function POST(request: Request) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@hellobat.app>';
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@send.hellobat.app>';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
 
   if (!resendKey) {
