@@ -16,6 +16,12 @@ export default function middleware(request: NextRequest) {
     hostname !== `www.${BASE_DOMAIN}` &&
     hostname.endsWith(`.${BASE_DOMAIN}`)
   ) {
+    // Les routes API (et internes Next) doivent atteindre leur vrai chemin,
+    // pas être préfixées par /site/slug — sinon elles renvoient une page 404
+    // HTML que le front ne peut pas parser en JSON ("Unexpected token '<'").
+    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
+      return NextResponse.next();
+    }
     const slug = hostname.replace(`.${BASE_DOMAIN}`, '');
     const rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname = `/site/${slug}${pathname === '/' ? '' : pathname}`;
