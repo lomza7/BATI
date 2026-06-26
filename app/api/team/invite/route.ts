@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { WORKSPACE_ROLE_LABELS, WORKSPACE_ROLE_OPTIONS, canManageWorkspaceTeam } from '@/lib/workspace';
 import { apiError } from '@/lib/api-errors';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -147,7 +148,7 @@ export async function POST(request: Request) {
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey) {
     const resend = new Resend(resendKey);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@send.hellobat.app>';
+    const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
     const companyName = ownerProfile.company_name || 'votre entreprise';
 
     try {

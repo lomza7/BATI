@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyTurnstile } from '@/lib/turnstile';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
 import { getNextQuoteNumber } from '@/lib/document-numbers';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -244,7 +245,7 @@ export async function POST(request: Request) {
   if (resendKey && artisanEmail) {
     try {
       const resend = new Resend(resendKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@send.hellobat.app>';
+      const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
       const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
       const quoteLink = quote?.id ? `${origin.replace(/\/$/, '')}/devis` : '';
 

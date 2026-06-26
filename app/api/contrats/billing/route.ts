@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildInvoicePaymentEmail } from '@/lib/email-templates';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -163,7 +164,7 @@ export async function POST(request: Request) {
 
         // Send email via Resend
         const resendKey = process.env.RESEND_API_KEY;
-        const fromEmail = process.env.RESEND_FROM_EMAIL;
+        const fromEmail = resolveFromEmail('Hellobat <facture@hellobat.app>');
         if (resendKey && fromEmail) {
           // Fetch artisan profile for email template
           const { data: profile } = await supabaseAdmin

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { resolveFromAddress } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const fromEmail = resolveFromAddress('equipe@hellobat.app');
   if (!resendKey || !fromEmail) {
     return NextResponse.json({ error: 'Configuration email manquante' }, { status: 503 });
   }

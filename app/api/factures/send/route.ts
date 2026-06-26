@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { buildInvoicePaymentEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -218,7 +219,7 @@ export async function POST(request: Request) {
         { excludeIds: excluded_attachment_ids },
       );
 
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@send.hellobat.app>';
+      const fromEmail = resolveFromEmail('Hellobat <facture@hellobat.app>');
 
       // Sujet : adapte le libellé selon le type de facture
       const subjectPrefix = invoice.invoice_type === 'acompte'

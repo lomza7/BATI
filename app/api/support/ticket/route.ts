@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
 
   // Email admin (best-effort, on ne fail pas le ticket si l'email échoue)
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
   if (resendKey && fromEmail) {
     try {
       const resend = new Resend(resendKey);

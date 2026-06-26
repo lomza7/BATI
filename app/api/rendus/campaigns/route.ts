@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildRenduCampaignEmail } from '@/lib/email-templates';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     if (resendKey) {
       try {
         const resend = new Resend(resendKey);
-        const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <noreply@send.hellobat.app>';
+        const fromEmail = resolveFromEmail('Hellobat <noreply@hellobat.app>');
         await resend.emails.send({
           from: fromEmail,
           to: clientEmail,

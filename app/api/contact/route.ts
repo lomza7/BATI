@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { z } from 'zod';
 import { verifyTurnstile } from '@/lib/turnstile';
 import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rate-limit';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
   if (!resendKey || !fromEmail) {
     console.error('[contact] RESEND_API_KEY ou RESEND_FROM_EMAIL manquant');
     return NextResponse.json({ error: 'Configuration email manquante' }, { status: 503 });
