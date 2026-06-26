@@ -83,9 +83,11 @@ export function SiteQuoteModal({ open, onClose, slug, companyName, ctaText }: Si
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || 'Erreur lors de l\u2019envoi');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(
+          data?.error || 'Une erreur est survenue, merci de r\u00e9essayer dans un instant.',
+        );
       }
 
       setSuccess(true);
