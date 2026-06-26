@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   if (resendKey) {
     try {
       const resend = new Resend(resendKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <comptable@send.hellobat.app>';
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <comptable@hellobat.app>';
       await resend.emails.send({
         from: fromEmail,
         to: accountantEmail,

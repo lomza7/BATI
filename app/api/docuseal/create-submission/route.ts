@@ -236,7 +236,7 @@ export async function POST(request: Request) {
         accentColor: dc.primary_color || '#d35400',
       });
 
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@send.hellobat.app>';
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
 
       // Charger les attestations / pieces jointes par defaut de l'artisan
       // (sauf celles que l'utilisateur a explicitement decochees dans le dialog).

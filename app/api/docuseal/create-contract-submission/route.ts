@@ -222,7 +222,7 @@ export async function POST(request: Request) {
         accentColor: dc.primary_color || '#d35400',
       });
 
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@send.hellobat.app>';
+      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
 
       const companyAttachments = await fetchCompanyAttachmentsForUser(
         admin,
