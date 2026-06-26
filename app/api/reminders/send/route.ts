@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildPaymentReminderEmail } from '@/lib/email-templates';
 import { formatCurrency, formatDate } from '@/lib/constants';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <facture@hellobat.app>';
+  const fromEmail = resolveFromEmail('Hellobat <facture@hellobat.app>');
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
 
   if (!resendKey) {

@@ -6,6 +6,7 @@ import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { docusealFetch } from '@/lib/docuseal';
 import { buildContractSignedClientEmail, buildContractSignedArtisanEmail } from '@/lib/email-templates';
 import crypto from 'node:crypto';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -168,7 +169,7 @@ async function maybeSendSignedContractEmail(
   }
 
   const resend = new Resend(resendKey);
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
+  const fromEmail = resolveFromEmail('Hellobat <signature@hellobat.app>');
   const dc = ((profile?.document_config as Record<string, string>) || {});
   const accentColor = dc.primary_color || '#d35400';
   const companyName = profile?.company_name || profile?.full_name || 'Artisan';

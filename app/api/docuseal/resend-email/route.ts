@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { buildQuoteSignatureEmail } from '@/lib/email-templates';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
     }
 
     const resend = new Resend(resendKey);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
+    const fromEmail = resolveFromEmail('Hellobat <signature@hellobat.app>');
 
     // Resend SDK v6+ retourne { data, error } — vérifier explicitement pour ne
     // pas avaler silencieusement les échecs de délivrabilité.

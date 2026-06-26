@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildReferralInviteEmail } from '@/lib/email-templates';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
 
   if (resendKey) {
     const resend = new Resend(resendKey);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@hellobat.app>';
+    const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
     try {
       const html = buildReferralInviteEmail({
         senderName,

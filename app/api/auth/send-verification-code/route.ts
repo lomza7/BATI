@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildVerificationCodeEmail } from '@/lib/email-templates';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(resendKey);
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <equipe@hellobat.app>';
+  const fromEmail = resolveFromEmail('Hellobat <equipe@hellobat.app>');
 
   try {
     await resend.emails.send({

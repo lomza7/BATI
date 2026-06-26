@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { docusealFetch, buildQuoteHtml } from '@/lib/docuseal';
 import { buildQuoteSignatureEmail, buildQuoteSentConfirmationEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -236,7 +237,7 @@ export async function POST(request: Request) {
         accentColor: dc.primary_color || '#d35400',
       });
 
-      const fromEmail = process.env.RESEND_FROM_EMAIL || 'Hellobat <signature@hellobat.app>';
+      const fromEmail = resolveFromEmail('Hellobat <signature@hellobat.app>');
 
       // Charger les attestations / pieces jointes par defaut de l'artisan
       // (sauf celles que l'utilisateur a explicitement decochees dans le dialog).

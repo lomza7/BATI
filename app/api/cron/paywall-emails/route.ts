@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildTrialReminderEmail, buildLowCreditsEmail } from '@/lib/email-templates';
+import { resolveFromEmail } from '@/lib/email-from';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +22,7 @@ interface ProfileRow {
 
 async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const from = process.env.RESEND_FROM_EMAIL || 'Hellobat <noreply@hellobat.app>';
+  const from = resolveFromEmail('Hellobat <noreply@hellobat.app>');
   try {
     const { error } = await resend.emails.send({ from, to, subject, html });
     if (error) {
