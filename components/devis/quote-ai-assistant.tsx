@@ -5,6 +5,8 @@ import { Camera, CheckCircle2, Mic, Square, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useUserPlan } from '@/lib/auth-context';
+import { UpgradeGate } from '@/components/shared/upgrade-gate';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -105,7 +107,18 @@ function inferClientName(transcript: string) {
 }
 
 export function QuoteAiAssistant({ onUseDraft, highlighted = false, presetRequest = null }: QuoteAiAssistantProps) {
+  const { isStarter } = useUserPlan();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (isStarter) {
+    return (
+      <div className="py-4">
+        <UpgradeGate requiredPlan="pro">
+          <div />
+        </UpgradeGate>
+      </div>
+    );
+  }
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const photosRef = useRef<PhotoPreview[]>([]);
   const [isRecording, setIsRecording] = useState(false);

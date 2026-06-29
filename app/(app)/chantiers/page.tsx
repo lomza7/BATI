@@ -31,7 +31,8 @@ import { supabase } from '@/lib/supabase';
 import { INVOICE_STATUSES, DEFAULT_PROJECT_PHASES, MEMBER_TYPES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate, type ProjectPhase } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { extractProjectPhotoPath, moveProjectToTrash as moveProjectToTrashRecord } from '@/lib/project-trash';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, useUserPlan } from '@/lib/auth-context';
+import { UpgradeBanner, UpgradeGate } from '@/components/shared/upgrade-gate';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -201,6 +202,7 @@ function formatTrackedHours(hours: number) {
 
 export default function ChantiersPage() {
   const { user } = useAuth();
+  const { isStarter } = useUserPlan();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detailFileInputRef = useRef<HTMLInputElement>(null);
@@ -229,6 +231,7 @@ export default function ChantiersPage() {
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [userPhases, setUserPhases] = useState<ProjectPhase[]>(DEFAULT_PROJECT_PHASES);
   const [projectActionId, setProjectActionId] = useState<string | null>(null);
+  const [showProjectLimitGate, setShowProjectLimitGate] = useState(false);
 
   useEffect(() => {
     void loadProjects();
@@ -342,6 +345,10 @@ export default function ChantiersPage() {
   }
 
   function openCreateEditor() {
+    if (projectLimitReached) {
+      setShowProjectLimitGate(true);
+      return;
+    }
     setEditorMode('create');
     setSelectedProject(null);
     resetEditorState();
@@ -865,6 +872,12 @@ export default function ChantiersPage() {
     [projects, search]
   );
 
+  const activeProjectCount = useMemo(
+    () => projects.filter((p) => p.status !== 'termine').length,
+    [projects]
+  );
+  const projectLimitReached = isStarter && activeProjectCount >= 2;
+
   const activeProject = selectedProject
     ? projects.find((project) => project.id === selectedProject.id) || selectedProject
     : null;
@@ -886,6 +899,13 @@ export default function ChantiersPage() {
           </Button>
         </div>
       </PageHeader>
+
+      {projectLimitReached && (
+        <UpgradeBanner
+          message="Vous avez atteint la limite de 2 chantiers actifs. Passez au Pro pour gérer plus de chantiers."
+          requiredPlan="pro"
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {(['a_planifier', 'en_cours', 'termine', 'en_pause'] as const).map((status) => {
@@ -2055,6 +2075,20 @@ export default function ChantiersPage() {
               })()}
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showProjectLimitGate} onOpenChange={setShowProjectLimitGate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Limite de chantiers atteinte</DialogTitle>
+            <DialogDescription>
+              Vous gérez déjà 2 chantiers actifs (limite du plan Starter). Passez au Pro pour des chantiers illimités.
+            </DialogDescription>
+          </DialogHeader>
+          <UpgradeGate requiredPlan="pro">
+            <div />
+          </UpgradeGate>
         </DialogContent>
       </Dialog>
 

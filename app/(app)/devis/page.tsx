@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Search, Filter, MoveHorizontal as MoreHorizontal, Send, Check, X, Mic, Wand2, PenLine, Eye, Copy, ExternalLink, Package, Trash2, Mail, RefreshCw, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, useUserPlan } from '@/lib/auth-context';
+import { UpgradeBanner, UpgradeGate } from '@/components/shared/upgrade-gate';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { QuoteAiAssistant, type AiQuoteDraft } from '@/components/devis/quote-ai-assistant';
@@ -67,11 +68,14 @@ interface QuoteLine {
 export default function DevisPage() {
   const AI_INTRO_SESSION_KEY = 'hellobat_ai_quote_intro_seen';
   const { user } = useAuth();
+  const { isStarter } = useUserPlan();
   const router = useRouter();
   const prefillProjectId = useRef<string | null>(null);
   const draftId = useRef<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [monthlyQuoteCount, setMonthlyQuoteCount] = useState(0);
+  const [showQuoteLimitGate, setShowQuoteLimitGate] = useState(false);
   const [search, setSearch] = useState('');
   const [showCreateOptions, setShowCreateOptions] = useState(false);
   const [showAiIntro, setShowAiIntro] = useState(false);
@@ -120,6 +124,15 @@ export default function DevisPage() {
         .select('id, quote_id, token, client_name, expires_at, viewed_at, signed_at, created_at, view_count, docuseal_signed_document_url')
         .order('created_at', { ascending: false }),
     ]);
+
+    // Compute monthly usage for plan limit enforcement
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const thisMonthCount = (quotesRes.data || []).filter(
+      (q: Record<string, unknown>) => new Date(q.created_at as string) >= startOfMonth
+    ).length;
+    setMonthlyQuoteCount(thisMonthCount);
 
     setQuotes(((quotesRes.data as unknown as Array<Record<string, unknown>>) || []).map(q => {
       const contracts = Array.isArray(q.recurring_contracts) ? q.recurring_contracts as Array<{ id: string }> : [];
@@ -465,6 +478,10 @@ export default function DevisPage() {
   }
 
   function openCreateOptions() {
+    if (isStarter && monthlyQuoteCount >= 5) {
+      setShowQuoteLimitGate(true);
+      return;
+    }
     setShowCreateOptions(true);
   }
 
@@ -524,6 +541,13 @@ export default function DevisPage() {
           Nouveau devis
         </Button>
       </PageHeader>
+
+      {isStarter && monthlyQuoteCount === 4 && (
+        <UpgradeBanner
+          message="Il vous reste 1 devis gratuit ce mois. Passez au Pro pour des devis illimités."
+          requiredPlan="pro"
+        />
+      )}
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -1025,6 +1049,20 @@ export default function DevisPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showQuoteLimitGate} onOpenChange={setShowQuoteLimitGate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Limite de devis atteinte</DialogTitle>
+            <DialogDescription>
+              Vous avez utilisé vos 5 devis gratuits ce mois. Passez au Pro pour créer des devis illimités.
+            </DialogDescription>
+          </DialogHeader>
+          <UpgradeGate requiredPlan="pro">
+            <div />
+          </UpgradeGate>
         </DialogContent>
       </Dialog>
 
