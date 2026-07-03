@@ -86,6 +86,7 @@ export default function DevisPage() {
   const [resendingQuoteId, setResendingQuoteId] = useState<string | null>(null);
   const [resentQuoteId, setResentQuoteId] = useState<string | null>(null);
   const [previewQuoteId, setPreviewQuoteId] = useState<string | null>(null);
+  const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
   // Set when returning from /devis/ai after a successful creation — drives
   // the confirmation banner at the top of the list. Cleared automatically
   // after 5s.
@@ -565,6 +566,9 @@ export default function DevisPage() {
                               <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                                 <Eye className="mr-2 h-4 w-4" /> Visualiser
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewQuoteId(q.id); }}>
+                                <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
+                              </DropdownMenuItem>
                               {(!send || !send.signed_at) && (
                                 <DropdownMenuItem onClick={() => router.push(`/devis/${q.id}/modifier`)}>
                                   <Pencil className="mr-2 h-4 w-4" /> Modifier
@@ -663,6 +667,9 @@ export default function DevisPage() {
                         ) : (<>
                         <DropdownMenuItem onClick={() => setPreviewQuoteId(q.id)}>
                           <Eye className="mr-2 h-4 w-4" /> Visualiser
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewQuoteId(q.id); }}>
+                          <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
                         </DropdownMenuItem>
                         {(!send || !send.signed_at) && (
                           <DropdownMenuItem onClick={() => router.push(`/devis/${q.id}/modifier`)}>
@@ -895,8 +902,9 @@ export default function DevisPage() {
       <DocumentPreviewDialog
         mode="quote"
         open={!!previewQuoteId}
-        onClose={() => setPreviewQuoteId(null)}
+        onClose={() => { setPreviewQuoteId(null); setPreviewAutoPrint(false); }}
         documentId={previewQuoteId}
+        autoPrint={previewAutoPrint}
       />
 
       {sendQuote && (

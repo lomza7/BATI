@@ -19,6 +19,7 @@ import {
   Search,
   Send,
   Trash2,
+  Download,
   TriangleAlert as AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -163,6 +164,7 @@ export default function FacturesPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState<Invoice | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
+  const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
   // Devis pour lequel on affiche le dialog "Facturation" (carte de facturation)
   const [billingQuote, setBillingQuote] = useState<QuoteCandidate | null>(null);
   // Loaded from profiles.document_config — controls the inline warning shown
@@ -650,6 +652,9 @@ export default function FacturesPage() {
               <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
                 <Eye className="mr-2 h-4 w-4" /> Visualiser
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewInvoiceId(inv.id); }}>
+                <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
+              </DropdownMenuItem>
               {inv.quote_id && (
                 <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
                   <Receipt className="mr-2 h-4 w-4" /> Suivi facturation
@@ -713,6 +718,9 @@ export default function FacturesPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setPreviewInvoiceId(inv.id)}>
                   <Eye className="mr-2 h-4 w-4" /> Visualiser
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewInvoiceId(inv.id); }}>
+                  <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
                 </DropdownMenuItem>
                 {inv.quote_id && (
                   <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
@@ -1250,8 +1258,9 @@ export default function FacturesPage() {
       <DocumentPreviewDialog
         mode="invoice"
         open={!!previewInvoiceId}
-        onClose={() => setPreviewInvoiceId(null)}
+        onClose={() => { setPreviewInvoiceId(null); setPreviewAutoPrint(false); }}
         documentId={previewInvoiceId}
+        autoPrint={previewAutoPrint}
       />
 
       <FirstBankAccountDialog
