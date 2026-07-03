@@ -150,6 +150,10 @@ export function DocumentPreviewDialog({
   const [resolvedDueDate, setResolvedDueDate] = useState<string | null | undefined>(dueDateProp);
   const [resolvedCreatedAt, setResolvedCreatedAt] = useState<Date>(new Date());
   const [bankAccount, setBankAccount] = useState<PreviewBankAccount | null>(null);
+  // Totaux stockés sur la ligne quotes/invoices — utilisés comme repli quand le
+  // document n'a aucune ligne (ex. devis migrés/anciens), pour ne jamais afficher 0 €.
+  const [storedTotalHt, setStoredTotalHt] = useState<number | null>(null);
+  const [storedTotalTtc, setStoredTotalTtc] = useState<number | null>(null);
 
   // Facturation d'acompte — spécifiques aux invoices de type 'acompte' ou 'solde'
   const [invoiceType, setInvoiceType] = useState<PreviewInvoiceType>('standard');
@@ -176,6 +180,9 @@ export function DocumentPreviewDialog({
     setLinkedQuoteNumber(null);
     setLinkedDeposits([]);
     setImportPdfUrl(null);
+    // Mode mémoire (création/édition) : pas de total stocké, on calcule depuis les lignes.
+    setStoredTotalHt(null);
+    setStoredTotalTtc(null);
   }, [documentId, titleProp, descriptionProp, linesProp, documentNumberProp, validUntilProp, dueDateProp, depositPercentageProp]);
 
   async function fetchImportPdfUrl(path: string): Promise<string | null> {
@@ -205,6 +212,9 @@ export function DocumentPreviewDialog({
 
     async function load() {
       setLoading(true);
+      // Repartir d'un état propre pour les totaux stockés (évite un repli périmé).
+      setStoredTotalHt(null);
+      setStoredTotalTtc(null);
 
       // 1. Always load the artisan profile
       const profileRes = await supabase
@@ -222,11 +232,13 @@ export function DocumentPreviewDialog({
         if (mode === 'quote') {
           const { data: quote } = await supabase
             .from('quotes')
-            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id, import_pdf_path')
+            .select('quote_number, title, description, valid_until, created_at, client_id, bank_account_id, import_pdf_path, total_ht, total_ttc')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
           if (quote) {
+            setStoredTotalHt(typeof quote.total_ht === 'number' ? quote.total_ht : null);
+            setStoredTotalTtc(typeof quote.total_ttc === 'number' ? quote.total_ttc : null);
             setResolvedTitle(quote.title || '');
             setResolvedDescription(quote.description || '');
             setResolvedNumber(quote.quote_number);
@@ -249,7 +261,6 @@ export function DocumentPreviewDialog({
               .eq('quote_id', documentId)
               .order('position', { ascending: true });
             if (linesErr) console.error('[preview] quote_lines error:', linesErr);
-            console.log('[preview] quote_lines fetched for', documentId, ':', linesData?.length ?? 0, 'rows');
             if (!cancelled) {
               setResolvedLines((linesData as PreviewLine[]) || []);
             }
@@ -268,11 +279,13 @@ export function DocumentPreviewDialog({
         } else {
           const { data: invoice } = await supabase
             .from('invoices')
-            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id, import_pdf_path')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id, import_pdf_path, total_ht, total_ttc')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
           if (invoice) {
+            setStoredTotalHt(typeof invoice.total_ht === 'number' ? invoice.total_ht : null);
+            setStoredTotalTtc(typeof invoice.total_ttc === 'number' ? invoice.total_ttc : null);
             setResolvedTitle(invoice.title || '');
             setResolvedDescription(invoice.description || '');
             setResolvedNumber(invoice.invoice_number);
@@ -441,9 +454,15 @@ export function DocumentPreviewDialog({
       tva_rate: l.tva_rate ?? 20,
     }))
   );
-  const totalHt = tvaTotals.total_ht;
-  const totalTva = tvaTotals.total_tva;
-  const totalTtc = tvaTotals.total_ttc;
+  // Repli : si le document n'a aucune ligne exploitable (ex. devis anciens/migrés)
+  // mais possède un total stocké, on affiche ce total plutôt que 0 €.
+  const hasComputableLines = validLines.length > 0;
+  const useStoredTotals =
+    !hasComputableLines && (storedTotalTtc != null || storedTotalHt != null);
+
+  const totalHt = useStoredTotals ? (storedTotalHt ?? storedTotalTtc ?? 0) : tvaTotals.total_ht;
+  const totalTtc = useStoredTotals ? (storedTotalTtc ?? storedTotalHt ?? 0) : tvaTotals.total_ttc;
+  const totalTva = useStoredTotals ? Math.max(0, totalTtc - totalHt) : tvaTotals.total_tva;
   const tvaBreakdown = tvaTotals.tva_breakdown;
   const singleRate = tvaBreakdown.length === 1 ? tvaBreakdown[0].rate : null;
   // For grouping we keep lines that carry structure (section/subsection) even
