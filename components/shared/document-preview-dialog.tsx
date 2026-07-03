@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Hexagon, Building2, User, PenLine, Shield, X, Landmark } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Hexagon, Building2, User, PenLine, Shield, X, Landmark, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -96,6 +96,8 @@ interface Props {
   depositPercentage?: number | null;
   // DB-load mode (used by list rows — fetches the saved quote/invoice)
   documentId?: string | null;
+  // Déclenche l'impression / téléchargement PDF dès l'ouverture (item "Télécharger" des listes)
+  autoPrint?: boolean;
 }
 
 function formatCurrency(amount: number): string {
@@ -129,11 +131,15 @@ export function DocumentPreviewDialog({
   bankAccountId: bankAccountIdProp,
   depositPercentage: depositPercentageProp,
   documentId,
+  autoPrint = false,
 }: Props) {
   const { user } = useAuth();
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
   const [client, setClient] = useState<PreviewClient | null>(null);
   const [loading, setLoading] = useState(false);
+  // Nombre de chargements terminés — sert à ne déclencher l'auto-impression
+  // qu'une fois les données réellement prêtes (évite d'imprimer un doc vide).
+  const [loadSeq, setLoadSeq] = useState(0);
 
   // Resolved values — either from DB (when documentId is set) or from props.
   const [resolvedTitle, setResolvedTitle] = useState<string>(titleProp || '');
@@ -369,7 +375,10 @@ export function DocumentPreviewDialog({
         setBankAccount(null);
       }
 
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        setLoadSeq((s) => s + 1);
+      }
     }
 
     load();
@@ -377,6 +386,50 @@ export function DocumentPreviewDialog({
       cancelled = true;
     };
   }, [open, user, documentId, mode, clientIdProp, bankAccountIdProp]);
+
+  // ── Téléchargement PDF via impression navigateur ──
+  // On clone le document dans <body> puis on imprime : le clone conserve les
+  // classes Tailwind (styles déjà chargés) et échappe au clipping de la modale.
+  const didAutoPrintRef = useRef(false);
+
+  function handleDownloadPdf() {
+    if (typeof window === 'undefined') return;
+    const node = document.getElementById('printable-document');
+    if (!node) {
+      window.print();
+      return;
+    }
+    const clone = node.cloneNode(true) as HTMLElement;
+    clone.id = 'print-clone';
+    document.body.appendChild(clone);
+    document.documentElement.classList.add('is-printing');
+    const cleanup = () => {
+      document.documentElement.classList.remove('is-printing');
+      clone.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  }
+
+  // Reset le garde une fois la modale fermée pour pouvoir re-déclencher.
+  useEffect(() => {
+    if (!open) didAutoPrintRef.current = false;
+  }, [open]);
+
+  // Déclenche automatiquement le téléchargement quand ouvert via l'item "Télécharger",
+  // une fois le chargement des données terminé (loadSeq > 0).
+  useEffect(() => {
+    if (!open || !autoPrint || loading || loadSeq === 0 || didAutoPrintRef.current) return;
+    didAutoPrintRef.current = true;
+    if (importPdfUrl) {
+      window.open(importPdfUrl, '_blank', 'noopener');
+      return;
+    }
+    // Laisse le temps au DOM de peindre le document avant d'imprimer.
+    const t = setTimeout(() => handleDownloadPdf(), 350);
+    return () => clearTimeout(t);
+  }, [open, autoPrint, loading, loadSeq, importPdfUrl]);
 
   // Totals computed from filled lines only (empty placeholders contribute 0
   // anyway, but filtering keeps the math explicit).
@@ -450,13 +503,24 @@ export function DocumentPreviewDialog({
                 PDF d&apos;origine — {documentLabel.toLowerCase()} importé{!isInvoice ? '' : 'e'} {displayNumber}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-[#6b6560] hover:bg-[#f5f3f0] transition-colors flex-shrink-0"
-              aria-label="Fermer"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <a
+                href={importPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-xs font-medium text-white bg-[#d35400] hover:bg-[#b8480a] transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Télécharger PDF</span>
+              </a>
+              <button
+                onClick={onClose}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-[#6b6560] hover:bg-[#f5f3f0] transition-colors"
+                aria-label="Fermer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <iframe
             src={importPdfUrl}
@@ -483,18 +547,28 @@ export function DocumentPreviewDialog({
               Aperçu — tel que le client le verra
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-[#6b6560] hover:bg-[#f5f3f0] transition-colors"
-            aria-label="Fermer"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleDownloadPdf}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 h-8 text-xs font-medium text-white bg-[#d35400] hover:bg-[#b8480a] transition-colors"
+              aria-label="Télécharger en PDF"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Télécharger PDF</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-[#6b6560] hover:bg-[#f5f3f0] transition-colors"
+              aria-label="Fermer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className={`px-4 sm:px-6 py-6 ${fontClass}`}>
           {/* Document card */}
-          <div className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
+          <div id="printable-document" className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
             {/* Document header */}
             {headerStyle === 'banner' ? (
               <div className="p-5 sm:p-8" style={{ backgroundColor: accent }}>

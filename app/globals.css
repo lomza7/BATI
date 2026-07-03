@@ -237,3 +237,44 @@
 .landing-map-popup .leaflet-popup-tip {
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
 }
+
+/* ── Impression / téléchargement PDF d'un devis ou d'une facture ──
+   Le document est cloné dans <body> avec l'id #print-clone au moment du clic,
+   puis on ajoute la classe .is-printing sur <html>. On masque tout le reste et
+   on imprime uniquement ce clone (voir DocumentPreviewDialog.handleDownloadPdf). */
+
+/* Le clone ne doit jamais être visible à l'écran (uniquement à l'impression) */
+#print-clone {
+  display: none !important;
+}
+
+@media print {
+  html.is-printing body > *:not(#print-clone) {
+    display: none !important;
+  }
+  html.is-printing #print-clone {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  /* Conserver les couleurs (bandeau accent, badges…) à l'impression */
+  html.is-printing #print-clone,
+  html.is-printing #print-clone * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html.is-printing #print-clone * {
+    overflow: visible !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
