@@ -8,7 +8,6 @@ import {
   Loader as Loader2,
   TriangleAlert as AlertTriangle,
   CircleCheck as CheckCircle,
-  Clock,
   Building2,
   User,
   Shield,
@@ -20,6 +19,7 @@ import {
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 import { formatIban } from '@/lib/banks';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
+import { PublicDocumentDownloadButton } from '@/components/shared/public-document-download-button';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -143,7 +143,7 @@ function formatDate(date: string): string {
 }
 
 const UNIT_LABELS: Record<string, string> = {
-  u: 'Unite',
+  u: 'Unité',
   m2: 'm²',
   ml: 'ml',
   h: 'Heure',
@@ -157,7 +157,6 @@ export default function PublicInvoicePage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sendData, setSendData] = useState<SendData | null>(null);
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [artisan, setArtisan] = useState<ArtisanProfile | null>(null);
@@ -189,8 +188,7 @@ export default function PublicInvoicePage() {
         return;
       }
 
-      const send = payload.send;
-      setSendData(send);
+      const send = payload.send as SendData;
       setStripeEnabledForSend(Boolean(send.enable_stripe_payment));
       if (send.paid_at) setIsPaid(true);
 
@@ -322,8 +320,8 @@ export default function PublicInvoicePage() {
     <div className={`min-h-screen bg-[#faf9f7] ${fontClass}`}>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#e5e1da]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="max-w-3xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             {showLogo && logoUrl ? (
               <img src={logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
             ) : (
@@ -331,14 +329,14 @@ export default function PublicInvoicePage() {
                 <Hexagon className="h-4 w-4 text-white" />
               </div>
             )}
-            <span className="text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
+            <span className="truncate text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
           </div>
-          {sendData && (
-            <div className="flex items-center gap-2 text-xs text-[#6b6560]">
-              <Clock className="h-3.5 w-3.5" />
-              Facture pour {sendData.client_name}
-            </div>
-          )}
+          <PublicDocumentDownloadButton
+            documentId="public-invoice-document"
+            filename={`Facture-${invoice.invoice_number}`}
+            accentColor={accent}
+            directUrl={`/api/public/factures/${token}/pdf`}
+          />
         </div>
       </header>
 
@@ -350,9 +348,9 @@ export default function PublicInvoicePage() {
               <PartyPopper className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-emerald-800">Paiement recu !</h3>
+              <h3 className="text-sm font-semibold text-emerald-800">Paiement reçu !</h3>
               <p className="text-xs text-emerald-600 mt-1">
-                Merci pour votre paiement. Votre facture a ete reglee avec succes.
+                Merci pour votre paiement. Votre facture a été réglée avec succès.
               </p>
             </div>
           </div>
@@ -365,9 +363,9 @@ export default function PublicInvoicePage() {
               <XCircle className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-amber-800">Paiement annule</h3>
+              <h3 className="text-sm font-semibold text-amber-800">Paiement annulé</h3>
               <p className="text-xs text-amber-600 mt-1">
-                Le paiement a ete annule. Vous pouvez reessayer a tout moment.
+                Le paiement a été annulé. Vous pouvez réessayer à tout moment.
               </p>
             </div>
           </div>
@@ -380,16 +378,16 @@ export default function PublicInvoicePage() {
               <CheckCircle className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-emerald-800">Facture payee</h3>
+              <h3 className="text-sm font-semibold text-emerald-800">Facture payée</h3>
               <p className="text-xs text-emerald-600 mt-1">
-                Cette facture a ete reglee{invoice.paid_at ? ` le ${formatDate(invoice.paid_at)}` : ''}.
+                Cette facture a été réglée{invoice.paid_at ? ` le ${formatDate(invoice.paid_at)}` : ''}.
               </p>
             </div>
           </div>
         )}
 
         {/* Document card */}
-        <div className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
+        <div id="public-invoice-document" className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
           {/* Document header — Standard */}
           <div className="p-5 sm:p-8 border-b border-[#e5e1da]">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
@@ -416,7 +414,7 @@ export default function PublicInvoicePage() {
                   {(artisan?.company_postal_code || artisan?.company_city) && (
                     <p>{[artisan.company_postal_code, artisan.company_city].filter(Boolean).join(' ')}</p>
                   )}
-                  {artisan?.company_phone && <p>Tel : {artisan.company_phone}</p>}
+                  {artisan?.company_phone && <p>Tél. : {artisan.company_phone}</p>}
                   {artisan?.tva_number && <p>TVA : {artisan.tva_number}</p>}
                 </div>
               </div>
@@ -433,7 +431,7 @@ export default function PublicInvoicePage() {
                 <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
                   <p>Date : {formatDate(invoice.created_at)}</p>
                   {invoice.due_date && (
-                    <p>Echeance : {formatDate(invoice.due_date)}</p>
+                    <p>Échéance : {formatDate(invoice.due_date)}</p>
                   )}
                 </div>
               </div>
@@ -471,7 +469,7 @@ export default function PublicInvoicePage() {
                 <tr className="border-b border-[#e5e1da]" style={{ backgroundColor: accent + '08' }}>
                   <th className="px-8 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Description</th>
                   <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qte</th>
-                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unite</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unité</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>P.U. HT</th>
                   <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>TVA</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
@@ -633,7 +631,7 @@ export default function PublicInvoicePage() {
 
           {/* Payment section */}
           {!isPaid && stripeAvailable && stripeEnabledForSend && payableAmount > 0 && (
-            <div className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
+            <div data-pdf-exclude className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
               <div className="flex items-center gap-2 mb-4">
                 <CreditCard className="h-4 w-4 text-[#6b6560]" />
                 <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
@@ -660,7 +658,7 @@ export default function PublicInvoicePage() {
               </button>
               <p className="text-[11px] text-[#6b6560]/60 mt-3 flex items-center gap-1">
                 <Shield className="h-3 w-3" />
-                Paiement securise par Stripe. Aucune donnee bancaire ne transite par cette plateforme.
+                Paiement sécurisé par Stripe. Aucune donnée bancaire ne transite par cette plateforme.
               </p>
             </div>
           )}
@@ -673,9 +671,9 @@ export default function PublicInvoicePage() {
                 {mentionsLegales || (
                   <>
                     {invoice.due_date
-                      ? `Echeance de paiement : ${formatDate(invoice.due_date)}. `
+                      ? `Échéance de paiement : ${formatDate(invoice.due_date)}. `
                       : ''}
-                    En cas de retard de paiement, des penalites seront exigibles (taux directeur BCE + 10 points). Indemnite forfaitaire de recouvrement : 40 EUR.
+                    En cas de retard de paiement, des pénalités seront exigibles (taux directeur BCE + 10 points). Indemnité forfaitaire de recouvrement : 40 EUR.
                   </>
                 )}
               </p>

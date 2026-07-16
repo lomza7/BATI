@@ -21,6 +21,7 @@ import { SignatureCanvas } from '@/components/devis/signature-canvas';
 import { DocusealSigning } from '@/components/devis/docuseal-signing';
 import { ContractPublicView, type ContractRecord, type ContractSendData, type ContractArtisanProfile } from '@/components/contracts/contract-public-view';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
+import { PublicDocumentDownloadButton } from '@/components/shared/public-document-download-button';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 import { formatIban } from '@/lib/banks';
 import { hasSections, groupLinesBySectionAndSubsection } from '@/lib/quote-sections';
@@ -137,7 +138,7 @@ function formatDate(date: string): string {
 }
 
 const UNIT_LABELS: Record<string, string> = {
-  u: 'Unite',
+  u: 'Unité',
   m2: 'm²',
   ml: 'ml',
   h: 'Heure',
@@ -363,8 +364,8 @@ export default function PublicQuotePage() {
     <div className={`min-h-screen bg-[#faf9f7] ${fontClass}`}>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#e5e1da]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="max-w-3xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             {showLogo && logoUrl ? (
               <img src={logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
             ) : (
@@ -372,14 +373,16 @@ export default function PublicQuotePage() {
                 <Hexagon className="h-4 w-4 text-white" />
               </div>
             )}
-            <span className="text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
+            <span className="truncate text-sm font-semibold" style={{ color: textColor }}>{companyName}</span>
           </div>
-          {sendData && (
-            <div className="flex items-center gap-2 text-xs text-[#6b6560]">
-              <Clock className="h-3.5 w-3.5" />
-              Devis pour {sendData.client_name}
-            </div>
-          )}
+          <PublicDocumentDownloadButton
+            documentId="public-quote-document"
+            filename={`Devis-${quote.quote_number}${signed ? '-signé' : ''}`}
+            accentColor={accent}
+            directUrl={signed && sendData?.docuseal_signed_document_url
+              ? sendData.docuseal_signed_document_url
+              : `/api/public/devis/${token}/pdf`}
+          />
         </div>
       </header>
 
@@ -391,16 +394,16 @@ export default function PublicQuotePage() {
               <CheckCircle className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-emerald-800">Devis signe</h3>
+              <h3 className="text-sm font-semibold text-emerald-800">Devis signé</h3>
               <p className="text-xs text-emerald-600 mt-1">
-                Ce devis a ete signe electroniquement le {signedAt ? formatDate(signedAt) : ''}.
+                Ce devis a été signé électroniquement le {signedAt ? formatDate(signedAt) : ''}.
               </p>
             </div>
           </div>
         )}
 
         {/* Document card */}
-        <div className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
+        <div id="public-quote-document" className="bg-white rounded-2xl border border-[#e5e1da] overflow-hidden shadow-sm">
           {/* Document header — Banner style */}
           {headerStyle === 'banner' ? (
             <div className="p-5 sm:p-8" style={{ backgroundColor: accent }}>
@@ -468,7 +471,7 @@ export default function PublicQuotePage() {
                     {(artisan?.company_postal_code || artisan?.company_city) && (
                       <p>{[artisan.company_postal_code, artisan.company_city].filter(Boolean).join(' ')}</p>
                     )}
-                    {artisan?.company_phone && <p>Tel : {artisan.company_phone}</p>}
+                    {artisan?.company_phone && <p>Tél. : {artisan.company_phone}</p>}
                     {artisan?.tva_number && <p>TVA : {artisan.tva_number}</p>}
                   </div>
                 </div>
@@ -495,7 +498,7 @@ export default function PublicQuotePage() {
           {headerStyle !== 'standard' && (artisan?.company_address || artisan?.company_phone || artisan?.tva_number) && (
             <div className="px-5 sm:px-8 py-3 border-b border-[#e5e1da] text-xs text-[#6b6560] flex flex-wrap gap-x-4 gap-y-0.5">
               {artisan?.company_address && <span>{artisan.company_address}, {artisan?.company_postal_code} {artisan?.company_city}</span>}
-              {artisan?.company_phone && <span>Tel : {artisan.company_phone}</span>}
+              {artisan?.company_phone && <span>Tél. : {artisan.company_phone}</span>}
               {artisan?.tva_number && <span>TVA : {artisan.tva_number}</span>}
             </div>
           )}
@@ -611,7 +614,7 @@ export default function PublicQuotePage() {
                 <tr className="border-b border-[#e5e1da]" style={{ backgroundColor: accent + '08' }}>
                   <th className="px-8 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Description</th>
                   <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Qte</th>
-                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unite</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Unité</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>P.U. HT</th>
                   <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>TVA</th>
                   <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>Total HT</th>
@@ -848,11 +851,15 @@ export default function PublicQuotePage() {
           )}
 
           {/* Signature section — no horizontal padding on mobile for max canvas width */}
-          <div id="signature-section" className="border-t-2 border-[#e5e1da] px-2 sm:px-8 py-6">
+          <div
+            id="signature-section"
+            data-pdf-exclude={signed ? undefined : 'true'}
+            className="border-t-2 border-[#e5e1da] px-2 sm:px-8 py-6"
+          >
             <div className="flex items-center gap-2 mb-4">
               <PenLine className="h-4 w-4 text-[#6b6560]" />
               <p className="text-xs font-semibold text-[#6b6560] uppercase tracking-wider">
-                Signature electronique
+                Signature électronique
               </p>
             </div>
 
@@ -870,10 +877,10 @@ export default function PublicQuotePage() {
                 <div className="flex items-center gap-2 text-sm text-emerald-700">
                   <CheckCircle className="h-4 w-4" />
                   <span>
-                    Signe electroniquement le {signedAt ? formatDate(signedAt) : ''}
+                    Signé électroniquement le {signedAt ? formatDate(signedAt) : ''}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div data-pdf-exclude className="flex flex-wrap gap-2">
                   {sendData?.docuseal_signed_document_url && (
                     <a
                       href={sendData.docuseal_signed_document_url}
@@ -883,7 +890,7 @@ export default function PublicQuotePage() {
                       style={{ backgroundColor: accent }}
                     >
                       <Download className="h-3 w-3" />
-                      Telecharger le devis signe
+                      Télécharger le devis signé
                     </a>
                   )}
                   {sendData?.docuseal_audit_log_url && (
@@ -903,7 +910,7 @@ export default function PublicQuotePage() {
             ) : sendData?.docuseal_slug ? (
               <div className="space-y-4">
                 <p className="text-sm text-[#6b6560]">
-                  En signant ce devis, vous acceptez les conditions et les prix indiques ci-dessus.
+                  En signant ce devis, vous acceptez les conditions et les prix indiqués ci-dessus.
                 </p>
                 <DocusealSigning
                   slug={sendData.docuseal_slug}
@@ -914,7 +921,7 @@ export default function PublicQuotePage() {
             ) : (
               <div className="space-y-4">
                 <p className="text-sm text-[#6b6560]">
-                  En signant ce devis, vous acceptez les conditions et les prix indiques ci-dessus.
+                  En signant ce devis, vous acceptez les conditions et les prix indiqués ci-dessus.
                 </p>
 
                 {signing ? (
@@ -941,7 +948,7 @@ export default function PublicQuotePage() {
                     {quote.valid_until
                       ? `Devis valable jusqu'au ${formatDate(quote.valid_until)}. `
                       : ''}
-                    Signature electronique realisee au sens du reglement europeen eIDAS{sendData?.docuseal_slug ? ' (signature electronique avancee)' : ' (signature electronique simple)'}.
+                    Signature électronique réalisée au sens du règlement européen eIDAS{sendData?.docuseal_slug ? ' (signature électronique avancée)' : ' (signature électronique simple)'}.
                     Ce document a valeur contractuelle entre les parties.
                   </>
                 )}

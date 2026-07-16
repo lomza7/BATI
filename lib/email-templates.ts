@@ -8,11 +8,23 @@ interface QuoteEmailData {
   totalTtc: string;
   validUntil: string | null;
   magicLink: string;
+  pdfUrl?: string;
   accentColor?: string;
 }
 
 export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
   const accent = data.accentColor || '#d35400';
+  const pdfButton = data.pdfUrl
+    ? `<td align="center" style="padding:4px">
+        <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+          Télécharger le PDF
+        </a>
+      </td>`
+    : '';
+  const pdfFallback = data.pdfUrl
+    ? `<br/><br/>Téléchargement PDF :<br/>
+       <a href="${data.pdfUrl}" style="color:${accent};word-break:break-all">${data.pdfUrl}</a>`
+    : '';
 
   const validUntilLine = data.validUntil
     ? `<p style="margin:0;font-size:13px;color:#6b6560">Valide jusqu'au ${data.validUntil}</p>`
@@ -48,7 +60,7 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
                 Bonjour <strong>${escHtml(data.clientName)}</strong>,
               </p>
               <p style="margin:0 0 24px;font-size:14px;color:#6b6560;line-height:1.6">
-                ${escHtml(data.artisanName)} vous a envoye un devis a consulter et signer electroniquement.
+                ${escHtml(data.artisanName)} vous a envoyé un devis à consulter et signer électroniquement. Vous pouvez aussi télécharger directement son PDF.
               </p>
 
               <!-- Bloc devis -->
@@ -73,19 +85,20 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
                 </tr>
               </table>
 
-              <!-- Bouton CTA -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <!-- Boutons CTA -->
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center">
-                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:12px;letter-spacing:-0.2px">
-                      Consulter et signer mon devis
+                  <td align="center" style="padding:4px">
+                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:13px 20px;border-radius:10px;white-space:nowrap">
+                      Voir et signer
                     </a>
                   </td>
+                  ${pdfButton}
                 </tr>
               </table>
 
               <p style="margin:20px 0 0;font-size:12px;color:#999;text-align:center;line-height:1.5">
-                Ce lien est personnel et securise. Il vous permet de consulter le detail du devis et de le signer electroniquement.
+                Ces liens sont personnels et sécurisés. Le bouton PDF télécharge directement le document sur votre appareil.
               </p>
             </td>
           </tr>
@@ -97,7 +110,7 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
                 <tr>
                   <td>
                     <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
-                      Envoye via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du batiment
+                      Envoyé via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
                     </p>
                   </td>
                 </tr>
@@ -114,6 +127,7 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
               <p style="margin:0;font-size:11px;color:#999">
                 Si le bouton ne fonctionne pas, copiez ce lien :<br/>
                 <a href="${data.magicLink}" style="color:${accent};word-break:break-all">${data.magicLink}</a>
+                ${pdfFallback}
               </p>
             </td>
           </tr>
@@ -293,6 +307,7 @@ interface InvoiceEmailData {
   totalTtc: string;
   dueDate: string | null;
   magicLink: string;
+  pdfUrl?: string;
   hasOnlinePayment: boolean;
   accentColor?: string;
   /** Type de facture — change le libellé et la narration de l'email */
@@ -305,9 +320,20 @@ interface InvoiceEmailData {
 
 export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
   const accent = data.accentColor || '#d35400';
+  const pdfButton = data.pdfUrl
+    ? `<td align="center" style="padding:4px">
+        <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+          Télécharger le PDF
+        </a>
+      </td>`
+    : '';
+  const pdfFallback = data.pdfUrl
+    ? `<br/><br/>Téléchargement PDF :<br/>
+       <a href="${data.pdfUrl}" style="color:${accent};word-break:break-all">${data.pdfUrl}</a>`
+    : '';
 
   const dueDateLine = data.dueDate
-    ? `<p style="margin:0;font-size:13px;color:#6b6560">Echeance : ${data.dueDate}</p>`
+    ? `<p style="margin:0;font-size:13px;color:#6b6560">Échéance : ${data.dueDate}</p>`
     : '';
 
   const invoiceType = data.invoiceType || 'standard';
@@ -336,18 +362,18 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
     ? `Afin de démarrer les travaux, ${escHtml(data.artisanName)} vous adresse ${documentNoun}.`
     : isFinal
       ? `${escHtml(data.artisanName)} vous adresse ${documentNoun}. Les acomptes déjà versés sont automatiquement déduits du montant à régler.`
-      : `${escHtml(data.artisanName)} vous a envoye une facture.`;
+      : `${escHtml(data.artisanName)} vous a envoyé une facture.`;
 
   const paymentNote = data.hasOnlinePayment
     ? isDeposit
       ? "Vous pouvez régler cet acompte en ligne en un clic."
-      : 'Vous pouvez consulter le detail de la facture et la payer en ligne en un clic.'
-    : 'Vous pouvez consulter le detail de la facture en cliquant sur le bouton ci-dessous.';
+      : 'Vous pouvez consulter le détail de la facture, télécharger son PDF et la payer en ligne en un clic.'
+    : 'Vous pouvez consulter le détail de la facture ou télécharger directement son PDF grâce aux boutons ci-dessous.';
 
   const ctaLabel = data.hasOnlinePayment
     ? isDeposit
       ? "Payer l'acompte"
-      : 'Voir et payer ma facture'
+      : 'Voir et payer'
     : 'Consulter ma facture';
 
   // Titre de l'onglet
@@ -412,19 +438,20 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
                 </tr>
               </table>
 
-              <!-- Bouton CTA -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <!-- Boutons CTA -->
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center">
-                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:12px;letter-spacing:-0.2px">
+                  <td align="center" style="padding:4px">
+                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:13px 20px;border-radius:10px;white-space:nowrap">
                       ${ctaLabel}
                     </a>
                   </td>
+                  ${pdfButton}
                 </tr>
               </table>
 
               <p style="margin:20px 0 0;font-size:12px;color:#999;text-align:center;line-height:1.5">
-                Ce lien est personnel et securise.${data.hasOnlinePayment ? ' Le paiement est gere par Stripe, aucune donnee bancaire ne transite par notre plateforme.' : ''}
+                Ces liens sont personnels et sécurisés. Le bouton PDF télécharge directement la facture sur votre appareil.${data.hasOnlinePayment ? ' Le paiement est géré par Stripe, aucune donnée bancaire ne transite par notre plateforme.' : ''}
               </p>
             </td>
           </tr>
@@ -436,7 +463,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
                 <tr>
                   <td>
                     <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
-                      Envoye via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du batiment
+                      Envoyé via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
                     </p>
                   </td>
                 </tr>
@@ -453,6 +480,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
               <p style="margin:0;font-size:11px;color:#999">
                 Si le bouton ne fonctionne pas, copiez ce lien :<br/>
                 <a href="${data.magicLink}" style="color:${accent};word-break:break-all">${data.magicLink}</a>
+                ${pdfFallback}
               </p>
             </td>
           </tr>
@@ -892,6 +920,7 @@ export interface PaymentReminderEmailData {
   totalTtc: string;
   dueDate: string | null;
   magicLink: string;
+  pdfUrl: string;
   hasOnlinePayment: boolean;
   accentColor?: string;
   reminderLevel: 1 | 2 | 3;
@@ -988,12 +1017,17 @@ export function buildPaymentReminderEmail(data: PaymentReminderEmailData): strin
                 </tr>
               </table>
 
-              <!-- Bouton CTA -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <!-- Boutons CTA -->
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center">
-                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:12px;letter-spacing:-0.2px">
+                  <td align="center" style="padding:4px">
+                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:13px 20px;border-radius:10px;white-space:nowrap">
                       ${ctaLabel}
+                    </a>
+                  </td>
+                  <td align="center" style="padding:4px">
+                    <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+                      Télécharger le PDF
                     </a>
                   </td>
                 </tr>
@@ -1029,6 +1063,8 @@ export function buildPaymentReminderEmail(data: PaymentReminderEmailData): strin
               <p style="margin:0;font-size:11px;color:#999">
                 Si le bouton ne fonctionne pas, copiez ce lien :<br/>
                 <a href="${data.magicLink}" style="color:${accent};word-break:break-all">${data.magicLink}</a>
+                <br/><br/>Téléchargement PDF :<br/>
+                <a href="${data.pdfUrl}" style="color:${accent};word-break:break-all">${data.pdfUrl}</a>
               </p>
             </td>
           </tr>

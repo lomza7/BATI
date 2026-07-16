@@ -177,6 +177,7 @@ export async function POST(request: Request) {
           const accent = profile?.document_config?.primary_color || '#d35400';
           const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
           const magicLink = `${siteUrl}/f/${token}`;
+          const pdfUrl = `${siteUrl}/api/public/factures/${token}/pdf`;
           const totalFormatted = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(totalTtc);
 
           // Check if artisan has Stripe connected
@@ -194,6 +195,7 @@ export async function POST(request: Request) {
             totalTtc: totalFormatted,
             dueDate: null,
             magicLink,
+            pdfUrl,
             hasOnlinePayment: !!stripeConn?.charges_enabled,
             accentColor: accent,
           });

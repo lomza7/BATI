@@ -73,6 +73,7 @@ export async function POST(request: Request) {
 
     const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
     const magicLink = `${base}/d/${send.token}`;
+    const pdfUrl = `${base}/api/public/devis/${send.token}/pdf`;
 
     const fmtTtc = new Intl.NumberFormat('fr-FR', {
       style: 'currency', currency: 'EUR', minimumFractionDigits: 2,
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
       totalTtc: fmtTtc,
       validUntil: fmtValid,
       magicLink,
+      pdfUrl,
       accentColor: dc.primary_color || '#d35400',
     });
 

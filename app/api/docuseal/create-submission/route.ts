@@ -197,6 +197,7 @@ export async function POST(request: Request) {
 
     const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
     const magicLink = `${base}/d/${token}`;
+    const pdfUrl = `${base}/api/public/devis/${token}/pdf`;
 
     // Envoyer l'email au client via Resend
     const resendKey = process.env.RESEND_API_KEY;
@@ -234,6 +235,7 @@ export async function POST(request: Request) {
         totalTtc: fmtTtc,
         validUntil: fmtValid,
         magicLink,
+        pdfUrl,
         accentColor: dc.primary_color || '#d35400',
       });
 

@@ -160,6 +160,7 @@ export async function POST(request: Request) {
         if (!sendRow?.token) break;
 
         const magicLink = `${siteUrl}/f/${sendRow.token}`;
+        const pdfUrl = `${siteUrl}/api/public/factures/${sendRow.token}/pdf`;
         const profile = profileMap.get(invoice.user_id);
         const artisanName = profile?.company_name || profile?.full_name || 'Votre artisan';
         const hasOnlinePayment = stripeMap.get(invoice.user_id) === true;
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
           totalTtc: formatCurrency(invoice.total_ttc),
           dueDate: formatDate(invoice.due_date),
           magicLink,
+          pdfUrl,
           hasOnlinePayment,
           reminderLevel: lvl.level,
           bodyText: interpolatedBody,

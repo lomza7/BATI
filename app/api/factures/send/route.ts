@@ -148,6 +148,7 @@ export async function POST(request: Request) {
 
     const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://hellobat.app';
     const magicLink = `${base}/f/${token}`;
+    const pdfUrl = `${base}/api/public/factures/${token}/pdf`;
 
     // Envoi email via Resend
     const resendKey = process.env.RESEND_API_KEY;
@@ -203,6 +204,7 @@ export async function POST(request: Request) {
         totalTtc: totalFormatted,
         dueDate: dueDateFormatted,
         magicLink,
+        pdfUrl,
         hasOnlinePayment,
         accentColor: dc.primary_color || '#d35400',
         invoiceType: invoice.invoice_type || 'standard',
@@ -220,6 +222,10 @@ export async function POST(request: Request) {
       );
 
       const fromEmail = resolveFromEmail('Hellobat <facture@hellobat.app>');
+      const copyEmail = user.email?.trim();
+      const shouldCopySender = Boolean(
+        copyEmail && copyEmail.toLowerCase() !== recipientEmail.toLowerCase(),
+      );
 
       // Sujet : adapte le libellé selon le type de facture
       const subjectPrefix = invoice.invoice_type === 'acompte'
@@ -232,7 +238,7 @@ export async function POST(request: Request) {
         const result = await resend.emails.send({
           from: fromEmail,
           to: recipientEmail,
-          ...(user.email ? { cc: user.email } : {}),
+          ...(shouldCopySender ? { cc: copyEmail } : {}),
           subject: `${subjectPrefix} — ${companyName}`,
           html: emailHtml,
           attachments: companyAttachments.map(att => ({
