@@ -34,8 +34,6 @@ export function PublicDocumentDownloadButton({
     return (
       <a
         href={directUrl}
-        target="_blank"
-        rel="noopener noreferrer"
         download={`${cleanFilename(filename)}.pdf`}
         className={buttonClassName}
         style={{ backgroundColor: accentColor }}

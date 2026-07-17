@@ -16,7 +16,7 @@ export function buildQuoteSignatureEmail(data: QuoteEmailData): string {
   const accent = data.accentColor || '#d35400';
   const pdfButton = data.pdfUrl
     ? `<td align="center" style="padding:4px">
-        <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+        <a href="${data.pdfUrl}" download="Devis-${escHtml(data.quoteNumber)}.pdf" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
           Télécharger le PDF
         </a>
       </td>`
@@ -322,7 +322,7 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
   const accent = data.accentColor || '#d35400';
   const pdfButton = data.pdfUrl
     ? `<td align="center" style="padding:4px">
-        <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+        <a href="${data.pdfUrl}" download="Facture-${escHtml(data.invoiceNumber)}.pdf" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
           Télécharger le PDF
         </a>
       </td>`
@@ -1026,7 +1026,7 @@ export function buildPaymentReminderEmail(data: PaymentReminderEmailData): strin
                     </a>
                   </td>
                   <td align="center" style="padding:4px">
-                    <a href="${data.pdfUrl}" target="_blank" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+                    <a href="${data.pdfUrl}" download="Facture-${escHtml(data.invoiceNumber)}.pdf" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
                       Télécharger le PDF
                     </a>
                   </td>

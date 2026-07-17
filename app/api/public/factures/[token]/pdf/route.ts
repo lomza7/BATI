@@ -38,12 +38,16 @@ export async function GET(
   const payload = data as PublicDocumentPayload;
   const bytes = await createPublicDocumentPdf(payload, 'invoice');
   const filename = getPublicDocumentFilename(payload, 'invoice');
+  const body = Buffer.from(bytes);
 
-  return new NextResponse(Buffer.from(bytes), {
+  return new NextResponse(body, {
     status: 200,
     headers: {
-      'Content-Type': 'application/pdf',
+      // octet-stream empêche les navigateurs mobiles d'ouvrir leur lecteur PDF
+      // et privilégie l'enregistrement immédiat dans les téléchargements.
+      'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(body.byteLength),
       'Cache-Control': 'private, no-store, max-age=0',
       'X-Content-Type-Options': 'nosniff',
     },
