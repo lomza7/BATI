@@ -1,5 +1,7 @@
 // Templates email HTML pour Hellobat
 
+import { buildCreditNoteLegalMention } from '@/lib/invoices/credit-notes';
+
 interface QuoteEmailData {
   clientName: string;
   artisanName: string;
@@ -492,6 +494,190 @@ export function buildInvoicePaymentEmail(data: InvoiceEmailData): string {
 </html>`.trim();
 }
 
+// ---------- Avoir (facture rectificative) ----------
+
+export interface CreditNoteEmailData {
+  clientName: string;
+  artisanName: string;
+  /** Numéro de l'avoir, série dédiée AV-YYYY-NNN */
+  creditNoteNumber: string;
+  creditNoteTitle: string;
+  /**
+   * Montant TTC déjà formaté et **en valeur absolue** : en base l'avoir est
+   * négatif, mais on présente au client un montant porté à son crédit, pas
+   * un « moins ». C'est l'appelant qui applique Math.abs.
+   */
+  totalTtc: string;
+  /** Numéro de la facture rectifiée — mention obligatoire. */
+  creditedInvoiceNumber: string;
+  /** Date d'émission de la facture rectifiée (ISO), pour la mention légale. */
+  creditedInvoiceDate?: string | null;
+  /** Motif déjà libellé (cf. creditReasonLabel). */
+  creditReason?: string | null;
+  magicLink: string;
+  pdfUrl?: string;
+  accentColor?: string;
+}
+
+/**
+ * Email d'envoi d'un avoir. Volontairement distinct de
+ * `buildInvoicePaymentEmail` : un avoir n'est jamais encaissable, donc aucun
+ * bouton « Payer », aucun montant « à régler », aucun IBAN, aucune échéance —
+ * en réclamer le paiement serait une erreur grossière vis-à-vis du client.
+ */
+export function buildCreditNoteEmail(data: CreditNoteEmailData): string {
+  const accent = data.accentColor || '#d35400';
+
+  const pdfButton = data.pdfUrl
+    ? `<td align="center" style="padding:4px">
+        <a href="${data.pdfUrl}" download="Avoir-${escHtml(data.creditNoteNumber)}.pdf" style="display:inline-block;background-color:#ffffff;color:${accent};font-size:14px;font-weight:600;text-decoration:none;padding:12px 18px;border-radius:10px;border:1px solid ${accent};white-space:nowrap">
+          Télécharger le PDF
+        </a>
+      </td>`
+    : '';
+  const pdfFallback = data.pdfUrl
+    ? `<br/><br/>Téléchargement PDF :<br/>
+       <a href="${data.pdfUrl}" style="color:${accent};word-break:break-all">${data.pdfUrl}</a>`
+    : '';
+
+  const creditedLine = `<p style="margin:0;font-size:13px;color:#6b6560">Rattaché à la facture ${escHtml(data.creditedInvoiceNumber)}</p>`;
+
+  const reasonBlock = data.creditReason
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da;margin-bottom:24px">
+        <tr>
+          <td style="padding:16px 24px">
+            <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Motif</p>
+            <p style="margin:0;font-size:14px;color:#1a1a1a">${escHtml(data.creditReason)}</p>
+          </td>
+        </tr>
+      </table>`
+    : '';
+
+  const legalMention = buildCreditNoteLegalMention({
+    creditedInvoiceNumber: data.creditedInvoiceNumber,
+    creditedInvoiceDate: data.creditedInvoiceDate,
+  });
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avoir ${escHtml(data.creditNoteNumber)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f3f0;font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08)">
+
+          <!-- Header avec accent -->
+          <tr>
+            <td style="background-color:${accent};padding:28px 32px;text-align:center">
+              <p style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:-0.3px">
+                ${escHtml(data.artisanName)}
+              </p>
+              <p style="margin:6px 0 0;font-size:13px;color:#ffffff;opacity:0.9">
+                Avoir ${escHtml(data.creditNoteNumber)}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Contenu principal -->
+          <tr>
+            <td style="padding:32px 32px 24px">
+              <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a">
+                Bonjour <strong>${escHtml(data.clientName)}</strong>,
+              </p>
+              <p style="margin:0 0 24px;font-size:14px;color:#6b6560;line-height:1.6">
+                ${escHtml(data.artisanName)} vous adresse un avoir rattaché à la facture
+                <strong>${escHtml(data.creditedInvoiceNumber)}</strong>. Un avoir est une facture
+                rectificative : il corrige ou annule tout ou partie du montant de cette facture.
+                <strong>Aucun paiement ne vous est demandé au titre de ce document.</strong>
+              </p>
+
+              <!-- Bloc avoir -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#faf9f7;border-radius:12px;border:1px solid #e5e1da;margin-bottom:24px">
+                <tr>
+                  <td style="padding:20px 24px">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td>
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Avoir</p>
+                          <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#1a1a1a">${escHtml(data.creditNoteTitle || data.creditNoteNumber)}</p>
+                          <p style="margin:0;font-size:12px;color:#6b6560">${escHtml(data.creditNoteNumber)}</p>
+                          ${creditedLine}
+                        </td>
+                        <td style="text-align:right;vertical-align:top">
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Montant à votre crédit</p>
+                          <p style="margin:0;font-size:22px;font-weight:700;color:${accent}">${escHtml(data.totalTtc)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              ${reasonBlock}
+
+              <!-- Boutons CTA -->
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:4px">
+                    <a href="${data.magicLink}" target="_blank" style="display:inline-block;background-color:${accent};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:13px 20px;border-radius:10px;white-space:nowrap">
+                      Consulter mon avoir
+                    </a>
+                  </td>
+                  ${pdfButton}
+                </tr>
+              </table>
+
+              <p style="margin:20px 0 0;font-size:12px;color:#999;text-align:center;line-height:1.5">
+                ${escHtml(legalMention)}
+              </p>
+              <p style="margin:10px 0 0;font-size:12px;color:#999;text-align:center;line-height:1.5">
+                Conservez cet avoir avec la facture d'origine : les deux documents vont ensemble.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:0 32px 24px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e1da;padding-top:16px">
+                <tr>
+                  <td>
+                    <p style="margin:0;font-size:11px;color:#bbb;text-align:center;line-height:1.5">
+                      Envoyé via <span style="color:${accent};font-weight:600">Hellobat</span> — Le logiciel des artisans du bâtiment
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Lien en clair sous l'email -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin-top:16px">
+          <tr>
+            <td align="center">
+              <p style="margin:0;font-size:11px;color:#999">
+                Si le bouton ne fonctionne pas, copiez ce lien :<br/>
+                <a href="${data.magicLink}" style="color:${accent};word-break:break-all">${data.magicLink}</a>
+                ${pdfFallback}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
 interface AccountantInvitationData {
   artisanName: string;
   accountantName: string;
@@ -925,6 +1111,12 @@ export interface PaymentReminderEmailData {
   accentColor?: string;
   reminderLevel: 1 | 2 | 3;
   bodyText: string; // Already interpolated plain text
+  /**
+   * Mention affichée sous le montant quand un avoir est venu réduire la
+   * facture : `totalTtc` est alors le net restant dû, pas le total d'origine,
+   * et le client doit comprendre l'écart avec la facture qu'il a reçue.
+   */
+  creditNoteMention?: string | null;
 }
 
 export function buildPaymentReminderEmail(data: PaymentReminderEmailData): string {
@@ -949,6 +1141,13 @@ export function buildPaymentReminderEmail(data: PaymentReminderEmailData): strin
     : '';
 
   const ctaLabel = data.hasOnlinePayment ? 'Voir et payer ma facture' : 'Consulter ma facture';
+
+  const creditNoteLine = data.creditNoteMention
+    ? `<p style="margin:4px 0 0;font-size:11px;color:#6b6560;line-height:1.4">${escHtml(data.creditNoteMention)}</p>`
+    : '';
+  // Avec un avoir, le montant affiché n'est plus le total de la facture mais
+  // ce qu'il en reste : le libellé doit le dire.
+  const amountLabel = data.creditNoteMention ? 'Reste à régler' : 'Montant TTC';
 
   // Convert plain text body to HTML paragraphs
   const bodyHtml = data.bodyText
@@ -1008,8 +1207,9 @@ export function buildPaymentReminderEmail(data: PaymentReminderEmailData): strin
                           ${dueDateLine}
                         </td>
                         <td style="text-align:right;vertical-align:top">
-                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">Montant TTC</p>
+                          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;font-weight:600">${escHtml(amountLabel)}</p>
                           <p style="margin:0;font-size:22px;font-weight:700;color:${accent}">${escHtml(data.totalTtc)}</p>
+                          ${creditNoteLine}
                         </td>
                       </tr>
                     </table>

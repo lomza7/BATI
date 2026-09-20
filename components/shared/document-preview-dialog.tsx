@@ -10,6 +10,17 @@ import { computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { hasSections, groupLinesBySectionAndSubsection } from '@/lib/quote-sections';
 import { formatIban } from '@/lib/banks';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
+import {
+  buildCreditNoteLegalMention,
+  creditReasonLabel,
+  fetchCreditNotesByInvoice,
+  isIssuedCreditNote,
+  netDueTtc,
+  netRevenueTtc,
+  sumCreditNotesTtc,
+  type CreditNoteRef,
+  type InvoiceType,
+} from '@/lib/invoices/credit-notes';
 
 interface PreviewBankAccount {
   label: string;
@@ -49,7 +60,20 @@ interface LinkedDeposit {
   deposit_percentage: number | null;
 }
 
-type PreviewInvoiceType = 'standard' | 'acompte' | 'solde';
+/**
+ * Facture rectifiée par un avoir — la référence à ce document est obligatoire
+ * sur l'avoir (art. 242 nonies A ann. II CGI).
+ */
+interface CreditedInvoiceRef {
+  id: string;
+  invoice_number: string;
+  issued_at: string | null;
+  created_at: string;
+}
+
+// Le type vient du module partagé : 'avoir' est une facture à part entière,
+// avec des montants négatifs et aucune échéance de paiement.
+type PreviewInvoiceType = InvoiceType;
 
 interface ArtisanProfile {
   company_name: string | null;
@@ -117,6 +141,20 @@ function formatDate(date: string | Date): string {
   }).format(new Date(date));
 }
 
+/** Format court JJ/MM/AAAA — utilisé pour la référence à la facture rectifiée. */
+function formatShortDate(date: string | Date): string {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(date));
+}
+
+/** Arrondi à 2 décimales — même règle que lib/tva.ts. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export function DocumentPreviewDialog({
   open,
   onClose,
@@ -161,6 +199,13 @@ export function DocumentPreviewDialog({
   const [linkedQuoteNumber, setLinkedQuoteNumber] = useState<string | null>(null);
   const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
 
+  // Avoirs — deux sens de lecture :
+  //  - sur un avoir : la facture rectifiée, à référencer explicitement ;
+  //  - sur une facture normale : les avoirs émis dessus, à déduire du net dû.
+  const [creditedInvoice, setCreditedInvoice] = useState<CreditedInvoiceRef | null>(null);
+  const [creditReason, setCreditReason] = useState<string | null>(null);
+  const [creditNotes, setCreditNotes] = useState<CreditNoteRef[]>([]);
+
   // PDF d'origine (devis/facture importes depuis l'ancien logiciel) — si present,
   // on l'affiche dans un iframe au lieu de reconstruire la mise en page.
   const [importPdfUrl, setImportPdfUrl] = useState<string | null>(null);
@@ -179,6 +224,9 @@ export function DocumentPreviewDialog({
     setDepositPercentage(depositPercentageProp ?? null);
     setLinkedQuoteNumber(null);
     setLinkedDeposits([]);
+    setCreditedInvoice(null);
+    setCreditReason(null);
+    setCreditNotes([]);
     setImportPdfUrl(null);
     // Mode mémoire (création/édition) : pas de total stocké, on calcule depuis les lignes.
     setStoredTotalHt(null);
@@ -215,6 +263,11 @@ export function DocumentPreviewDialog({
       // Repartir d'un état propre pour les totaux stockés (évite un repli périmé).
       setStoredTotalHt(null);
       setStoredTotalTtc(null);
+      // Idem pour les données d'avoir : un document en chassant un autre, une
+      // référence périmée afficherait une mention légale fausse.
+      setCreditedInvoice(null);
+      setCreditReason(null);
+      setCreditNotes([]);
 
       // 1. Always load the artisan profile
       const profileRes = await supabase
@@ -279,7 +332,7 @@ export function DocumentPreviewDialog({
         } else {
           const { data: invoice } = await supabase
             .from('invoices')
-            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id, import_pdf_path, total_ht, total_ttc')
+            .select('invoice_number, title, description, due_date, created_at, issued_at, client_id, bank_account_id, invoice_type, deposit_percentage, quote_id, credited_invoice_id, credit_reason, import_pdf_path, total_ht, total_ttc')
             .eq('id', documentId)
             .maybeSingle();
           if (cancelled) return;
@@ -350,7 +403,28 @@ export function DocumentPreviewDialog({
                 .neq('status', 'annulee')
                 .order('issued_at', { ascending: true, nullsFirst: false })
                 .order('created_at', { ascending: true });
-              if (!cancelled) setLinkedDeposits((depositRows || []) as LinkedDeposit[]);
+
+              // Un acompte peut lui-même avoir été crédité par un avoir : ce
+              // qui a réellement été réclamé au client, c'est son montant NET.
+              // La RPC publique (get_public_invoice_by_token) applique déjà ce
+              // calcul ; sans lui, l'aperçu de l'artisan déduirait plus que ce
+              // que son client lit sur le même document.
+              const depositList = (depositRows || []) as LinkedDeposit[];
+              const notesByDeposit = await fetchCreditNotesByInvoice(
+                supabase,
+                depositList.map((d) => d.id),
+              );
+              if (!cancelled) {
+                setLinkedDeposits(
+                  depositList.map((d) => ({
+                    ...d,
+                    total_ttc: netRevenueTtc(
+                      { total_ttc: Number(d.total_ttc || 0) },
+                      notesByDeposit.get(d.id) || [],
+                    ),
+                  })),
+                );
+              }
 
               // On récupère aussi le numéro du devis pour le header/mentions
               const { data: srcQuote } = await supabase
@@ -361,6 +435,25 @@ export function DocumentPreviewDialog({
               if (!cancelled) setLinkedQuoteNumber(srcQuote?.quote_number || null);
             } else if (invType !== 'acompte' && !cancelled) {
               setLinkedDeposits([]);
+            }
+
+            // Avoir : on charge la facture rectifiée pour pouvoir la référencer
+            // de façon non équivoque (numéro + date d'émission).
+            if (invType === 'avoir' && invoice.credited_invoice_id) {
+              const { data: creditedRow } = await supabase
+                .from('invoices')
+                .select('id, invoice_number, issued_at, created_at')
+                .eq('id', invoice.credited_invoice_id)
+                .maybeSingle();
+              if (!cancelled) {
+                setCreditedInvoice((creditedRow as CreditedInvoiceRef) || null);
+                setCreditReason(invoice.credit_reason || null);
+              }
+            } else if (invType !== 'avoir') {
+              // Facture normale : on charge les avoirs émis dessus pour afficher
+              // le récapitulatif et le net réellement dû.
+              const notesByInvoice = await fetchCreditNotesByInvoice(supabase, [documentId]);
+              if (!cancelled) setCreditNotes(notesByInvoice.get(documentId) || []);
             }
           }
         }
@@ -444,6 +537,13 @@ export function DocumentPreviewDialog({
     return () => clearTimeout(t);
   }, [open, autoPrint, loading, loadSeq, importPdfUrl]);
 
+  // Nature du document — déterminée avant les totaux, car un avoir change les
+  // règles de calcul (montants négatifs légitimes).
+  const isInvoice = mode === 'invoice';
+  const isDepositInvoice = isInvoice && invoiceType === 'acompte';
+  const isFinalInvoice = isInvoice && invoiceType === 'solde';
+  const isCreditNoteDoc = isInvoice && invoiceType === 'avoir';
+
   // Totals computed from filled lines only (empty placeholders contribute 0
   // anyway, but filtering keeps the math explicit).
   const validLines = resolvedLines.filter((l) => l.description.trim());
@@ -462,7 +562,10 @@ export function DocumentPreviewDialog({
 
   const totalHt = useStoredTotals ? (storedTotalHt ?? storedTotalTtc ?? 0) : tvaTotals.total_ht;
   const totalTtc = useStoredTotals ? (storedTotalTtc ?? storedTotalHt ?? 0) : tvaTotals.total_ttc;
-  const totalTva = useStoredTotals ? Math.max(0, totalTtc - totalHt) : tvaTotals.total_tva;
+  // Pas de borne à 0 : un avoir porte une TVA négative, c'est précisément la
+  // régularisation que l'artisan récupère (art. 272-1 CGI). L'écraser à 0 la
+  // lui ferait perdre. Sur un document normal, la soustraction reste positive.
+  const totalTva = useStoredTotals ? round2(totalTtc - totalHt) : tvaTotals.total_tva;
   const tvaBreakdown = tvaTotals.tva_breakdown;
   const singleRate = tvaBreakdown.length === 1 ? tvaBreakdown[0].rate : null;
   // For grouping we keep lines that carry structure (section/subsection) even
@@ -486,24 +589,59 @@ export function DocumentPreviewDialog({
   const companyName = artisan?.company_name || artisan?.full_name || 'Artisan';
   const fontClass = dc.font === 'serif' ? 'font-serif' : 'font-sans';
 
-  const isInvoice = mode === 'invoice';
-  const isDepositInvoice = isInvoice && invoiceType === 'acompte';
-  const isFinalInvoice = isInvoice && invoiceType === 'solde';
   const documentLabel = isInvoice
-    ? isDepositInvoice
-      ? "FACTURE D'ACOMPTE"
-      : isFinalInvoice
-        ? 'FACTURE DE SOLDE'
-        : 'FACTURE'
+    ? isCreditNoteDoc
+      ? 'AVOIR'
+      : isDepositInvoice
+        ? "FACTURE D'ACOMPTE"
+        : isFinalInvoice
+          ? 'FACTURE DE SOLDE'
+          : 'FACTURE'
     : 'DEVIS';
-  const fallbackNumber = isInvoice ? 'F-AAAA-XXX' : 'D-AAAA-XXX';
-  const titlePlaceholder = isInvoice ? 'Titre de la facture' : 'Titre du devis';
+  const fallbackNumber = isCreditNoteDoc ? 'AV-AAAA-XXX' : isInvoice ? 'F-AAAA-XXX' : 'D-AAAA-XXX';
+  const titlePlaceholder = isCreditNoteDoc
+    ? "Titre de l'avoir"
+    : isInvoice
+      ? 'Titre de la facture'
+      : 'Titre du devis';
   const displayNumber = resolvedNumber || fallbackNumber;
+
+  // Référence à la facture rectifiée — obligatoire et non équivoque sur un avoir.
+  const creditedInvoiceDate = creditedInvoice
+    ? creditedInvoice.issued_at || creditedInvoice.created_at
+    : null;
+  const creditedRefLabel =
+    isCreditNoteDoc && creditedInvoice
+      ? `Rectifie la facture ${creditedInvoice.invoice_number}${
+          creditedInvoiceDate ? ` du ${formatShortDate(creditedInvoiceDate)}` : ''
+        }`
+      : null;
+  const creditNoteLegalMention = !isCreditNoteDoc
+    ? ''
+    : creditedInvoice
+      ? buildCreditNoteLegalMention({
+          creditedInvoiceNumber: creditedInvoice.invoice_number,
+          creditedInvoiceDate,
+        })
+      : // Repli tant que la facture rectifiée n'est pas chargée : on ne laisse
+        // jamais un avoir sans mention de régularisation de TVA.
+        "Avoir rectificatif. TVA régularisée conformément à l'article 272-1 du Code général des impôts. Ce document ne donne lieu à aucun paiement de votre part.";
 
   // Montant total des acomptes à déduire (calcul au rendu pour rester cohérent
   // si un acompte est annulé après émission du solde).
   const deductedTtc = linkedDeposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0);
-  const finalRemainingTtc = Math.max(0, totalTtc - deductedTtc);
+  // Un avoir a un TTC négatif : le borner à 0 effacerait la déduction.
+  const finalRemainingTtc = isCreditNoteDoc
+    ? round2(totalTtc - deductedTtc)
+    : Math.max(0, round2(totalTtc - deductedTtc));
+
+  // Avoirs émis sur CETTE facture (jamais sur un avoir : on ne crédite pas un
+  // avoir). Les brouillons ne déduisent rien, donc ils ne s'affichent pas.
+  const issuedCreditNotes = creditNotes.filter(isIssuedCreditNote);
+  const creditedTtc = sumCreditNotesTtc(creditNotes);
+  // Base à créditer : le reste à payer d'une facture de solde, sinon le TTC.
+  const baseDueTtc = isFinalInvoice && linkedDeposits.length > 0 ? finalRemainingTtc : totalTtc;
+  const netDueAfterCredits = netDueTtc({ total_ttc: baseDueTtc }, creditNotes);
 
   // Si un PDF d'origine est attache (document importe depuis l'ancien logiciel),
   // on l'affiche tel quel dans un iframe plutot que de reconstruire la mise en
@@ -513,13 +651,13 @@ export function DocumentPreviewDialog({
       <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
         <DialogContent className="max-w-4xl h-[90vh] p-0 gap-0 bg-[#faf9f7] flex flex-col">
           <DialogTitle className="sr-only">
-            {isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
+            {isCreditNoteDoc ? "Aperçu de l'avoir" : isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
           </DialogTitle>
           <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-[#e5e1da]">
             <div className="flex items-center gap-2 min-w-0">
               <div className="h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
               <span className="text-xs font-medium text-[#6b6560] truncate">
-                PDF d&apos;origine — {documentLabel.toLowerCase()} importé{!isInvoice ? '' : 'e'} {displayNumber}
+                PDF d&apos;origine — {documentLabel.toLowerCase()} importé{isInvoice && !isCreditNoteDoc ? 'e' : ''} {displayNumber}
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -555,7 +693,7 @@ export function DocumentPreviewDialog({
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0 bg-[#faf9f7]">
         <DialogTitle className="sr-only">
-          {isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
+          {isCreditNoteDoc ? "Aperçu de l'avoir" : isInvoice ? 'Aperçu de la facture' : 'Aperçu du devis'}
         </DialogTitle>
 
         {/* Header preview bar */}
@@ -609,6 +747,9 @@ export function DocumentPreviewDialog({
                   <div className="sm:text-right">
                     <p className="text-2xl sm:text-3xl font-bold text-white">{documentLabel}</p>
                     <p className="text-sm font-medium text-white/80 mt-1">{displayNumber}</p>
+                    {creditedRefLabel && (
+                      <p className="text-xs text-white/80 mt-1 font-medium">{creditedRefLabel}</p>
+                    )}
                     {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
                       <p className="text-xs text-white/70 mt-1">
                         {isDepositInvoice
@@ -633,6 +774,9 @@ export function DocumentPreviewDialog({
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-lg font-bold" style={{ color: accent }}>{documentLabel}</span>
                   <span className="text-sm font-medium" style={{ color: textColor }}>{displayNumber}</span>
+                  {creditedRefLabel && (
+                    <span className="text-xs font-medium" style={{ color: accent }}>{creditedRefLabel}</span>
+                  )}
                   {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
                     <span className="text-xs text-[#6b6560]">
                       {isDepositInvoice
@@ -677,6 +821,9 @@ export function DocumentPreviewDialog({
                   <div className="sm:text-right flex-shrink-0">
                     <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>{documentLabel}</p>
                     <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{displayNumber}</p>
+                    {creditedRefLabel && (
+                      <p className="text-xs font-medium mt-1" style={{ color: accent }}>{creditedRefLabel}</p>
+                    )}
                     {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
                       <p className="text-xs mt-1" style={{ color: accent }}>
                         {isDepositInvoice
@@ -686,8 +833,9 @@ export function DocumentPreviewDialog({
                     )}
                     <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
                       <p>Date : {formatDate(resolvedCreatedAt)}</p>
+                      {/* Un avoir n'est pas payable : ni échéance, ni relance. */}
                       {isInvoice ? (
-                        resolvedDueDate && <p>Échéance : {formatDate(resolvedDueDate)}</p>
+                        !isCreditNoteDoc && resolvedDueDate && <p>Échéance : {formatDate(resolvedDueDate)}</p>
                       ) : (
                         resolvedValidUntil && <p>Valable jusqu&apos;au : {formatDate(resolvedValidUntil)}</p>
                       )}
@@ -743,8 +891,16 @@ export function DocumentPreviewDialog({
               <h2 className="text-lg font-semibold" style={{ color: textColor }}>
                 {resolvedTitle || <span className="text-[#6b6560] font-normal italic">{titlePlaceholder}</span>}
               </h2>
-              {resolvedDescription && (
+              {/* Sur un avoir, `description` porte la mention légale de
+                  rectification : elle est déjà rendue en pied de document, la
+                  répéter ici ferait doublon. */}
+              {!isCreditNoteDoc && resolvedDescription && (
                 <p className="text-sm text-[#6b6560] mt-1 leading-relaxed whitespace-pre-wrap">{resolvedDescription}</p>
+              )}
+              {isCreditNoteDoc && creditReason && (
+                <p className="text-sm mt-2 font-medium" style={{ color: accent }}>
+                  Motif : {creditReasonLabel(creditReason)}
+                </p>
               )}
             </div>
 
@@ -931,9 +1087,20 @@ export function DocumentPreviewDialog({
                   </>
                 )}
                 <div className="flex items-center justify-between w-full sm:w-72 pt-2 border-t border-[#e5e1da] mt-1">
-                  <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
-                  <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(totalTtc)}</span>
+                  <span className="text-base font-semibold" style={{ color: textColor }}>
+                    {isCreditNoteDoc ? "Total TTC de l'avoir" : 'Total TTC'}
+                  </span>
+                  <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>{formatCurrency(totalTtc)}</span>
                 </div>
+                {isCreditNoteDoc && (
+                  <div className="w-full sm:w-72 pt-2 mt-1 border-t border-dashed border-[#e5e1da]/70">
+                    <p className="text-[11px] leading-relaxed text-[#6b6560]">
+                      Montant crédité en votre faveur
+                      {creditedInvoice ? ` sur la facture ${creditedInvoice.invoice_number}` : ''}.
+                      {' '}Aucun règlement n&apos;est attendu de votre part.
+                    </p>
+                  </div>
+                )}
                 {mode === 'quote' && depositPercentage && depositPercentage > 0 && (
                   <div className="flex flex-col items-end gap-0.5 w-full sm:w-72 pt-2 mt-1 border-t border-dashed border-[#e5e1da]/70">
                     <div className="flex items-center justify-between w-full">
@@ -985,8 +1152,12 @@ export function DocumentPreviewDialog({
                     </span>
                   </div>
                   <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t-2 mt-1" style={{ borderColor: accent }}>
+                    {/* Si des avoirs sont émis sur ce solde, le montant réellement
+                        dû est celui du bloc « Avoirs émis » plus bas : ce total-ci
+                        n'est alors qu'une étape, il ne peut pas s'appeler
+                        « reste à payer ». */}
                     <span className="text-base font-semibold" style={{ color: textColor }}>
-                      Reste à payer
+                      {issuedCreditNotes.length > 0 ? 'Net après acomptes' : 'Reste à payer'}
                     </span>
                     <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>
                       {formatCurrency(finalRemainingTtc)}
@@ -996,8 +1167,52 @@ export function DocumentPreviewDialog({
               </div>
             )}
 
-            {/* Coordonnées bancaires */}
-            {bankAccount && (
+            {/* Avoirs émis sur cette facture — le statut de la facture n'est jamais
+                modifié : l'état « créditée » se dérive ici, des avoirs eux-mêmes. */}
+            {!isCreditNoteDoc && issuedCreditNotes.length > 0 && (
+              <div className="border-t-2 border-dashed px-5 sm:px-8 py-5" style={{ borderColor: accent + '4d' }}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: accent }}>
+                  Avoirs émis
+                </p>
+                <div className="flex flex-col items-end gap-1.5">
+                  {issuedCreditNotes.map((n) => {
+                    const dateStr = n.issued_at || n.created_at;
+                    return (
+                      <div key={n.id} className="flex items-center justify-between w-full sm:w-[22rem] text-sm">
+                        <span className="text-[#6b6560] truncate mr-2">
+                          {n.invoice_number}
+                          {dateStr && (
+                            <span className="text-[11px] ml-1">({formatDate(dateStr)})</span>
+                          )}
+                        </span>
+                        <span className="font-medium tabular-nums" style={{ color: textColor }}>
+                          {formatCurrency(Number(n.total_ttc))}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {issuedCreditNotes.length > 1 && (
+                    <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t border-dashed border-[#e5e1da] mt-1">
+                      <span className="text-sm text-[#6b6560]">Total des avoirs</span>
+                      <span className="text-sm font-medium tabular-nums" style={{ color: textColor }}>
+                        {formatCurrency(creditedTtc)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t-2 mt-1" style={{ borderColor: accent }}>
+                    <span className="text-base font-semibold" style={{ color: textColor }}>
+                      Net dû
+                    </span>
+                    <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>
+                      {formatCurrency(netDueAfterCredits)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Coordonnées bancaires — jamais sur un avoir : rien n'est encaissable. */}
+            {bankAccount && !isCreditNoteDoc && (
               <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Landmark className="h-4 w-4" style={{ color: accent }} />
@@ -1048,7 +1263,15 @@ export function DocumentPreviewDialog({
               <div className="flex items-start gap-2">
                 <Shield className="h-3.5 w-3.5 text-[#6b6560]/50 mt-0.5 flex-shrink-0" />
                 <p className="text-[11px] text-[#6b6560]/60 leading-relaxed">
-                  {mentionsLegales || (
+                  {isCreditNoteDoc ? (
+                    // Mention obligatoire : référence à la facture rectifiée +
+                    // régularisation de TVA. Les mentions personnalisées de
+                    // l'artisan s'y ajoutent, elles ne la remplacent jamais.
+                    <>
+                      {creditNoteLegalMention}
+                      {mentionsLegales ? ` ${mentionsLegales}` : ''}
+                    </>
+                  ) : mentionsLegales || (
                     isInvoice ? (
                       <>
                         {isDepositInvoice ? 'Facture d\u2019acompte' : isFinalInvoice ? 'Facture de solde' : 'Facture'} émise le {formatDate(resolvedCreatedAt)}
@@ -1074,6 +1297,13 @@ export function DocumentPreviewDialog({
               {isDepositInvoice && (
                 <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5 italic">
                   TVA exigible à l&apos;encaissement conformément à l&apos;article 269-2 du CGI.
+                </p>
+              )}
+              {isCreditNoteDoc && tvaBreakdown.length > 0 && (
+                <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5 italic">
+                  {tvaBreakdown.length === 1
+                    ? `TVA régularisée au taux de ${formatTvaRate(tvaBreakdown[0].rate)}.`
+                    : `TVA régularisée selon plusieurs taux : ${tvaBreakdown.map((b) => formatTvaRate(b.rate)).join(', ')}.`}
                 </p>
               )}
               <InsuranceFooter insurance={artisan} />

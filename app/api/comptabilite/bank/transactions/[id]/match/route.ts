@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { applyMatch } from '@/lib/comptabilite/reconciliation';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   // Vérifie que la transaction appartient à l'utilisateur
   const { data: tx } = await sb
     .from('bank_transactions')
-    .select('id, user_id')
+    .select('id, user_id, direction')
     .eq('id', params.id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -52,15 +53,47 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   // Vérifie que la cible (expense ou invoice) appartient aussi à l'utilisateur.
   // Empêche un cross-tenant write via un target_id forgé.
-  const targetTable = body.kind === 'expense' ? 'expenses' : 'invoices';
-  const { data: target } = await supabaseAdmin
-    .from(targetTable)
-    .select('id')
-    .eq('id', body.target_id)
-    .eq('user_id', user.id)
-    .maybeSingle();
-  if (!target) {
-    return NextResponse.json({ error: 'Cible introuvable' }, { status: 404 });
+  if (body.kind === 'invoice') {
+    const { data: invoice } = await supabaseAdmin
+      .from('invoices')
+      .select('id, invoice_type')
+      .eq('id', body.target_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!invoice) {
+      return NextResponse.json({ error: 'Cible introuvable' }, { status: 404 });
+    }
+
+    // Un avoir rembourse le client : le rapprocher le ferait passer à « payée »
+    // et effacerait la régularisation qu'il porte.
+    if (isCreditNote(invoice)) {
+      return NextResponse.json(
+        { error: "Un avoir ne peut pas être rapproché d'une transaction bancaire" },
+        { status: 400 },
+      );
+    }
+
+    // Contrôle de direction : une facture s'encaisse. Un débit rapproché d'une
+    // facture la marquerait payée alors que l'argent est sorti du compte.
+    if (tx.direction !== 'credit') {
+      return NextResponse.json(
+        {
+          error:
+            "Un débit bancaire ne peut pas être rapproché d'une facture. Rapprochez-le d'une dépense.",
+        },
+        { status: 400 },
+      );
+    }
+  } else {
+    const { data: expense } = await supabaseAdmin
+      .from('expenses')
+      .select('id')
+      .eq('id', body.target_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!expense) {
+      return NextResponse.json({ error: 'Cible introuvable' }, { status: 404 });
+    }
   }
 
   const method = (body.method === 'ai' || body.method === 'auto' ? body.method : 'manual') as

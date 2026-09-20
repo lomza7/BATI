@@ -2,9 +2,19 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
-import { buildInvoicePaymentEmail } from '@/lib/email-templates';
+import { buildInvoicePaymentEmail, buildCreditNoteEmail } from '@/lib/email-templates';
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 import { resolveFromEmail } from '@/lib/email-from';
+import {
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isFullyCredited,
+  creditReasonLabel,
+  netDueTtc,
+  sumCreditNotesTtc,
+  type CreditNoteRef,
+  type InvoiceType,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -57,7 +67,7 @@ export async function POST(request: Request) {
     const [invoiceRes, profileRes, stripeRes] = await Promise.all([
       admin
         .from('invoices')
-        .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, invoice_type, deposit_percentage, quote_id, clients(name, email)')
+        .select('id, invoice_number, title, total_ttc, status, due_date, issued_at, invoice_type, deposit_percentage, quote_id, credited_invoice_id, credit_reason, clients(name, email)')
         .eq('id', invoice_id)
         .eq('user_id', user.id)
         .single(),
@@ -85,11 +95,28 @@ export async function POST(request: Request) {
       status: string;
       due_date: string | null;
       issued_at: string | null;
-      invoice_type: 'standard' | 'acompte' | 'solde' | null;
+      invoice_type: InvoiceType | null;
       deposit_percentage: number | null;
       quote_id: string | null;
+      credited_invoice_id: string | null;
+      credit_reason: string | null;
       clients?: { name?: string | null; email?: string | null } | null;
     };
+
+    // Un avoir suit un chemin à part de bout en bout : gabarit d'email dédié,
+    // sujet dédié, pas de paiement en ligne, pas de relance.
+    const isAvoir = isCreditNote(invoice);
+
+    // Avoirs déjà émis sur CETTE facture. On les charge avant tout calcul : ils
+    // conditionnent aussi bien le montant annoncé dans l'email que la présence
+    // du bouton « Payer ma facture ». Un avoir ne peut pas lui-même être
+    // crédité, on ne les charge donc que pour une facture ordinaire.
+    const creditNotes: CreditNoteRef[] = isAvoir
+      ? []
+      : (await fetchCreditNotesByInvoice(admin, [invoice.id])).get(invoice.id) || [];
+    // Une facture intégralement créditée ne réclame plus rien : ni bouton payer
+    // dans l'email, ni checkout Stripe sur la page publique.
+    const fullyCredited = !isAvoir && isFullyCredited(invoice, creditNotes);
 
     // Pour un acompte / solde, on récupère le numéro du devis source pour
     // l'afficher dans la narration de l'email.
@@ -103,13 +130,35 @@ export async function POST(request: Request) {
       relatedQuoteNumber = quoteRow?.quote_number || null;
     }
 
+    // Pour un avoir, la référence à la facture rectifiée est une mention
+    // obligatoire (art. 242 nonies A ann. II CGI) : on la charge pour l'email.
+    type CreditedInvoiceRef = {
+      invoice_number: string;
+      issued_at: string | null;
+      created_at: string | null;
+    };
+    let creditedInvoice: CreditedInvoiceRef | null = null;
+    if (isAvoir && invoice.credited_invoice_id) {
+      const { data: creditedRow } = await admin
+        .from('invoices')
+        .select('invoice_number, issued_at, created_at')
+        .eq('id', invoice.credited_invoice_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      creditedInvoice = (creditedRow as CreditedInvoiceRef | null) || null;
+    }
+
     const profile = (profileRes.data || {}) as {
       company_name?: string | null;
       full_name?: string | null;
       document_config?: Record<string, unknown> | null;
     };
 
-    const hasOnlinePayment = Boolean(stripeRes.data?.charges_enabled);
+    // Un avoir n'est jamais encaissable : même Stripe connecté, pas de bouton
+    // payer. Idem pour une facture intégralement créditée — proposer de payer
+    // un montant nul (ou déjà remboursé) serait une réclamation indue.
+    const hasOnlinePayment =
+      Boolean(stripeRes.data?.charges_enabled) && !isAvoir && !fullyCredited;
 
     // Creer le magic link
     const token = generateToken();
@@ -125,7 +174,7 @@ export async function POST(request: Request) {
         client_email: client_email?.trim() || null,
         token,
         expires_at: expiresAt.toISOString(),
-        enable_stripe_payment: Boolean(enable_stripe_payment),
+        enable_stripe_payment: Boolean(enable_stripe_payment) && !isAvoir && !fullyCredited,
       })
       .select('id')
       .single();
@@ -135,11 +184,14 @@ export async function POST(request: Request) {
     }
     const sendId = sendRow.id as string;
 
-    // Passer la facture en envoyee + set issued_at si necessaire
+    // Passer la facture en envoyee + set issued_at si necessaire.
+    // `reminders_enabled` est bien une colonne de `invoices` : on la force a
+    // false sur un avoir, qui n'est ni du ni relancable — sans quoi le cron
+    // de relances irait reclamer au client un document qu'il ne doit pas payer.
     const updates: Record<string, string | boolean> = {
       status: 'envoyee',
       updated_at: new Date().toISOString(),
-      reminders_enabled: reminders_enabled ?? false,
+      reminders_enabled: isAvoir ? false : (reminders_enabled ?? false),
     };
     if (invoice.status === 'brouillon' || invoice.status === 'creee') {
       updates.issued_at = new Date().toISOString();
@@ -169,21 +221,40 @@ export async function POST(request: Request) {
       const dc = (profile.document_config || {}) as Record<string, string>;
       const companyName = profile.company_name || profile.full_name || 'Artisan';
 
-      // Pour un solde : on déduit les acomptes versés du montant affiché dans
-      // l'email pour éviter de montrer un montant incorrect au client.
+      // Le montant annoncé dans l'email doit être exactement celui que réclame
+      // la page publique /f/[token] et celui qu'encaisse Stripe : on reprend
+      // donc le même ordre de déduction — avoirs émis sur la facture, puis
+      // acomptes déjà facturés pour un solde.
+      // Pour un avoir : le montant est négatif en base, mais on présente au
+      // client un montant porté à son crédit, donc en valeur absolue.
       let displayTotalTtc = Number(invoice.total_ttc) || 0;
-      if (invoice.invoice_type === 'solde' && invoice.quote_id) {
-        const { data: deposits } = await admin
-          .from('invoices')
-          .select('total_ttc')
-          .eq('quote_id', invoice.quote_id)
-          .eq('invoice_type', 'acompte')
-          .neq('status', 'annulee');
-        const deducted = (deposits || []).reduce(
-          (sum, d) => sum + Number(d.total_ttc || 0),
-          0,
-        );
-        displayTotalTtc = Math.max(0, displayTotalTtc - deducted);
+      if (isAvoir) {
+        displayTotalTtc = Math.abs(displayTotalTtc);
+      } else {
+        displayTotalTtc = netDueTtc({ total_ttc: displayTotalTtc }, creditNotes);
+
+        if (invoice.invoice_type === 'solde' && invoice.quote_id) {
+          const { data: deposits } = await admin
+            .from('invoices')
+            .select('id, total_ttc')
+            .eq('quote_id', invoice.quote_id)
+            .eq('invoice_type', 'acompte')
+            .neq('status', 'annulee');
+          const depositRows = (deposits || []) as { id: string; total_ttc: number | null }[];
+          // Chaque acompte est pris NET de ses propres avoirs : un acompte
+          // annulé par un avoir n'a rien encaissé, le déduire en brut du solde
+          // retirerait au client une somme qu'il n'a jamais versée.
+          const notesByDeposit = await fetchCreditNotesByInvoice(
+            admin,
+            depositRows.map((d) => d.id),
+          );
+          const deducted = depositRows.reduce((sum, d) => {
+            const net =
+              Number(d.total_ttc || 0) + sumCreditNotesTtc(notesByDeposit.get(d.id) || []);
+            return sum + Math.max(0, net);
+          }, 0);
+          displayTotalTtc = Math.max(0, displayTotalTtc - deducted);
+        }
       }
 
       const totalFormatted = new Intl.NumberFormat('fr-FR', {
@@ -196,21 +267,39 @@ export async function POST(request: Request) {
         ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(invoice.due_date))
         : null;
 
-      const emailHtml = buildInvoicePaymentEmail({
-        clientName: client_name.trim(),
-        artisanName: companyName,
-        invoiceNumber: invoice.invoice_number,
-        invoiceTitle: invoice.title || '',
-        totalTtc: totalFormatted,
-        dueDate: dueDateFormatted,
-        magicLink,
-        pdfUrl,
-        hasOnlinePayment,
-        accentColor: dc.primary_color || '#d35400',
-        invoiceType: invoice.invoice_type || 'standard',
-        depositPercentage: invoice.deposit_percentage,
-        relatedQuoteNumber,
-      });
+      // Gabarit dédié pour un avoir : ni échéance, ni bouton payer, ni IBAN.
+      const emailHtml = isAvoir
+        ? buildCreditNoteEmail({
+            clientName: client_name.trim(),
+            artisanName: companyName,
+            creditNoteNumber: invoice.invoice_number,
+            creditNoteTitle: invoice.title || '',
+            totalTtc: totalFormatted,
+            creditedInvoiceNumber: creditedInvoice?.invoice_number || '',
+            creditedInvoiceDate: creditedInvoice?.issued_at || creditedInvoice?.created_at || null,
+            creditReason: creditReasonLabel(invoice.credit_reason) || null,
+            magicLink,
+            pdfUrl,
+            accentColor: dc.primary_color || '#d35400',
+          })
+        : buildInvoicePaymentEmail({
+            clientName: client_name.trim(),
+            artisanName: companyName,
+            invoiceNumber: invoice.invoice_number,
+            invoiceTitle: invoice.title || '',
+            totalTtc: totalFormatted,
+            dueDate: dueDateFormatted,
+            magicLink,
+            pdfUrl,
+            hasOnlinePayment,
+            accentColor: dc.primary_color || '#d35400',
+            invoiceType:
+              invoice.invoice_type === 'acompte' || invoice.invoice_type === 'solde'
+                ? invoice.invoice_type
+                : 'standard',
+            depositPercentage: invoice.deposit_percentage,
+            relatedQuoteNumber,
+          });
 
       // Pieces jointes par defaut (attestations, assurances, etc.) — on
       // exclut celles que l'utilisateur a decochees dans le dialog.
@@ -228,11 +317,13 @@ export async function POST(request: Request) {
       );
 
       // Sujet : adapte le libellé selon le type de facture
-      const subjectPrefix = invoice.invoice_type === 'acompte'
-        ? `Facture d'acompte ${invoice.invoice_number}`
-        : invoice.invoice_type === 'solde'
-          ? `Facture de solde ${invoice.invoice_number}`
-          : `Facture ${invoice.invoice_number}`;
+      const subjectPrefix = isAvoir
+        ? `Avoir ${invoice.invoice_number}`
+        : invoice.invoice_type === 'acompte'
+          ? `Facture d'acompte ${invoice.invoice_number}`
+          : invoice.invoice_type === 'solde'
+            ? `Facture de solde ${invoice.invoice_number}`
+            : `Facture ${invoice.invoice_number}`;
 
       try {
         const result = await resend.emails.send({

@@ -25,6 +25,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import {
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isFullyCredited,
+  netDueTtc,
+} from '@/lib/invoices/credit-notes';
 import { formatCurrency, INVOICE_STATUSES } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { ClientPicker } from '@/components/shared/client-picker';
@@ -50,7 +56,15 @@ interface RecentPayment {
   paid_at: string | null;
   created_at: string;
   clients: { name: string } | null;
+  invoice_type: string | null;
+  /** Reste réellement dû, avoirs déduits. Égal à total_ttc sans avoir. */
+  net_ttc: number;
+  /** La facture a-t-elle été intégralement créditée par un ou des avoirs ? */
+  fully_credited: boolean;
 }
+
+/** Ligne telle que la base la renvoie, avant calcul du net d'avoirs. */
+type RecentPaymentRow = Omit<RecentPayment, 'net_ttc' | 'fully_credited'>;
 
 interface SessionData {
   session_id: string;
@@ -208,13 +222,33 @@ export default function EncaissementPage() {
 
   async function loadRecentPayments() {
     if (!user) return;
+    // Un avoir n'est jamais encaissable : il n'a pas sa place dans cette
+    // liste, qui sert autant d'historique que de file de relance QR code.
     const { data } = await supabase
       .from('invoices')
-      .select('id, invoice_number, title, total_ttc, status, paid_at, created_at, clients(name)')
+      .select('id, invoice_number, title, total_ttc, status, paid_at, created_at, invoice_type, clients(name)')
       .in('payment_method', ['terminal', 'hellopay'])
+      .or('invoice_type.is.null,invoice_type.neq.avoir')
       .order('created_at', { ascending: false })
       .limit(10);
-    setRecentPayments((data as unknown as RecentPayment[]) || []);
+
+    const rows = ((data as unknown as RecentPaymentRow[]) || []).filter((row) => !isCreditNote(row));
+    const notesByInvoice = await fetchCreditNotesByInvoice(supabase, rows.map((row) => row.id));
+    setRecentPayments(
+      rows
+        .map((row) => {
+          const notes = notesByInvoice.get(row.id) || [];
+          return {
+            ...row,
+            net_ttc: netDueTtc(row, notes),
+            fully_credited: isFullyCredited(row, notes),
+          };
+        })
+        // Une facture non réglée et intégralement créditée n'est plus à
+        // encaisser : elle sort de la file. Une facture déjà réglée reste en
+        // historique, l'avoir y vaut remboursement et non relance.
+        .filter((row) => row.status === 'payee' || !row.fully_credited)
+    );
   }
 
   async function startPayment() {
@@ -333,18 +367,25 @@ export default function EncaissementPage() {
     try {
       const { data: invoice } = await supabase
         .from('invoices')
-        .select('id, invoice_number, title, total_ttc, status')
+        .select('id, invoice_number, title, total_ttc, status, invoice_type')
         .eq('id', invoiceId)
         .maybeSingle();
 
       if (!invoice) throw new Error('Facture introuvable');
+      if (isCreditNote(invoice)) throw new Error("Un avoir ne s'encaisse pas");
       if (invoice.status === 'payee') {
         loadRecentPayments();
         setStep('form');
         return;
       }
 
-      const ttc = Number(invoice.total_ttc);
+      // On n'encaisse que le reste dû : réclamer le brut ferait payer au
+      // client un montant qu'un avoir lui a déjà crédité.
+      const notes = await fetchCreditNotesByInvoice(supabase, [invoice.id]);
+      const ttc = netDueTtc(invoice, notes.get(invoice.id) || []);
+      if (ttc <= 0) {
+        throw new Error('Cette facture est intégralement créditée par un avoir : il n\'y a plus rien à encaisser');
+      }
       const amountCents = Math.round(ttc * 100);
 
       // Regenerate a fresh Stripe session for this invoice — handles old
@@ -671,7 +712,15 @@ export default function EncaissementPage() {
                       </div>
                       <div className="text-right flex-shrink-0 ml-3 flex items-center gap-2">
                         <div>
-                          <p className="text-sm font-semibold">{formatCurrency(p.total_ttc)}</p>
+                          {/* Une facture non réglée s'affiche au net d'avoirs :
+                              c'est ce montant que le QR code encaissera. */}
+                          <p className="text-sm font-semibold">{formatCurrency(isOpen ? p.net_ttc : p.total_ttc)}</p>
+                          {isOpen && p.net_ttc !== p.total_ttc && (
+                            <p className="text-[11px] text-violet-700">Avoir déduit</p>
+                          )}
+                          {!isOpen && p.fully_credited && (
+                            <p className="text-[11px] text-violet-700">Remboursée par avoir</p>
+                          )}
                           <p className={`text-xs ${p.status === 'payee' ? 'text-green-600' : 'text-muted-foreground'}`}>
                             {isOpen ? 'Afficher le QR code' : st.label}
                           </p>

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { parseTvaBreakdown } from '@/lib/tva';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 
 interface ExpenseRow {
   date: string;
@@ -30,6 +31,8 @@ interface InvoiceRow {
   total_ttc: number | null;
   tva_rate: number | null;
   tva_breakdown?: unknown;
+  /** 'standard' | 'acompte' | 'solde' | 'avoir' — un avoir porte des montants négatifs. */
+  invoice_type?: string | null;
 }
 
 interface Props {
@@ -99,32 +102,56 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
     const collected: Record<string, { ht: number; tva: number }> = {};
     for (const r of TVA_RATES) collected[String(r)] = { ht: 0, tva: 0 };
 
+    // Ventilation des seuls avoirs (montants négatifs), pour montrer à
+    // l'artisan ce que ses factures rectificatives retirent de sa TVA
+    // collectée. Ils restent comptés dans `collected` : c'est bien une TVA
+    // collectée nette qu'on déclare.
+    const credited: Record<string, { ht: number; tva: number }> = {};
+    for (const r of TVA_RATES) credited[String(r)] = { ht: 0, tva: 0 };
+    let creditNoteCount = 0;
+
     for (const inv of invoices) {
-      const refDate = tvaMethod === 'encaissements' ? inv.paid_at : inv.issued_at || inv.created_at;
+      // Un avoir n'est jamais encaissé : sa TVA se régularise dès l'émission
+      // (art. 272-1 CGI). Le rattacher à paid_at le ferait disparaître du
+      // panneau chez un artisan à la TVA sur les encaissements.
+      const credit = isCreditNote(inv);
+      const refDate = credit
+        ? inv.issued_at || inv.created_at
+        : tvaMethod === 'encaissements'
+        ? inv.paid_at
+        : inv.issued_at || inv.created_at;
       if (!refDate) continue;
       if (!isInPeriod(refDate, period)) continue;
+      if (credit) creditNoteCount += 1;
 
-      // Prefer multi-rate breakdown when available
+      const add = (key: string, ht: number, tva: number) => {
+        collected[key] = collected[key] || { ht: 0, tva: 0 };
+        collected[key].ht += ht;
+        collected[key].tva += tva;
+        if (credit) {
+          credited[key] = credited[key] || { ht: 0, tva: 0 };
+          credited[key].ht += ht;
+          credited[key].tva += tva;
+        }
+      };
+
+      // Prefer multi-rate breakdown when available. Le breakdown d'un avoir
+      // est déjà négatif taux par taux : la somme additive régularise chaque
+      // taux toute seule.
       const breakdown = parseTvaBreakdown(inv.tva_breakdown);
       if (breakdown.length > 0) {
-        for (const b of breakdown) {
-          const key = String(b.rate);
-          collected[key] = collected[key] || { ht: 0, tva: 0 };
-          collected[key].ht += b.base_ht;
-          collected[key].tva += b.tva_amount;
-        }
+        for (const b of breakdown) add(String(b.rate), b.base_ht, b.tva_amount);
         continue;
       }
 
       // Fallback to single legacy rate
       const ht = Number(inv.total_ht || 0);
       const ttc = Number(inv.total_ttc || 0);
-      const tva = Math.max(0, ttc - ht);
+      // Un avoir a une TVA négative : la borner à 0 effacerait la
+      // régularisation. Le garde-fou ne vaut que pour les factures.
+      const tva = credit ? ttc - ht : Math.max(0, ttc - ht);
       const rate = inv.tva_rate != null ? Number(inv.tva_rate) : 20;
-      const key = String(rate in collected ? rate : 20);
-      collected[key] = collected[key] || { ht: 0, tva: 0 };
-      collected[key].ht += ht;
-      collected[key].tva += tva;
+      add(String(rate in collected ? rate : 20), ht, tva);
     }
 
     // TVA déductible : depuis les dépenses dans la période (toujours date pièce)
@@ -144,28 +171,63 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
     }
 
     const totalCollected = Object.values(collected).reduce((s, v) => s + v.tva, 0);
+    const totalCreditedHt = Object.values(credited).reduce((s, v) => s + v.ht, 0);
+    const totalCredited = Object.values(credited).reduce((s, v) => s + v.tva, 0);
     const totalDeductible = Object.values(deductible).reduce((s, v) => s + v.tva, 0);
     const balance = totalCollected - totalDeductible;
 
-    return { collected, deductible, totalCollected, totalDeductible, balance };
+    // Taux réellement mouvementés : un taux peut n'avoir que des avoirs, donc
+    // des montants négatifs — on ne teste jamais « > 0 ».
+    const collectedRates = TVA_RATES.filter((r) => {
+      const c = collected[String(r)];
+      return c && (c.ht !== 0 || c.tva !== 0);
+    });
+    const deductibleRates = TVA_RATES.filter((r) => {
+      const d = deductible[String(r)];
+      return d && (d.ht !== 0 || d.tva !== 0);
+    });
+
+    return {
+      collected,
+      credited,
+      creditNoteCount,
+      deductible,
+      collectedRates,
+      deductibleRates,
+      totalCollected,
+      totalCredited,
+      totalCreditedHt,
+      totalDeductible,
+      balance,
+    };
   }, [expenses, invoices, period, tvaMethod]);
 
   function handleExportCsv() {
     const rows: string[] = [];
     rows.push(['Section', 'Taux', 'Base HT', 'TVA'].join(';'));
-    for (const r of TVA_RATES) {
+    for (const r of computed.collectedRates) {
       const c = computed.collected[String(r)];
-      if (c.ht > 0 || c.tva > 0) {
-        rows.push(['TVA collectée', `${r}%`, c.ht.toFixed(2), c.tva.toFixed(2)].join(';'));
+      rows.push(['TVA collectée', `${r}%`, c.ht.toFixed(2), c.tva.toFixed(2)].join(';'));
+      const cr = computed.credited[String(r)];
+      if (cr && (cr.ht !== 0 || cr.tva !== 0)) {
+        rows.push(['dont avoirs', `${r}%`, cr.ht.toFixed(2), cr.tva.toFixed(2)].join(';'));
       }
     }
-    for (const r of TVA_RATES) {
+    for (const r of computed.deductibleRates) {
       const d = computed.deductible[String(r)];
-      if (d.ht > 0 || d.tva > 0) {
-        rows.push(['TVA déductible', `${r}%`, d.ht.toFixed(2), d.tva.toFixed(2)].join(';'));
-      }
+      rows.push(['TVA déductible', `${r}%`, d.ht.toFixed(2), d.tva.toFixed(2)].join(';'));
     }
     rows.push(['Total collectée', '', '', computed.totalCollected.toFixed(2)].join(';'));
+    if (computed.creditNoteCount > 0) {
+      rows.push(
+        [
+          `Dont avoirs (${computed.creditNoteCount})`,
+          '',
+          computed.totalCreditedHt.toFixed(2),
+          computed.totalCredited.toFixed(2),
+        ].join(';'),
+      );
+    }
     rows.push(['Total déductible', '', '', computed.totalDeductible.toFixed(2)].join(';'));
     rows.push([
       computed.balance >= 0 ? 'TVA à reverser' : 'Crédit de TVA',
@@ -238,18 +300,40 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
               </tr>
             </thead>
             <tbody>
-              {TVA_RATES.map((r) => {
+              {computed.collectedRates.map((r) => {
                 const c = computed.collected[String(r)];
-                if (!c || (c.ht === 0 && c.tva === 0)) return null;
+                const cr = computed.credited[String(r)];
+                const hasCredit = Boolean(cr) && (cr.ht !== 0 || cr.tva !== 0);
                 return (
                   <tr key={r} className="border-b border-border/60">
-                    <td className="px-4 py-2">{r}%</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{fmtEur(c.ht)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">{fmtEur(c.tva)}</td>
+                    <td className="px-4 py-2">
+                      {r}%
+                      {hasCredit && (
+                        <span className="block text-[10px] font-medium text-violet-700">
+                          dont avoirs
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {fmtEur(c.ht)}
+                      {hasCredit && (
+                        <span className="block text-[10px] font-medium text-red-600">
+                          {fmtEur(cr.ht)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums font-medium">
+                      {fmtEur(c.tva)}
+                      {hasCredit && (
+                        <span className="block text-[10px] font-medium text-red-600">
+                          {fmtEur(cr.tva)}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
-              {computed.totalCollected === 0 && (
+              {computed.collectedRates.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-4 text-center text-xs text-muted-foreground">
                     Aucune recette sur la période
@@ -265,6 +349,20 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
                   {fmtEur(computed.totalCollected)}
                 </td>
               </tr>
+              {computed.creditNoteCount > 0 && (
+                <tr className="bg-muted/30">
+                  <td className="px-4 py-2 text-[11px] font-medium text-violet-700">
+                    Dont {computed.creditNoteCount} avoir{computed.creditNoteCount > 1 ? 's' : ''}{' '}
+                    émis
+                  </td>
+                  <td className="px-4 py-2 text-right text-[11px] tabular-nums text-red-600">
+                    {fmtEur(computed.totalCreditedHt)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-[11px] font-medium tabular-nums text-red-600">
+                    {fmtEur(computed.totalCredited)}
+                  </td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>
@@ -284,9 +382,8 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
               </tr>
             </thead>
             <tbody>
-              {TVA_RATES.map((r) => {
+              {computed.deductibleRates.map((r) => {
                 const d = computed.deductible[String(r)];
-                if (!d || (d.ht === 0 && d.tva === 0)) return null;
                 return (
                   <tr key={r} className="border-b border-border/60">
                     <td className="px-4 py-2">{r}%</td>
@@ -295,7 +392,7 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
                   </tr>
                 );
               })}
-              {computed.totalDeductible === 0 && (
+              {computed.deductibleRates.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-4 text-center text-xs text-muted-foreground">
                     Aucune dépense déductible sur la période
@@ -341,12 +438,20 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
             <p>− Déductible : {fmtEur(computed.totalDeductible)}</p>
           </div>
         </div>
+        {computed.totalCollected < 0 && (
+          <p className="mt-3 border-t border-emerald-200/60 pt-2 text-[11px] font-medium text-emerald-700">
+            Votre TVA collectée est négative sur cette période&nbsp;: les avoirs émis dépassent les
+            factures. Cette TVA a déjà été reversée, elle est donc à récupérer auprès du Trésor.
+          </p>
+        )}
       </Card>
 
       <p className="text-[11px] text-muted-foreground">
         Estimation indicative. La déclaration officielle (CA3 / CA12) doit être validée par votre
         comptable. Les dépenses en autoliquidation TVA ne sont pas comptées comme déductibles côté
-        artisan.
+        artisan. Les avoirs émis sont ventilés par taux avec leurs montants négatifs et viennent en
+        diminution de la TVA collectée dès leur date d&apos;émission (art. 272-1 CGI), sans attendre
+        un quelconque encaissement.
       </p>
     </div>
   );

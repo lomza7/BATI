@@ -28,11 +28,17 @@ import {
   mapServicesCSV,
   mapQuotesCSV,
   mapInvoicesCSV,
+  fallbackCreditNoteToCancelled,
+  type CreditNoteFallbackCause,
+  type ImportWarning,
+  type MappedInvoice,
 } from '@/lib/import/costructor';
 import {
   getNextQuoteNumber,
   getNextInvoiceNumber,
+  getNextCreditNoteNumber,
 } from '@/lib/document-numbers';
+import { CREDITABLE_STATUSES, isCreditNote } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -53,6 +59,12 @@ interface ImportResult {
   skipped: number;
   total: number;
   errors: ImportError[];
+  /**
+   * Lignes importées mais dégradées — typiquement un avoir rétrogradé en
+   * facture annulée faute de facture d'origine résolvable. Elles ne sont ni
+   * des erreurs (la ligne est en base) ni un succès complet.
+   */
+  warnings?: ImportWarning[];
 }
 
 function normalizeName(name: string): string {
@@ -332,6 +344,10 @@ async function importInvoices(
       ? 'Ajoutez une colonne « Client » (ou « Customer ») avec le nom du contact.'
       : 'Ajoutez une colonne « Numéro » avec une référence sur chaque ligne.',
   }));
+  // Avertissements déjà produits par le mapper (avoir sans référence de
+  // facture d'origine dans le fichier), enrichis plus bas par ceux des
+  // références non résolvables.
+  const warnings: ImportWarning[] = [...mapped.warnings];
 
   const { data: existingClients } = await sb
     .from('clients')
@@ -350,28 +366,144 @@ async function importInvoices(
   const yearPrefix = next.slice(0, 7);
   let counter = parseInt(next.slice(yearPrefix.length), 10) || 1;
 
+  // Série AV- des avoirs, distincte de la série F- : on ne la réserve que si
+  // le fichier en contient, pour ne pas payer une requête inutile.
+  const creditNoteRows = mapped.rows.filter((r) => isCreditNote(r));
+  const standardRows = mapped.rows.filter((r) => !isCreditNote(r));
+  let creditYearPrefix = '';
+  let creditCounter = 1;
+  // Factures déjà en base : un avoir du fichier peut rectifier une facture
+  // importée lors d'un passage précédent.
+  const invoiceByNumber = new Map<
+    string,
+    { id: string; invoice_type: string | null; status: string | null; project_id: string | null }
+  >();
+
+  if (creditNoteRows.length > 0) {
+    const nextCredit = await getNextCreditNoteNumber(sb, userId);
+    creditYearPrefix = nextCredit.slice(0, 8); // "AV-YYYY-"
+    creditCounter = parseInt(nextCredit.slice(creditYearPrefix.length), 10) || 1;
+
+    const { data: existingInvoices } = await sb
+      .from('invoices')
+      .select('id, invoice_number, invoice_type, status, project_id')
+      .eq('user_id', userId);
+    for (const inv of existingInvoices || []) {
+      const invRow = inv as { id: string; invoice_number: string | null; invoice_type: string | null; status: string | null; project_id: string | null };
+      if (!invRow.invoice_number) continue;
+      invoiceByNumber.set(normalizeName(invRow.invoice_number), {
+        id: invRow.id,
+        invoice_type: invRow.invoice_type,
+        status: invRow.status,
+        project_id: invRow.project_id,
+      });
+    }
+  }
+
   let inserted = 0;
   let skipped = mapped.errors.length;
 
-  for (const row of mapped.rows) {
+  // Numéro source → facture insérée pendant CET import, pour qu'un avoir
+  // puisse rectifier une facture du même fichier.
+  const importedBySourceNumber = new Map<
+    string,
+    { id: string; status: string | null; project_id: string | null }
+  >();
+
+  async function insertInvoiceRow(
+    row: MappedInvoice,
+    clientId: string,
+    projectId: string | null,
+    creditedInvoiceId: string | null,
+  ): Promise<void> {
+    const isAvoir = row.invoice_type === 'avoir';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      let invoiceNumber: string;
+      if (isAvoir) {
+        const padded = creditCounter < 1000 ? String(creditCounter).padStart(3, '0') : String(creditCounter);
+        invoiceNumber = `${creditYearPrefix}${padded}`;
+        creditCounter++;
+      } else {
+        const padded = counter < 1000 ? String(counter).padStart(3, '0') : String(counter);
+        invoiceNumber = `${yearPrefix}${padded}`;
+        counter++;
+      }
+
+      const payload = {
+        invoice_number: invoiceNumber,
+        client_id: clientId,
+        project_id: projectId,
+        quote_id: null,
+        title: row.title,
+        status: row.status,
+        invoice_type: row.invoice_type,
+        credited_invoice_id: creditedInvoiceId,
+        credit_reason: isAvoir ? row.credit_reason : null,
+        total_ht: row.total_ht,
+        total_tva: row.total_tva,
+        tva_rate: row.tva_rate,
+        total_ttc: row.total_ttc,
+        due_date: row.due_date,
+        paid_at: row.paid_at,
+        issued_at: row.issued_at,
+        user_id: userId,
+        ...(row.issued_at ? { created_at: row.issued_at } : {}),
+      };
+
+      const { data, error } = await sb.from('invoices').insert(payload).select('id').single();
+      if (error) {
+        if (error.code === '23505') continue;
+        skipped++;
+        errors.push({
+          line: row.line,
+          reason: `${isAvoir ? 'Avoir' : 'Facture'} « ${row.source_number} » : ${error.message}`,
+          hint: 'Vérifiez que les montants HT et TTC sont des nombres valides.',
+        });
+        return;
+      }
+      inserted++;
+      if (data?.id && row.source_number) {
+        importedBySourceNumber.set(normalizeName(row.source_number), {
+          id: data.id as string,
+          status: row.status,
+          project_id: projectId,
+        });
+      }
+      return;
+    }
+    skipped++;
+    errors.push({
+      line: row.line,
+      reason: `${isAvoir ? 'Avoir' : 'Facture'} « ${row.source_number} » : numéro déjà utilisé, ligne ignorée.`,
+      hint: 'Relancez l\'import : un nouveau numéro sera attribué.',
+    });
+  }
+
+  // ── 1re passe : les factures ────────────────────────────────────────────
+  // Les avoirs viennent ensuite : ils doivent pouvoir référencer une facture
+  // du même fichier, qui n'existe qu'une fois insérée.
+  for (const row of standardRows) {
     const client = clientMap.get(normalizeName(row.client_name));
     if (!client) {
       skipped++;
       errors.push({
-        line: parseInt(row.externalId, 10) || 0,
+        line: row.line,
         reason: `Client introuvable : « ${row.client_name} »`,
         hint: 'Importez d\'abord vos contacts depuis l\'onglet Contacts, ou créez ce client manuellement.',
       });
       continue;
     }
 
-    // Create a project (chantier) for this invoice — skip for deposits
+    // Create a project (chantier) for this invoice — skip for deposits.
+    // `creates_project` est à false sur les lignes d'avoir rétrogradées : sans
+    // ce test, un avoir fabriquerait un chantier au budget négatif, qui
+    // polluerait la carte, la liste des chantiers et tous les cumuls.
     let projectId: string | null = null;
     const projectName = row.title || 'Chantier importé';
     const isDeposit = /\b(acompte|accompte|solde)\b/i.test(projectName);
     const isCompleted = row.status === 'payee';
 
-    if (!isDeposit) {
+    if (!isDeposit && row.creates_project) {
       const { data: project } = await sb
         .from('projects')
         .insert({
@@ -399,46 +531,64 @@ async function importInvoices(
       }
     }
 
-    let success = false;
-    for (let attempt = 0; attempt < 5 && !success; attempt++) {
-      const padded = counter < 1000 ? String(counter).padStart(3, '0') : String(counter);
-      const invoiceNumber = `${yearPrefix}${padded}`;
-      counter++;
+    await insertInvoiceRow(row, client.id, projectId, null);
+  }
 
-      const payload = {
-        invoice_number: invoiceNumber,
-        client_id: client.id,
-        project_id: projectId,
-        quote_id: null,
-        title: row.title,
-        status: row.status,
-        total_ht: row.total_ht,
-        tva_rate: row.tva_rate,
-        total_ttc: row.total_ttc,
-        due_date: row.due_date,
-        paid_at: row.paid_at,
-        issued_at: row.issued_at,
-        user_id: userId,
-        ...(row.issued_at ? { created_at: row.issued_at } : {}),
-      };
-
-      const { error } = await sb.from('invoices').insert(payload);
-      if (error) {
-        if (error.code === '23505') continue;
-        skipped++;
-        errors.push({
-          line: parseInt(row.externalId, 10) || 0,
-          reason: `Facture « ${row.source_number} » : ${error.message}`,
-          hint: 'Vérifiez que les montants HT et TTC sont des nombres valides.',
-        });
-        break;
-      }
-      inserted++;
-      success = true;
-    }
-    if (!success && !errors.some((e) => e.reason.includes(row.source_number))) {
+  // ── 2e passe : les avoirs ───────────────────────────────────────────────
+  for (const row of creditNoteRows) {
+    const client = clientMap.get(normalizeName(row.client_name));
+    if (!client) {
       skipped++;
+      errors.push({
+        line: row.line,
+        reason: `Client introuvable : « ${row.client_name} »`,
+        hint: 'Importez d\'abord vos contacts depuis l\'onglet Contacts, ou créez ce client manuellement.',
+      });
+      continue;
     }
+
+    const ref = normalizeName(row.credited_source_number);
+    const fromBatch = ref ? importedBySourceNumber.get(ref) : undefined;
+    const fromDb = ref ? invoiceByNumber.get(ref) : undefined;
+
+    let creditedId: string | null = null;
+    let creditedProjectId: string | null = null;
+    let cause: CreditNoteFallbackCause | null = null;
+
+    if (fromBatch) {
+      // La base refuse un avoir sur un brouillon ou sur un avoir.
+      if ((CREDITABLE_STATUSES as readonly string[]).includes(fromBatch.status || '')) {
+        creditedId = fromBatch.id;
+        creditedProjectId = fromBatch.project_id;
+      } else {
+        cause = 'facture_non_creditable';
+      }
+    } else if (fromDb) {
+      if (
+        fromDb.invoice_type !== 'avoir'
+        && (CREDITABLE_STATUSES as readonly string[]).includes(fromDb.status || '')
+      ) {
+        creditedId = fromDb.id;
+        creditedProjectId = fromDb.project_id;
+      } else {
+        cause = 'facture_non_creditable';
+      }
+    } else {
+      cause = 'facture_introuvable';
+    }
+
+    if (!creditedId) {
+      // Plutôt que de laisser partir un INSERT que la base rejettera, on
+      // rétrograde en facture annulée et on le dit à l'artisan.
+      const fallback = fallbackCreditNoteToCancelled(row, cause || 'facture_introuvable');
+      warnings.push(fallback.warning);
+      await insertInvoiceRow(fallback.row, client.id, null, null);
+      continue;
+    }
+
+    // Un avoir ne crée jamais de chantier : il reprend celui de la facture
+    // rectifiée quand elle en a un, pour rester dans le même dossier.
+    await insertInvoiceRow(row, client.id, creditedProjectId, creditedId);
   }
 
   return {
@@ -447,6 +597,7 @@ async function importInvoices(
     skipped,
     total: mapped.rows.length + mapped.errors.length,
     errors,
+    warnings,
   };
 }
 

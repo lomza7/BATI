@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isCreditNoteImportItem } from '@/lib/ai/invoice-import-schema';
+import { getNextCreditNoteNumber } from '@/lib/document-numbers';
+import { CREDITABLE_STATUSES } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -17,6 +20,43 @@ interface CommitItem {
   amount_ttc: number;
   tva_rate: number;
   create_invoice: boolean;
+  /** 'facture' (défaut) ou 'avoir'. Voir lib/ai/invoice-import-schema.ts. */
+  document_type?: string;
+  /** Numéro de la facture rectifiée, obligatoire pour un avoir. */
+  credited_invoice_number?: string;
+}
+
+/** Arrondi à 2 décimales — même règle que lib/tva.ts. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function num(v: unknown): number {
+  const parsed = Number(v);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Empreinte d'un avoir, pour le détecter en doublon.
+ *
+ * Un avoir importé prend un numéro REGÉNÉRÉ dans la série AV- : le numéro du
+ * document scanné n'existe nulle part en base, donc la détection classique par
+ * `invoice_number` ne peut rien voir. Et comme un avoir ne crée aucun chantier,
+ * l'empreinte « client + adresse + date + montant » ne trouve rien non plus.
+ * Sans cette clé, rescanner le même PDF le lendemain crédite la facture une
+ * seconde fois et ampute le CA et la TVA collectée du double.
+ *
+ * NOTE : même clé dans app/api/ai/invoice-import/check-duplicates/route.ts.
+ * Les deux doivent rester alignées (helper volontairement local, cf. lot
+ * d'implémentation des avoirs).
+ */
+function creditNoteFingerprint(
+  creditedInvoiceId: string,
+  totalTtc: number,
+  issuedAt: string | null | undefined,
+): string {
+  const day = String(issuedAt || '').slice(0, 10);
+  return creditedInvoiceId + '|' + round2(Math.abs(num(totalTtc))).toFixed(2) + '|' + day;
 }
 
 interface GeoResult {
@@ -130,9 +170,27 @@ export async function POST(request: Request) {
     }
   }
 
+  // Avoirs déjà en base, indexés par empreinte (facture rectifiée + montant +
+  // date) : c'est la seule façon de reconnaître un avoir déjà importé, son
+  // numéro d'origine n'étant pas conservé.
+  const { data: existingCreditNotes } = await supabaseAdmin
+    .from('invoices')
+    .select('credited_invoice_id, total_ttc, issued_at')
+    .eq('user_id', ownerId)
+    .eq('invoice_type', 'avoir');
+
+  const existingCreditNoteFingerprints = new Set(
+    (existingCreditNotes || [])
+      .filter(function (note) { return !!note.credited_invoice_id; })
+      .map(function (note) {
+        return creditNoteFingerprint(note.credited_invoice_id as string, note.total_ttc as number, note.issued_at as string | null);
+      }),
+  );
+
   // Track items in current batch to prevent intra-batch duplicates
   const batchInvoiceNums = new Set<string>();
   const batchFingerprints = new Set<string>();
+  const batchCreditNoteFingerprints = new Set<string>();
 
   // Cache clients by normalized name to avoid duplicate lookups
   const clientCache = new Map<string, string>();
@@ -163,14 +221,162 @@ export async function POST(request: Request) {
         batchFingerprints.add(fp);
       }
 
-      // 1. Client lookup/creation
-      const normalizedName = item.client_name.trim();
-      if (!normalizedName) {
-        errors.push({ index: i, reason: 'Nom du client manquant' });
-        continue;
+      // 0 bis. Avoir : résoudre la facture rectifiée AVANT tout effet de bord.
+      //
+      // Un avoir est une facture rectificative (art. 289 CGI) : la base impose
+      // `credited_invoice_id` non nul, pointant sur une facture émise du même
+      // compte. Si on ne sait pas à quelle facture le rattacher, l'insertion
+      // violerait la contrainte — autant refuser proprement la ligne ici,
+      // avant d'avoir créé un client ou un chantier pour rien.
+      const isAvoir = isCreditNoteImportItem(item);
+      let creditedInvoice: { id: string; client_id: string | null; project_id: string | null } | null = null;
+      // Montants de l'avoir, dérivés et contrôlés avant toute insertion.
+      let creditPlan: { ht: number; tva: number; ttc: number; rate: number; issuedAt: string } | null = null;
+
+      if (isAvoir) {
+        if (!item.create_invoice) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : rien à créer sans la création des factures — un avoir ne crée ni client ni chantier. Activez la création des factures.',
+          });
+          continue;
+        }
+
+        if (!item.amount_ht && !item.amount_ttc) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : montant illisible sur le document (0 €). Créez-le manuellement depuis la facture concernée.',
+          });
+          continue;
+        }
+
+        const creditedNumber = (item.credited_invoice_number || '').trim();
+        if (!creditedNumber) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : le numéro de la facture rectifiée est absent du document. Créez l\'avoir depuis la facture concernée.',
+          });
+          continue;
+        }
+
+        const { data: target } = await supabaseAdmin
+          .from('invoices')
+          .select('id, invoice_number, client_id, project_id, invoice_type, status')
+          .eq('user_id', ownerId)
+          .ilike('invoice_number', creditedNumber)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // `ilike` traite % et _ comme des jokers : on revérifie l'égalité
+        // exacte, un avoir rattaché à la mauvaise facture étant une pièce
+        // comptable fausse.
+        const targetMatches =
+          !!target
+          && String(target.invoice_number || '').trim().toLowerCase() === creditedNumber.toLowerCase();
+
+        if (!targetMatches) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : la facture rectifiée « ' + creditedNumber + ' » est introuvable dans votre compte. Importez-la d\'abord.',
+          });
+          continue;
+        }
+
+        if (target.invoice_type === 'avoir') {
+          errors.push({
+            index: i,
+            reason: 'Avoir : « ' + creditedNumber + ' » est déjà un avoir, un avoir ne peut pas en rectifier un autre.',
+          });
+          continue;
+        }
+
+        if (!(CREDITABLE_STATUSES as readonly string[]).includes(target.status)) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : la facture « ' + creditedNumber + ' » n\'est pas émise (statut ' + (target.status || 'inconnu') + '). Une facture en brouillon se corrige directement, sans avoir.',
+          });
+          continue;
+        }
+
+        creditedInvoice = { id: target.id, client_id: target.client_id, project_id: target.project_id };
+
+        // Montants : beaucoup d'avoirs n'affichent qu'un TTC (« Montant à
+        // votre crédit : 550 € TTC »), l'IA renvoie alors 0 en HT. Recopier
+        // les deux champs tels quels donnerait total_tva = tout le TTC, donc
+        // 500 € de TVA réclamés à tort à l'administration. On dérive donc le
+        // montant manquant depuis le taux, et on refuse la ligne si le couple
+        // reste incohérent plutôt que de laisser la base la rejeter avec un
+        // message Postgres en anglais.
+        // `|| 20` serait faux sur un document exonéré de TVA (taux 0) : on ne
+        // retombe sur 20 % que si le champ est réellement absent ou illisible.
+        const rawRate = Number(item.tva_rate);
+        const tvaRate = Number.isFinite(rawRate) ? Math.max(0, rawRate) : 20;
+        let amountHt = Math.abs(num(item.amount_ht));
+        let amountTtc = Math.abs(num(item.amount_ttc));
+
+        if (!amountTtc && amountHt) amountTtc = round2(amountHt * (1 + tvaRate / 100));
+        if (!amountHt && amountTtc) amountHt = round2(amountTtc / (1 + tvaRate / 100));
+
+        const amountTva = round2(amountTtc - amountHt);
+
+        if (amountTva < -0.01) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : montants incohérents sur le document (HT supérieur au TTC). Vérifiez le HT et le TTC, ou créez l\'avoir depuis la facture concernée.',
+          });
+          continue;
+        }
+
+        if (amountTva > amountHt + 0.01) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : TVA illisible sur le document (elle dépasserait le montant HT). Corrigez le HT ou le taux de TVA, ou créez l\'avoir depuis la facture concernée.',
+          });
+          continue;
+        }
+
+        const creditIssuedAt = item.invoice_date || new Date().toISOString();
+
+        // Doublon d'avoir : même facture rectifiée, même montant, même date.
+        const creditFingerprint = creditNoteFingerprint(creditedInvoice.id, amountTtc, creditIssuedAt);
+        if (
+          existingCreditNoteFingerprints.has(creditFingerprint)
+          || batchCreditNoteFingerprints.has(creditFingerprint)
+        ) {
+          errors.push({
+            index: i,
+            reason: 'Doublon : un avoir du même montant et de la même date existe déjà sur la facture « ' + creditedNumber + ' ». Il n\'a pas été réimporté pour ne pas la créditer deux fois.',
+          });
+          skipped.duplicates++;
+          continue;
+        }
+        batchCreditNoteFingerprints.add(creditFingerprint);
+
+        creditPlan = {
+          ht: -amountHt,
+          tva: -Math.max(0, amountTva),
+          ttc: -amountTtc,
+          rate: tvaRate,
+          issuedAt: creditIssuedAt,
+        };
       }
 
-      let clientId = clientCache.get(normalizedName.toLowerCase());
+      // 1. Client lookup/creation
+      const normalizedName = (item.client_name || '').trim();
+      let clientId: string | undefined;
+
+      // Un avoir se rattache au client de la facture rectifiée : reprendre ce
+      // client-là évite de fabriquer un doublon à partir d'un nom mal lu sur
+      // le scan, et garantit que l'avoir apparaît dans le même dossier client.
+      if (creditedInvoice?.client_id) {
+        clientId = creditedInvoice.client_id;
+      } else if (!normalizedName) {
+        errors.push({ index: i, reason: 'Nom du client manquant' });
+        continue;
+      } else {
+        clientId = clientCache.get(normalizedName.toLowerCase());
+      }
 
       if (!clientId) {
         // Lookup existing client
@@ -210,8 +416,10 @@ export async function POST(request: Request) {
         clientCache.set(normalizedName.toLowerCase(), clientId!);
       }
 
-      // 2. Geocode address
-      const geo = await geocodeAddress(item.client_address, item.client_city, item.client_postal_code);
+      // 2. Geocode address — inutile pour un avoir, qui ne crée aucun chantier
+      const geo = isAvoir
+        ? { lat: null, lng: null, city: item.client_city, postcode: item.client_postal_code }
+        : await geocodeAddress(item.client_address, item.client_city, item.client_postal_code);
 
       // 3. Create project (skip for deposits — they belong to an existing project)
       const projectName = item.description || 'Chantier importé';
@@ -219,8 +427,13 @@ export async function POST(request: Request) {
 
       let project: { id: string } | null = null;
 
-      // For deposits, try to find an existing project for the same client
-      if (isDeposit && clientId) {
+      // Un avoir ne crée jamais de chantier : il rectifie une facture qui a
+      // déjà le sien. On reprend le chantier de la facture rectifiée quand
+      // elle en a un, pour que l'avoir reste dans le même dossier.
+      if (isAvoir) {
+        project = creditedInvoice?.project_id ? { id: creditedInvoice.project_id } : null;
+      } else if (isDeposit && clientId) {
+        // For deposits, try to find an existing project for the same client
         const { data: existingProject } = await supabaseAdmin
           .from('projects')
           .select('id')
@@ -238,7 +451,7 @@ export async function POST(request: Request) {
         // — never create a chantier for a deposit invoice
       }
 
-      if (!project && !isDeposit) {
+      if (!project && !isDeposit && !isAvoir) {
         const { data: newProject, error: projectErr } = await supabaseAdmin
           .from('projects')
           .insert({
@@ -270,18 +483,76 @@ export async function POST(request: Request) {
         created.projects++;
       }
 
-      if (!project && !isDeposit) {
+      if (!project && !isDeposit && !isAvoir) {
         errors.push({ index: i, reason: 'Erreur création chantier' });
+        continue;
+      }
+
+      // 4 bis. Avoir : facture rectificative, série AV- dédiée, montants
+      // négatifs, jamais encaissable (ni échéance, ni date de paiement, ni
+      // statut « payée »). La référence à la facture rectifiée est une
+      // mention légale obligatoire, portée par credited_invoice_id.
+      if (isAvoir && creditedInvoice && creditPlan) {
+        const creditNoteNumber = await getNextCreditNoteNumber(supabaseAdmin, ownerId);
+
+        const { error: creditErr } = await supabaseAdmin
+          .from('invoices')
+          .insert({
+            user_id: ownerId,
+            invoice_number: creditNoteNumber,
+            invoice_type: 'avoir',
+            credited_invoice_id: creditedInvoice.id,
+            // Un scan ne permet pas de qualifier le motif de façon fiable :
+            // on marque « autre », l'artisan le précise depuis l'avoir.
+            credit_reason: 'autre',
+            client_id: clientId,
+            project_id: project?.id || null,
+            title: item.description || 'Avoir importé',
+            status: 'envoyee',
+            total_ht: creditPlan.ht,
+            total_tva: creditPlan.tva,
+            tva_rate: creditPlan.rate,
+            total_ttc: creditPlan.ttc,
+            issued_at: creditPlan.issuedAt,
+            due_date: null,
+            paid_at: null,
+          });
+
+        if (creditErr) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : création impossible (' + (creditErr.message || 'erreur inconnue') + ')',
+          });
+          continue;
+        }
+
+        created.invoices++;
+        continue;
+      }
+
+      // Garde-fou : un avoir ne doit JAMAIS retomber dans le chemin « facture
+      // standard ». Il partirait en invoice_type 'standard' avec des montants
+      // négatifs, rejeté par invoices_non_avoir_positive_amounts — ou, pire,
+      // enregistré comme une facture normale réclamant de l'argent au client.
+      if (isAvoir) {
+        errors.push({
+          index: i,
+          reason: 'Avoir : import impossible, la facture rectifiée n\'a pas pu être déterminée. Créez l\'avoir depuis la facture concernée.',
+        });
         continue;
       }
 
       // 4. Optionally create invoice
       if (item.create_invoice) {
-        // Generate next invoice number
+        // Generate next invoice number.
+        // Les avoirs sont exclus : ils vivent dans la même table mais dans une
+        // série AV- distincte. Sans ce filtre, un avoir récemment créé ferait
+        // sauter le compteur des factures (AV-2026-007 -> F-2026-008).
         const { data: lastInvoice } = await supabaseAdmin
           .from('invoices')
           .select('invoice_number')
           .eq('user_id', ownerId)
+          .neq('invoice_type', 'avoir')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();

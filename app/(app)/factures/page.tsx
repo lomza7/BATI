@@ -21,6 +21,7 @@ import {
   Trash2,
   Download,
   TriangleAlert as AlertTriangle,
+  Undo2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -28,6 +29,19 @@ import { moveEntityToTrash } from '@/lib/recycle-bin';
 import { INVOICE_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate } from '@/lib/constants';
 import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
+import {
+  CREDITABLE_STATUSES,
+  claimedTtc,
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isFullyCredited,
+  isPartiallyCredited,
+  netDueTtc,
+  netRevenueTtc,
+  remainingCreditableTtc,
+  type CreditNoteRef,
+  type InvoiceType,
+} from '@/lib/invoices/credit-notes';
 import { PageHeader } from '@/components/shared/page-header';
 import { QuotaMeter } from '@/components/paywall/quota-meter';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -57,6 +71,7 @@ import { BankAccountPicker } from '@/components/shared/bank-account-picker';
 import { ClientPicker, type Client } from '@/components/shared/client-picker';
 import { FirstBankAccountDialog } from '@/components/shared/first-bank-account-dialog';
 import { QuoteBillingCard } from '@/components/devis/quote-billing-card';
+import { CreateCreditNoteDialog } from '@/components/factures/create-credit-note-dialog';
 import { TerminalPaymentDialog } from '@/components/terminal/terminal-payment-dialog';
 import type { DepositInvoice } from '@/lib/invoices/deposits';
 import {
@@ -82,8 +97,11 @@ interface Invoice {
   is_archived: boolean;
   created_at: string;
   payment_method: string;
-  invoice_type: 'standard' | 'acompte' | 'solde';
+  invoice_type: InvoiceType;
   deposit_percentage: number | null;
+  /** Renseigné uniquement sur un avoir : facture rectifiée. */
+  credited_invoice_id: string | null;
+  credit_reason: string | null;
   clients: { name: string; email?: string | null } | null;
 }
 
@@ -123,7 +141,8 @@ interface QuoteCandidate {
 
 type QuoteInvoiceFilter = 'to_invoice' | 'already_invoiced';
 type QuoteSortKey = 'recent' | 'oldest' | 'amount_desc' | 'amount_asc' | 'client';
-type InvoiceStatusFilter = 'all' | keyof typeof INVOICE_STATUSES;
+/** `avoir` n'est pas un statut mais un type de document : filtre à part. */
+type InvoiceStatusFilter = 'all' | 'avoir' | keyof typeof INVOICE_STATUSES;
 type InvoiceSortKey = 'recent' | 'oldest' | 'due_asc' | 'due_desc' | 'amount_desc' | 'amount_asc' | 'client';
 
 function formatDateTime(iso: string | null): string {
@@ -146,6 +165,11 @@ export default function FacturesPage() {
   // les devis chargés.
   const pendingBillingQuoteId = useRef<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  // Avoirs indexés par facture rectifiée : badges « Créditée », net restant dû
+  // et garde-fou sur le cumul des avoirs.
+  const [creditNotes, setCreditNotes] = useState<Map<string, CreditNoteRef[]>>(new Map());
+  // Facture pour laquelle on ouvre le dialog d'émission d'avoir
+  const [creditNoteInvoice, setCreditNoteInvoice] = useState<Invoice | null>(null);
   const [quotes, setQuotes] = useState<QuoteCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -240,7 +264,7 @@ export default function FacturesPage() {
     const [invoiceRes, quoteRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, invoice_type, deposit_percentage, clients(name, email, deleted_at)')
+        .select('id, invoice_number, quote_id, recurring_contract_id, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, is_archived, created_at, payment_method, invoice_type, deposit_percentage, credited_invoice_id, credit_reason, clients(name, email, deleted_at)')
         .order('created_at', { ascending: false }),
       supabase
         .from('quotes')
@@ -260,13 +284,13 @@ export default function FacturesPage() {
           deposit_percentage,
           clients(name, email, deleted_at),
           quote_lines(id, description, quantity, unit, unit_price, tva_rate, total, position, section, subsection),
-          invoices(id)
+          invoices(id, invoice_type)
         `)
         .is('deleted_at', null)
         .order('created_at', { ascending: false }),
     ]);
 
-    setInvoices((((invoiceRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
+    const nextInvoices = (((invoiceRes.data as unknown as Array<Record<string, unknown>>) || [])).map((invoice) => {
       const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
       return {
         ...invoice,
@@ -275,6 +299,8 @@ export default function FacturesPage() {
           invoice.deposit_percentage === null || invoice.deposit_percentage === undefined
             ? null
             : Number(invoice.deposit_percentage),
+        credited_invoice_id: invoice.credited_invoice_id ? String(invoice.credited_invoice_id) : null,
+        credit_reason: invoice.credit_reason ? String(invoice.credit_reason) : null,
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? {
               name: String((clientValue as { name?: string }).name || ''),
@@ -282,7 +308,18 @@ export default function FacturesPage() {
             }
           : null,
       } as Invoice;
-    }));
+    });
+
+    setInvoices(nextInvoices);
+
+    // Avoirs rattachés aux factures affichées : un seul aller-retour pour tout
+    // l'écran (badges « Créditée », net restant dû, plafond de créditation).
+    setCreditNotes(
+      await fetchCreditNotesByInvoice(
+        supabase,
+        nextInvoices.filter((inv) => !isCreditNote(inv)).map((inv) => inv.id),
+      ),
+    );
 
     const nextQuotes = (((quoteRes.data as unknown as Array<Record<string, unknown>>) || []).map((quote) => {
       const linkedInvoices = Array.isArray(quote.invoices) ? (quote.invoices as Array<Record<string, unknown>>) : [];
@@ -304,7 +341,9 @@ export default function FacturesPage() {
         clients: clientValue && typeof clientValue === 'object' && !(clientValue as { deleted_at?: string | null }).deleted_at
           ? { name: String((clientValue as { name?: string }).name || ''), email: (clientValue as { email?: string | null }).email || null }
           : null,
-        has_linked_invoice: linkedInvoices.length > 0,
+        // Un avoir rectifie une facture, il ne facture pas le devis : le compter
+        // ici sortirait le devis du KPI « Devis à facturer ».
+        has_linked_invoice: linkedInvoices.some((inv) => String(inv.invoice_type || 'standard') !== 'avoir'),
         deposit_percentage:
           quote.deposit_percentage === null || quote.deposit_percentage === undefined
             ? null
@@ -449,14 +488,33 @@ export default function FacturesPage() {
     // Whitelist : empêche les régressions comptables (ex: payee → brouillon).
     // Une facture officiellement émise (creee/envoyee/payee/en_retard) ne peut
     // plus revenir en brouillon. "payee" est terminal — pas de retour possible.
-    const current = invoices.find(i => i.id === id)?.status;
-    const ALLOWED: Record<string, string[]> = {
-      brouillon: ['creee', 'envoyee', 'payee'],
-      creee: ['envoyee', 'payee', 'en_retard'],
-      envoyee: ['payee', 'en_retard'],
-      en_retard: ['payee', 'envoyee'],
-      payee: [],
-    };
+    //
+    // Un avoir suit un cycle à part : il est émis puis envoyé, jamais encaissé
+    // ni en retard (il ne crée aucune créance) et jamais annulé — on ne rectifie
+    // pas une rectification, on émet une nouvelle facture.
+    //
+    // "annulee" n'est ouvert qu'au brouillon : une facture déjà émise se
+    // corrige par un avoir, jamais par un changement de statut, sinon elle
+    // sortirait des agrégats en plus de la déduction portée par l'avoir.
+    const invoice = invoices.find(i => i.id === id);
+    const current = invoice?.status;
+    const ALLOWED: Record<string, string[]> = isCreditNote(invoice)
+      ? {
+          brouillon: ['creee', 'envoyee'],
+          creee: ['envoyee'],
+          envoyee: [],
+          en_retard: [],
+          payee: [],
+          annulee: [],
+        }
+      : {
+          brouillon: ['creee', 'envoyee', 'payee', 'annulee'],
+          creee: ['envoyee', 'payee', 'en_retard'],
+          envoyee: ['payee', 'en_retard'],
+          en_retard: ['payee', 'envoyee'],
+          payee: [],
+          annulee: [],
+        };
     if (current && !ALLOWED[current]?.includes(status)) {
       window.alert(`Transition interdite : ${current} → ${status}`);
       return;
@@ -492,6 +550,55 @@ export default function FacturesPage() {
   }
 
   const activeInvoices = invoices.filter(inv => !inv.is_archived);
+
+  /** Avoirs émis sur une facture donnée (vide pour un avoir). */
+  function creditNotesOf(inv: Invoice): CreditNoteRef[] {
+    return creditNotes.get(inv.id) || [];
+  }
+
+  /**
+   * Montant qui sera réellement débité par le Terminal, à l'euro près :
+   * mêmes règles que /api/stripe/terminal/create-payment-intent — ce que la
+   * facture réclame (une facture de solde déduit les acomptes déjà facturés,
+   * eux-mêmes nets de leurs avoirs), puis déduction de ses propres avoirs.
+   * Helper local : il ne sert qu'à aligner l'affichage sur le serveur.
+   */
+  function terminalAmountTtc(inv: Invoice): number {
+    let depositsTtc = 0;
+    if (inv.invoice_type === 'solde' && inv.quote_id) {
+      depositsTtc = invoices
+        .filter(
+          (d) =>
+            d.quote_id === inv.quote_id &&
+            d.invoice_type === 'acompte' &&
+            d.status !== 'annulee',
+        )
+        .reduce((sum, d) => sum + netDueTtc(d, creditNotesOf(d)), 0);
+    }
+    return netDueTtc(
+      { total_ttc: claimedTtc(inv, depositsTtc) },
+      creditNotesOf(inv),
+    );
+  }
+
+  /** État de créditation dérivé des avoirs — le statut n'est jamais modifié. */
+  function creditState(inv: Invoice): 'none' | 'partial' | 'full' {
+    if (isCreditNote(inv)) return 'none';
+    const notes = creditNotesOf(inv);
+    if (notes.length === 0) return 'none';
+    if (isFullyCredited(inv, notes)) return 'full';
+    return isPartiallyCredited(inv, notes) ? 'partial' : 'none';
+  }
+
+  /**
+   * Un avoir n'est possible que sur une facture réellement émise, qui n'est
+   * pas elle-même un avoir et sur laquelle il reste du montant à créditer.
+   */
+  function canCreateCreditNote(inv: Invoice): boolean {
+    if (isCreditNote(inv)) return false;
+    if (!(CREDITABLE_STATUSES as readonly string[]).includes(inv.status)) return false;
+    return remainingCreditableTtc(inv, creditNotesOf(inv)) > 0.01;
+  }
   const archivedInvoices = invoices.filter(inv => inv.is_archived);
 
   const filteredInvoices = useMemo(() => {
@@ -503,6 +610,8 @@ export default function FacturesPage() {
           inv.invoice_number.toLowerCase().includes(term) ||
           inv.clients?.name?.toLowerCase().includes(term);
         if (!matchesSearch) return false;
+        // « Avoirs » filtre sur le type de document, pas sur le statut.
+        if (invoiceStatusFilter === 'avoir') return isCreditNote(inv);
         if (invoiceStatusFilter !== 'all' && inv.status !== invoiceStatusFilter) return false;
         return true;
       })
@@ -572,13 +681,28 @@ export default function FacturesPage() {
     return next;
   }, [quotes, quoteFilter, quoteSearchTerm, quoteSort]);
 
-  const totalUnpaid = activeInvoices.filter(i => i.status === 'envoyee' || i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
-  const totalPaid = activeInvoices.filter(i => i.status === 'payee').reduce((s, i) => s + i.total_ttc, 0);
-  const totalLate = activeInvoices.filter(i => i.status === 'en_retard').reduce((s, i) => s + i.total_ttc, 0);
+  // « En attente » et « En retard » sont des files d'action, pas des agrégats
+  // comptables : elles excluent les avoirs (rien à encaisser dessus) et
+  // raisonnent en net d'avoirs, sinon on réclamerait au client un montant
+  // qu'on lui a déjà crédité.
+  const totalUnpaid = activeInvoices
+    .filter(i => !isCreditNote(i) && (i.status === 'envoyee' || i.status === 'en_retard'))
+    .reduce((s, i) => s + netDueTtc(i, creditNotesOf(i)), 0);
+  // « Encaissé » : montant resté acquis, avoirs émis sur les factures payées
+  // déduits (l'avoir lui-même n'est jamais au statut payee, donc aucun risque
+  // de double déduction).
+  const totalPaid = activeInvoices
+    .filter(i => !isCreditNote(i) && i.status === 'payee')
+    .reduce((s, i) => s + netRevenueTtc(i, creditNotesOf(i)), 0);
+  const totalLate = activeInvoices
+    .filter(i => !isCreditNote(i) && i.status === 'en_retard')
+    .reduce((s, i) => s + netDueTtc(i, creditNotesOf(i)), 0);
   const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice && quote.status !== 'refuse');
 
   function handleInvoiceClick(inv: Invoice) {
-    if (inv.quote_id) {
+    // Un avoir n'appartient pas au cycle de facturation d'un devis : même s'il
+    // en portait un, il ouvre toujours sa propre prévisualisation.
+    if (inv.quote_id && !isCreditNote(inv)) {
       const linkedQuote = quotes.find((q) => q.id === inv.quote_id);
       if (linkedQuote) {
         setBillingQuote(linkedQuote);
@@ -590,6 +714,9 @@ export default function FacturesPage() {
 
   function renderInvoiceRow(inv: Invoice, archived = false) {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
+    const isAvoir = isCreditNote(inv);
+    const credited = creditState(inv);
+    const netDue = credited === 'none' ? null : netDueTtc(inv, creditNotesOf(inv));
     return (
       <tr
         key={inv.id}
@@ -607,6 +734,21 @@ export default function FacturesPage() {
             {inv.invoice_type === 'solde' && (
               <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 font-normal">
                 Solde
+              </Badge>
+            )}
+            {isAvoir && (
+              <Badge className="bg-rose-50 text-rose-700 hover:bg-rose-50 font-normal">
+                Avoir
+              </Badge>
+            )}
+            {credited === 'full' && (
+              <Badge className="bg-rose-50 text-rose-700 hover:bg-rose-50 font-normal">
+                Créditée
+              </Badge>
+            )}
+            {credited === 'partial' && (
+              <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 font-normal">
+                Partiellement créditée
               </Badge>
             )}
           </div>
@@ -633,7 +775,14 @@ export default function FacturesPage() {
             )}
           </div>
         </td>
-        <td className="px-4 py-3 text-sm font-medium text-foreground text-right">{formatCurrency(inv.total_ttc)}</td>
+        <td className={`px-4 py-3 text-sm font-medium text-right ${isAvoir ? 'text-rose-600' : 'text-foreground'}`}>
+          {formatCurrency(inv.total_ttc)}
+          {netDue !== null && (
+            <span className="block text-xs font-normal text-muted-foreground" title="Montant restant dû après déduction des avoirs">
+              Net : {formatCurrency(netDue)}
+            </span>
+          )}
+        </td>
         <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
           <span title="Date de création">{formatDateTime(inv.created_at)}</span>
           {inv.issued_at && (
@@ -655,7 +804,7 @@ export default function FacturesPage() {
               <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewInvoiceId(inv.id); }}>
                 <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
               </DropdownMenuItem>
-              {inv.quote_id && (
+              {inv.quote_id && !isAvoir && (
                 <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
                   <Receipt className="mr-2 h-4 w-4" /> Suivi facturation
                 </DropdownMenuItem>
@@ -667,18 +816,38 @@ export default function FacturesPage() {
                       <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
                     </DropdownMenuItem>
                   )}
+                  {/* Un avoir s'envoie comme une facture : le dialog bascule
+                      de lui-même en mode avoir (ni relance, ni paiement) et
+                      l'email utilise le gabarit dédié. */}
                   <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
-                    <Send className="mr-2 h-4 w-4" /> Envoyer au client
+                    <Send className="mr-2 h-4 w-4" /> {isAvoir ? "Envoyer l'avoir" : 'Envoyer au client'}
                   </DropdownMenuItem>
-                  {stripeChargesEnabled && inv.status !== 'payee' && (
+                  {canCreateCreditNote(inv) && (
+                    <DropdownMenuItem onClick={() => setCreditNoteInvoice(inv)}>
+                      <Undo2 className="mr-2 h-4 w-4" /> Créer un avoir
+                    </DropdownMenuItem>
+                  )}
+                  {/* Une facture intégralement créditée n'a plus rien à
+                      encaisser : le lecteur refuserait le paiement, autant ne
+                      pas le proposer devant le client. */}
+                  {stripeChargesEnabled && !isAvoir && inv.status !== 'payee' && credited !== 'full' && (
                     <DropdownMenuItem onClick={() => setTerminalInvoice(inv)}>
                       <CreditCard className="mr-2 h-4 w-4" /> Encaisser par Terminal
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                  {!isAvoir && (
+                    <>
+                      <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                    </>
+                  )}
+                  {!isAvoir && inv.status === 'brouillon' && (
+                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'annulee')} className="text-muted-foreground">
+                      Annuler le brouillon
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
                     <Archive className="mr-2 h-4 w-4" /> Archiver
@@ -699,6 +868,9 @@ export default function FacturesPage() {
 
   function renderInvoiceCard(inv: Invoice, archived = false) {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
+    const isAvoir = isCreditNote(inv);
+    const credited = creditState(inv);
+    const netDue = credited === 'none' ? null : netDueTtc(inv, creditNotesOf(inv));
     return (
       <div
         key={inv.id}
@@ -722,7 +894,7 @@ export default function FacturesPage() {
                 <DropdownMenuItem onClick={() => { setPreviewAutoPrint(true); setPreviewInvoiceId(inv.id); }}>
                   <Download className="mr-2 h-4 w-4" /> Télécharger (PDF)
                 </DropdownMenuItem>
-                {inv.quote_id && (
+                {inv.quote_id && !isAvoir && (
                   <DropdownMenuItem onClick={() => handleInvoiceClick(inv)}>
                     <Receipt className="mr-2 h-4 w-4" /> Suivi facturation
                   </DropdownMenuItem>
@@ -734,13 +906,29 @@ export default function FacturesPage() {
                         <FileCheck className="mr-2 h-4 w-4" /> Créer la facture
                       </DropdownMenuItem>
                     )}
+                    {/* L'avoir s'envoie aussi : le dialog masque relance et
+                        lien de paiement quand il en détecte un. */}
                     <DropdownMenuItem onClick={() => setSendingInvoice(inv)}>
-                      <Send className="mr-2 h-4 w-4" /> Envoyer au client
+                      <Send className="mr-2 h-4 w-4" /> {isAvoir ? "Envoyer l'avoir" : 'Envoyer au client'}
                     </DropdownMenuItem>
+                    {canCreateCreditNote(inv) && (
+                      <DropdownMenuItem onClick={() => setCreditNoteInvoice(inv)}>
+                        <Undo2 className="mr-2 h-4 w-4" /> Créer un avoir
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => updateStatus(inv.id, 'envoyee')}>Marquer envoyée</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                    {!isAvoir && (
+                      <>
+                        <DropdownMenuItem onClick={() => updateStatus(inv.id, 'payee')}>Marquer payée</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => updateStatus(inv.id, 'en_retard')}>Marquer en retard</DropdownMenuItem>
+                      </>
+                    )}
+                    {!isAvoir && inv.status === 'brouillon' && (
+                      <DropdownMenuItem onClick={() => updateStatus(inv.id, 'annulee')} className="text-muted-foreground">
+                        Annuler le brouillon
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => archiveInvoice(inv.id)} className="text-muted-foreground">
                       <Archive className="mr-2 h-4 w-4" /> Archiver
@@ -766,6 +954,21 @@ export default function FacturesPage() {
               Solde
             </Badge>
           )}
+          {isAvoir && (
+            <Badge className="bg-rose-50 text-rose-700 hover:bg-rose-50 font-normal">
+              Avoir
+            </Badge>
+          )}
+          {credited === 'full' && (
+            <Badge className="bg-rose-50 text-rose-700 hover:bg-rose-50 font-normal">
+              Créditée
+            </Badge>
+          )}
+          {credited === 'partial' && (
+            <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 font-normal">
+              Partiellement créditée
+            </Badge>
+          )}
           <StatusBadge label={st.label} color={st.color} />
           {inv.status === 'brouillon' && !archived && (
             <Button
@@ -787,8 +990,15 @@ export default function FacturesPage() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-foreground">{formatCurrency(inv.total_ttc)}</p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`text-sm font-medium ${isAvoir ? 'text-rose-600' : 'text-foreground'}`}>
+              {formatCurrency(inv.total_ttc)}
+            </p>
+            {netDue !== null && (
+              <p className="text-xs text-muted-foreground">Net restant dû : {formatCurrency(netDue)}</p>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '-'}</p>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -1097,6 +1307,9 @@ export default function FacturesPage() {
               <Button variant={invoiceStatusFilter === 'en_retard' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('en_retard')}>
                 En retard
               </Button>
+              <Button variant={invoiceStatusFilter === 'avoir' ? 'default' : 'outline'} size="sm" onClick={() => setInvoiceStatusFilter('avoir')}>
+                Avoirs
+              </Button>
             </div>
             <select
               value={invoiceSort}
@@ -1247,6 +1460,20 @@ export default function FacturesPage() {
         </DialogContent>
       </Dialog>
 
+      {creditNoteInvoice && (
+        <CreateCreditNoteDialog
+          open={creditNoteInvoice !== null}
+          onOpenChange={(open) => { if (!open) setCreditNoteInvoice(null); }}
+          invoice={creditNoteInvoice}
+          onCreated={(creditNoteId) => {
+            setCreditNoteInvoice(null);
+            loadData();
+            // Ouvre directement l'avoir créé pour vérification / impression
+            setPreviewInvoiceId(creditNoteId);
+          }}
+        />
+      )}
+
       {sendingInvoice && (
         <SendInvoiceDialog
           invoice={sendingInvoice}
@@ -1373,7 +1600,11 @@ export default function FacturesPage() {
           onOpenChange={(open) => { if (!open) setTerminalInvoice(null); }}
           invoiceId={terminalInvoice.id}
           invoiceNumber={terminalInvoice.invoice_number}
-          totalTtc={terminalInvoice.total_ttc}
+          /* Montant annoncé au client = montant du PaymentIntent créé par
+             /api/stripe/terminal/create-payment-intent, donc net des avoirs
+             émis sur la facture. Afficher le brut ferait débiter la carte
+             d'un autre montant que celui annoncé. */
+          totalTtc={terminalAmountTtc(terminalInvoice)}
           onPaymentSuccess={() => {
             setTerminalInvoice(null);
             loadData();

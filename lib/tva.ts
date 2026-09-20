@@ -86,12 +86,19 @@ export function computeTvaBreakdown(lines: TvaLine[]): TvaTotals {
     };
   });
 
-  // Taux majoritaire : celui qui a la plus grosse base HT
+  // Taux majoritaire : celui qui porte la plus grosse base HT.
+  //
+  // On compare en VALEUR ABSOLUE : les lignes d'un avoir ont des bases
+  // négatives, et une comparaison signée partant de -1 n'aurait jamais été
+  // vraie — tout avoir serait retombé sur le repli à 20 %, y compris sur un
+  // chantier de rénovation à 10 % ou 5,5 %, faussant la TVA régularisée.
+  // Sur des bases positives, le résultat est strictement identique à avant.
   let primary_rate = 20;
   let maxBase = -1;
   for (const entry of tva_breakdown) {
-    if (entry.base_ht > maxBase) {
-      maxBase = entry.base_ht;
+    const weight = Math.abs(entry.base_ht);
+    if (weight > maxBase) {
+      maxBase = weight;
       primary_rate = entry.rate;
     }
   }

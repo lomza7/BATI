@@ -4,6 +4,13 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { apiError } from '@/lib/api-errors';
 import { consumeAi } from '@/lib/credits';
 import { callOpenAI, OpenAIError } from '@/lib/ai/openai';
+import {
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isIssuedCreditNote,
+  netDueTtc,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -103,19 +110,82 @@ export async function POST(request: Request) {
         }
       }
 
-      // Fetch related invoices
+      // Fetch related invoices.
+      //
+      // `invoice_type` est indispensable : un avoir remonte ici comme une
+      // ligne de `invoices` avec un montant negatif. Sans le type, le modele
+      // le lit comme une facture ordinaire et ecrit au client des phrases du
+      // genre « votre facture payee de -1200 € » — ou pire, lui reclame le
+      // montant d'un avoir qui est a son credit.
       const { data: invoices } = await sbAdmin
         .from('invoices')
-        .select('invoice_number, title, status, total_ttc, created_at')
+        .select('id, invoice_number, title, status, total_ttc, created_at, invoice_type, credited_invoice_id')
         .eq('client_id', client.id)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (invoices?.length) {
+        // Numeros des factures rectifiees : elles ne sont pas forcement dans
+        // les 5 dernieres lignes, on va chercher celles qui manquent.
+        const knownNumbers = new Map<string, string>();
+        for (const inv of invoices) {
+          if (inv.id && inv.invoice_number) knownNumbers.set(inv.id, inv.invoice_number);
+        }
+        const missingCreditedIds = invoices
+          .map((inv) => inv.credited_invoice_id as string | null)
+          .filter((id): id is string => !!id && !knownNumbers.has(id));
+
+        if (missingCreditedIds.length) {
+          const { data: credited } = await sbAdmin
+            .from('invoices')
+            .select('id, invoice_number')
+            .eq('user_id', user.id)
+            .in('id', Array.from(new Set(missingCreditedIds)));
+          for (const row of credited || []) {
+            if (row.id && row.invoice_number) knownNumbers.set(row.id, row.invoice_number);
+          }
+        }
+
+        // Avoirs emis sur les factures listees, pour annoncer un reste du
+        // juste plutot que le TTC brut d'une facture deja creditee.
+        const invoiceIds = invoices
+          .filter((inv) => !isCreditNote(inv))
+          .map((inv) => inv.id as string)
+          .filter(Boolean);
+        const creditNotesByInvoice = await fetchCreditNotesByInvoice(sbAdmin, invoiceIds);
+
         clientContext += `\n### Factures recentes :\n`;
         for (const inv of invoices) {
-          clientContext += `- ${inv.invoice_number} : ${inv.title} — ${inv.status} — ${inv.total_ttc}€ TTC (${new Date(inv.created_at).toLocaleDateString('fr-FR')})\n`;
+          const date = new Date(inv.created_at).toLocaleDateString('fr-FR');
+
+          if (isCreditNote(inv)) {
+            const creditedNumber = inv.credited_invoice_id
+              ? knownNumbers.get(inv.credited_invoice_id) || 'facture inconnue'
+              : 'facture inconnue';
+            // Un avoir en brouillon n'est pas emis : il ne deduit rien et le
+            // client n'en a jamais entendu parler. Ne jamais le citer comme un
+            // document existant.
+            if (!isIssuedCreditNote(inv)) {
+              clientContext += `- Avoir ${inv.invoice_number} rattache a la facture ${creditedNumber} : BROUILLON non emis — ne rien en dire au client, il ne deduit rien\n`;
+              continue;
+            }
+            clientContext += `- Avoir ${inv.invoice_number} rattache a la facture ${creditedNumber} : ${inv.title} — ${inv.status} — ${inv.total_ttc}€ TTC (${date}) — montant a DEDUIRE, jamais a reclamer au client\n`;
+            continue;
+          }
+
+          // Seuls les avoirs emis comptent, comme dans `sumCreditNotesTtc` et
+          // `netDueTtc` : sans ce filtre on annoncerait un avoir de 0 € ou le
+          // numero d'un document jamais envoye.
+          const notes = (creditNotesByInvoice.get(inv.id as string) || []).filter(isIssuedCreditNote);
+          clientContext += `- ${inv.invoice_number} : ${inv.title} — ${inv.status} — ${inv.total_ttc}€ TTC (${date})`;
+          if (notes.length) {
+            const credited = Math.abs(sumCreditNotesTtc(notes));
+            const numbers = notes.map((n) => n.invoice_number).filter(Boolean).join(', ');
+            const prefix = notes.length > 1 ? 'les avoirs' : 'l\'avoir';
+            clientContext += ` — ${credited}€ credites par ${prefix} ${numbers}, reste du ${netDueTtc(inv, notes)}€ TTC`;
+          }
+          clientContext += `\n`;
         }
       }
 
@@ -168,6 +238,10 @@ Regles :
 - ${toneInstructions}
 - Sois concis et direct
 - Si le contexte client est fourni, utilise-le pour personnaliser la reponse (reference aux devis, chantiers, etc.)
+- Les lignes commencant par "Avoir" (numeros AV-...) sont des AVOIRS : des factures rectificatives emises en faveur du client. Leur montant est negatif et vient EN DEDUCTION de la facture qu'elles rectifient.
+- Un avoir ne se reclame JAMAIS au client : ce n'est pas une somme due, c'est une somme a son credit. Ne parle jamais d'un avoir comme d'une facture impayee, d'une facture payee ou d'un montant a regler.
+- N'ecris jamais un montant negatif au client. Si tu dois citer un avoir, formule-le comme un montant deduit ou credite (exemple : "un avoir de 1 200 € a votre credit").
+- Quand une facture porte un "reste du", c'est ce montant-la qu'il faut annoncer au client, jamais le total TTC brut deja credite.
 - Ne mens pas et n'invente pas d'informations — si tu ne sais pas, dis-le poliment
 - Termine par une formule de politesse appropriee
 - Signe avec : ${userName}${companyName ? `\n${companyName}` : ''}

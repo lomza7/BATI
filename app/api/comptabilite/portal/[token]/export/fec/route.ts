@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateToken } from '@/lib/comptabilite/accountant-scope';
 import { buildFecFile, fecFileName } from '@/lib/comptabilite/fec-export';
+import {
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isIssuedCreditNote,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
 
   let invoiceQuery = supabaseAdmin
     .from('invoices')
-    .select('id, invoice_number, title, total_ht, total_ttc, tva_rate, tva_breakdown, paid_at, issued_at, created_at, client_id, invoice_type, quote_id, clients(name)')
+    .select('id, invoice_number, title, status, total_ht, total_ttc, tva_rate, tva_breakdown, paid_at, issued_at, created_at, client_id, invoice_type, credited_invoice_id, quote_id, clients(name)')
     .eq('user_id', access.user_id)
     .order('created_at', { ascending: true });
   if (scope.start) invoiceQuery = invoiceQuery.gte('created_at', scope.start);
@@ -57,15 +63,51 @@ export async function GET(_request: Request, { params }: { params: { token: stri
   if (soldeQuoteIds.length > 0) {
     const { data: linkedDeposits } = await supabaseAdmin
       .from('invoices')
-      .select('quote_id, total_ttc')
+      .select('id, quote_id, total_ttc')
       .eq('user_id', access.user_id)
       .eq('invoice_type', 'acompte')
       .neq('status', 'annulee')
       .in('quote_id', soldeQuoteIds);
-    for (const d of linkedDeposits || []) {
-      const qid = String((d as Record<string, unknown>).quote_id);
-      const amount = Number((d as Record<string, unknown>).total_ttc || 0);
-      depositsByQuote.set(qid, (depositsByQuote.get(qid) || 0) + amount);
+    const depositRows = (linkedDeposits || []) as Record<string, unknown>[];
+    // Un acompte crédité par un avoir est déjà sorti du CA par l'écriture
+    // inverse de l'avoir : le retrancher en BRUT du solde retirerait le même
+    // montant une seconde fois du journal des ventes. On ne déduit donc que le
+    // montant NET de chaque acompte (avoirs émis inclus, brouillons exclus).
+    const notesByDeposit = await fetchCreditNotesByInvoice(
+      supabaseAdmin,
+      depositRows.map((d) => String(d.id)),
+    );
+    for (const d of depositRows) {
+      const qid = String(d.quote_id);
+      const netTtc = Math.max(
+        0,
+        Number(d.total_ttc || 0) + sumCreditNotesTtc(notesByDeposit.get(String(d.id)) || []),
+      );
+      depositsByQuote.set(qid, (depositsByQuote.get(qid) || 0) + netTtc);
+    }
+  }
+
+  // Numéro de la facture rectifiée par chaque avoir. On le résout par une
+  // requête dédiée plutôt que par un embed PostgREST : la facture rectifiée
+  // peut très bien être hors de la période exportée (un avoir émis en N sur
+  // une facture de N-1 est le cas le plus courant).
+  const creditedInvoiceIds = Array.from(
+    new Set(
+      (invoices || [])
+        .map((inv: Record<string, unknown>) => inv.credited_invoice_id as string | null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const creditedNumberById = new Map<string, string>();
+  if (creditedInvoiceIds.length > 0) {
+    const { data: creditedInvoices } = await supabaseAdmin
+      .from('invoices')
+      .select('id, invoice_number')
+      .eq('user_id', access.user_id)
+      .in('id', creditedInvoiceIds);
+    for (const c of creditedInvoices || []) {
+      const row = c as Record<string, unknown>;
+      creditedNumberById.set(String(row.id), String(row.invoice_number || ''));
     }
   }
 
@@ -88,45 +130,59 @@ export async function GET(_request: Request, { params }: { params: { token: stri
         : ((e.expense_categories as Record<string, unknown>)?.slug as string | null) || null,
   }));
 
-  const invoiceRows = (invoices || []).map((inv: Record<string, unknown>) => {
-    const type = (inv.invoice_type as string | undefined) || 'standard';
-    const qid = inv.quote_id as string | null | undefined;
-    const rawHt = Number(inv.total_ht || 0);
-    const rawTtc = Number(inv.total_ttc || 0);
+  const invoiceRows = (invoices || [])
+    // Un avoir en brouillon n'est pas émis : il ne régularise rien et n'a donc
+    // rien à faire dans le FEC, qui ne contient que des écritures validées.
+    .filter((inv: Record<string, unknown>) => {
+      const type = (inv.invoice_type as string | null) || 'standard';
+      if (!isCreditNote({ invoice_type: type })) return true;
+      return isIssuedCreditNote({ status: inv.status as string | null });
+    })
+    .map((inv: Record<string, unknown>) => {
+      const type = (inv.invoice_type as string | undefined) || 'standard';
+      const qid = inv.quote_id as string | null | undefined;
+      const rawHt = Number(inv.total_ht || 0);
+      const rawTtc = Number(inv.total_ttc || 0);
 
-    // Pour les factures de solde, on déduit les acomptes pour éviter le
-    // double comptage du CA. Le ratio brut/net est appliqué au HT pour garder
-    // une ligne FEC cohérente (HT + TVA = TTC).
-    let effectiveHt = rawHt;
-    let effectiveTtc = rawTtc;
-    if (type === 'solde' && qid) {
-      const deducted = depositsByQuote.get(String(qid)) || 0;
-      effectiveTtc = Math.max(0, rawTtc - deducted);
-      // Si le brut n'est pas nul, on applique le même ratio au HT pour que
-      // (HT + TVA) reste égal au TTC effectif. Sinon on tombe à 0.
-      effectiveHt = rawTtc > 0 ? Math.round((effectiveTtc * rawHt / rawTtc) * 100) / 100 : 0;
-    }
+      // Pour les factures de solde, on déduit les acomptes pour éviter le
+      // double comptage du CA. Le ratio brut/net est appliqué au HT pour garder
+      // une ligne FEC cohérente (HT + TVA = TTC).
+      let effectiveHt = rawHt;
+      let effectiveTtc = rawTtc;
+      if (type === 'solde' && qid) {
+        const deducted = depositsByQuote.get(String(qid)) || 0;
+        effectiveTtc = Math.max(0, rawTtc - deducted);
+        // Si le brut n'est pas nul, on applique le même ratio au HT pour que
+        // (HT + TVA) reste égal au TTC effectif. Sinon on tombe à 0.
+        effectiveHt = rawTtc > 0 ? Math.round((effectiveTtc * rawHt / rawTtc) * 100) / 100 : 0;
+      }
 
-    return {
-      id: String(inv.id),
-      invoice_number: String(inv.invoice_number || ''),
-      title: String(inv.title || ''),
-      client_name:
-        Array.isArray(inv.clients)
-          ? ((inv.clients[0] as Record<string, unknown>)?.name as string | null) || ''
-          : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',
-      total_ht: effectiveHt,
-      tva_rate: inv.tva_rate as number | null,
-      // Pour un solde, on ne passe pas le breakdown stocké (qui correspond au
-      // brut) — le builder retombera sur le taux legacy pour générer une
-      // paire de lignes cohérente avec le HT effectif.
-      tva_breakdown: type === 'solde' ? null : inv.tva_breakdown,
-      total_ttc: effectiveTtc,
-      paid_at: inv.paid_at as string | null,
-      issued_at: inv.issued_at as string | null,
-      created_at: String(inv.created_at),
-    };
-  });
+      const creditedId = inv.credited_invoice_id as string | null | undefined;
+
+      return {
+        id: String(inv.id),
+        invoice_number: String(inv.invoice_number || ''),
+        title: String(inv.title || ''),
+        client_name:
+          Array.isArray(inv.clients)
+            ? ((inv.clients[0] as Record<string, unknown>)?.name as string | null) || ''
+            : ((inv.clients as Record<string, unknown>)?.name as string | null) || '',
+        // Montants d'un avoir laissés tels quels, donc négatifs : c'est
+        // buildFecFile qui les repasse en positif du bon côté de l'écriture.
+        total_ht: effectiveHt,
+        tva_rate: inv.tva_rate as number | null,
+        // Pour un solde, on ne passe pas le breakdown stocké (qui correspond au
+        // brut) — le builder retombera sur le taux legacy pour générer une
+        // paire de lignes cohérente avec le HT effectif.
+        tva_breakdown: type === 'solde' ? null : inv.tva_breakdown,
+        total_ttc: effectiveTtc,
+        paid_at: inv.paid_at as string | null,
+        issued_at: inv.issued_at as string | null,
+        created_at: String(inv.created_at),
+        invoice_type: type,
+        credited_invoice_number: creditedId ? creditedNumberById.get(String(creditedId)) || null : null,
+      };
+    });
 
   const fec = buildFecFile({
     artisanName,

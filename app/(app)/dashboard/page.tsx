@@ -9,6 +9,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ReferenceLine,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -31,6 +32,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import {
+  invoiceTypeLabel,
+  isCreditNote,
+  isFullyCredited,
+  netDueTtc,
+} from '@/lib/invoices/credit-notes';
 import { buildLeadSourceLabelMap, type LeadSource } from '@/lib/lead-sources';
 import { DEFAULT_LEAD_STAGES, type LeadStageConfig } from '@/lib/lead-pipeline';
 import {
@@ -137,6 +144,10 @@ interface InvoiceRow {
   updated_at: string;
   project_id: string | null;
   quote_id: string | null;
+  /** 'standard' | 'acompte' | 'solde' | 'avoir'. */
+  invoice_type: string;
+  /** Renseigné uniquement sur un avoir : la facture qu'il rectifie. */
+  credited_invoice_id: string | null;
   clients: { name: string } | null;
 }
 
@@ -610,18 +621,32 @@ function buildRevenuePoint(
   month: string,
   quotes: QuoteRow[],
   invoices: InvoiceRow[],
+  paidInvoiceIds: Set<string>,
   start: Date,
   end: Date
 ): RevenuePoint {
-  const paidInvs = invoices.filter((inv) => inv.status === 'payee' && isBetween(inv.paid_at, start, end));
+  const paidInvs = invoices.filter(
+    (inv) => !isCreditNote(inv) && inv.status === 'payee' && isBetween(inv.paid_at, start, end)
+  );
+  // Un avoir n'est jamais marqué « payé » : s'il rectifie une facture déjà
+  // encaissée, il vaut remboursement et se déduit de l'encaissé à sa date
+  // d'émission. Ses montants étant négatifs, la somme reste additive.
+  const refunds = invoices.filter(
+    (inv) =>
+      isCreditNote(inv) &&
+      inv.credited_invoice_id !== null &&
+      paidInvoiceIds.has(inv.credited_invoice_id) &&
+      isBetween(inv.created_at, start, end)
+  );
+  // Les avoirs figurent dans periodInvs : le CA facturé les déduit de lui-même.
   const periodInvs = invoices.filter((inv) => isBetween(inv.created_at, start, end));
   const periodQuotes = quotes.filter((q) => isBetween(q.created_at, start, end));
   return {
     month,
-    encaisse: paidInvs.reduce((s, inv) => s + inv.total_ttc, 0),
+    encaisse: paidInvs.reduce((s, inv) => s + inv.total_ttc, 0) + refunds.reduce((s, inv) => s + inv.total_ttc, 0),
     factures: periodInvs.reduce((s, inv) => s + inv.total_ttc, 0),
     devis: periodQuotes.reduce((s, q) => s + q.total_ttc, 0),
-    encaisse_ht: paidInvs.reduce((s, inv) => s + inv.total_ht, 0),
+    encaisse_ht: paidInvs.reduce((s, inv) => s + inv.total_ht, 0) + refunds.reduce((s, inv) => s + inv.total_ht, 0),
     factures_ht: periodInvs.reduce((s, inv) => s + inv.total_ht, 0),
     devis_ht: periodQuotes.reduce((s, q) => s + q.total_ht, 0),
   };
@@ -634,6 +659,9 @@ function buildRevenueSeries(
   range: { start: Date; end: Date }
 ) {
   const points: RevenuePoint[] = [];
+  const paidInvoiceIds = new Set(
+    invoices.filter((inv) => !isCreditNote(inv) && inv.status === 'payee').map((inv) => inv.id)
+  );
 
   if (preset === 'custom') {
     // Custom range → auto granularity based on duration
@@ -643,14 +671,14 @@ function buildRevenueSeries(
       for (let h = 8; h <= 20; h += 2) {
         const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
         const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
-        points.push(buildRevenuePoint(`${h}h`, quotes, invoices, start, end));
+        points.push(buildRevenuePoint(`${h}h`, quotes, invoices, paidInvoiceIds, start, end));
       }
     } else if (durationDays <= 31) {
       let cursor = new Date(range.start);
       while (cursor <= range.end) {
         const start = new Date(cursor);
         const end = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 23, 59, 59, 999);
-        points.push(buildRevenuePoint(`${cursor.getDate()}/${cursor.getMonth() + 1}`, quotes, invoices, start, end));
+        points.push(buildRevenuePoint(`${cursor.getDate()}/${cursor.getMonth() + 1}`, quotes, invoices, paidInvoiceIds, start, end));
         cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
       }
     } else if (durationDays <= 365) {
@@ -661,26 +689,26 @@ function buildRevenueSeries(
         const clampedStart = start < range.start ? range.start : start;
         const clampedEnd = end > range.end ? range.end : end;
         const label = cursor.toLocaleDateString('fr-FR', { month: 'short' });
-        points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, clampedStart, clampedEnd));
+        points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, paidInvoiceIds, clampedStart, clampedEnd));
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
       }
     } else {
       for (let y = range.start.getFullYear(); y <= range.end.getFullYear(); y++) {
-        points.push(buildRevenuePoint(String(y), quotes, invoices, new Date(y, 0, 1), new Date(y, 11, 31, 23, 59, 59, 999)));
+        points.push(buildRevenuePoint(String(y), quotes, invoices, paidInvoiceIds, new Date(y, 0, 1), new Date(y, 11, 31, 23, 59, 59, 999)));
       }
     }
   } else if (preset === 'jour') {
     for (let h = 8; h <= 20; h += 2) {
       const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h);
       const end = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), h + 2, 0, 0, -1);
-      points.push(buildRevenuePoint(`${h}h`, quotes, invoices, start, end));
+      points.push(buildRevenuePoint(`${h}h`, quotes, invoices, paidInvoiceIds, start, end));
     }
   } else if (preset === 'semaine') {
     const dayLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     for (let d = 0; d < 7; d++) {
       const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate() + d);
       const end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
-      points.push(buildRevenuePoint(dayLabels[d], quotes, invoices, start, end));
+      points.push(buildRevenuePoint(dayLabels[d], quotes, invoices, paidInvoiceIds, start, end));
     }
   } else if (preset === 'mois') {
     let weekNum = 1;
@@ -689,7 +717,7 @@ function buildRevenueSeries(
       const weekStart = new Date(cursor);
       const weekEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 6, 23, 59, 59, 999);
       const clampedEnd = weekEnd > range.end ? range.end : weekEnd;
-      points.push(buildRevenuePoint(`S${weekNum}`, quotes, invoices, weekStart, clampedEnd));
+      points.push(buildRevenuePoint(`S${weekNum}`, quotes, invoices, paidInvoiceIds, weekStart, clampedEnd));
       cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
       weekNum++;
     }
@@ -698,7 +726,7 @@ function buildRevenueSeries(
       const start = new Date(range.start.getFullYear(), m, 1);
       const end = new Date(range.start.getFullYear(), m + 1, 0, 23, 59, 59, 999);
       const label = start.toLocaleDateString('fr-FR', { month: 'short' });
-      points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, start, end));
+      points.push(buildRevenuePoint(label.charAt(0).toUpperCase() + label.slice(1), quotes, invoices, paidInvoiceIds, start, end));
     }
   }
 
@@ -743,7 +771,7 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, invoice_type, created_at, updated_at, clients(name, deleted_at)')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, project_id, quote_id, invoice_type, credited_invoice_id, created_at, updated_at, clients(name, deleted_at)')
         .neq('status', 'brouillon')
         .order('created_at', { ascending: false }),
       supabase
@@ -819,6 +847,8 @@ export default function DashboardPage() {
     // chaque chantier deux fois (acomptes + facture de solde au total brut).
     // Voir lib/invoices/deposits.ts pour le helper metier équivalent.
     const rawInvoices = ((invoicesRes.data as unknown as Array<Record<string, unknown>>) || []);
+    const rawInvoicesById = new Map<string, Record<string, unknown>>();
+    for (const inv of rawInvoices) rawInvoicesById.set(String(inv.id), inv);
     const depositsByQuote = new Map<string, number>();
     for (const inv of rawInvoices) {
       const type = inv.invoice_type as string | undefined;
@@ -832,12 +862,31 @@ export default function DashboardPage() {
         );
       }
     }
+    // Un avoir émis sur un acompte réduit d'autant le montant déjà versé.
+    // Sans ce second passage, la facture de solde déduirait un acompte que
+    // l'avoir a déjà annulé : le chantier serait amputé deux fois.
+    for (const inv of rawInvoices) {
+      if ((inv.invoice_type as string | undefined) !== 'avoir') continue;
+      const creditedId = inv.credited_invoice_id as string | null | undefined;
+      if (!creditedId) continue;
+      const credited = rawInvoicesById.get(creditedId);
+      if (!credited || (credited.invoice_type as string | undefined) !== 'acompte') continue;
+      const quoteId = credited.quote_id as string | null | undefined;
+      if (!quoteId) continue;
+      const prev = depositsByQuote.get(quoteId) || 0;
+      depositsByQuote.set(
+        quoteId,
+        prev + toNumber(inv.total_ttc as string | number | null | undefined),
+      );
+    }
     setInvoices(rawInvoices.map((invoice) => {
       const clientValue = Array.isArray(invoice.clients) ? invoice.clients[0] : invoice.clients;
       const rawTotalTtc = toNumber(invoice.total_ttc as string | number | null | undefined);
       const invoiceType = (invoice.invoice_type as string | undefined) || 'standard';
       const quoteId = (invoice.quote_id as string | null) || null;
-      // Pour un solde : total effectif = brut - somme des acomptes (non annulés)
+      // Pour un solde : total effectif = brut - somme des acomptes (non annulés).
+      // Un avoir garde son montant brut, négatif : c'est lui qui porte la
+      // déduction dans tous les agrégats additifs.
       const effectiveTotalTtc =
         invoiceType === 'solde' && quoteId
           ? Math.max(0, rawTotalTtc - (depositsByQuote.get(quoteId) || 0))
@@ -851,6 +900,8 @@ export default function DashboardPage() {
         total_ttc: effectiveTotalTtc,
         project_id: (invoice.project_id as string | null) || null,
         quote_id: quoteId,
+        invoice_type: invoiceType,
+        credited_invoice_id: (invoice.credited_invoice_id as string | null) || null,
       } as InvoiceRow;
     }));
     const loadedProjects = (((projectsRes.data as unknown as Array<Record<string, unknown>>) || [])).map((project) => {
@@ -964,21 +1015,59 @@ export default function DashboardPage() {
       end: new Date(filterRange.start.getTime() - 1),
     };
 
+    // ── Avoirs ──
+    // Les avoirs sont chargés comme les autres factures, montants négatifs :
+    // les agrégats de CA (facturé, encaissé, marge) les gardent, la somme
+    // additive porte la déduction. En revanche les compteurs de pièces et les
+    // files d'action (échéances, relances, à encaisser) doivent les écarter,
+    // ainsi que les factures intégralement créditées : on ne relance pas un
+    // client pour un montant qu'on lui a déjà crédité.
+    const creditNotesByInvoice = new Map<string, InvoiceRow[]>();
+    invoices.forEach((inv) => {
+      if (!isCreditNote(inv) || !inv.credited_invoice_id) return;
+      const list = creditNotesByInvoice.get(inv.credited_invoice_id) || [];
+      list.push(inv);
+      creditNotesByInvoice.set(inv.credited_invoice_id, list);
+    });
+    const notesFor = (invoiceId: string): InvoiceRow[] => creditNotesByInvoice.get(invoiceId) || [];
+    const isOpenInvoice = (inv: InvoiceRow) => !isCreditNote(inv) && !isFullyCredited(inv, notesFor(inv.id));
+
     // ── Filter all raw data by the selected period ──
     const fQuotes = quotes.filter((q) => isBetween(q.created_at, filterRange.start, filterRange.end));
     const fInvoices = invoices.filter((inv) => isBetween(inv.created_at, filterRange.start, filterRange.end));
+    // Base des files d'action : ni avoir, ni facture soldée par un avoir.
+    const fOpenInvoices = fInvoices.filter(isOpenInvoice);
     const fProjects = projects.filter((p) => isBetween(p.created_at, filterRange.start, filterRange.end));
     const fEvents = planningEvents.filter((e) => isBetween(e.start_date, filterRange.start, filterRange.end));
 
     // Revenue: paid invoices in period (any invoice paid in range, not just created in range)
     const paidThisPeriod = invoices.filter(
-      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, filterRange.start, filterRange.end)
+      (invoice) => !isCreditNote(invoice) && invoice.status === 'payee' && isBetween(invoice.paid_at, filterRange.start, filterRange.end)
     );
     const paidPreviousPeriod = invoices.filter(
-      (invoice) => invoice.status === 'payee' && isBetween(invoice.paid_at, previousRange.start, previousRange.end)
+      (invoice) => !isCreditNote(invoice) && invoice.status === 'payee' && isBetween(invoice.paid_at, previousRange.start, previousRange.end)
     );
-    const revenueThisMonth = paidThisPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
-    const revenuePreviousMonth = paidPreviousPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0);
+    // Un avoir ne peut pas passer « payée » : s'il rectifie une facture déjà
+    // encaissée, il vaut remboursement et s'impute à sa date d'émission.
+    const paidInvoiceIds = new Set(
+      invoices.filter((inv) => !isCreditNote(inv) && inv.status === 'payee').map((inv) => inv.id)
+    );
+    const refundsBetween = (start: Date, end: Date) =>
+      invoices
+        .filter(
+          (inv) =>
+            isCreditNote(inv) &&
+            inv.credited_invoice_id !== null &&
+            paidInvoiceIds.has(inv.credited_invoice_id) &&
+            isBetween(inv.created_at, start, end)
+        )
+        .reduce((sum, inv) => sum + inv.total_ttc, 0);
+    const revenueThisMonth =
+      paidThisPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0)
+      + refundsBetween(filterRange.start, filterRange.end);
+    const revenuePreviousMonth =
+      paidPreviousPeriod.reduce((sum, invoice) => sum + invoice.total_ttc, 0)
+      + refundsBetween(previousRange.start, previousRange.end);
     const revenueDelta = revenuePreviousMonth > 0
       ? Math.round(((revenueThisMonth - revenuePreviousMonth) / revenuePreviousMonth) * 100)
       : revenueThisMonth > 0
@@ -1017,15 +1106,19 @@ export default function DashboardPage() {
             : 'bg-blue-500',
         href: '/devis',
       })),
+      // Un avoir reste une activité à afficher : on le signale par son libellé
+      // de type et une pastille neutre, puisqu'il n'attend aucun paiement.
       ...fInvoices.slice(0, 4).map((invoice) => ({
         id: `invoice-${invoice.id}`,
-        label: `${invoice.invoice_number} • ${INVOICE_STATUSES[invoice.status]?.label || 'Facture'}${invoice.clients?.name ? ` • ${invoice.clients.name}` : ''}`,
+        label: `${invoice.invoice_number} • ${isCreditNote(invoice) ? `${invoiceTypeLabel(invoice.invoice_type)} — ` : ''}${INVOICE_STATUSES[invoice.status]?.label || 'Facture'}${invoice.clients?.name ? ` • ${invoice.clients.name}` : ''}`,
         time: getRelativeTimeLabel(invoice.updated_at || invoice.created_at),
-        color: invoice.status === 'payee'
-          ? 'bg-emerald-500'
-          : invoice.status === 'en_retard'
-            ? 'bg-red-500'
-            : 'bg-amber-500',
+        color: isCreditNote(invoice)
+          ? 'bg-violet-500'
+          : invoice.status === 'payee'
+            ? 'bg-emerald-500'
+            : invoice.status === 'en_retard'
+              ? 'bg-red-500'
+              : 'bg-amber-500',
         href: '/factures',
       })),
       ...fProjects.slice(0, 4).map((project) => ({
@@ -1043,7 +1136,7 @@ export default function DashboardPage() {
 
     // Deadlines scoped to period
     const deadlineItems: DeadlineItem[] = [
-      ...fInvoices
+      ...fOpenInvoices
         .filter((invoice) => invoice.due_date && invoice.status !== 'payee')
         .map((invoice) => ({
           id: `invoice-${invoice.id}`,
@@ -1079,7 +1172,7 @@ export default function DashboardPage() {
 
     // Reminders scoped to period
     const reminderItems: ReminderItem[] = [
-      ...fInvoices
+      ...fOpenInvoices
         .filter((invoice) => invoice.status === 'en_retard' && invoice.due_date)
         .map((invoice) => {
           const daysLate = Math.max(1, Math.abs(differenceInDays(invoice.due_date as string, now)));
@@ -1095,7 +1188,7 @@ export default function DashboardPage() {
             kind: 'facturation' as const,
           };
         }),
-      ...fInvoices
+      ...fOpenInvoices
         .filter((invoice) => (invoice.status === 'envoyee' || invoice.status === 'brouillon') && invoice.due_date)
         .map((invoice) => {
           const days = differenceInDays(invoice.due_date as string, now);
@@ -1230,7 +1323,7 @@ export default function DashboardPage() {
       },
       {
         label: 'Factures à encaisser',
-        value: fInvoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length,
+        value: fOpenInvoices.filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard').length,
         fill: 'hsl(var(--chart-1))',
       },
       {
@@ -1308,6 +1401,8 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total || a.slug.localeCompare(b.slug));
 
     const totalQuotesPeriod = fQuotes.reduce((sum, q) => sum + q.total_ttc, 0);
+    // CA facturé : les avoirs restent dans la somme, leur montant négatif
+    // fait la déduction. Les en exclure gonflerait le CA de la période.
     const totalInvoicesPeriod = fInvoices.reduce((sum, inv) => sum + inv.total_ttc, 0);
 
     // MRR from active contracts
@@ -1357,11 +1452,21 @@ export default function DashboardPage() {
     // Helper: resolve a project_id from an invoice (direct link, then fallback via quote_id)
     const quotesById = new Map<string, QuoteRow>();
     quotes.forEach((q) => quotesById.set(q.id, q));
-    function invoiceProjectId(inv: InvoiceRow): string | null {
+    const invoicesById = new Map<string, InvoiceRow>();
+    invoices.forEach((inv) => invoicesById.set(inv.id, inv));
+    function invoiceProjectId(inv: InvoiceRow, followCredited = true): string | null {
       if (inv.project_id) return inv.project_id;
       if (inv.quote_id) {
         const q = quotesById.get(inv.quote_id);
         if (q?.project_id) return q.project_id;
+      }
+      // Un avoir hérite du chantier de la facture qu'il rectifie : sans ce
+      // rattrapage, sa déduction manquerait à la marge du chantier alors que
+      // le CA brut, lui, y figure. Un avoir ne pouvant pas créditer un avoir,
+      // la remontée se fait sur un seul niveau.
+      if (followCredited && isCreditNote(inv) && inv.credited_invoice_id) {
+        const credited = invoicesById.get(inv.credited_invoice_id);
+        if (credited) return invoiceProjectId(credited, false);
       }
       return null;
     }
@@ -1391,7 +1496,9 @@ export default function DashboardPage() {
       });
     });
 
-    // CA HT: invoices émises (any status) dans la période, rattachées à un chantier
+    // CA HT: invoices émises (any status) dans la période, rattachées à un
+    // chantier. Les avoirs sont dans le lot avec un HT négatif : ils s'y
+    // déduisent d'eux-mêmes, aucun filtre de type à poser ici.
     invoices.forEach((inv) => {
       const projectId = invoiceProjectId(inv);
       if (!projectId) return;
@@ -1429,8 +1536,10 @@ export default function DashboardPage() {
       p.margePct = p.caHT > 0 && p.coutTotal > 0 ? (p.margeBrute / p.caHT) * 100 : null;
     });
 
+    // Un chantier sur-crédité peut afficher un CA négatif : il doit rester
+    // dans la liste, sinon sa régularisation disparaît des totaux.
     const projectMargins = Array.from(projectFinanceMap.values())
-      .filter((p) => p.caHT > 0 || p.coutTotal > 0);
+      .filter((p) => p.caHT !== 0 || p.coutTotal > 0);
 
     // Aggregated metrics on the period (weighted average across all chantiers actifs)
     const totalCA = projectMargins.reduce((s, p) => s + p.caHT, 0);
@@ -1532,9 +1641,11 @@ export default function DashboardPage() {
       upcomingBillingsCount: upcomingBillings.length,
       hasAnyData: quotes.length > 0 || invoices.length > 0 || projects.length > 0 || leads.length > 0 || contracts.length > 0,
       activeProjects: fProjects.filter((project) => project.status === 'en_cours').length,
-      unpaidInvoicesTotal: fInvoices
+      // Reste à encaisser : montant net des avoirs, jamais le brut — on ne
+      // réclame pas au client ce qu'on lui a déjà crédité.
+      unpaidInvoicesTotal: fOpenInvoices
         .filter((invoice) => invoice.status === 'envoyee' || invoice.status === 'en_retard')
-        .reduce((sum, invoice) => sum + invoice.total_ttc, 0),
+        .reduce((sum, invoice) => sum + netDueTtc(invoice, notesFor(invoice.id)), 0),
       openProjectsBudget: fProjects
         .filter((project) => project.status !== 'termine')
         .reduce((sum, project) => sum + project.budget, 0),
@@ -1793,6 +1904,9 @@ export default function DashboardPage() {
                       </div>
                     )} />} />
                     <ChartLegend content={<ChartLegendContent />} />
+                    {/* Ligne de zéro : un mois où les avoirs dépassent les factures
+                        descend sous l'axe, il faut pouvoir lire la bascule. */}
+                    <ReferenceLine y={0} stroke="hsl(var(--border))" />
                     {revenueSeries.has('devis') && <Bar dataKey="devis" fill="var(--color-devis)" radius={[4, 4, 0, 0]} />}
                     {revenueSeries.has('factures') && <Bar dataKey="factures" fill="var(--color-factures)" radius={[4, 4, 0, 0]} />}
                     {revenueSeries.has('encaisse') && <Bar dataKey="encaisse" fill="var(--color-encaisse)" radius={[4, 4, 0, 0]} />}
@@ -1819,9 +1933,11 @@ export default function DashboardPage() {
                       {dashboardData.revenueChartData.map((row, idx) => (
                         <tr key={idx} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
                           <td className="py-2.5 pr-4 pl-4 sm:pl-0 font-medium text-foreground">{row.month}</td>
-                          {revenueSeries.has('devis') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'devis') > 0 ? formatCurrency(rv(row, 'devis')) : <span className="text-muted-foreground">—</span>}</td>}
-                          {revenueSeries.has('factures') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'factures') > 0 ? formatCurrency(rv(row, 'factures')) : <span className="text-muted-foreground">—</span>}</td>}
-                          {revenueSeries.has('encaisse') && <td className="py-2.5 pl-3 pr-4 sm:pr-0 text-right tabular-nums font-medium">{rv(row, 'encaisse') > 0 ? formatCurrency(rv(row, 'encaisse')) : <span className="text-muted-foreground">—</span>}</td>}
+                          {/* Comparaison à 0 et non « > 0 » : un mois net d'avoirs
+                              peut être négatif, il ne doit pas s'afficher « — ». */}
+                          {revenueSeries.has('devis') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'devis') !== 0 ? formatCurrency(rv(row, 'devis')) : <span className="text-muted-foreground">—</span>}</td>}
+                          {revenueSeries.has('factures') && <td className="py-2.5 px-3 text-right tabular-nums">{rv(row, 'factures') !== 0 ? formatCurrency(rv(row, 'factures')) : <span className="text-muted-foreground">—</span>}</td>}
+                          {revenueSeries.has('encaisse') && <td className="py-2.5 pl-3 pr-4 sm:pr-0 text-right tabular-nums font-medium">{rv(row, 'encaisse') !== 0 ? formatCurrency(rv(row, 'encaisse')) : <span className="text-muted-foreground">—</span>}</td>}
                         </tr>
                       ))}
                     </tbody>

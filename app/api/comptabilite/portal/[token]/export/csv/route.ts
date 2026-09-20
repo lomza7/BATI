@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateToken } from '@/lib/comptabilite/accountant-scope';
 import { parseTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import { creditReasonLabel, invoiceTypeLabel, isCreditNote } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -90,7 +91,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
       .from('invoices')
       .select(
         `invoice_number, title, status, issued_at, due_date, paid_at, total_ht, tva_rate, total_tva, tva_breakdown, total_ttc,
-         invoice_type, deposit_percentage,
+         invoice_type, deposit_percentage, credited_invoice_id, credit_reason,
          clients(name)`,
       )
       .eq('user_id', access.user_id)
@@ -98,6 +99,29 @@ export async function GET(request: Request, { params }: { params: { token: strin
     if (scope.start) q = q.gte('created_at', scope.start);
     if (scope.end) q = q.lte('created_at', scope.end + 'T23:59:59');
     const { data } = await q;
+
+    // Numéro de la facture rectifiée par chaque avoir. Requête à part : la
+    // facture rectifiée est souvent hors de la période exportée (avoir émis
+    // en N sur une facture de N-1).
+    const creditedInvoiceIds = Array.from(
+      new Set(
+        (data || [])
+          .map((inv: Record<string, unknown>) => inv.credited_invoice_id as string | null)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const creditedNumberById = new Map<string, string>();
+    if (creditedInvoiceIds.length > 0) {
+      const { data: creditedInvoices } = await supabaseAdmin
+        .from('invoices')
+        .select('id, invoice_number')
+        .eq('user_id', access.user_id)
+        .in('id', creditedInvoiceIds);
+      for (const c of creditedInvoices || []) {
+        const row = c as Record<string, unknown>;
+        creditedNumberById.set(String(row.id), String(row.invoice_number || ''));
+      }
+    }
 
     const headers = [
       'Numéro',
@@ -113,13 +137,21 @@ export async function GET(request: Request, { params }: { params: { token: strin
       'Montant TVA',
       'Montant TTC',
       'Détail TVA multi-taux',
+      'Facture rectifiée',
+      'Motif de l\'avoir',
     ];
     const rows = (data || []).map((inv: Record<string, unknown>) => {
+      const invoiceType = (inv.invoice_type as string | null) || 'standard';
+      const isAvoir = isCreditNote({ invoice_type: invoiceType });
       const breakdown = parseTvaBreakdown(inv.tva_breakdown);
       const totalHt = Number(inv.total_ht || 0);
       const totalTtc = Number(inv.total_ttc || 0);
-      const totalTva =
-        inv.total_tva != null ? Number(inv.total_tva) : Math.max(0, totalTtc - totalHt);
+      // Les montants d'un avoir sont négatifs : borner à 0 la TVA reconstruite
+      // ferait disparaître la TVA régularisée de l'export du comptable.
+      const fallbackTva = isAvoir
+        ? Math.min(0, totalTtc - totalHt)
+        : Math.max(0, totalTtc - totalHt);
+      const totalTva = inv.total_tva != null ? Number(inv.total_tva) : fallbackTva;
       const detailTva =
         breakdown.length > 1
           ? breakdown
@@ -129,16 +161,15 @@ export async function GET(request: Request, { params }: { params: { token: strin
               )
               .join(' + ')
           : '';
-      const invoiceType = (inv.invoice_type as string | null) || 'standard';
+      // Facture / Acompte / Solde / Avoir — le comptable doit pouvoir trier
+      // l'export sur cette colonne sans relire les montants.
       const pct = inv.deposit_percentage as number | null;
       const typeLabel =
-        invoiceType === 'acompte'
-          ? pct
-            ? `Acompte ${pct}%`
-            : 'Acompte'
-          : invoiceType === 'solde'
-            ? 'Solde'
-            : 'Standard';
+        invoiceType === 'acompte' && pct
+          ? `Acompte ${pct}%`
+          : invoiceTypeLabel(invoiceType);
+      const creditedId = inv.credited_invoice_id as string | null | undefined;
+      const creditedNumber = creditedId ? creditedNumberById.get(String(creditedId)) || '' : '';
       return [
         inv.invoice_number,
         inv.title,
@@ -155,6 +186,8 @@ export async function GET(request: Request, { params }: { params: { token: strin
         totalTva.toFixed(2),
         inv.total_ttc,
         detailTva,
+        creditedNumber,
+        isAvoir ? creditReasonLabel(inv.credit_reason as string | null) : '',
       ];
     });
 

@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import type { InvoiceImportItem } from '@/lib/ai/invoice-import-schema';
+import { isCreditNoteImportItem, type InvoiceImportItem } from '@/lib/ai/invoice-import-schema';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -74,6 +74,10 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
   const [createInvoices, setCreateInvoices] = useState(true);
   const [creating, setCreating] = useState(false);
   const [result, setResult] = useState<{ clients: number; projects: number; invoices: number } | null>(null);
+  // Lignes refusées par le serveur (avoir sans facture rectifiée, doublon…) :
+  // sans cet affichage, l'artisan voit « Import terminé ! » alors que rien
+  // n'a été créé.
+  const [commitErrors, setCommitErrors] = useState<{ label: string; reason: string }[]>([]);
 
   function handleClose() {
     if (step === 'scanning' || creating) return;
@@ -81,6 +85,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
     setFiles([]);
     setRows([]);
     setResult(null);
+    setCommitErrors([]);
     setScanProgress(0);
     onOpenChange(false);
   }
@@ -144,6 +149,8 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
             description: '',
             amount_ht: 0,
             amount_ttc: 0,
+            document_type: 'facture',
+            credited_invoice_number: '',
             tva_rate: 20,
             confidence: 0,
             checked: false,
@@ -174,6 +181,8 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
           description: '',
           amount_ht: 0,
           amount_ttc: 0,
+          document_type: 'facture',
+          credited_invoice_number: '',
           tva_rate: 20,
           confidence: 0,
           checked: false,
@@ -235,7 +244,12 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
                 client_address: x.r.client_address,
                 invoice_date: x.r.invoice_date,
                 invoice_number: x.r.invoice_number,
+                amount_ht: x.r.amount_ht,
                 amount_ttc: x.r.amount_ttc,
+                // Un avoir se dédoublonne sur la facture rectifiée, pas sur
+                // une empreinte de chantier : le serveur a besoin du type.
+                document_type: x.r.document_type,
+                credited_invoice_number: x.r.credited_invoice_number,
               };
             }),
           }),
@@ -301,6 +315,12 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
               amount_ht: r.amount_ht,
               amount_ttc: r.amount_ttc,
               tva_rate: r.tva_rate,
+              // Sans ces deux champs, un avoir scanné arrive au serveur sans
+              // sa facture rectifiée : la base refuse l'insertion et l'avoir
+              // est perdu (art. 242 nonies A ann. II CGI — la référence à la
+              // facture initiale est obligatoire).
+              document_type: r.document_type,
+              credited_invoice_number: r.credited_invoice_number,
               create_invoice: createInvoices,
             };
           }),
@@ -317,7 +337,25 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
 
       const data = await res.json();
       setResult(data.created);
-      toast.success(data.created.projects + ' chantier' + (data.created.projects > 1 ? 's' : '') + ' créé' + (data.created.projects > 1 ? 's' : ''));
+      // Le serveur renvoie l'index dans le tableau envoyé : on le retraduit en
+      // repère lisible (fichier scanné / client) pour l'artisan.
+      const rejected: { index: number; reason: string }[] = data.errors || [];
+      setCommitErrors(rejected.map(function (err) {
+        const source = selected[err.index];
+        const label = source
+          ? (source.sourceFile || source.client_name || 'Ligne ' + (err.index + 1))
+          : 'Ligne ' + (err.index + 1);
+        return { label, reason: err.reason };
+      }));
+
+      const createdCount = (data.created?.projects || 0) + (data.created?.invoices || 0);
+      if (createdCount === 0) {
+        toast.error('Aucun document n\'a pu être importé.');
+      } else if (rejected.length > 0) {
+        toast.warning(rejected.length + ' ligne' + (rejected.length > 1 ? 's' : '') + ' non importée' + (rejected.length > 1 ? 's' : ''));
+      } else {
+        toast.success('Import terminé');
+      }
       onComplete();
     } catch {
       toast.error('Erreur réseau');
@@ -327,7 +365,10 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
     }
   }
 
-  const checkedCount = rows.filter(function (r) { return r.checked && !r.error && !r.duplicate; }).length;
+  const selectedRows = rows.filter(function (r) { return r.checked && !r.error && !r.duplicate; });
+  const checkedCount = selectedRows.length;
+  const selectedCreditNotes = selectedRows.filter(isCreditNoteImportItem).length;
+  const selectedProjects = checkedCount - selectedCreditNotes;
   const errorRows = rows.filter(function (r) { return !!r.error; });
   const duplicateRows = rows.filter(function (r) { return !!r.duplicate && !r.error; });
   const validRows = rows.filter(function (r) { return !r.error && !r.duplicate; });
@@ -464,6 +505,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
                   {allReviewable.map(function (row, idx) {
                     const rowIndex = rows.indexOf(row);
                     const isDuplicate = !!row.duplicate;
+                    const isAvoir = isCreditNoteImportItem(row);
                     return (
                       <div
                         key={idx}
@@ -498,12 +540,32 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
                                 placeholder="Client"
                                 disabled={isDuplicate && !row.checked}
                               />
+                              {isAvoir && (
+                                <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-50 text-[10px]">Avoir</Badge>
+                              )}
                               {isDuplicate ? (
                                 <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50 text-[10px]">Doublon</Badge>
                               ) : (
                                 confidenceBadge(row.confidence)
                               )}
                             </div>
+                            {isAvoir && (
+                              <div className="space-y-1">
+                                <Input
+                                  value={row.credited_invoice_number || ''}
+                                  onChange={function (e) { updateRow(rowIndex, 'credited_invoice_number', e.target.value); }}
+                                  className="h-7 text-xs"
+                                  placeholder="N° de la facture rectifiée (ex. F-2025-042)"
+                                  disabled={isDuplicate && !row.checked}
+                                />
+                                {!(row.credited_invoice_number || '').trim() && (
+                                  <p className="text-[11px] text-amber-700">
+                                    Indiquez la facture que cet avoir rectifie : la référence est
+                                    obligatoire et l&apos;avoir ne peut pas être importé sans elle.
+                                  </p>
+                                )}
+                              </div>
+                            )}
                             <Input
                               value={row.client_address + (row.client_city ? ', ' + row.client_city : '') + (row.client_postal_code ? ' ' + row.client_postal_code : '')}
                               onChange={function (e) {
@@ -545,13 +607,23 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
                   </label>
                 </div>
 
+                {selectedCreditNotes > 0 && !createInvoices && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                    Un avoir est une facture rectificative : il ne crée ni client ni chantier.
+                    Cochez « Créer aussi les factures dans Hellobat » pour l&apos;importer.
+                  </div>
+                )}
+
                 <Button
                   onClick={handleCommit}
                   disabled={checkedCount === 0}
                   className="w-full gap-2"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  Créer {checkedCount} chantier{checkedCount > 1 ? 's' : ''}
+                  {selectedCreditNotes > 0
+                    ? 'Importer ' + checkedCount + ' document' + (checkedCount > 1 ? 's' : '')
+                      + ' (' + selectedCreditNotes + ' avoir' + (selectedCreditNotes > 1 ? 's' : '') + ')'
+                    : 'Créer ' + selectedProjects + ' chantier' + (selectedProjects > 1 ? 's' : '')}
                 </Button>
               </>
             )}
@@ -569,18 +641,48 @@ export function InvoiceImportDialog({ open, onOpenChange, onComplete }: InvoiceI
             ) : (
               <>
                 <div className="flex justify-center">
-                  <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                  <div className={
+                    'h-12 w-12 rounded-full flex items-center justify-center '
+                    + (commitErrors.length > 0 ? 'bg-amber-100' : 'bg-emerald-100')
+                  }>
+                    {commitErrors.length > 0 ? (
+                      <AlertTriangle className="h-6 w-6 text-amber-600" />
+                    ) : (
+                      <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                    )}
                   </div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold">Import terminé !</div>
+                  <div className="text-lg font-semibold">
+                    {commitErrors.length > 0 ? 'Import terminé, avec des lignes refusées' : 'Import terminé !'}
+                  </div>
                   <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                    <div>{result.projects} chantier{result.projects > 1 ? 's' : ''} créé{result.projects > 1 ? 's' : ''}</div>
+                    {(result.projects > 0 || result.invoices === 0) && (
+                      <div>{result.projects} chantier{result.projects > 1 ? 's' : ''} créé{result.projects > 1 ? 's' : ''}</div>
+                    )}
                     {result.clients > 0 && <div>{result.clients} nouveau{result.clients > 1 ? 'x' : ''} client{result.clients > 1 ? 's' : ''}</div>}
-                    {result.invoices > 0 && <div>{result.invoices} facture{result.invoices > 1 ? 's' : ''} créée{result.invoices > 1 ? 's' : ''}</div>}
+                    {result.invoices > 0 && <div>{result.invoices} document{result.invoices > 1 ? 's' : ''} de facturation créé{result.invoices > 1 ? 's' : ''}</div>}
                   </div>
                 </div>
+
+                {commitErrors.length > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-left">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-1">
+                      <AlertCircle className="h-4 w-4" />
+                      {commitErrors.length} ligne{commitErrors.length > 1 ? 's' : ''} non importée{commitErrors.length > 1 ? 's' : ''}
+                    </div>
+                    <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                      {commitErrors.map(function (err, i) {
+                        return (
+                          <div key={i} className="text-xs text-amber-700">
+                            {err.label} : {err.reason}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <Button variant="outline" onClick={handleClose}>
                   Fermer
                 </Button>

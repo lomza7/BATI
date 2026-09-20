@@ -12,8 +12,18 @@
  * - Anything that can't be parsed becomes a row in `errors`, never a thrown
  *   exception — the user must always be able to see the preview, even if half
  *   the file is malformed.
+ * - Une ligne d'avoir (facture rectificative) est reconnue comme telle et
+ *   mappée vers `invoice_type = 'avoir'` avec des montants négatifs. Elle
+ *   n'est plus aplatie en facture annulée, ce qui détruisait l'information de
+ *   crédit. Voir la section « Avoirs » en bas de fichier.
  */
 
+import {
+  CREDIT_NOTE_PREFIX,
+  CREDIT_REASONS,
+  isCreditNote,
+  type InvoiceType,
+} from '@/lib/invoices/credit-notes';
 import type { ParsedCSV } from './csv-parser';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -59,16 +69,48 @@ export interface MappedQuote {
 
 export interface MappedInvoice {
   externalId: string;
+  /** Ligne du CSV (en-tête = 1), pour pointer l'artisan au bon endroit. */
+  line: number;
   source_number: string;
   source_quote_number: string; // empty if none
   client_name: string;
   title: string;
   status: InvoiceStatus;
+  /**
+   * `'avoir'` pour une facture rectificative, `'standard'` sinon. Les autres
+   * types (`acompte`, `solde`) ne sont pas détectables de façon fiable dans un
+   * export concurrent : ils exigeraient un devis rattaché, que l'import n'a
+   * pas toujours.
+   */
+  invoice_type: InvoiceType;
+  /**
+   * Avoirs uniquement : numéro, dans le fichier source, de la facture
+   * rectifiée. Vide si le CSV ne le porte pas. C'est à la route d'import de le
+   * résoudre en `credited_invoice_id` — la base refuse un avoir sans facture
+   * rectifiée valide (cf. `validate_credit_note`). Toujours vide quand
+   * `invoice_type !== 'avoir'`.
+   */
+  credited_source_number: string;
+  /** Avoirs uniquement : motif, normalisé sur `CREDIT_REASONS` quand possible. */
+  credit_reason: string | null;
+  /**
+   * `false` quand la ligne ne doit PAS donner lieu à la création d'un chantier
+   * — cas des avoirs, dont le montant négatif fabriquerait un chantier à
+   * budget négatif. Les routes d'import doivent tester ce drapeau avant
+   * d'insérer dans `projects`.
+   */
+  creates_project: boolean;
+  /** Négatif pour un avoir. */
   total_ht: number;
+  /** Négatif pour un avoir. */
+  total_tva: number;
   tva_rate: number;
+  /** Négatif pour un avoir. */
   total_ttc: number;
   issued_at: string | null;
+  /** Toujours `null` sur un avoir : il n'est pas encaissable, donc sans échéance. */
   due_date: string | null;
+  /** Toujours `null` sur un avoir. */
   paid_at: string | null;
 }
 
@@ -82,9 +124,21 @@ export interface MappedService {
   tva_rate: number;
 }
 
+/**
+ * Avertissement non bloquant du rapport d'import : la ligne a bien été
+ * importée, mais dégradée. À afficher à l'artisan en français, à côté des
+ * erreurs, pour qu'il sache ce qu'il doit corriger dans son fichier.
+ */
+export interface ImportWarning {
+  line: number;
+  reason: string;
+  hint?: string;
+}
+
 export interface ImportSummary<T> {
   rows: T[];
   errors: { line: number; reason: string }[];
+  warnings: ImportWarning[];
 }
 
 // ── Mojibake repair ──────────────────────────────────────────────────────────
@@ -191,10 +245,25 @@ function pick(row: Record<string, string>, candidates: string[]): string {
  */
 export function parseFrenchNumber(value: string): number {
   if (!value) return 0;
-  const cleaned = value
+  let cleaned = value
     .replace(/\s/g, '')
     .replace(/[€$£]/g, '')
     .replace(/,/g, '.');
+
+  // Les logiciels de compta notent souvent les négatifs autrement que par un
+  // signe en tête : entre parenthèses « (1.234,56) » ou signe en fin de champ
+  // « 1234.56- ». Sans ce traitement, un avoir exporté ainsi remonterait
+  // positif (ou nul), donc dans le mauvais sens.
+  let negative = false;
+  if (/^\(.*\)$/.test(cleaned)) {
+    negative = true;
+    cleaned = cleaned.slice(1, -1);
+  }
+  if (cleaned.endsWith('-')) {
+    negative = true;
+    cleaned = cleaned.slice(0, -1);
+  }
+
   // If the string contains multiple dots, the leftmost ones are thousands
   // separators ("1.234.56" → "1234.56").
   const parts = cleaned.split('.');
@@ -206,7 +275,36 @@ export function parseFrenchNumber(value: string): number {
     normalized = `${parts.join('')}.${decimal}`;
   }
   const n = parseFloat(normalized);
-  return Number.isFinite(n) ? n : 0;
+  if (!Number.isFinite(n)) return 0;
+  return negative ? -Math.abs(n) : n;
+}
+
+/** Arrondi à 2 décimales — même règle que lib/tva.ts. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Détermine le taux de TVA d'un document.
+ *
+ * La colonne « TVA » d'un export peut contenir soit un taux (20), soit un
+ * montant en euros (1 234,56) : on ne retient la valeur telle quelle que si
+ * elle ressemble à un taux, sinon on la recalcule depuis les totaux.
+ *
+ * Le calcul se fait sur les valeurs absolues, pour rester juste sur un avoir
+ * dont les deux totaux sont négatifs. Un taux hors de [0, 50] n'a aucun sens
+ * (cas typique : un TTC absent, qui donnerait −100 %) : on retombe sur 20 %,
+ * le taux à corriger ensuite depuis la fiche document.
+ */
+function deriveTvaRate(tvaCell: number, totalHt: number, totalTtc: number): number {
+  if (tvaCell > 0 && tvaCell <= 50) return tvaCell;
+  const ht = Math.abs(totalHt);
+  const ttc = Math.abs(totalTtc);
+  if (ht > 0 && ttc > 0) {
+    const derived = Math.round(((ttc - ht) / ht) * 100);
+    if (derived >= 0 && derived <= 50) return derived;
+  }
+  return 20;
 }
 
 /**
@@ -297,12 +395,31 @@ function mapInvoiceStatus(value: string): InvoiceStatus {
   const s = value.toLowerCase();
   if (!s) return 'brouillon';
   if (s.includes('brouillon') || s.includes('draft')) return 'brouillon';
-  if (s.includes('annul') || s.includes('avoir') || s.includes('cancel')) return 'annulee';
+  // Note : « avoir » ne vaut plus annulation. Une ligne d'avoir est détectée en
+  // amont (cf. detectCreditNote) et devient une facture rectificative à part
+  // entière ; elle ne passe jamais par ici.
+  if (s.includes('annul') || s.includes('cancel')) return 'annulee';
   if (s.includes('paye') || s.includes('paid') || s.includes('regle') || s.includes('réglé')) return 'payee';
   if (s.includes('retard') || s.includes('overdue')) return 'en_retard';
   if (s.includes('envoy') || s.includes('sent') || s.includes('final')) return 'envoyee';
   if (s.includes('cree') || s.includes('créé') || s.includes('issued') || s.includes('import')) return 'creee';
   return 'creee';
+}
+
+/**
+ * Statut d'un avoir importé.
+ *
+ * Un avoir n'est ni encaissable ni exigible : « payée » et « en retard » n'ont
+ * aucun sens pour lui. Il n'a donc que deux états utiles ici — brouillon (le
+ * fichier le dit explicitement) ou émis. Sans indication, un avoir repris d'un
+ * logiciel concurrent est un document historique déjà remis au client : on le
+ * considère émis, sinon il ne déduirait rien des agrégats
+ * (cf. `isIssuedCreditNote`).
+ */
+function mapCreditNoteStatus(value: string): InvoiceStatus {
+  const s = value.toLowerCase();
+  if (s.includes('brouillon') || s.includes('draft')) return 'brouillon';
+  return 'envoyee';
 }
 
 // ── Row mappers ──────────────────────────────────────────────────────────────
@@ -366,7 +483,8 @@ export function mapContactsCSV(parsed: ParsedCSV): ImportSummary<MappedClient> {
     });
   });
 
-  return { rows, errors };
+  // Aucun avertissement possible sur les contacts : une ligne passe ou échoue.
+  return { rows, errors, warnings: [] };
 }
 
 const QUOTE_HEADERS = {
@@ -427,7 +545,7 @@ export function mapQuotesCSV(parsed: ParsedCSV): ImportSummary<MappedQuote> {
     });
   });
 
-  return { rows, errors };
+  return { rows, errors, warnings: [] };
 }
 
 const INVOICE_HEADERS = {
@@ -444,6 +562,44 @@ const INVOICE_HEADERS = {
   dueDate: ['Date echeance', "Date d'échéance", 'Echeance', 'Due date'],
   paidAt: ['Date de paiement', 'Date paiement', 'Paid at', 'Date reglement'],
   quoteRef: ['Devis', 'Quote', 'Devis lie'],
+  notes: ['Commentaire', 'Comment', 'Notes', 'Note', 'Observations', 'Libelle', 'Libellé'],
+  // Colonne portant le numéro de la facture rectifiée par un avoir. Tous les
+  // candidats sont volontairement composés de plusieurs mots : « Facture »
+  // seul serait attrapé par la recherche par sous-chaîne de `pick()` et
+  // renverrait le numéro de la ligne elle-même.
+  creditedRef: [
+    "Facture d'origine",
+    'Facture origine',
+    'Facture rectifiee',
+    'Facture rectifiée',
+    'Facture initiale',
+    'Facture liee',
+    'Facture liée',
+    'Facture creditee',
+    'Facture créditée',
+    'Facture de reference',
+    'Facture de référence',
+    'Reference facture',
+    'Référence facture',
+    'Avoir sur facture',
+    'Avoir sur',
+    "Document d'origine",
+    'Document origine',
+    "Piece d'origine",
+    "Pièce d'origine",
+    'Original invoice',
+    'Credited invoice',
+    'Related invoice',
+    'Invoice ref',
+  ],
+  reason: [
+    "Motif de l'avoir",
+    'Motif avoir',
+    'Motif',
+    'Raison',
+    'Cause',
+    'Reason',
+  ],
 };
 
 // ── Services / bibliothèque de prix ──────────────────────────────────────────
@@ -509,13 +665,271 @@ export function mapServicesCSV(parsed: ParsedCSV): ImportSummary<MappedService> 
     });
   });
 
-  return { rows, errors };
+  return { rows, errors, warnings: [] };
+}
+
+// ── Avoirs (factures rectificatives) ─────────────────────────────────────────
+
+/**
+ * Les logiciels concurrents exportent leurs avoirs dans le même fichier que
+ * leurs factures, avec des conventions qui varient d'un éditeur à l'autre :
+ * colonne « Type » valant « Avoir », numéro préfixé AV, montants négatifs, ou
+ * simplement « Avoir sur facture 2024-012 » dans le libellé. On reconnaît tous
+ * ces cas.
+ *
+ * Aplatir un avoir en facture annulée — ce que faisait cet import — perd à la
+ * fois la déduction de chiffre d'affaires et la régularisation de TVA
+ * (art. 272-1 CGI) : l'artisan repartait avec une comptabilité fausse.
+ */
+
+/** Retire les accents en conservant la casse — une référence garde la sienne. */
+function flattenAccents(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Minuscules, sans accents, espaces normalisés — pour les comparaisons. */
+function normalizeText(value: string): string {
+  return flattenAccents(value).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Mots qui désignent un avoir dans un export (français, anglais, allemand). */
+const CREDIT_NOTE_WORDS = /avoir|credit ?note|note de credit|gutschrift|nota de credito/;
+
+/**
+ * Numéro qui trahit un avoir : notre propre série (AV-2026-001) comme les
+ * conventions des concurrents (AV2024-12, AVR-7, AVOIR 15).
+ */
+const CREDIT_NOTE_NUMBER = new RegExp(
+  `^(?:${CREDIT_NOTE_PREFIX}[a-z]?[-_\\s./]?\\d|avoir)`,
+  'i',
+);
+
+/**
+ * « Avoir » est aussi un verbe très courant : dans un libellé libre, on ne le
+ * retient qu'en position de document (« Avoir n° 12 », « Avoir sur facture
+ * 2024-03 »), jamais au milieu d'une phrase.
+ */
+const CREDIT_NOTE_IN_LABEL = /^avoir\b|\bavoir (?:n[°o]|sur|s\/|facture|de facture)/;
+
+function detectCreditNote(params: {
+  number: string;
+  type: string;
+  status: string;
+  title: string;
+  notes: string;
+  totalHt: number;
+  totalTtc: number;
+}): boolean {
+  // Des montants négatifs signent un crédit, quoi que dise le reste du
+  // fichier — et la base refuse de toute façon une facture non-avoir négative.
+  if (params.totalHt < 0 || params.totalTtc < 0) return true;
+  if (CREDIT_NOTE_WORDS.test(normalizeText(params.type))) return true;
+  if (CREDIT_NOTE_WORDS.test(normalizeText(params.status))) return true;
+  if (CREDIT_NOTE_NUMBER.test(params.number.trim())) return true;
+  if (CREDIT_NOTE_IN_LABEL.test(normalizeText(params.title))) return true;
+  if (CREDIT_NOTE_IN_LABEL.test(normalizeText(params.notes))) return true;
+  return false;
+}
+
+/**
+ * « Facture d'origine n° F-2024-012 », « Avoir sur facture 2024/03 »… La
+ * référence capturée doit contenir au moins un chiffre, sinon ce n'est pas un
+ * numéro de document.
+ */
+const CREDITED_REF_IN_TEXT = new RegExp(
+  '\\b(?:factures?|fact|fac|invoices?|inv|piece|document)' +
+    "(?:\\s*(?:d['\u2019]\\s*origine|origine|rectifiee|rectifie|initiale|liee|lie|" +
+    'creditee|credite|de reference|reference|n[\u00b0\u00bao]|numero|num|no|#|:|-|\\.)\\s*)*' +
+    '\\s*([A-Za-z]{0,4}[-_/.]?\\d[A-Za-z0-9._/-]*)',
+  'i',
+);
+
+/** Comparaison de références, insensible à la casse et à la ponctuation. */
+function sameRef(a: string, b: string): boolean {
+  const flat = (v: string) =>
+    flattenAccents(v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const left = flat(a);
+  return left.length > 0 && left === flat(b);
+}
+
+function isPlausibleDocumentRef(ref: string, ownNumber: string): boolean {
+  if (ref.length < 2) return false;
+  if (!/\d/.test(ref)) return false;
+  // Une date n'est pas une référence de document.
+  if (/^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(ref)) return false;
+  // Une ligne ne se crédite pas elle-même.
+  if (sameRef(ref, ownNumber)) return false;
+  return true;
+}
+
+function matchCreditedRefInText(text: string, ownNumber: string): string {
+  if (!text) return '';
+  const matched = flattenAccents(text).match(CREDITED_REF_IN_TEXT);
+  if (!matched) return '';
+  const ref = matched[1].replace(/[\s:;,.]+$/, '');
+  return isPlausibleDocumentRef(ref, ownNumber) ? ref : '';
+}
+
+/**
+ * Numéro de la facture rectifiée : colonne dédiée d'abord, puis, à défaut,
+ * extraction depuis les libellés — beaucoup d'exports n'ont pas de colonne et
+ * se contentent d'un « Avoir sur facture 2024-012 » en texte libre.
+ */
+function findCreditedRef(
+  row: Record<string, string>,
+  ownNumber: string,
+  freeTexts: string[],
+): string {
+  const cell = pick(row, INVOICE_HEADERS.creditedRef);
+  if (cell) {
+    const bare = flattenAccents(cell)
+      .trim()
+      .replace(/^[\s:#.-]+/, '')
+      .replace(/[\s:;,.]+$/, '');
+    if (bare && !/\s/.test(bare) && isPlausibleDocumentRef(bare, ownNumber)) {
+      return bare;
+    }
+    const fromCell = matchCreditedRefInText(cell, ownNumber);
+    if (fromCell) return fromCell;
+  }
+  for (const text of freeTexts) {
+    const found = matchCreditedRefInText(text, ownNumber);
+    if (found) return found;
+  }
+  return '';
+}
+
+/** Rattachement d'un motif libre aux `CREDIT_REASONS` de l'app. */
+const CREDIT_REASON_KEYWORDS: Array<{ value: string; pattern: RegExp }> = [
+  { value: 'erreur_facturation', pattern: /erreur|correction|mauvais montant|double facturation/ },
+  { value: 'geste_commercial', pattern: /geste|remise|ristourne|rabais|commercial/ },
+  { value: 'annulation', pattern: /annul|resiliation|desistement/ },
+  { value: 'travaux_non_realises', pattern: /non realis|non effectu|non execut|travaux abandonn|chantier abandonn/ },
+  { value: 'retour_materiel', pattern: /retour|reprise (?:de )?materiel|marchandise/ },
+  { value: 'litige', pattern: /litige|reclamation|contentieux|malfacon|\bsav\b/ },
+];
+
+/**
+ * Rattache un motif libre à l'un des `CREDIT_REASONS`. Renvoie `null` plutôt
+ * que d'inventer : pas de motif vaut mieux qu'un motif faux.
+ */
+function matchKnownCreditReason(raw: string): string | null {
+  const text = normalizeText(raw);
+  if (!text) return null;
+  for (const reason of CREDIT_REASONS) {
+    if (text === reason.value || text === normalizeText(reason.label)) {
+      return reason.value;
+    }
+  }
+  for (const { value, pattern } of CREDIT_REASON_KEYWORDS) {
+    if (pattern.test(text)) return value;
+  }
+  return null;
+}
+
+const MAX_CREDIT_REASON_LENGTH = 200;
+
+/**
+ * Motif de l'avoir : la colonne dédiée si elle existe (normalisée quand elle
+ * correspond à un motif connu, sinon reprise telle quelle), à défaut un motif
+ * reconnaissable dans les libellés. On ne recopie jamais un libellé entier
+ * dans le motif.
+ */
+function normalizeCreditReason(raw: string, fallbackText: string): string | null {
+  const known = matchKnownCreditReason(raw);
+  if (known) return known;
+  const free = raw.trim();
+  if (free) {
+    return free.length > MAX_CREDIT_REASON_LENGTH
+      ? `${free.slice(0, MAX_CREDIT_REASON_LENGTH - 3).trimEnd()}...`
+      : free;
+  }
+  return matchKnownCreditReason(fallbackText);
+}
+
+/** Pourquoi un avoir n'a pas pu être importé en tant que tel. */
+export type CreditNoteFallbackCause =
+  | 'reference_absente'
+  | 'facture_introuvable'
+  | 'facture_non_creditable';
+
+function buildCreditNoteFallbackWarning(
+  row: MappedInvoice,
+  cause: CreditNoteFallbackCause,
+): ImportWarning {
+  const prefix = `Avoir « ${row.source_number} » importé comme facture annulée`;
+  const ref = row.credited_source_number;
+  switch (cause) {
+    case 'facture_introuvable':
+      return {
+        line: row.line,
+        reason: `${prefix} : la facture d'origine « ${ref} » est introuvable dans Hellobat.`,
+        hint: "Importez d'abord cette facture, puis créez l'avoir depuis sa fiche.",
+      };
+    case 'facture_non_creditable':
+      return {
+        line: row.line,
+        reason: `${prefix} : la facture d'origine « ${ref} » ne peut pas être créditée (brouillon, avoir, ou autre compte).`,
+        hint: "Un avoir ne rectifie qu'une facture déjà émise de votre compte.",
+      };
+    case 'reference_absente':
+    default:
+      return {
+        line: row.line,
+        reason: `${prefix} : aucune facture d'origine n'est indiquée dans le fichier.`,
+        hint: "Ajoutez une colonne « Facture d'origine » contenant le numéro de la facture rectifiée, puis réimportez cette ligne.",
+      };
+  }
+}
+
+/**
+ * Rétrograde un avoir en facture annulée — le comportement historique de cet
+ * import.
+ *
+ * La base impose qu'un avoir référence une facture émise du même compte
+ * (trigger `validate_credit_note`). Sans référence résolvable, l'insertion
+ * échouerait et l'artisan perdrait purement et simplement la ligne : on
+ * préfère importer une facture annulée, à montant positif, et le lui dire
+ * dans le rapport d'import. Il pourra émettre le vrai avoir depuis la fiche
+ * facture une fois celle-ci présente.
+ *
+ * À appeler aussi côté route, quand la référence existe mais ne se résout pas
+ * en `credited_invoice_id` — plutôt que de laisser partir un INSERT qui sera
+ * rejeté par la base.
+ *
+ * La ligne rétrogradée ne crée toujours pas de chantier : c'est un avoir, pas
+ * un travail vendu.
+ */
+export function fallbackCreditNoteToCancelled(
+  row: MappedInvoice,
+  cause: CreditNoteFallbackCause,
+): { row: MappedInvoice; warning: ImportWarning } {
+  const warning = buildCreditNoteFallbackWarning(row, cause);
+  if (!isCreditNote(row)) return { row, warning };
+  return {
+    row: {
+      ...row,
+      invoice_type: 'standard',
+      status: 'annulee',
+      // `credited_invoice_id` est interdit hors avoir : on efface la référence
+      // pour qu'aucune route ne tente de la poser.
+      credited_source_number: '',
+      creates_project: false,
+      total_ht: Math.abs(row.total_ht),
+      total_tva: Math.abs(row.total_tva),
+      total_ttc: Math.abs(row.total_ttc),
+      due_date: null,
+      paid_at: null,
+    },
+    warning,
+  };
 }
 
 export function mapInvoicesCSV(parsed: ParsedCSV): ImportSummary<MappedInvoice> {
   const repaired = repairParsedCsv(parsed);
   const rows: MappedInvoice[] = [];
   const errors: { line: number; reason: string }[] = [];
+  const warnings: ImportWarning[] = [];
 
   repaired.rows.forEach((row, idx) => {
     const lineNumber = idx + 2;
@@ -529,37 +943,103 @@ export function mapInvoicesCSV(parsed: ParsedCSV): ImportSummary<MappedInvoice> 
       errors.push({ line: lineNumber, reason: 'Client manquant' });
       return;
     }
+
     const totalHt = parseFrenchNumber(pick(row, INVOICE_HEADERS.totalHt));
     const totalTtc = parseFrenchNumber(pick(row, INVOICE_HEADERS.totalTtc));
     const tvaParsed = parseFrenchNumber(pick(row, INVOICE_HEADERS.tva));
-    const tvaRate =
-      tvaParsed > 0 && tvaParsed <= 50
-        ? tvaParsed
-        : totalHt > 0
-          ? Math.round(((totalTtc - totalHt) / totalHt) * 100)
-          : 20;
+    const tvaRate = deriveTvaRate(tvaParsed, totalHt, totalTtc);
 
-    // "Avoir" → cancelled (annulee). Otherwise honour the status field.
-    const typeStr = pick(row, INVOICE_HEADERS.type).toLowerCase();
-    const status: InvoiceStatus = typeStr.includes('avoir')
-      ? 'annulee'
-      : mapInvoiceStatus(pick(row, INVOICE_HEADERS.status));
+    const typeStr = pick(row, INVOICE_HEADERS.type);
+    const statusStr = pick(row, INVOICE_HEADERS.status);
+    const rawTitle = pick(row, INVOICE_HEADERS.title);
+    const notes = pick(row, INVOICE_HEADERS.notes);
+    const externalId = pick(row, INVOICE_HEADERS.id) || String(lineNumber);
+    const issuedAt = parseFrenchDate(pick(row, INVOICE_HEADERS.issuedAt));
 
-    rows.push({
-      externalId: pick(row, INVOICE_HEADERS.id) || String(lineNumber),
-      source_number: number,
-      source_quote_number: pick(row, INVOICE_HEADERS.quoteRef),
-      client_name: clientName,
-      title: pick(row, INVOICE_HEADERS.title) || `Facture ${number}`,
-      status,
-      total_ht: totalHt,
-      tva_rate: tvaRate,
-      total_ttc: totalTtc || totalHt * (1 + tvaRate / 100),
-      issued_at: parseFrenchDate(pick(row, INVOICE_HEADERS.issuedAt)),
-      due_date: parseFrenchDate(pick(row, INVOICE_HEADERS.dueDate)),
-      paid_at: parseFrenchDate(pick(row, INVOICE_HEADERS.paidAt)),
+    const looksLikeCreditNote = detectCreditNote({
+      number,
+      type: typeStr,
+      status: statusStr,
+      title: rawTitle,
+      notes,
+      totalHt,
+      totalTtc,
     });
+
+    if (!looksLikeCreditNote) {
+      const computedTtc = totalTtc || totalHt * (1 + tvaRate / 100);
+      rows.push({
+        externalId,
+        line: lineNumber,
+        source_number: number,
+        source_quote_number: pick(row, INVOICE_HEADERS.quoteRef),
+        client_name: clientName,
+        title: rawTitle || `Facture ${number}`,
+        status: mapInvoiceStatus(statusStr),
+        invoice_type: 'standard',
+        credited_source_number: '',
+        credit_reason: null,
+        creates_project: true,
+        total_ht: totalHt,
+        total_tva: Math.max(0, round2(computedTtc - totalHt)),
+        tva_rate: tvaRate,
+        total_ttc: computedTtc,
+        issued_at: issuedAt,
+        due_date: parseFrenchDate(pick(row, INVOICE_HEADERS.dueDate)),
+        paid_at: parseFrenchDate(pick(row, INVOICE_HEADERS.paidAt)),
+      });
+      return;
+    }
+
+    // Montants stockés négatifs, quelle que soit la convention du fichier
+    // source : certains exportent la valeur absolue avec un type « Avoir »,
+    // d'autres exportent déjà des négatifs.
+    const amountHt = Math.abs(totalHt);
+    const amountTtc = Math.abs(totalTtc) || round2(amountHt * (1 + tvaRate / 100));
+
+    const creditNote: MappedInvoice = {
+      externalId,
+      line: lineNumber,
+      source_number: number,
+      // Un avoir ne se rattache pas à un devis : le lier ferait croire au
+      // devis qu'il a été facturé une fois de plus.
+      source_quote_number: '',
+      client_name: clientName,
+      title: rawTitle || `Avoir ${number}`,
+      status: mapCreditNoteStatus(statusStr),
+      invoice_type: 'avoir',
+      credited_source_number: findCreditedRef(row, number, [
+        rawTitle,
+        notes,
+        typeStr,
+        statusStr,
+      ]),
+      credit_reason: normalizeCreditReason(
+        pick(row, INVOICE_HEADERS.reason),
+        `${typeStr} ${rawTitle} ${notes}`,
+      ),
+      // Un avoir ne vend rien : pas de chantier, et surtout pas de chantier au
+      // budget négatif.
+      creates_project: false,
+      total_ht: -amountHt,
+      total_tva: -Math.max(0, round2(amountTtc - amountHt)),
+      tva_rate: tvaRate,
+      total_ttc: -amountTtc,
+      issued_at: issuedAt,
+      // Ni échéance ni encaissement : un avoir n'est pas payable.
+      due_date: null,
+      paid_at: null,
+    };
+
+    if (!creditNote.credited_source_number) {
+      const fallback = fallbackCreditNoteToCancelled(creditNote, 'reference_absente');
+      warnings.push(fallback.warning);
+      rows.push(fallback.row);
+      return;
+    }
+
+    rows.push(creditNote);
   });
 
-  return { rows, errors };
+  return { rows, errors, warnings };
 }

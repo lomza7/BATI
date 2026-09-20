@@ -194,6 +194,15 @@ export default function PublicPayPage() {
     }
     const data = await res.json();
 
+    // Montant annonce au client : il doit etre exactement celui du
+    // PaymentIntent. `total_ttc` est le total BRUT de la facture : il ignore
+    // les avoirs deja emis (et, pour une facture de solde, les acomptes deja
+    // regles), donc il annoncerait un montant que Stripe ne debitera pas.
+    // On ne s'en sert que comme dernier recours d'affichage.
+    const fallbackCents = Math.round(
+      Number(data.net_due_ttc ?? data.total_ttc) * 100,
+    );
+
     if (data.status === 'payee') {
       setPaid(true);
       setSession({
@@ -201,7 +210,7 @@ export default function PublicPayPage() {
         stripe_account_id: data.payment_stripe_account_id || '',
         client_secret: data.payment_client_secret || '',
         publishable_key: data.payment_publishable_key || '',
-        amount_cents: Math.round(Number(data.total_ttc) * 100),
+        amount_cents: fallbackCents,
         description: data.title,
         status: 'completed',
       });
@@ -215,20 +224,38 @@ export default function PublicPayPage() {
       return;
     }
 
+    const stripe = await loadStripe(data.payment_publishable_key || '', {
+      stripeAccount: data.payment_stripe_account_id,
+    });
+
+    // Seule verite de ce qui sera debite : le montant porte par le
+    // PaymentIntent lui-meme, calcule cote serveur net des avoirs.
+    let amountCents = fallbackCents;
+    if (stripe) {
+      try {
+        const { paymentIntent } = await stripe.retrievePaymentIntent(
+          data.payment_client_secret,
+        );
+        if (paymentIntent && typeof paymentIntent.amount === 'number') {
+          amountCents = paymentIntent.amount;
+        }
+      } catch {
+        // Reseau indisponible : on retombe sur le montant renvoye par l'API.
+      }
+    }
+
     const s: PaySession = {
       id: data.id,
       stripe_account_id: data.payment_stripe_account_id,
       client_secret: data.payment_client_secret,
       publishable_key: data.payment_publishable_key || '',
-      amount_cents: Math.round(Number(data.total_ttc) * 100),
+      amount_cents: amountCents,
       description: data.title,
       status: 'pending',
     };
 
     setSession(s);
-    setStripePromise(
-      loadStripe(s.publishable_key, { stripeAccount: s.stripe_account_id }),
-    );
+    setStripePromise(Promise.resolve(stripe));
     setLoading(false);
   }
 
