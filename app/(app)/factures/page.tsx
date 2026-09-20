@@ -557,28 +557,46 @@ export default function FacturesPage() {
   }
 
   /**
-   * Montant qui sera réellement débité par le Terminal, à l'euro près :
-   * mêmes règles que /api/stripe/terminal/create-payment-intent — ce que la
-   * facture réclame (une facture de solde déduit les acomptes déjà facturés,
-   * eux-mêmes nets de leurs avoirs), puis déduction de ses propres avoirs.
-   * Helper local : il ne sert qu'à aligner l'affichage sur le serveur.
+   * Acomptes nets TTC, indexés par devis — mêmes règles que
+   * `fetchDepositsNetTtc` côté serveur : acomptes non annulés du devis, chacun
+   * net de ses propres avoirs. Calculé une seule fois pour tout l'écran à
+   * partir des factures déjà chargées, plutôt qu'une somme par ligne affichée.
    */
-  function terminalAmountTtc(inv: Invoice): number {
-    let depositsTtc = 0;
-    if (inv.invoice_type === 'solde' && inv.quote_id) {
-      depositsTtc = invoices
-        .filter(
-          (d) =>
-            d.quote_id === inv.quote_id &&
-            d.invoice_type === 'acompte' &&
-            d.status !== 'annulee',
-        )
-        .reduce((sum, d) => sum + netDueTtc(d, creditNotesOf(d)), 0);
+  const depositsByQuote = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const inv of invoices) {
+      if (inv.invoice_type !== 'acompte' || !inv.quote_id || inv.status === 'annulee') continue;
+      const net = netDueTtc(inv, creditNotes.get(inv.id) || []);
+      map.set(inv.quote_id, (map.get(inv.quote_id) || 0) + net);
     }
-    return netDueTtc(
-      { total_ttc: claimedTtc(inv, depositsTtc) },
-      creditNotesOf(inv),
-    );
+    return map;
+  }, [invoices, creditNotes]);
+
+  /** Acomptes déjà facturés sur le devis — 0 hors facture de solde. */
+  function depositsOf(inv: Invoice): number {
+    if (inv.invoice_type !== 'solde' || !inv.quote_id) return 0;
+    return depositsByQuote.get(inv.quote_id) || 0;
+  }
+
+  /**
+   * Étape 1 de l'ordre canonique : ce que la facture réclame réellement au
+   * client, avant tout avoir. Une facture de solde stocke le total BRUT du
+   * devis dans `total_ttc` : elle ne réclame que le reste, acomptes déduits.
+   * Identité pour tout autre type de facture.
+   */
+  function claimedOf(inv: Invoice): number {
+    return claimedTtc(inv, depositsOf(inv));
+  }
+
+  /**
+   * Étape 2 : montant restant dû, avoirs de la facture déduits. C'est aussi,
+   * à l'euro près, ce que débitera le Terminal — mêmes règles que
+   * /api/stripe/terminal/create-payment-intent. Toute la page (badges, net
+   * restant dû, KPI, bouton Terminal) part d'ici, sinon le montant affiché
+   * diverge du montant encaissé.
+   */
+  function netDueOf(inv: Invoice): number {
+    return netDueTtc({ total_ttc: claimedOf(inv) }, creditNotesOf(inv));
   }
 
   /** État de créditation dérivé des avoirs — le statut n'est jamais modifié. */
@@ -586,18 +604,29 @@ export default function FacturesPage() {
     if (isCreditNote(inv)) return 'none';
     const notes = creditNotesOf(inv);
     if (notes.length === 0) return 'none';
-    if (isFullyCredited(inv, notes)) return 'full';
-    return isPartiallyCredited(inv, notes) ? 'partial' : 'none';
+    // On compare les avoirs au montant réclamé, jamais au brut : sur un solde,
+    // le brut inclut les acomptes, qui portent leur propre facture et leur
+    // propre avoir — les recompter ici ferait passer pour « partiellement
+    // créditée » une facture qui ne réclame plus rien.
+    const claimed = { total_ttc: claimedOf(inv) };
+    if (isFullyCredited(claimed, notes)) return 'full';
+    if (!isPartiallyCredited(claimed, notes)) return 'none';
+    // Solde déjà entièrement couvert par ses acomptes : il ne réclame plus
+    // rien, le moindre avoir émis dessus l'a donc soldé en totalité.
+    return netDueTtc(claimed, notes) <= 0.01 ? 'full' : 'partial';
   }
 
   /**
    * Un avoir n'est possible que sur une facture réellement émise, qui n'est
    * pas elle-même un avoir et sur laquelle il reste du montant à créditer.
+   * Le plafond se calcule sur le montant réclamé (`depositsOf`), exactement
+   * comme le fait le dialog d'émission : sans cela on proposerait « Créer un
+   * avoir » sur un solde que le dialog déclare aussitôt déjà crédité.
    */
   function canCreateCreditNote(inv: Invoice): boolean {
     if (isCreditNote(inv)) return false;
     if (!(CREDITABLE_STATUSES as readonly string[]).includes(inv.status)) return false;
-    return remainingCreditableTtc(inv, creditNotesOf(inv)) > 0.01;
+    return remainingCreditableTtc(inv, creditNotesOf(inv), depositsOf(inv)) > 0.01;
   }
   const archivedInvoices = invoices.filter(inv => inv.is_archived);
 
@@ -683,20 +712,23 @@ export default function FacturesPage() {
 
   // « En attente » et « En retard » sont des files d'action, pas des agrégats
   // comptables : elles excluent les avoirs (rien à encaisser dessus) et
-  // raisonnent en net d'avoirs, sinon on réclamerait au client un montant
-  // qu'on lui a déjà crédité.
+  // raisonnent sur le montant réclamé puis net d'avoirs, sinon on réclamerait
+  // au client un montant qu'on lui a déjà crédité — et on compterait deux fois
+  // les acomptes, une fois via leur propre facture et une fois via le brut du
+  // solde.
   const totalUnpaid = activeInvoices
     .filter(i => !isCreditNote(i) && (i.status === 'envoyee' || i.status === 'en_retard'))
-    .reduce((s, i) => s + netDueTtc(i, creditNotesOf(i)), 0);
+    .reduce((s, i) => s + netDueOf(i), 0);
   // « Encaissé » : montant resté acquis, avoirs émis sur les factures payées
   // déduits (l'avoir lui-même n'est jamais au statut payee, donc aucun risque
-  // de double déduction).
+  // de double déduction). Même base réclamée, pour ne pas encaisser deux fois
+  // l'acompte d'un devis dont le solde est payé.
   const totalPaid = activeInvoices
     .filter(i => !isCreditNote(i) && i.status === 'payee')
-    .reduce((s, i) => s + netRevenueTtc(i, creditNotesOf(i)), 0);
+    .reduce((s, i) => s + netRevenueTtc({ total_ttc: claimedOf(i) }, creditNotesOf(i)), 0);
   const totalLate = activeInvoices
     .filter(i => !isCreditNote(i) && i.status === 'en_retard')
-    .reduce((s, i) => s + netDueTtc(i, creditNotesOf(i)), 0);
+    .reduce((s, i) => s + netDueOf(i), 0);
   const quotesToInvoice = quotes.filter((quote) => !quote.has_linked_invoice && quote.status !== 'refuse');
 
   function handleInvoiceClick(inv: Invoice) {
@@ -716,7 +748,7 @@ export default function FacturesPage() {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
     const isAvoir = isCreditNote(inv);
     const credited = creditState(inv);
-    const netDue = credited === 'none' ? null : netDueTtc(inv, creditNotesOf(inv));
+    const netDue = credited === 'none' ? null : netDueOf(inv);
     return (
       <tr
         key={inv.id}
@@ -778,7 +810,7 @@ export default function FacturesPage() {
         <td className={`px-4 py-3 text-sm font-medium text-right ${isAvoir ? 'text-rose-600' : 'text-foreground'}`}>
           {formatCurrency(inv.total_ttc)}
           {netDue !== null && (
-            <span className="block text-xs font-normal text-muted-foreground" title="Montant restant dû après déduction des avoirs">
+            <span className="block text-xs font-normal text-muted-foreground" title="Montant réellement réclamé (acomptes déjà facturés déduits sur un solde), avoirs déduits">
               Net : {formatCurrency(netDue)}
             </span>
           )}
@@ -827,10 +859,13 @@ export default function FacturesPage() {
                       <Undo2 className="mr-2 h-4 w-4" /> Créer un avoir
                     </DropdownMenuItem>
                   )}
-                  {/* Une facture intégralement créditée n'a plus rien à
-                      encaisser : le lecteur refuserait le paiement, autant ne
-                      pas le proposer devant le client. */}
-                  {stripeChargesEnabled && !isAvoir && inv.status !== 'payee' && credited !== 'full' && (
+                  {/* Une facture qui ne réclame plus rien (intégralement
+                      créditée, ou solde déjà couvert par ses acomptes) n'a
+                      rien à encaisser : le lecteur refuserait le paiement,
+                      autant ne pas le proposer devant le client. On teste le
+                      montant lui-même, seule condition qui ne peut pas
+                      diverger de celle appliquée par la route serveur. */}
+                  {stripeChargesEnabled && !isAvoir && inv.status !== 'payee' && netDueOf(inv) > 0 && (
                     <DropdownMenuItem onClick={() => setTerminalInvoice(inv)}>
                       <CreditCard className="mr-2 h-4 w-4" /> Encaisser par Terminal
                     </DropdownMenuItem>
@@ -870,7 +905,7 @@ export default function FacturesPage() {
     const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
     const isAvoir = isCreditNote(inv);
     const credited = creditState(inv);
-    const netDue = credited === 'none' ? null : netDueTtc(inv, creditNotesOf(inv));
+    const netDue = credited === 'none' ? null : netDueOf(inv);
     return (
       <div
         key={inv.id}
@@ -1604,7 +1639,7 @@ export default function FacturesPage() {
              /api/stripe/terminal/create-payment-intent, donc net des avoirs
              émis sur la facture. Afficher le brut ferait débiter la carte
              d'un autre montant que celui annoncé. */
-          totalTtc={terminalAmountTtc(terminalInvoice)}
+          totalTtc={netDueOf(terminalInvoice)}
           onPaymentSuccess={() => {
             setTerminalInvoice(null);
             loadData();

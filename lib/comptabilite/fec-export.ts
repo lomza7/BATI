@@ -39,6 +39,18 @@ interface FecInvoice {
   tva_breakdown?: unknown;
   total_ttc: number | null;
   paid_at: string | null;
+  /**
+   * Montant TTC **réellement encaissé**, quand il diffère du TTC du document.
+   *
+   * Cas visé : une facture créditée AVANT son règlement. Le client ne vire
+   * alors que le net d'avoirs — c'est ce montant que réclament la page
+   * publique et les routes de paiement — et écrire le brut au journal BQ
+   * surévaluerait le compte 512 tout en laissant une dette fantôme au 411.
+   *
+   * Absent (cas de l'immense majorité des factures, sans aucun avoir) → on
+   * retombe sur `total_ttc` et l'écriture est inchangée.
+   */
+  paid_ttc?: number | null;
   issued_at?: string | null;
   created_at: string;
   /** 'standard' | 'acompte' | 'solde' | 'avoir' — seul 'avoir' inverse l'écriture. */
@@ -331,7 +343,19 @@ export function buildFecFile(opts: FecOptions): string {
     // et ne produit aucun mouvement de trésorerie. Le remboursement effectif
     // (décaissement 411 → 512) est HORS SCOPE ici : l'application ne trace pas
     // encore ce flux, il n'y a donc rien à écrire au journal BQ.
-    if (inv.paid_at && !isAvoir) {
+    //
+    // Le montant porté en banque est celui réellement reçu (`paid_ttc`), qui
+    // ne vaut le TTC du document que si aucun avoir n'a précédé le règlement.
+    // Sans cela, D512 = C411 = brut alors que la banque n'a encaissé que le
+    // net : le 512 serait surévalué et le 411 se solderait en négatif.
+    const receivedTtc =
+      inv.paid_ttc === null || inv.paid_ttc === undefined || !Number.isFinite(Number(inv.paid_ttc))
+        ? ttc
+        : Number(inv.paid_ttc);
+
+    // Une facture intégralement créditée avant paiement n'a rien encaissé :
+    // pas d'écriture de banque à 0,00, qui ne ferait que polluer le fichier.
+    if (inv.paid_at && !isAvoir && receivedTtc > 0) {
       const payDt = fmtDate(inv.paid_at);
       const payNum = `BQ${String(ecritureCounter).padStart(6, '0')}`;
       ecritureCounter += 1;
@@ -349,7 +373,7 @@ export function buildFecFile(opts: FecOptions): string {
         piece,
         payDt,
         `Encaissement ${piece}`,
-        fmtAmount(ttc),
+        fmtAmount(receivedTtc),
         '0,00',
         '',
         '',
@@ -372,7 +396,7 @@ export function buildFecFile(opts: FecOptions): string {
         payDt,
         `Encaissement ${piece}`,
         '0,00',
-        fmtAmount(ttc),
+        fmtAmount(receivedTtc),
         '',
         '',
         payDt,

@@ -5,7 +5,9 @@ import { apiError } from '@/lib/api-errors';
 import { consumeAi } from '@/lib/credits';
 import { callOpenAI, OpenAIError } from '@/lib/ai/openai';
 import {
+  claimedTtc,
   fetchCreditNotesByInvoice,
+  fetchDepositsNetTtc,
   isCreditNote,
   isIssuedCreditNote,
   netDueTtc,
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
       // montant d'un avoir qui est a son credit.
       const { data: invoices } = await sbAdmin
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ttc, created_at, invoice_type, credited_invoice_id')
+        .select('id, invoice_number, title, status, total_ttc, created_at, invoice_type, quote_id, credited_invoice_id')
         .eq('client_id', client.id)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -155,6 +157,27 @@ export async function POST(request: Request) {
           .filter(Boolean);
         const creditNotesByInvoice = await fetchCreditNotesByInvoice(sbAdmin, invoiceIds);
 
+        // Une facture de SOLDE stocke le total BRUT du devis : ce qu'elle
+        // reclame reellement au client, c'est ce total moins les acomptes deja
+        // factures, eux-memes nets de leurs propres avoirs. Sans cette
+        // deduction, le modele annonce au client des acomptes qu'il a deja
+        // regles. Un seul aller-retour par devis distinct, aucun si le client
+        // n'a pas de facture de solde.
+        const soldeQuoteIds = Array.from(
+          new Set(
+            invoices
+              .filter((inv) => !isCreditNote(inv) && inv.invoice_type === 'solde' && inv.quote_id)
+              .map((inv) => inv.quote_id as string),
+          ),
+        );
+        const depositsByQuote = new Map<string, number>();
+        if (soldeQuoteIds.length) {
+          const nets = await Promise.all(
+            soldeQuoteIds.map((quoteId) => fetchDepositsNetTtc(sbAdmin, quoteId)),
+          );
+          soldeQuoteIds.forEach((quoteId, index) => depositsByQuote.set(quoteId, nets[index]));
+        }
+
         clientContext += `\n### Factures recentes :\n`;
         for (const inv of invoices) {
           const date = new Date(inv.created_at).toLocaleDateString('fr-FR');
@@ -178,12 +201,24 @@ export async function POST(request: Request) {
           // `netDueTtc` : sans ce filtre on annoncerait un avoir de 0 € ou le
           // numero d'un document jamais envoye.
           const notes = (creditNotesByInvoice.get(inv.id as string) || []).filter(isIssuedCreditNote);
-          clientContext += `- ${inv.invoice_number} : ${inv.title} — ${inv.status} — ${inv.total_ttc}€ TTC (${date})`;
+
+          // Ordre canonique : d'abord ce que la facture reclame vraiment
+          // (acomptes deduits pour un solde), puis les avoirs emis dessus.
+          const depositsTtc =
+            inv.invoice_type === 'solde' && inv.quote_id
+              ? depositsByQuote.get(inv.quote_id as string) || 0
+              : 0;
+          const claimed = claimedTtc(inv, depositsTtc);
+
+          clientContext += `- ${inv.invoice_number} : ${inv.title} — ${inv.status} — ${claimed}€ TTC (${date})`;
+          if (depositsTtc > 0) {
+            clientContext += ` [facture de solde : total du devis ${inv.total_ttc}€ moins ${depositsTtc}€ d'acomptes deja factures — ne jamais reclamer les acomptes une seconde fois]`;
+          }
           if (notes.length) {
             const credited = Math.abs(sumCreditNotesTtc(notes));
             const numbers = notes.map((n) => n.invoice_number).filter(Boolean).join(', ');
             const prefix = notes.length > 1 ? 'les avoirs' : 'l\'avoir';
-            clientContext += ` — ${credited}€ credites par ${prefix} ${numbers}, reste du ${netDueTtc(inv, notes)}€ TTC`;
+            clientContext += ` — ${credited}€ credites par ${prefix} ${numbers}, reste du ${netDueTtc({ total_ttc: claimed }, notes)}€ TTC`;
           }
           clientContext += `\n`;
         }
@@ -241,6 +276,7 @@ Regles :
 - Les lignes commencant par "Avoir" (numeros AV-...) sont des AVOIRS : des factures rectificatives emises en faveur du client. Leur montant est negatif et vient EN DEDUCTION de la facture qu'elles rectifient.
 - Un avoir ne se reclame JAMAIS au client : ce n'est pas une somme due, c'est une somme a son credit. Ne parle jamais d'un avoir comme d'une facture impayee, d'une facture payee ou d'un montant a regler.
 - N'ecris jamais un montant negatif au client. Si tu dois citer un avoir, formule-le comme un montant deduit ou credite (exemple : "un avoir de 1 200 € a votre credit").
+- Les montants "€ TTC" indiques pour chaque facture sont deja ceux reellement reclames au client (pour une facture de solde, les acomptes deja factures sont deduits). Ne recalcule rien, ne rajoute aucun acompte.
 - Quand une facture porte un "reste du", c'est ce montant-la qu'il faut annoncer au client, jamais le total TTC brut deja credite.
 - Ne mens pas et n'invente pas d'informations — si tu ne sais pas, dis-le poliment
 - Termine par une formule de politesse appropriee

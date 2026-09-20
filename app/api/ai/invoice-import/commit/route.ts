@@ -59,6 +59,83 @@ function creditNoteFingerprint(
   return creditedInvoiceId + '|' + round2(Math.abs(num(totalTtc))).toFixed(2) + '|' + day;
 }
 
+/**
+ * Numéro du document tel qu'il figure sur le document SCANNÉ.
+ *
+ * Hellobat REGÉNÈRE le numéro de toute facture importée (série `F-YYYY-NNN`) :
+ * le numéro lu sur le papier n'existait jusqu'ici nulle part en base. Un avoir
+ * scanné ensuite référence pourtant sa facture par CE numéro-là — la chaîne
+ * scan → revue → validation ne pouvait donc structurellement jamais rattacher
+ * un avoir à une facture importée par le même outil.
+ *
+ * On conserve donc le numéro d'origine dans `invoices.description`, avec la
+ * même convention que l'import CSV et que `attach-pdfs` : « Importé
+ * (F-2025-042) ». Cette mention apparaît sous le titre dans l'aperçu du
+ * document, comme celle des devis importés : c'est la seule trace du
+ * numéro d'origine, et elle rend la facture reconnaissable.
+ *
+ * Helpers volontairement locaux : `lib/invoices/credit-notes.ts` est partagé
+ * et hors périmètre de ce lot.
+ */
+const SOURCE_NUMBER_PATTERN = /Importé \(([^)]+)\)/;
+
+function buildImportDescription(sourceNumber: string | null | undefined): string {
+  const trimmed = (sourceNumber || '').trim();
+  return trimmed ? 'Importé (' + trimmed + ')' : '';
+}
+
+function extractSourceNumber(description: string | null | undefined): string {
+  if (!description) return '';
+  const match = String(description).match(SOURCE_NUMBER_PATTERN);
+  return match ? match[1].trim() : '';
+}
+
+function normalizeNumber(value: string | null | undefined): string {
+  return (value || '').trim().toLowerCase();
+}
+
+/**
+ * Comparaison tolérante de deux raisons sociales : l'OCR d'un scan ponctue et
+ * capitalise rarement comme la fiche client (« SARL Dupont » / « Dupont SARL »).
+ * On compare sans accents ni ponctuation, et on accepte l'inclusion — assez
+ * souple pour ne pas refuser un avoir légitime, assez strict pour distinguer
+ * deux clients différents.
+ */
+function normalizeClientName(name: string | null | undefined): string {
+  return (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function isSameClientName(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = normalizeClientName(a);
+  const right = normalizeClientName(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+/**
+ * Facture candidate au rattachement d'un avoir. Le client en fait partie : un
+ * avoir ne rectifie jamais la facture d'un autre client.
+ */
+interface CreditTarget {
+  id: string;
+  client_id: string | null;
+  client_name: string;
+  project_id: string | null;
+  invoice_type: string | null;
+  status: string | null;
+  /**
+   * `true` quand la facture a été reconnue sur la numérotation du document
+   * source (celle de l'ancien logiciel), `false` quand elle l'a été sur la
+   * numérotation Hellobat — cas où l'homonymie est possible.
+   */
+  fromSourceNumbering: boolean;
+}
+
 interface GeoResult {
   lat: number | null;
   lng: number | null;
@@ -195,7 +272,79 @@ export async function POST(request: Request) {
   // Cache clients by normalized name to avoid duplicate lookups
   const clientCache = new Map<string, string>();
 
-  for (let i = 0; i < body.items.length; i++) {
+  /**
+   * Client déjà connu pour ce nom — sans jamais en créer un. Sert à vérifier
+   * qu'un avoir scanné porte bien sur une facture de SON client.
+   */
+  async function findExistingClientId(rawName: string): Promise<string | null> {
+    const name = (rawName || '').trim();
+    if (!name) return null;
+
+    const cached = clientCache.get(name.toLowerCase());
+    if (cached) return cached;
+
+    const { data } = await supabaseAdmin
+      .from('clients')
+      .select('id')
+      .eq('user_id', ownerId)
+      .ilike('name', name)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (!data?.id) return null;
+    clientCache.set(name.toLowerCase(), data.id as string);
+    return data.id as string;
+  }
+
+  // Factures rattachables, indexées d'une part sur la numérotation du document
+  // SOURCE (conservée dans `description`), d'autre part sur celle de Hellobat.
+  // On ne paie ces index que si le lot contient au moins un avoir.
+  const hasCreditNoteItems = body.items.some(isCreditNoteImportItem);
+  const targetBySourceNumber = new Map<string, CreditTarget>();
+  const targetByInvoiceNumber = new Map<string, CreditTarget>();
+  // Numéro source → facture insérée pendant CE lot, pour qu'un avoir scanné en
+  // même temps que sa facture puisse la rectifier.
+  const importedBySourceNumber = new Map<string, CreditTarget>();
+
+  if (hasCreditNoteItems) {
+    const { data: creditCandidates } = await supabaseAdmin
+      .from('invoices')
+      .select('id, invoice_number, invoice_type, status, client_id, project_id, description, clients(name)')
+      .eq('user_id', ownerId);
+
+    for (const row of creditCandidates || []) {
+      const invRow = row as Record<string, unknown>;
+      const clientData = invRow.clients as { name?: string } | null;
+      const base = {
+        id: invRow.id as string,
+        client_id: (invRow.client_id as string | null) || null,
+        client_name: clientData?.name || '',
+        project_id: (invRow.project_id as string | null) || null,
+        invoice_type: (invRow.invoice_type as string | null) || null,
+        status: (invRow.status as string | null) || null,
+      };
+
+      const sourceNumber = normalizeNumber(extractSourceNumber(invRow.description as string | null));
+      if (sourceNumber) {
+        targetBySourceNumber.set(sourceNumber, { ...base, fromSourceNumbering: true });
+      }
+      const hellobatNumber = normalizeNumber(invRow.invoice_number as string | null);
+      if (hellobatNumber) {
+        targetByInvoiceNumber.set(hellobatNumber, { ...base, fromSourceNumbering: false });
+      }
+    }
+  }
+
+  // Les avoirs passent en dernier : un avoir doit pouvoir rectifier une facture
+  // déposée dans le MÊME lot, qui n'existe qu'une fois insérée. Le tri est
+  // stable, donc l'ordre d'un lot sans avoir reste strictement inchangé.
+  const processingOrder = body.items
+    .map(function (_item, index) { return index; })
+    .sort(function (a, b) {
+      return Number(isCreditNoteImportItem(body.items[a])) - Number(isCreditNoteImportItem(body.items[b]));
+    });
+
+  for (const i of processingOrder) {
     const item = body.items[i];
 
     try {
@@ -259,23 +408,19 @@ export async function POST(request: Request) {
           continue;
         }
 
-        const { data: target } = await supabaseAdmin
-          .from('invoices')
-          .select('id, invoice_number, client_id, project_id, invoice_type, status')
-          .eq('user_id', ownerId)
-          .ilike('invoice_number', creditedNumber)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Résolution sur la numérotation du document SOURCE d'abord : celle du
+        // même lot, puis celle des factures déjà importées. La numérotation
+        // Hellobat n'arrive qu'en dernier recours — elle partage le gabarit
+        // « F-YYYY-NNN » avec celle de l'ancien logiciel, et un simple homonyme
+        // rattacherait l'avoir à la facture d'un tiers.
+        const creditedKey = normalizeNumber(creditedNumber);
+        const target =
+          importedBySourceNumber.get(creditedKey)
+          || targetBySourceNumber.get(creditedKey)
+          || targetByInvoiceNumber.get(creditedKey)
+          || null;
 
-        // `ilike` traite % et _ comme des jokers : on revérifie l'égalité
-        // exacte, un avoir rattaché à la mauvaise facture étant une pièce
-        // comptable fausse.
-        const targetMatches =
-          !!target
-          && String(target.invoice_number || '').trim().toLowerCase() === creditedNumber.toLowerCase();
-
-        if (!targetMatches) {
+        if (!target) {
           errors.push({
             index: i,
             reason: 'Avoir : la facture rectifiée « ' + creditedNumber + ' » est introuvable dans votre compte. Importez-la d\'abord.',
@@ -291,10 +436,40 @@ export async function POST(request: Request) {
           continue;
         }
 
-        if (!(CREDITABLE_STATUSES as readonly string[]).includes(target.status)) {
+        if (!(CREDITABLE_STATUSES as readonly string[]).includes(target.status || '')) {
           errors.push({
             index: i,
             reason: 'Avoir : la facture « ' + creditedNumber + ' » n\'est pas émise (statut ' + (target.status || 'inconnu') + '). Une facture en brouillon se corrige directement, sans avoir.',
+          });
+          continue;
+        }
+
+        // Contrôle du client. Le numéro de la facture rectifiée est lu sur un
+        // document de l'ANCIEN logiciel de l'artisan : rattacher sur ce seul
+        // numéro crédite la facture d'un homonyme, dont le net dû, la relance
+        // et le chiffre d'affaires se retrouvent amputés — pendant que le vrai
+        // client n'a jamais son avoir. On exige donc que le client lu sur le
+        // document soit celui de la facture rectifiée, et on ne remplace jamais
+        // silencieusement l'un par l'autre.
+        const scannedClientName = (item.client_name || '').trim();
+        const scannedClientId = await findExistingClientId(scannedClientName);
+        const clientConfirmed =
+          (!!scannedClientId && scannedClientId === target.client_id)
+          || isSameClientName(scannedClientName, target.client_name);
+
+        // Une facture sans client rattaché n'appartient à personne d'autre :
+        // on l'accepte quand elle a été reconnue sur la numérotation source,
+        // jamais sur un simple homonyme de la numérotation Hellobat.
+        const sameClient =
+          clientConfirmed || (!target.client_id && target.fromSourceNumbering);
+
+        if (!sameClient) {
+          errors.push({
+            index: i,
+            reason: 'Avoir : le document est au nom de « ' + (scannedClientName || 'client illisible')
+              + ' » alors que la facture « ' + creditedNumber + ' » est au nom de « '
+              + (target.client_name || 'un autre client')
+              + ' ». Créez l\'avoir depuis la facture concernée.',
           });
           continue;
         }
@@ -366,9 +541,10 @@ export async function POST(request: Request) {
       const normalizedName = (item.client_name || '').trim();
       let clientId: string | undefined;
 
-      // Un avoir se rattache au client de la facture rectifiée : reprendre ce
-      // client-là évite de fabriquer un doublon à partir d'un nom mal lu sur
-      // le scan, et garantit que l'avoir apparaît dans le même dossier client.
+      // Un avoir se rattache au client de la facture rectifiée. Ce n'est plus
+      // un remplacement silencieux : le contrôle ci-dessus a vérifié que c'est
+      // bien le client lu sur le document. Reprendre son identifiant évite de
+      // fabriquer un doublon à partir d'un nom mal orthographié par l'OCR.
       if (creditedInvoice?.client_id) {
         clientId = creditedInvoice.client_id;
       } else if (!normalizedName) {
@@ -565,7 +741,7 @@ export async function POST(request: Request) {
         }
         const invoiceNumber = `F-${year}-${String(nextNum).padStart(3, '0')}`;
 
-        const { error: invoiceErr } = await supabaseAdmin
+        const { data: insertedInvoice, error: invoiceErr } = await supabaseAdmin
           .from('invoices')
           .insert({
             user_id: ownerId,
@@ -573,6 +749,9 @@ export async function POST(request: Request) {
             client_id: clientId,
             project_id: project?.id || null,
             title: item.description || 'Facture importée',
+            // Numéro lu sur le document : c'est lui qu'un avoir scanné
+            // référence, ici ou lors d'un import ultérieur.
+            description: buildImportDescription(item.invoice_number),
             status: 'payee',
             total_ht: item.amount_ht || 0,
             tva_rate: item.tva_rate || 20,
@@ -580,10 +759,25 @@ export async function POST(request: Request) {
             issued_at: item.invoice_date || new Date().toISOString(),
             due_date: item.invoice_date || new Date().toISOString().split('T')[0],
             paid_at: item.invoice_date || new Date().toISOString(),
-          });
+          })
+          .select('id')
+          .single();
 
         if (!invoiceErr) {
           created.invoices++;
+
+          const sourceNumber = normalizeNumber(item.invoice_number);
+          if (insertedInvoice?.id && sourceNumber) {
+            importedBySourceNumber.set(sourceNumber, {
+              id: insertedInvoice.id as string,
+              client_id: clientId || null,
+              client_name: normalizedName,
+              project_id: project?.id || null,
+              invoice_type: 'standard',
+              status: 'payee',
+              fromSourceNumbering: true,
+            });
+          }
         }
       }
     } catch (e) {

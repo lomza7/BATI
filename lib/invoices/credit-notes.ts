@@ -332,11 +332,21 @@ export function buildFullCreditNoteLines(
   creditNoteId: string,
 ): CreditNoteLineInsert[] {
   return sourceLines.map((line, index) => {
-    const quantity = num(line.quantity) || 1;
+    // Le repli à 1 ne vaut que pour une quantité ABSENTE (import ancien, ligne
+    // sans quantité saisie). Une quantité 0 explicite — l'éditeur de devis
+    // l'accepte, et la ligne ne pèse alors rien dans les totaux de la facture —
+    // doit rester 0 : la transformer en 1 ferait créditer au client un montant
+    // que la facture ne lui a jamais facturé, et pourrait faire sauter le
+    // plafond de créditation contrôlé en base.
+    const hasQuantity = line.quantity !== null && line.quantity !== undefined;
+    const quantity = hasQuantity ? num(line.quantity) : 1;
     const unitPrice = num(line.unit_price);
-    const total = line.total === null || line.total === undefined
-      ? round2(quantity * unitPrice)
-      : num(line.total);
+    // Le total est dérivé de la quantité réellement retenue, sinon l'invariant
+    // `quantity * unit_price === total` — celui sur lequel s'appuie
+    // `computeTvaBreakdown` — serait faux dès que la quantité est repliée.
+    const total = hasQuantity && line.total !== null && line.total !== undefined
+      ? num(line.total)
+      : round2(quantity * unitPrice);
 
     return {
       user_id: userId,

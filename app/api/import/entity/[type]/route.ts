@@ -67,8 +67,52 @@ interface ImportResult {
   warnings?: ImportWarning[];
 }
 
+/**
+ * Facture candidate au rattachement d'un avoir. `client_id` en fait partie :
+ * un avoir ne rectifie jamais la facture d'un autre client, et c'est le seul
+ * garde-fou contre deux numérotations homonymes.
+ */
+interface CreditTarget {
+  id: string;
+  invoice_type: string | null;
+  status: string | null;
+  project_id: string | null;
+  client_id: string | null;
+}
+
 function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Numéro du document tel qu'il figure dans le FICHIER SOURCE de l'artisan.
+ *
+ * Hellobat REGÉNÈRE le numéro de chaque document importé (série `F-YYYY-NNN`),
+ * si bien que le numéro d'origine disparaissait jusqu'ici. Un avoir du même
+ * fichier — ou d'un second fichier importé plus tard — référence pourtant la
+ * facture par SON numéro d'origine : sans trace de ce numéro, plus aucun avoir
+ * n'était rattachable et tous finissaient rétrogradés en factures annulées.
+ *
+ * On le conserve donc dans `invoices.description`, avec exactement la même
+ * convention que l'import des devis et que `attach-pdfs`, qui la relit déjà :
+ * « Importé (F-2025-042) ». Cette mention apparaît sous le titre dans
+ * l'aperçu du document, comme celle des devis importés : c'est la seule
+ * trace du numéro d'origine, et elle rend la facture reconnaissable.
+ *
+ * Helpers volontairement locaux : `lib/invoices/credit-notes.ts` est partagé
+ * et hors périmètre de ce lot.
+ */
+const SOURCE_NUMBER_PATTERN = /Importé \(([^)]+)\)/;
+
+function buildImportDescription(sourceNumber: string | null | undefined): string {
+  const trimmed = (sourceNumber || '').trim();
+  return trimmed ? `Importé (${trimmed})` : '';
+}
+
+function extractSourceNumber(description: string | null | undefined): string {
+  if (!description) return '';
+  const match = description.match(SOURCE_NUMBER_PATTERN);
+  return match ? match[1].trim() : '';
 }
 
 async function readBytes(file: File): Promise<Uint8Array> {
@@ -372,12 +416,15 @@ async function importInvoices(
   const standardRows = mapped.rows.filter((r) => !isCreditNote(r));
   let creditYearPrefix = '';
   let creditCounter = 1;
-  // Factures déjà en base : un avoir du fichier peut rectifier une facture
-  // importée lors d'un passage précédent.
-  const invoiceByNumber = new Map<
-    string,
-    { id: string; invoice_type: string | null; status: string | null; project_id: string | null }
-  >();
+  // Factures déjà en base, indexées par le numéro du fichier source (celui que
+  // porte un avoir) : un avoir du fichier peut rectifier une facture importée
+  // lors d'un passage précédent, qui a reçu un numéro Hellobat sans rapport
+  // avec celui de l'ancien logiciel.
+  const invoiceBySourceNumber = new Map<string, CreditTarget>();
+  // Même chose sur la numérotation Hellobat : conservé en dernier recours,
+  // mais utilisable seulement si la facture appartient au même client (les
+  // deux numérotations partagent le gabarit « F-YYYY-NNN » et se recouvrent).
+  const invoiceByNumber = new Map<string, CreditTarget>();
 
   if (creditNoteRows.length > 0) {
     const nextCredit = await getNextCreditNoteNumber(sb, userId);
@@ -386,17 +433,28 @@ async function importInvoices(
 
     const { data: existingInvoices } = await sb
       .from('invoices')
-      .select('id, invoice_number, invoice_type, status, project_id')
+      .select('id, invoice_number, invoice_type, status, project_id, client_id, description')
       .eq('user_id', userId);
     for (const inv of existingInvoices || []) {
-      const invRow = inv as { id: string; invoice_number: string | null; invoice_type: string | null; status: string | null; project_id: string | null };
-      if (!invRow.invoice_number) continue;
-      invoiceByNumber.set(normalizeName(invRow.invoice_number), {
+      const invRow = inv as {
+        id: string;
+        invoice_number: string | null;
+        invoice_type: string | null;
+        status: string | null;
+        project_id: string | null;
+        client_id: string | null;
+        description: string | null;
+      };
+      const target: CreditTarget = {
         id: invRow.id,
         invoice_type: invRow.invoice_type,
         status: invRow.status,
         project_id: invRow.project_id,
-      });
+        client_id: invRow.client_id,
+      };
+      const sourceNumber = extractSourceNumber(invRow.description);
+      if (sourceNumber) invoiceBySourceNumber.set(normalizeName(sourceNumber), target);
+      if (invRow.invoice_number) invoiceByNumber.set(normalizeName(invRow.invoice_number), target);
     }
   }
 
@@ -405,10 +463,7 @@ async function importInvoices(
 
   // Numéro source → facture insérée pendant CET import, pour qu'un avoir
   // puisse rectifier une facture du même fichier.
-  const importedBySourceNumber = new Map<
-    string,
-    { id: string; status: string | null; project_id: string | null }
-  >();
+  const importedBySourceNumber = new Map<string, CreditTarget>();
 
   async function insertInvoiceRow(
     row: MappedInvoice,
@@ -435,6 +490,9 @@ async function importInvoices(
         project_id: projectId,
         quote_id: null,
         title: row.title,
+        // Numéro d'origine conservé : c'est lui qu'un avoir référence, ici ou
+        // lors d'un import ultérieur.
+        description: buildImportDescription(row.source_number),
         status: row.status,
         invoice_type: row.invoice_type,
         credited_invoice_id: creditedInvoiceId,
@@ -465,8 +523,10 @@ async function importInvoices(
       if (data?.id && row.source_number) {
         importedBySourceNumber.set(normalizeName(row.source_number), {
           id: data.id as string,
+          invoice_type: row.invoice_type,
           status: row.status,
           project_id: projectId,
+          client_id: clientId,
         });
       }
       return;
@@ -547,34 +607,37 @@ async function importInvoices(
       continue;
     }
 
+    // `credited_source_number` est le numéro tel qu'il figure dans le fichier
+    // de l'ancien logiciel : on le cherche donc d'abord dans la numérotation
+    // SOURCE — celle du même import, puis celle des imports précédents. La
+    // numérotation Hellobat n'arrive qu'en dernier recours : les deux séries
+    // partagent le gabarit « F-YYYY-NNN », et un simple homonyme ferait
+    // créditer la facture d'un tiers.
     const ref = normalizeName(row.credited_source_number);
-    const fromBatch = ref ? importedBySourceNumber.get(ref) : undefined;
-    const fromDb = ref ? invoiceByNumber.get(ref) : undefined;
+    const candidate = ref
+      ? importedBySourceNumber.get(ref) || invoiceBySourceNumber.get(ref) || invoiceByNumber.get(ref)
+      : undefined;
 
     let creditedId: string | null = null;
     let creditedProjectId: string | null = null;
     let cause: CreditNoteFallbackCause | null = null;
 
-    if (fromBatch) {
-      // La base refuse un avoir sur un brouillon ou sur un avoir.
-      if ((CREDITABLE_STATUSES as readonly string[]).includes(fromBatch.status || '')) {
-        creditedId = fromBatch.id;
-        creditedProjectId = fromBatch.project_id;
-      } else {
-        cause = 'facture_non_creditable';
-      }
-    } else if (fromDb) {
-      if (
-        fromDb.invoice_type !== 'avoir'
-        && (CREDITABLE_STATUSES as readonly string[]).includes(fromDb.status || '')
-      ) {
-        creditedId = fromDb.id;
-        creditedProjectId = fromDb.project_id;
-      } else {
-        cause = 'facture_non_creditable';
-      }
-    } else {
+    if (!candidate) {
       cause = 'facture_introuvable';
+    } else if (
+      candidate.invoice_type === 'avoir'
+      || !(CREDITABLE_STATUSES as readonly string[]).includes(candidate.status || '')
+    ) {
+      // La base refuse un avoir sur un brouillon ou sur un avoir.
+      cause = 'facture_non_creditable';
+    } else if (candidate.client_id !== client.id) {
+      // Homonymie de numéro entre deux clients : mieux vaut une facture
+      // annulée signalée dans le rapport qu'un avoir posé sur la facture de
+      // quelqu'un d'autre, qui amputerait son net dû, sa relance et le CA.
+      cause = 'facture_non_creditable';
+    } else {
+      creditedId = candidate.id;
+      creditedProjectId = candidate.project_id;
     }
 
     if (!creditedId) {

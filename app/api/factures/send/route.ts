@@ -6,12 +6,13 @@ import { buildInvoicePaymentEmail, buildCreditNoteEmail } from '@/lib/email-temp
 import { fetchCompanyAttachmentsForUser } from '@/lib/company-attachments';
 import { resolveFromEmail } from '@/lib/email-from';
 import {
+  claimedTtc,
   fetchCreditNotesByInvoice,
+  fetchDepositsNetTtc,
   isCreditNote,
   isFullyCredited,
   creditReasonLabel,
   netDueTtc,
-  sumCreditNotesTtc,
   type CreditNoteRef,
   type InvoiceType,
 } from '@/lib/invoices/credit-notes';
@@ -114,9 +115,23 @@ export async function POST(request: Request) {
     const creditNotes: CreditNoteRef[] = isAvoir
       ? []
       : (await fetchCreditNotesByInvoice(admin, [invoice.id])).get(invoice.id) || [];
+
+    // Une facture de SOLDE stocke le total BRUT du devis : ce qu'elle réclame
+    // réellement, c'est ce total moins les acomptes déjà facturés, nets de
+    // leurs propres avoirs. C'est ce montant réclamé — et non le brut — qui
+    // sert de base à tout ce qui suit : montant annoncé dans l'email, bouton
+    // payer, état « intégralement créditée ». Le plafond appliqué par la base
+    // aux avoirs porte lui aussi sur ce montant réclamé.
+    const depositsTtc =
+      !isAvoir && invoice.invoice_type === 'solde' && invoice.quote_id
+        ? await fetchDepositsNetTtc(admin, invoice.quote_id)
+        : 0;
+    const claimedTotalTtc = claimedTtc(invoice, depositsTtc);
+
     // Une facture intégralement créditée ne réclame plus rien : ni bouton payer
     // dans l'email, ni checkout Stripe sur la page publique.
-    const fullyCredited = !isAvoir && isFullyCredited(invoice, creditNotes);
+    const fullyCredited =
+      !isAvoir && isFullyCredited({ total_ttc: claimedTotalTtc }, creditNotes);
 
     // Pour un acompte / solde, on récupère le numéro du devis source pour
     // l'afficher dans la narration de l'email.
@@ -223,39 +238,13 @@ export async function POST(request: Request) {
 
       // Le montant annoncé dans l'email doit être exactement celui que réclame
       // la page publique /f/[token] et celui qu'encaisse Stripe : on reprend
-      // donc le même ordre de déduction — avoirs émis sur la facture, puis
-      // acomptes déjà facturés pour un solde.
+      // donc le même ordre de déduction — le montant réclamé (acomptes déduits
+      // pour un solde), puis les avoirs émis sur cette facture.
       // Pour un avoir : le montant est négatif en base, mais on présente au
       // client un montant porté à son crédit, donc en valeur absolue.
-      let displayTotalTtc = Number(invoice.total_ttc) || 0;
-      if (isAvoir) {
-        displayTotalTtc = Math.abs(displayTotalTtc);
-      } else {
-        displayTotalTtc = netDueTtc({ total_ttc: displayTotalTtc }, creditNotes);
-
-        if (invoice.invoice_type === 'solde' && invoice.quote_id) {
-          const { data: deposits } = await admin
-            .from('invoices')
-            .select('id, total_ttc')
-            .eq('quote_id', invoice.quote_id)
-            .eq('invoice_type', 'acompte')
-            .neq('status', 'annulee');
-          const depositRows = (deposits || []) as { id: string; total_ttc: number | null }[];
-          // Chaque acompte est pris NET de ses propres avoirs : un acompte
-          // annulé par un avoir n'a rien encaissé, le déduire en brut du solde
-          // retirerait au client une somme qu'il n'a jamais versée.
-          const notesByDeposit = await fetchCreditNotesByInvoice(
-            admin,
-            depositRows.map((d) => d.id),
-          );
-          const deducted = depositRows.reduce((sum, d) => {
-            const net =
-              Number(d.total_ttc || 0) + sumCreditNotesTtc(notesByDeposit.get(d.id) || []);
-            return sum + Math.max(0, net);
-          }, 0);
-          displayTotalTtc = Math.max(0, displayTotalTtc - deducted);
-        }
-      }
+      const displayTotalTtc = isAvoir
+        ? Math.abs(Number(invoice.total_ttc) || 0)
+        : netDueTtc({ total_ttc: claimedTotalTtc }, creditNotes);
 
       const totalFormatted = new Intl.NumberFormat('fr-FR', {
         style: 'currency',

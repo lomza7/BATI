@@ -270,13 +270,31 @@ function invoiceRefDate(
 
 /**
  * Le document entre-t-il dans les recettes ? Une facture doit être encaissée ;
- * un avoir émis compte toujours — ses montants étant négatifs, il vient
- * mécaniquement en déduction du chiffre d'affaires.
+ * un avoir émis vient en déduction du chiffre d'affaires — ses montants étant
+ * négatifs, la somme additive suffit.
+ *
+ * Nuance de la méthode « encaissements » : on ne retire des recettes que ce
+ * qui y est entré. Un avoir qui annule une facture jamais réglée (erreur de
+ * facturation, le motif le plus courant) ne doit rien retirer, sans quoi le
+ * mois affiche une recette négative alors que l'artisan n'a ni encaissé ni
+ * remboursé quoi que ce soit. En méthode « débits », le couple facture / avoir
+ * est symétrique et compte toujours.
+ *
+ * `paidAtByInvoice` indexe le `paid_at` de chaque facture chargée ; une
+ * facture rectifiée absente de cet index laisse l'avoir compter, faute de
+ * pouvoir trancher.
  */
 function countsInRevenue(
-  inv: Pick<InvoiceRow, 'invoice_type' | 'status' | 'paid_at'>,
+  inv: Pick<InvoiceRow, 'invoice_type' | 'status' | 'paid_at' | 'credited_invoice_id'>,
+  method: 'encaissements' | 'debits',
+  paidAtByInvoice: Map<string, string | null>,
 ): boolean {
-  if (isCreditNote(inv)) return true;
+  if (isCreditNote(inv)) {
+    if (method !== 'encaissements') return true;
+    const creditedId = inv.credited_invoice_id;
+    if (!creditedId || !paidAtByInvoice.has(creditedId)) return true;
+    return Boolean(paidAtByInvoice.get(creditedId));
+  }
   return inv.status === 'paid' || Boolean(inv.paid_at);
 }
 
@@ -995,6 +1013,15 @@ export default function ComptabilitePage() {
     [expenses, dashboardPeriod],
   );
 
+  // `paid_at` de chaque facture chargée : un avoir ne retire une recette que si
+  // la facture qu'il rectifie a réellement été encaissée (méthode
+  // « encaissements »).
+  const paidAtByInvoice = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const i of invoices) map.set(i.id, i.paid_at);
+    return map;
+  }, [invoices]);
+
   const periodInvoices = useMemo(() => {
     return invoices.filter((i) =>
       // Méthode encaissements : date de paiement — méthode débits : date
@@ -1019,7 +1046,9 @@ export default function ComptabilitePage() {
     // Recettes (factures encaissées dans la période, selon tvaMethod) et avoirs
     // émis. Les montants d'un avoir sont négatifs : la somme additive suffit à
     // le déduire du chiffre d'affaires, sans traitement particulier.
-    const revenueInvoices = periodInvoices.filter(countsInRevenue);
+    const revenueInvoices = periodInvoices.filter((i) =>
+      countsInRevenue(i, tvaMethod, paidAtByInvoice),
+    );
     const creditNotes = revenueInvoices.filter(isCreditNote);
     const revHt = revenueInvoices.reduce((s, i) => s + Number(i.total_ht || 0), 0);
     const revTtc = revenueInvoices.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
@@ -1078,7 +1107,7 @@ export default function ComptabilitePage() {
       totalActive,
       pointedRatio,
     };
-  }, [periodExpenses, periodInvoices]);
+  }, [periodExpenses, periodInvoices, tvaMethod, paidAtByInvoice]);
 
   const monthlyData = useMemo(() => {
     const months: { month: string; depenses: number; recettes: number }[] = [];
@@ -1101,6 +1130,10 @@ export default function ComptabilitePage() {
             ? i.paid_at
             : i.issued_at;
           if (!ref) return false;
+          // …mais seulement s'il retire une recette réellement encaissée : en
+          // méthode « encaissements », un avoir sur une facture jamais réglée
+          // creuserait une barre négative sur un mois sans le moindre flux.
+          if (credit && !countsInRevenue(i, tvaMethod, paidAtByInvoice)) return false;
           if (
             tvaMethod === 'encaissements' &&
             !credit &&
@@ -1118,7 +1151,7 @@ export default function ComptabilitePage() {
       });
     }
     return months;
-  }, [expenses, invoices, tvaMethod]);
+  }, [expenses, invoices, tvaMethod, paidAtByInvoice]);
 
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1159,7 +1192,7 @@ export default function ComptabilitePage() {
   const revenueRows = useMemo(
     () =>
       invoices.filter((i) => {
-        if (!countsInRevenue(i)) return false;
+        if (!countsInRevenue(i, tvaMethod, paidAtByInvoice)) return false;
         if (filterYear === 'all') return true;
         const year = Number(filterYear);
         const matchesYear = (d: string | null | undefined) =>
@@ -1171,7 +1204,7 @@ export default function ComptabilitePage() {
           (isCreditNote(i) && !i.issued_at && matchesYear(i.created_at))
         );
       }),
-    [invoices, filterYear],
+    [invoices, filterYear, tvaMethod, paidAtByInvoice],
   );
   const revenueCreditRows = useMemo(() => revenueRows.filter(isCreditNote), [revenueRows]);
   const revenueInvoiceCount = revenueRows.length - revenueCreditRows.length;
@@ -3091,6 +3124,9 @@ export default function ComptabilitePage() {
             marquées comme payées. Les avoirs émis y figurent en négatif&nbsp;: ils viennent en
             déduction du chiffre d&apos;affaires dès leur émission, sans jamais modifier la facture
             qu&apos;ils rectifient.
+            {tvaMethod === 'encaissements'
+              ? " Un avoir qui annule une facture jamais encaissée n'y figure pas : il n'y a aucune recette à retirer."
+              : ''}
           </p>
         </TabsContent>
 
@@ -3105,6 +3141,7 @@ export default function ComptabilitePage() {
               is_autoliquidation: e.is_autoliquidation,
             }))}
             invoices={invoices.map((i) => ({
+              id: i.id,
               paid_at: i.paid_at,
               issued_at: i.issued_at,
               created_at: i.created_at,
@@ -3113,6 +3150,9 @@ export default function ComptabilitePage() {
               tva_rate: i.tva_rate,
               tva_breakdown: i.tva_breakdown,
               invoice_type: i.invoice_type,
+              // Permet au panneau de vérifier que la TVA qu'un avoir
+              // régularise a bien été collectée (TVA sur les encaissements).
+              credited_invoice_id: i.credited_invoice_id,
             }))}
             tvaMethod={tvaMethod}
             vatRegime={vatRegime}

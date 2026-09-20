@@ -13,7 +13,9 @@
  * Deux modes :
  *  - **avoir total** : miroir exact des lignes de la facture, signes inversés
  *    (on conserve la structure en sections et le taux de TVA ligne à ligne,
- *    sinon un chantier à 10 % régulariserait de la TVA à 20 %) ;
+ *    sinon un chantier à 10 % régulariserait de la TVA à 20 %). Exception : une
+ *    facture de solde avec acomptes, dont les lignes décrivent le devis entier —
+ *    on rectifie alors le seul net réclamé, ventilé par taux de TVA ;
  *  - **avoir partiel** : une ligne unique au montant et au taux choisis, pour
  *    un geste commercial ou une régularisation.
  *
@@ -47,7 +49,13 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate } from '@/lib/constants';
-import { LINE_TVA_RATES, computeTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import {
+  LINE_TVA_RATES,
+  computeTvaBreakdown,
+  formatTvaRate,
+  parseTvaBreakdown,
+  type TvaBreakdownEntry,
+} from '@/lib/tva';
 import { getNextCreditNoteNumber } from '@/lib/document-numbers';
 import {
   CREDIT_REASONS,
@@ -58,7 +66,7 @@ import {
   claimedHt,
   claimedTtc,
   fetchCreditNotesByInvoice,
-  netRevenueTtc,
+  netDueTtc,
   remainingCreditableTtc,
   sumCreditNotesTtc,
   type CreditNoteRef,
@@ -100,6 +108,51 @@ function parseAmount(raw: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Ventile un montant HT sur les taux de TVA du document, au prorata de la base
+ * HT portée par chaque taux.
+ *
+ * Une facture de rénovation mélange couramment 10 % et 20 %. Rectifier son net
+ * réclamé par une ligne unique au taux majoritaire imputerait toute la TVA
+ * régularisée à ce seul taux, et le TTC de l'avoir ne retomberait pas sur le
+ * montant réellement réclamé au client (trop bas à 10 %, au-dessus du plafond
+ * de créditation à 20 %). Une ligne par taux rétablit les deux.
+ *
+ * La dernière part reçoit le solde : la somme des lignes retombe au centime sur
+ * le montant à créditer.
+ */
+function splitHtByRate(
+  amountHt: number,
+  breakdown: TvaBreakdownEntry[],
+  fallbackRate: number,
+): Array<{ amountHt: number; tvaRate: number }> {
+  const target = round2(Math.abs(amountHt));
+  const weights = breakdown
+    .map((entry) => ({ rate: Number(entry.rate), weight: Math.abs(Number(entry.base_ht) || 0) }))
+    .filter((entry) => Number.isFinite(entry.rate) && entry.weight > 0);
+  const totalWeight = weights.reduce((sum, entry) => sum + entry.weight, 0);
+
+  if (weights.length <= 1 || totalWeight <= 0) {
+    return [{ amountHt: target, tvaRate: weights.length === 1 ? weights[0].rate : fallbackRate }];
+  }
+
+  let allocated = 0;
+  return weights
+    .map((entry, index) => {
+      const share =
+        index === weights.length - 1
+          ? round2(target - allocated)
+          : round2((target * entry.weight) / totalWeight);
+      allocated = round2(allocated + share);
+      return { amountHt: share, tvaRate: entry.rate };
+    })
+    .filter((part) => part.amountHt > 0);
+}
+
 export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated }: Props) {
   const { user } = useAuth();
   const [mode, setMode] = useState<Mode>('total');
@@ -108,6 +161,8 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
   const [sourceClientId, setSourceClientId] = useState<string | null>(null);
   const [sourceProjectId, setSourceProjectId] = useState<string | null>(null);
   const [sourceTvaRate, setSourceTvaRate] = useState<number>(20);
+  /** Taux de TVA portés par la facture, avec leur base HT (colonne `tva_breakdown`). */
+  const [sourceBreakdown, setSourceBreakdown] = useState<TvaBreakdownEntry[]>([]);
   const [existingNotes, setExistingNotes] = useState<CreditNoteRef[]>([]);
   const [amountHt, setAmountHt] = useState('');
   const [tvaRate, setTvaRate] = useState<number>(20);
@@ -139,6 +194,7 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
     setError('');
     setLoadError('');
     setDepositsTtc(0);
+    setSourceBreakdown([]);
     setSubmitting(false);
     setLoading(true);
 
@@ -146,7 +202,9 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
       const [detailRes, linesRes, notesMap] = await Promise.all([
         supabase
           .from('invoices')
-          .select('client_id, project_id, tva_rate')
+          // `tva_breakdown` : indispensable pour ventiler un avoir sur une
+          // facture multi-taux sans tout imputer au taux majoritaire.
+          .select('client_id, project_id, tva_rate, tva_breakdown')
           .eq('id', invoice.id)
           .maybeSingle(),
         // Tous les champs de ligne : sans `section` / `subsection` / `tva_rate`
@@ -173,12 +231,18 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
         return;
       }
 
-      const detail = detailRes.data as { client_id?: string | null; project_id?: string | null; tva_rate?: number | null } | null;
+      const detail = detailRes.data as {
+        client_id?: string | null;
+        project_id?: string | null;
+        tva_rate?: number | null;
+        tva_breakdown?: unknown;
+      } | null;
       setSourceClientId(detail?.client_id || null);
       setSourceProjectId(detail?.project_id || null);
       const rate = safeTvaRate(detail?.tva_rate);
       setSourceTvaRate(rate);
       setTvaRate(rate);
+      setSourceBreakdown(parseTvaBreakdown(detail?.tva_breakdown));
       setSourceLines((linesRes.data as SourceInvoiceLine[] | null) || []);
       setExistingNotes(notesMap.get(invoice.id) || []);
 
@@ -207,11 +271,16 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
         const depositNotes = await fetchCreditNotesByInvoice(supabase, rows.map((d) => d.id));
         if (cancelled) return;
 
-        const net = rows.reduce((sum, d) => {
-          const gross = Number(d.total_ttc) || 0;
-          return sum + netRevenueTtc({ total_ttc: gross }, depositNotes.get(d.id) || []);
-        }, 0);
-        setDepositsTtc(Math.max(0, Math.round(net * 100) / 100));
+        // On borne à 0 acompte par acompte (netDueTtc), et non sur la somme :
+        // c'est exactement la règle de `fetchDepositsNetTtc` côté serveur et des
+        // routes de paiement. Avec un plafonnement global, un acompte
+        // sur-crédité viendrait en déduction des autres et autoriserait un avoir
+        // plus élevé ici que ce que le serveur accepte.
+        const net = rows.reduce(
+          (sum, d) => sum + netDueTtc({ total_ttc: Number(d.total_ttc) || 0 }, depositNotes.get(d.id) || []),
+          0,
+        );
+        setDepositsTtc(Math.round(net * 100) / 100);
       }
 
       setLoading(false);
@@ -241,11 +310,50 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
   /**
    * Une facture de solde ne peut pas etre avoiree par miroir de ses lignes :
    * celles-ci decrivent le devis entier, acomptes compris. On rectifie le
-   * montant net reellement reclame, en une ligne.
+   * montant net reellement reclame, ventile en une ligne par taux de TVA.
    */
   const mirrorForbidden = invoice.invoice_type === 'solde' && depositsTtc > 0;
+  /** Des acomptes ont déjà été facturés sur le devis : le bandeau doit le dire. */
+  const hasDeposits = depositsTtc > 0;
 
   const parsedAmountHt = useMemo(() => parseAmount(amountHt), [amountHt]);
+
+  /**
+   * Taux de TVA de la facture avec leur base HT. On préfère le `tva_breakdown`
+   * stocké sur le document ; à défaut (import ancien, colonne vide) on le
+   * reconstruit depuis les lignes.
+   */
+  const effectiveBreakdown = useMemo<TvaBreakdownEntry[]>(() => {
+    if (sourceBreakdown.length > 0) return sourceBreakdown;
+    if (sourceLines.length === 0) return [];
+    return computeTvaBreakdown(
+      sourceLines.map((line) => ({
+        quantity: Number(line.quantity) || 0,
+        unit_price: Number(line.unit_price) || 0,
+        tva_rate: line.tva_rate === null || line.tva_rate === undefined ? sourceTvaRate : Number(line.tva_rate),
+      })),
+    ).tva_breakdown;
+  }, [sourceBreakdown, sourceLines, sourceTvaRate]);
+
+  /**
+   * Lignes de l'avoir quand le miroir ligne à ligne est interdit (solde avec
+   * acomptes) : le net réellement réclamé, ventilé sur les taux de TVA que la
+   * facture a collectés. L'aperçu et l'insert partent du même tableau, ils ne
+   * peuvent pas diverger.
+   */
+  const netCreditLines = useMemo(() => {
+    if (!mirrorForbidden) return [];
+    const parts = splitHtByRate(claimedHtValue, effectiveBreakdown, sourceTvaRate);
+    const multiRate = parts.length > 1;
+    return parts.map((part, index) => ({
+      amountHt: part.amountHt,
+      tvaRate: part.tvaRate,
+      label: multiRate
+        ? `Annulation de la facture ${invoice.invoice_number} (net des acomptes) — TVA ${formatTvaRate(part.tvaRate)}`
+        : `Annulation de la facture ${invoice.invoice_number} (net des acomptes)`,
+      position: index,
+    }));
+  }, [mirrorForbidden, claimedHtValue, effectiveBreakdown, sourceTvaRate, invoice.invoice_number]);
 
   /**
    * Totaux de l'avoir, négatifs. En mode total on calcule à partir des lignes
@@ -261,10 +369,15 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
     if (mode === 'total') {
       if (mirrorForbidden) {
         // Les lignes decrivent le devis entier : les refleter crediterait aussi
-        // les acomptes, qui ont leur propre facture. On rectifie le net reclame.
-        return computeTvaBreakdown([
-          { quantity: 1, unit_price: -Math.abs(claimedHtValue), tva_rate: sourceTvaRate },
-        ]);
+        // les acomptes, qui ont leur propre facture. On rectifie le net reclame,
+        // ventile sur les taux de TVA reellement collectes par la facture.
+        return computeTvaBreakdown(
+          netCreditLines.map((line) => ({
+            quantity: 1,
+            unit_price: -Math.abs(line.amountHt),
+            tva_rate: line.tvaRate,
+          })),
+        );
       }
       if (creditLinesPreview.length > 0) {
         return computeTvaBreakdown(
@@ -284,7 +397,7 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
     return computeTvaBreakdown([
       { quantity: 1, unit_price: -Math.abs(parsedAmountHt), tva_rate: tvaRate },
     ]);
-  }, [mode, mirrorForbidden, claimedHtValue, creditLinesPreview, invoice.total_ht, sourceTvaRate, parsedAmountHt, tvaRate]);
+  }, [mode, mirrorForbidden, netCreditLines, creditLinesPreview, invoice.total_ht, sourceTvaRate, parsedAmountHt, tvaRate]);
 
   /** Valeur absolue du TTC crédité — le stockage, lui, reste négatif. */
   const creditTtc = Math.abs(totals.total_ttc);
@@ -383,18 +496,35 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
         throw insertError || new Error("Impossible de créer l'avoir.");
       }
 
-      const linesToInsert =
-        mode === 'total' && sourceLines.length > 0 && !mirrorForbidden
-          ? buildFullCreditNoteLines(sourceLines, user.id, created.id)
-          : [
-              buildPartialCreditNoteLine({
-                amountHt: mode === 'total' ? claimedHtValue : parsedAmountHt,
-                tvaRate: mode === 'total' ? sourceTvaRate : tvaRate,
-                label: mode === 'total' ? `Annulation de la facture ${invoice.invoice_number}` : effectiveLabel,
-                userId: user.id,
-                creditNoteId: created.id,
-              }),
-            ];
+      const linesToInsert = (() => {
+        // Solde avec acomptes : une ligne par taux de TVA, portant le net
+        // réclamé. Ce sont exactement les lignes prévisualisées.
+        if (mode === 'total' && mirrorForbidden) {
+          return netCreditLines.map((line) => ({
+            ...buildPartialCreditNoteLine({
+              amountHt: line.amountHt,
+              tvaRate: line.tvaRate,
+              label: line.label,
+              userId: user.id,
+              creditNoteId: created.id,
+            }),
+            // Plusieurs lignes : les positions doivent rester distinctes.
+            position: line.position,
+          }));
+        }
+        if (mode === 'total' && sourceLines.length > 0) {
+          return buildFullCreditNoteLines(sourceLines, user.id, created.id);
+        }
+        return [
+          buildPartialCreditNoteLine({
+            amountHt: mode === 'total' ? claimedHtValue : parsedAmountHt,
+            tvaRate: mode === 'total' ? sourceTvaRate : tvaRate,
+            label: mode === 'total' ? `Annulation de la facture ${invoice.invoice_number}` : effectiveLabel,
+            userId: user.id,
+            creditNoteId: created.id,
+          }),
+        ];
+      })();
 
       const { error: linesError } = await supabase.from('invoice_lines').insert(linesToInsert);
       if (linesError) {
@@ -432,9 +562,30 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
           {/* Bandeau facture rectifiée */}
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Montant de la facture TTC</span>
+              <span className="text-muted-foreground">
+                {hasDeposits ? 'Total du devis TTC' : 'Montant de la facture TTC'}
+              </span>
               <span className="font-semibold tabular-nums">{formatCurrency(invoice.total_ttc)}</span>
             </div>
+            {/* Une facture de solde porte le total BRUT du devis : sans ces deux
+                lignes, l'artisan lit un montant qui n'a jamais été réclamé au
+                client et croit à un plafonnement arbitraire. */}
+            {hasDeposits && (
+              <>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">dont acomptes déjà facturés</span>
+                  <span className="font-semibold tabular-nums text-rose-700">
+                    − {formatCurrency(depositsTtc)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Montant réclamé TTC</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatCurrency(claimedTtcValue)}
+                  </span>
+                </div>
+              </>
+            )}
             {alreadyCreditedTtc < 0 && (
               <div className="mt-1 flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Déjà crédité</span>
@@ -470,7 +621,17 @@ export function CreateCreditNoteDialog({ open, onOpenChange, invoice, onCreated 
             <div className="h-24 animate-pulse rounded-xl bg-muted" />
           ) : mode === 'total' ? (
             <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              {sourceLines.length > 0 ? (
+              {mirrorForbidden ? (
+                <>
+                  Les lignes de cette facture décrivent le devis entier, acomptes compris.
+                  L&apos;avoir ne reprend donc pas ces lignes : il porte le montant réellement
+                  réclamé après acomptes, soit {formatCurrency(claimedTtcValue)} TTC,{' '}
+                  {netCreditLines.length > 1
+                    ? `ventilé en ${netCreditLines.length} lignes, une par taux de TVA de la facture.`
+                    : `en une ligne à la TVA ${formatTvaRate(netCreditLines[0]?.tvaRate ?? sourceTvaRate)}.`}{' '}
+                  Les acomptes déjà facturés se rectifient depuis leur propre facture.
+                </>
+              ) : sourceLines.length > 0 ? (
                 <>
                   L&apos;avoir reprend les {sourceLines.length} ligne
                   {sourceLines.length > 1 ? 's' : ''} de la facture avec les signes inversés,

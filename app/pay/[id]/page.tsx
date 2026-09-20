@@ -187,30 +187,44 @@ export default function PublicPayPage() {
     if (!invoiceId) return;
 
     const res = await fetch(`/api/hellopay/pay-session/${invoiceId}`);
+    const data = await res.json().catch(() => null);
+
     if (!res.ok) {
-      setError('Lien de paiement invalide ou expire');
+      // L'API explique pourquoi le lien n'est plus servi (facture
+      // integralement creditee par un avoir, montant perime...) : on reprend
+      // son message plutot qu'un libelle generique.
+      setError(
+        typeof data?.error === 'string' && data.error
+          ? data.error
+          : 'Lien de paiement invalide ou expire',
+      );
       setLoading(false);
       return;
     }
-    const data = await res.json();
 
-    // Montant annonce au client : il doit etre exactement celui du
-    // PaymentIntent. `total_ttc` est le total BRUT de la facture : il ignore
-    // les avoirs deja emis (et, pour une facture de solde, les acomptes deja
-    // regles), donc il annoncerait un montant que Stripe ne debitera pas.
-    // On ne s'en sert que comme dernier recours d'affichage.
-    const fallbackCents = Math.round(
-      Number(data.net_due_ttc ?? data.total_ttc) * 100,
-    );
+    // Seule source de verite du montant : `net_due_ttc`, recalcule cote
+    // serveur (acomptes deja factures deduits pour une facture de solde, puis
+    // avoirs emis retires) et aligne sur le montant du PaymentIntent.
+    // `total_ttc` est le total BRUT : il annoncerait un montant que Stripe ne
+    // debitera pas, on ne s'en sert jamais.
+    const netDue = Number(data?.net_due_ttc);
+    if (!Number.isFinite(netDue)) {
+      setError('Montant indisponible, demandez un nouveau lien de paiement');
+      setLoading(false);
+      return;
+    }
+    const netDueCents = Math.round(netDue * 100);
 
     if (data.status === 'payee') {
+      // Montant reellement encaisse par Stripe (a defaut, le net recalcule).
+      const paid = Number(data.paid_amount_ttc);
       setPaid(true);
       setSession({
         id: data.id,
         stripe_account_id: data.payment_stripe_account_id || '',
         client_secret: data.payment_client_secret || '',
         publishable_key: data.payment_publishable_key || '',
-        amount_cents: fallbackCents,
+        amount_cents: Number.isFinite(paid) ? Math.round(paid * 100) : netDueCents,
         description: data.title,
         status: 'completed',
       });
@@ -228,19 +242,28 @@ export default function PublicPayPage() {
       stripeAccount: data.payment_stripe_account_id,
     });
 
-    // Seule verite de ce qui sera debite : le montant porte par le
-    // PaymentIntent lui-meme, calcule cote serveur net des avoirs.
-    let amountCents = fallbackCents;
+    // Garde-fou : ce qui sera debite est le montant porte par le
+    // PaymentIntent. L'API a deja refuse de servir un lien perime, mais si
+    // elle n'a pas pu le verifier on ne laisse jamais afficher un montant
+    // different de celui qui sera preleve.
     if (stripe) {
       try {
         const { paymentIntent } = await stripe.retrievePaymentIntent(
           data.payment_client_secret,
         );
-        if (paymentIntent && typeof paymentIntent.amount === 'number') {
-          amountCents = paymentIntent.amount;
+        if (
+          paymentIntent &&
+          typeof paymentIntent.amount === 'number' &&
+          Math.abs(paymentIntent.amount - netDueCents) > 1
+        ) {
+          setError(
+            'Le montant de ce lien de paiement n\'est plus a jour. Demandez un nouveau lien a votre artisan.',
+          );
+          setLoading(false);
+          return;
         }
       } catch {
-        // Reseau indisponible : on retombe sur le montant renvoye par l'API.
+        // Reseau indisponible : on garde le montant verifie cote serveur.
       }
     }
 
@@ -249,7 +272,7 @@ export default function PublicPayPage() {
       stripe_account_id: data.payment_stripe_account_id,
       client_secret: data.payment_client_secret,
       publishable_key: data.payment_publishable_key || '',
-      amount_cents: amountCents,
+      amount_cents: netDueCents,
       description: data.title,
       status: 'pending',
     };

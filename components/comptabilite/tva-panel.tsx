@@ -24,6 +24,7 @@ interface ExpenseRow {
 }
 
 interface InvoiceRow {
+  id: string;
   paid_at: string | null;
   issued_at: string | null;
   created_at: string;
@@ -33,6 +34,8 @@ interface InvoiceRow {
   tva_breakdown?: unknown;
   /** 'standard' | 'acompte' | 'solde' | 'avoir' — un avoir porte des montants négatifs. */
   invoice_type?: string | null;
+  /** Facture rectifiée par cet avoir — sert à savoir si sa TVA a été collectée. */
+  credited_invoice_id?: string | null;
 }
 
 interface Props {
@@ -110,11 +113,31 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
     for (const r of TVA_RATES) credited[String(r)] = { ht: 0, tva: 0 };
     let creditNoteCount = 0;
 
+    // Date d'encaissement de chaque facture, pour savoir si la TVA qu'un avoir
+    // régularise a bien été collectée un jour.
+    const paidAtById = new Map<string, string | null>();
+    for (const inv of invoices) paidAtById.set(inv.id, inv.paid_at);
+
     for (const inv of invoices) {
       // Un avoir n'est jamais encaissé : sa TVA se régularise dès l'émission
       // (art. 272-1 CGI). Le rattacher à paid_at le ferait disparaître du
       // panneau chez un artisan à la TVA sur les encaissements.
       const credit = isCreditNote(inv);
+
+      // …mais on ne régularise que ce qui a été collecté. En TVA sur les
+      // encaissements, une facture jamais réglée n'a jamais fait naître de TVA
+      // exigible (art. 269-2-c CGI) : l'avoir qui l'annule — le cas d'usage le
+      // plus courant, l'erreur de facturation — n'a donc rien à récupérer.
+      // Le compter fabriquerait un crédit de TVA qui n'existe pas. En TVA sur
+      // les débits, le couple facture / avoir est symétrique : rien à changer.
+      if (credit && tvaMethod === 'encaissements') {
+        const creditedId = inv.credited_invoice_id;
+        // Facture rectifiée connue et jamais encaissée → l'avoir est ignoré.
+        // Si elle est absente de la liste, on ne sait rien : on garde le
+        // comportement historique plutôt que de masquer une régularisation.
+        if (creditedId && paidAtById.has(creditedId) && !paidAtById.get(creditedId)) continue;
+      }
+
       const refDate = credit
         ? inv.issued_at || inv.created_at
         : tvaMethod === 'encaissements'
@@ -450,8 +473,10 @@ export function TvaPanel({ expenses, invoices, tvaMethod, vatRegime }: Props) {
         Estimation indicative. La déclaration officielle (CA3 / CA12) doit être validée par votre
         comptable. Les dépenses en autoliquidation TVA ne sont pas comptées comme déductibles côté
         artisan. Les avoirs émis sont ventilés par taux avec leurs montants négatifs et viennent en
-        diminution de la TVA collectée dès leur date d&apos;émission (art. 272-1 CGI), sans attendre
-        un quelconque encaissement.
+        diminution de la TVA collectée à leur date d&apos;émission (art. 272-1 CGI).
+        {tvaMethod === 'encaissements'
+          ? " En TVA sur les encaissements, un avoir qui annule une facture jamais réglée n'apparaît pas ici : cette TVA n'ayant jamais été exigible, il n'y a rien à récupérer."
+          : ''}
       </p>
     </div>
   );

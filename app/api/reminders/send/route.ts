@@ -5,12 +5,14 @@ import { buildPaymentReminderEmail } from '@/lib/email-templates';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { resolveFromEmail } from '@/lib/email-from';
 import {
+  claimedTtc,
   fetchCreditNotesByInvoice,
-  isFullyCredited,
+  fetchDepositsNetTtc,
   isIssuedCreditNote,
   netDueTtc,
   sumCreditNotesTtc,
   type CreditNoteRef,
+  type InvoiceType,
 } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
@@ -22,6 +24,8 @@ interface InvoiceRow {
   title: string;
   total_ttc: number;
   due_date: string;
+  invoice_type: InvoiceType | null;
+  quote_id: string | null;
   clients: { name: string; email: string | null } | null;
 }
 
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
   // peut donc pas écarter de lignes à NULL au passage.
   const invoicesRes = await supabaseAdmin
     .from('invoices')
-    .select('id, user_id, invoice_number, title, total_ttc, due_date, clients(name, email)')
+    .select('id, user_id, invoice_number, title, total_ttc, due_date, invoice_type, quote_id, clients(name, email)')
     .eq('status', 'envoyee')
     .eq('reminders_enabled', true)
     .neq('invoice_type', 'avoir')
@@ -105,6 +109,27 @@ export async function POST(request: Request) {
   const sentSet = new Set<string>();
   for (const l of (logsRes.data || []) as unknown as ReminderLog[]) {
     sentSet.add(`${l.invoice_id}:${l.reminder_level}`);
+  }
+
+  // Une facture de SOLDE stocke le total BRUT du devis : ce qu'elle réclame
+  // réellement au client, c'est ce total moins les acomptes déjà facturés,
+  // eux-mêmes nets de leurs propres avoirs. Sans cette déduction, la relance
+  // met en demeure pour un montant que ni la page publique ni Stripe ne
+  // réclament. On regroupe par devis : un seul aller-retour par devis distinct,
+  // et aucun pour les lots sans facture de solde.
+  const soldeQuoteIds = Array.from(
+    new Set(
+      invoices
+        .filter((i) => i.invoice_type === 'solde' && i.quote_id)
+        .map((i) => i.quote_id as string),
+    ),
+  );
+  const depositsByQuote = new Map<string, number>();
+  if (soldeQuoteIds.length > 0) {
+    const nets = await Promise.all(
+      soldeQuoteIds.map((quoteId) => fetchDepositsNetTtc(supabaseAdmin, quoteId)),
+    );
+    soldeQuoteIds.forEach((quoteId, index) => depositsByQuote.set(quoteId, nets[index]));
   }
 
   // Fetch artisan profiles for email content
@@ -147,19 +172,29 @@ export async function POST(request: Request) {
       const clientEmail = invoice.clients?.email;
       if (!clientEmail) continue;
 
-      // Avoirs émis sur cette facture. Une facture intégralement créditée
-      // n'est plus due : la relancer reviendrait à réclamer au client un
-      // montant qu'on lui a déjà crédité.
+      // Ordre canonique, identique aux routes d'encaissement : d'abord ce que
+      // la facture réclame vraiment (acomptes déduits pour un solde), puis les
+      // avoirs émis sur cette facture. Jamais le brut, et jamais deux fois la
+      // même déduction.
+      const depositsTtc =
+        invoice.invoice_type === 'solde' && invoice.quote_id
+          ? depositsByQuote.get(invoice.quote_id) || 0
+          : 0;
+      const claimed = claimedTtc(invoice, depositsTtc);
+
+      // Une facture intégralement créditée — ou un solde entièrement couvert
+      // par les acomptes — n'est plus due : la relancer reviendrait à réclamer
+      // au client un montant qu'on lui a déjà crédité ou qu'il a déjà réglé.
       const creditNotes: CreditNoteRef[] = creditNotesByInvoice.get(invoice.id) || [];
-      const netDue = netDueTtc(invoice, creditNotes);
-      if (isFullyCredited(invoice, creditNotes) || netDue <= 0.01) continue;
+      const netDue = netDueTtc({ total_ttc: claimed }, creditNotes);
+      if (netDue <= 0.01) continue;
 
       const issuedCreditNotes = creditNotes.filter(isIssuedCreditNote);
       const creditedTtc = sumCreditNotesTtc(creditNotes);
       const plural = issuedCreditNotes.length > 1 ? 's' : '';
       const creditNoteMention =
         issuedCreditNotes.length > 0 && creditedTtc < 0
-          ? `Facture de ${formatCurrency(invoice.total_ttc)}, avoir${plural} de ${formatCurrency(Math.abs(creditedTtc))} déduit${plural}.`
+          ? `Facture de ${formatCurrency(claimed)}, avoir${plural} de ${formatCurrency(Math.abs(creditedTtc))} déduit${plural}.`
           : null;
 
       const dueDate = new Date(invoice.due_date);

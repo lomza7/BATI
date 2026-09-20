@@ -2,8 +2,8 @@
 //
 // Stratégie : pour chaque transaction non rapprochée, on cherche
 //   - Débit (sortie de compte) → une dépense avec montant TTC == |amount| et date proche
-//   - Crédit (entrée) → une facture dont le montant brut OU le net d'avoirs
-//     == amount, et dont la date est proche
+//   - Crédit (entrée) → une facture dont le montant RÉCLAMÉ (acomptes déduits
+//     sur un solde) OU son net d'avoirs == amount, et dont la date est proche
 //
 // Si un seul candidat correspond, on l'attribue automatiquement (confidence = 1.0).
 // Sinon on laisse la transaction orpheline pour la passe IA ou le traitement manuel.
@@ -13,7 +13,12 @@
 // lib/invoices/credit-notes.ts).
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchCreditNotesByInvoice, isCreditNote, netDueTtc } from '@/lib/invoices/credit-notes';
+import {
+  claimedTtc,
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  netDueTtc,
+} from '@/lib/invoices/credit-notes';
 
 const DATE_WINDOW_DEBIT_DAYS = 7; // dépense saisie peut précéder/suivre le débit bancaire
 const DATE_WINDOW_CREDIT_DAYS = 7; // idem pour les paiements de factures
@@ -50,6 +55,7 @@ interface InvoiceRow {
   due_date: string | null;
   status: string | null;
   invoice_type: string | null;
+  quote_id: string | null;
   bank_transaction_id: string | null;
 }
 
@@ -98,7 +104,9 @@ export async function autoMatchTransactions(
   // négatif et aucune entrée bancaire ne leur correspond.
   const { data: invData, error: invErr } = await sb
     .from('invoices')
-    .select('id, total_ttc, paid_at, issued_at, due_date, status, invoice_type, bank_transaction_id')
+    .select(
+      'id, total_ttc, paid_at, issued_at, due_date, status, invoice_type, quote_id, bank_transaction_id',
+    )
     .eq('user_id', userId)
     .is('bank_transaction_id', null);
   if (invErr) throw invErr;
@@ -112,6 +120,13 @@ export async function autoMatchTransactions(
     sb,
     invoices.map((i) => i.id),
   );
+
+  // Acomptes déjà facturés, nets de leurs propres avoirs, par devis. Une
+  // facture de solde stocke le total BRUT du devis : sans cette déduction, on
+  // chercherait sur le relevé un montant que l'app n'a jamais réclamé au
+  // client. Rien n'est chargé quand aucun solde n'est en jeu — le cas de
+  // l'immense majorité des artisans.
+  const depositsNetByQuote = await fetchDepositsNetByQuote(sb, userId, invoices);
 
   let matched = 0;
   let ambiguous = 0;
@@ -147,17 +162,28 @@ export async function autoMatchTransactions(
       const candidates = invoices.filter((i) => {
         if (usedInvoiceIds.has(i.id)) return false;
         if (i.total_ttc == null) return false;
+        // Ordre canonique : on part de ce que la facture RÉCLAME réellement
+        // (`claimedTtc` retire les acomptes déjà facturés sur un solde), puis
+        // on en déduit les avoirs. Partir du `total_ttc` brut d'un solde
+        // reviendrait à chercher le total du devis, que le client n'a jamais
+        // eu à virer.
+        //
         // Deux montants sont acceptables sur le relevé :
         //  - le net d'avoirs, quand le client règle une facture déjà créditée ;
-        //  - le brut, quand le virement a eu lieu AVANT l'émission de l'avoir
-        //    (facture réglée en totalité, puis remboursement séparé).
+        //  - le montant réclamé sans avoir, quand le virement a eu lieu AVANT
+        //    l'émission de l'avoir (facture réglée en totalité, puis
+        //    remboursement séparé).
         // Ne chercher que le net perdrait ce second cas, pourtant le plus
         // fréquent : un avoir se constate presque toujours après coup.
-        const gross = Number(i.total_ttc);
-        const net = netDueTtc(i, creditNotesByInvoice.get(i.id) || []);
+        const deposits =
+          i.invoice_type === 'solde' && i.quote_id
+            ? depositsNetByQuote.get(i.quote_id) || 0
+            : 0;
+        const claimed = claimedTtc(i, deposits);
+        const net = netDueTtc({ total_ttc: claimed }, creditNotesByInvoice.get(i.id) || []);
         const amountMatches =
           (net > 0 && Math.abs(net - target) < 0.01) ||
-          (gross > 0 && Math.abs(gross - target) < 0.01);
+          (claimed > 0 && Math.abs(claimed - target) < 0.01);
         if (!amountMatches) return false;
         const refDate = i.paid_at || i.issued_at || i.due_date;
         if (!refDate) return true;
@@ -293,6 +319,58 @@ export async function clearMatch(
 }
 
 // ───────────────────────── Helpers ─────────────────────────
+
+/**
+ * Acomptes déjà facturés, nets des avoirs émis sur chacun, indexés par devis.
+ *
+ * C'est l'équivalent groupé de `fetchDepositsNetTtc`
+ * (lib/invoices/credit-notes.ts), qui ne traite qu'un devis à la fois : un
+ * rapprochement porte sur tout le portefeuille de factures, on ne peut pas
+ * faire un aller-retour par ligne. Les filtres sont volontairement identiques
+ * à ceux de la version partagée — c'est la seule façon de chercher sur le
+ * relevé exactement le montant que l'app a réclamé au client.
+ */
+async function fetchDepositsNetByQuote(
+  sb: SupabaseClient,
+  userId: string,
+  invoices: InvoiceRow[],
+): Promise<Map<string, number>> {
+  const byQuote = new Map<string, number>();
+  const quoteIds = Array.from(
+    new Set(
+      invoices
+        .filter((i) => i.invoice_type === 'solde' && i.quote_id)
+        .map((i) => i.quote_id as string),
+    ),
+  );
+  if (quoteIds.length === 0) return byQuote;
+
+  const { data } = await sb
+    .from('invoices')
+    .select('id, quote_id, total_ttc')
+    .eq('user_id', userId)
+    .eq('invoice_type', 'acompte')
+    .neq('status', 'annulee')
+    .in('quote_id', quoteIds);
+
+  const deposits = (data || []) as Array<{
+    id: string;
+    quote_id: string;
+    total_ttc: number | null;
+  }>;
+  if (deposits.length === 0) return byQuote;
+
+  const notesByDeposit = await fetchCreditNotesByInvoice(
+    sb,
+    deposits.map((d) => d.id),
+  );
+  for (const d of deposits) {
+    const net = netDueTtc(d, notesByDeposit.get(d.id) || []);
+    const total = (byQuote.get(d.quote_id) || 0) + net;
+    byQuote.set(d.quote_id, Math.round(total * 100) / 100);
+  }
+  return byQuote;
+}
 
 function shiftDate(date: string, days: number): string {
   const d = new Date(date + 'T00:00:00');
