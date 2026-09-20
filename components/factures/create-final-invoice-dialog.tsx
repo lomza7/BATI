@@ -13,6 +13,12 @@
  * Pourquoi le brut en DB plutôt que le net : si un acompte est annulé
  * après coup, la facture de solde reste correcte sans besoin de la
  * modifier. La déduction est une vue, pas une donnée persistante.
+ *
+ * Les acomptes déduits sont **nets des avoirs** émis sur eux : un acompte
+ * crédité n'a plus à être déduit du solde, sinon le client sous-paierait.
+ * C'est exactement ce que fait la vue publique de la facture
+ * (`get_public_invoice_by_token`), et les deux doivent annoncer le même
+ * « Reste à payer ».
  */
 
 import { useMemo, useState } from 'react';
@@ -32,7 +38,8 @@ import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { computeTvaBreakdown } from '@/lib/tva';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
-import type { QuoteBillingSummary } from '@/lib/invoices/deposits';
+import { creditNotesFor, type QuoteBillingSummary } from '@/lib/invoices/deposits';
+import { claimedTtc, netDueTtc, sumCreditNotesTtc } from '@/lib/invoices/credit-notes';
 
 interface QuoteLine {
   id: string;
@@ -87,19 +94,45 @@ export function CreateFinalInvoiceDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
 
+  /**
+   * Acomptes du devis, chacun ramené au montant réellement resté à la charge
+   * du client : total TTC diminué des avoirs émis dessus (borné à 0).
+   */
   const deposits = useMemo(
-    () => billing.invoices.filter((i) => i.invoice_type === 'acompte'),
-    [billing.invoices],
+    () =>
+      billing.invoices
+        .filter((i) => i.invoice_type === 'acompte')
+        .map((d) => {
+          const notes = creditNotesFor(billing, d.id);
+          const creditedTtc = sumCreditNotesTtc(notes);
+          return {
+            invoice: d,
+            /** Négatif ou nul. */
+            creditedTtc,
+            /** Ce qui reste déductible du solde. */
+            netTtc: netDueTtc(d, notes),
+          };
+        }),
+    [billing],
   );
 
   const deductedTtc = useMemo(
-    () => deposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0),
+    () => Math.round(deposits.reduce((sum, d) => sum + d.netTtc, 0) * 100) / 100,
     [deposits],
   );
 
-  const remainingToPayTtc = Math.max(0, quote.total_ttc - deductedTtc);
+  // Même calcul que `claimedTtc` côté rendu et côté vue publique : le solde
+  // réclame le total du devis moins les acomptes nets.
+  const remainingToPayTtc = claimedTtc(
+    { total_ttc: quote.total_ttc, invoice_type: 'solde' },
+    deductedTtc,
+  );
 
-  const hasUnpaidDeposit = deposits.some((d) => d.status !== 'payee');
+  // Un acompte intégralement crédité n'a plus rien à encaisser : il ne doit
+  // pas déclencher l'avertissement « acompte non payé ».
+  const hasUnpaidDeposit = deposits.some((d) => d.invoice.status !== 'payee' && d.netTtc > 0);
+
+  const hasCreditedDeposit = deposits.some((d) => d.creditedTtc < 0);
 
   async function handleCreate() {
     if (!user || !confirmed || submitting) return;
@@ -225,31 +258,46 @@ export function CreateFinalInvoiceDialog({
               <p className="text-xs font-semibold text-[#d35400] uppercase tracking-wide">
                 Acomptes à déduire
               </p>
-              {deposits.map((d) => {
+              {deposits.map(({ invoice: d, creditedTtc, netTtc }) => {
                 const dateStr = d.issued_at || d.created_at;
+                const fullyCredited = creditedTtc < 0 && netTtc <= 0;
                 return (
                   <div key={d.id} className="flex items-center justify-between text-sm gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground truncate">{d.invoice_number}</p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(dateStr)}
-                        {d.status !== 'payee' && (
+                        {d.status !== 'payee' && netTtc > 0 && (
                           <span className="ml-1 text-amber-700">• Non payé</span>
+                        )}
+                        {fullyCredited && (
+                          <span className="ml-1 text-amber-700">• Annulé par avoir</span>
+                        )}
+                        {creditedTtc < 0 && !fullyCredited && (
+                          <span className="ml-1 text-amber-700">
+                            • Avoir de {formatCurrency(Math.abs(creditedTtc))} déduit
+                          </span>
                         )}
                       </p>
                     </div>
-                    <span className="tabular-nums font-medium">
-                      − {formatCurrency(Number(d.total_ttc))}
-                    </span>
+                    <span className="tabular-nums font-medium">− {formatCurrency(netTtc)}</span>
                   </div>
                 );
               })}
               <div className="flex justify-between pt-2 border-t border-[#d35400]/20 text-sm">
-                <span className="font-semibold">Total déduit</span>
+                <span className="font-semibold">
+                  Total déduit{hasCreditedDeposit ? ' (net des avoirs)' : ''}
+                </span>
                 <span className="font-semibold tabular-nums">
                   − {formatCurrency(deductedTtc)}
                 </span>
               </div>
+              {hasCreditedDeposit && (
+                <p className="text-[11px] leading-snug text-[#d35400]/80">
+                  La part d&apos;acompte annulée par un avoir n&apos;est plus déduite : le client
+                  la doit sur cette facture de solde.
+                </p>
+              )}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
@@ -290,7 +338,8 @@ export function CreateFinalInvoiceDialog({
               className="mt-0.5"
             />
             <Label htmlFor="final-confirm" className="text-sm cursor-pointer leading-snug">
-              Je confirme que tous les acomptes ci-dessus seront déduits sur cette facture de solde.
+              Je confirme que les montants d&apos;acompte ci-dessus, nets des avoirs émis, seront
+              déduits sur cette facture de solde.
             </Label>
           </label>
 

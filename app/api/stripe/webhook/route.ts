@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       const invoiceId = session.metadata?.invoice_id;
-      if (invoiceId) {
+      if (invoiceId && !(await isCreditNoteInvoice(invoiceId))) {
         await supabaseAdmin.rpc('mark_invoice_paid', {
           p_invoice_id: invoiceId,
           p_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : '',
@@ -164,6 +165,12 @@ export async function POST(request: Request) {
       const connectedAccountId = event.account; // set on Connect events
 
       if (invoiceId) {
+        // Un avoir ne s'encaisse pas : on n'ecrit ni le statut, ni le
+        // payment_method, meme si un PaymentIntent porte son id en metadata.
+        if (await isCreditNoteInvoice(invoiceId)) {
+          console.warn('[stripe/webhook] paiement Terminal ignore : la facture est un avoir', invoiceId);
+          break;
+        }
         // Payment initiated from Hellobat Terminal — mark invoice paid
         await supabaseAdmin.rpc('mark_invoice_paid', {
           p_invoice_id: invoiceId,
@@ -200,6 +207,22 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+/**
+ * Un avoir est une facture rectificative : il rembourse le client et n'est
+ * jamais encaisse (cf. lib/invoices/credit-notes.ts). La RPC mark_invoice_paid
+ * le refuse deja cote base, on l'arrete ici pour ne pas non plus ecrire les
+ * champs de paiement qui l'entourent. Une facture introuvable est traitee comme
+ * un avoir : on ne touche a rien.
+ */
+async function isCreditNoteInvoice(invoiceId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('invoices')
+    .select('invoice_type')
+    .eq('id', invoiceId)
+    .maybeSingle();
+  return !data || isCreditNote(data);
 }
 
 async function creditPackPurchase(args: { userId: string; credits: number; sessionId: string }) {

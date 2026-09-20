@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isCreditNoteImportItem } from '@/lib/ai/invoice-import-schema';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,42 @@ interface CheckItem {
   invoice_date: string;
   invoice_number: string;
   amount_ttc: number;
+  amount_ht?: number;
+  /** 'facture' (défaut) ou 'avoir'. */
+  document_type?: string;
+  /** Avoirs : numéro de la facture rectifiée, tel que lu sur le document. */
+  credited_invoice_number?: string;
+}
+
+/** Arrondi à 2 décimales — même règle que lib/tva.ts. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function num(v: unknown): number {
+  const parsed = Number(v);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Empreinte d'un avoir : facture rectifiée + montant TTC + date d'émission.
+ *
+ * Un avoir importé prend un numéro regénéré dans la série AV- et ne crée aucun
+ * chantier : ni la détection par `invoice_number`, ni l'empreinte de chantier
+ * ne peuvent le reconnaître. Sans cette clé, un même avoir rescanné déduirait
+ * deux fois de la facture d'origine.
+ *
+ * NOTE : même clé dans app/api/ai/invoice-import/commit/route.ts, qui fait foi.
+ * Les deux doivent rester alignées (helper volontairement local, cf. lot
+ * d'implémentation des avoirs).
+ */
+function creditNoteFingerprint(
+  creditedInvoiceId: string,
+  totalTtc: number,
+  issuedAt: string | null | undefined,
+): string {
+  const day = String(issuedAt || '').slice(0, 10);
+  return creditedInvoiceId + '|' + round2(Math.abs(num(totalTtc))).toFixed(2) + '|' + day;
 }
 
 export type DuplicateFlag = {
@@ -53,10 +90,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Items manquants' }, { status: 400 });
   }
 
-  // Fetch existing invoice numbers
+  // Fetch existing invoices (numbers + données nécessaires aux avoirs)
   const { data: existingInvoices } = await supabaseAdmin
     .from('invoices')
-    .select('invoice_number')
+    .select('id, invoice_number, invoice_type, credited_invoice_id, total_ttc, issued_at')
     .eq('user_id', ownerId);
 
   const existingInvoiceNumbers = new Set(
@@ -64,6 +101,25 @@ export async function POST(request: Request) {
       .map(function (inv) { return (inv.invoice_number || '').trim().toLowerCase(); })
       .filter(Boolean),
   );
+
+  // Numéro → id, pour résoudre la facture rectifiée référencée par un avoir.
+  const invoiceIdByNumber = new Map<string, string>();
+  const existingCreditNoteFingerprints = new Set<string>();
+  for (const inv of existingInvoices || []) {
+    const number = (inv.invoice_number || '').trim().toLowerCase();
+    if (number && inv.invoice_type !== 'avoir') {
+      invoiceIdByNumber.set(number, inv.id as string);
+    }
+    if (inv.invoice_type === 'avoir' && inv.credited_invoice_id) {
+      existingCreditNoteFingerprints.add(
+        creditNoteFingerprint(
+          inv.credited_invoice_id as string,
+          inv.total_ttc as number,
+          inv.issued_at as string | null,
+        ),
+      );
+    }
+  }
 
   // Fetch existing projects with client info for fuzzy matching
   const { data: existingProjects } = await supabaseAdmin
@@ -102,6 +158,23 @@ export async function POST(request: Request) {
         index: i,
         reason: 'Facture n°' + item.invoice_number + ' déjà existante',
       });
+      continue;
+    }
+
+    // Avoir : l'empreinte de chantier ne veut rien dire (un avoir n'en crée
+    // aucun). On compare à la facture rectifiée, au montant et à la date.
+    if (isCreditNoteImportItem(item)) {
+      const creditedNumber = (item.credited_invoice_number || '').trim().toLowerCase();
+      const creditedId = creditedNumber ? invoiceIdByNumber.get(creditedNumber) : undefined;
+      if (creditedId) {
+        const fingerprint = creditNoteFingerprint(creditedId, item.amount_ttc, item.invoice_date);
+        if (existingCreditNoteFingerprints.has(fingerprint)) {
+          duplicates.push({
+            index: i,
+            reason: 'Avoir déjà importé sur la facture n°' + (item.credited_invoice_number || '').trim(),
+          });
+        }
+      }
       continue;
     }
 

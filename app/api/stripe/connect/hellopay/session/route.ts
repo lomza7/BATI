@@ -2,8 +2,17 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  claimedTtc,
+  fetchCreditNotesByInvoice,
+  fetchDepositsNetTtc,
+  isCreditNote,
+  netDueTtc,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
+
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -36,7 +45,7 @@ export async function POST(request: Request) {
   // requête forgée avec un amount_cents arbitraire.
   const { data: invoice } = await supabaseAdmin
     .from('invoices')
-    .select('id, total_ttc, status')
+    .select('id, total_ttc, status, invoice_type, quote_id')
     .eq('id', invoice_id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -44,13 +53,42 @@ export async function POST(request: Request) {
   if (!invoice) {
     return NextResponse.json({ error: 'Facture introuvable' }, { status: 404 });
   }
-  if (invoice.status === 'payee' || invoice.status === 'annulee') {
-    return NextResponse.json({ error: 'Facture déjà payée ou annulée' }, { status: 400 });
+
+  // Un avoir rembourse le client : il n'est jamais encaissable, ni en ligne,
+  // ni au terminal, ni par lien de paiement.
+  if (isCreditNote(invoice)) {
+    return NextResponse.json(
+      { error: 'Un avoir ne peut pas être encaissé' },
+      { status: 400 },
+    );
   }
 
-  const amount_cents = Math.round(Number(invoice.total_ttc) * 100);
+  if (invoice.status === 'payee' || invoice.status === 'annulee') {
+    return NextResponse.json({ error: 'Cette facture est déjà payée ou annulée' }, { status: 400 });
+  }
+
+  // Facture de solde : on ne réclame que le reste après acomptes, ces
+  // derniers étant comptés nets de leurs propres avoirs.
+  const depositsTtc =
+    invoice.invoice_type === 'solde' && invoice.quote_id
+      ? await fetchDepositsNetTtc(supabaseAdmin, invoice.quote_id)
+      : 0;
+
+  // Avoirs émis sur cette facture : on encaisse le net, jamais le brut.
+  const creditNotes = (await fetchCreditNotesByInvoice(supabaseAdmin, [invoice.id])).get(invoice.id) || [];
+  const creditedTtc = sumCreditNotesTtc(creditNotes);
+  const amount_cents = Math.round(
+    netDueTtc({ total_ttc: claimedTtc(invoice, depositsTtc) }, creditNotes) * 100,
+  );
   if (!amount_cents || amount_cents <= 0) {
-    return NextResponse.json({ error: 'Montant invalide' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: creditedTtc < 0
+          ? 'Cette facture a été intégralement créditée par un avoir'
+          : 'Montant invalide',
+      },
+      { status: 400 },
+    );
   }
 
   // Fetch artisan's Stripe connection
@@ -116,6 +154,9 @@ export async function POST(request: Request) {
       session_id: invoice_id,
       client_secret: paymentIntent.client_secret,
       payment_intent_id: paymentIntent.id,
+      // Montant réellement débité : c'est celui-ci qu'il faut afficher au
+      // client, jamais le total brut de la facture.
+      amount_cents,
       stripe_account_id: connection.stripe_account_id,
       publishable_key: publishableKey,
       pay_url: payUrl,

@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  claimedTtc,
+  fetchCreditNotesByInvoice,
+  fetchDepositsNetTtc,
+  isCreditNote,
+  netDueTtc,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
+
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -45,31 +54,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Facture introuvable' }, { status: 404 });
   }
 
-  if (invoice.status === 'payee') {
-    return NextResponse.json({ error: 'Cette facture est deja payee' }, { status: 400 });
+  // Un avoir est une facture rectificative : il rembourse le client, il ne
+  // s'encaisse jamais. Aucun lien de paiement ne doit pouvoir le régler.
+  if (isCreditNote(invoice)) {
+    return NextResponse.json(
+      { error: 'Un avoir ne peut pas être réglé en ligne' },
+      { status: 400 },
+    );
+  }
+
+  if (invoice.status === 'payee' || invoice.status === 'annulee') {
+    return NextResponse.json(
+      { error: 'Cette facture est déjà payée ou annulée' },
+      { status: 400 },
+    );
   }
 
   // Pour les factures de solde : on calcule le reste à payer en déduisant les
-  // acomptes liés non annulés. C'est volontairement recalculé à la lecture
-  // (pas stocké) pour rester correct si un acompte est annulé après coup.
-  let effectiveTotalTtc = Number(invoice.total_ttc);
-  if (invoice.invoice_type === 'solde' && invoice.quote_id) {
-    const { data: deposits } = await supabaseAdmin
-      .from('invoices')
-      .select('total_ttc')
-      .eq('quote_id', invoice.quote_id)
-      .eq('invoice_type', 'acompte')
-      .neq('status', 'annulee');
-    const deducted = (deposits || []).reduce(
-      (sum, d) => sum + Number(d.total_ttc || 0),
-      0,
-    );
-    effectiveTotalTtc = Math.max(0, Number(invoice.total_ttc) - deducted);
-  }
+  // acomptes liés non annulés, nets de leurs propres avoirs. C'est
+  // volontairement recalculé à la lecture (pas stocké) pour rester correct si
+  // un acompte est annulé ou crédité après coup.
+  const depositsTtc =
+    invoice.invoice_type === 'solde' && invoice.quote_id
+      ? await fetchDepositsNetTtc(supabaseAdmin, invoice.quote_id)
+      : 0;
+
+  // Avoirs émis sur cette facture : on encaisse le net, jamais le brut, sinon
+  // on réclame au client un montant qu'on lui a déjà crédité. `claimedTtc`
+  // ramène d'abord la facture à ce qu'elle réclame réellement (cas du solde),
+  // puis `netDueTtc` en retire les avoirs — jamais deux fois les mêmes.
+  const creditNotes = (await fetchCreditNotesByInvoice(supabaseAdmin, [invoice.id])).get(invoice.id) || [];
+  const creditedTtc = sumCreditNotesTtc(creditNotes);
+  const effectiveTotalTtc = netDueTtc(
+    { total_ttc: claimedTtc(invoice, depositsTtc) },
+    creditNotes,
+  );
 
   if (effectiveTotalTtc <= 0) {
     return NextResponse.json(
-      { error: 'Cette facture ne comporte aucun montant à régler' },
+      {
+        error: creditedTtc < 0
+          ? 'Cette facture a été intégralement créditée par un avoir'
+          : 'Cette facture ne comporte aucun montant à régler',
+      },
       { status: 400 },
     );
   }

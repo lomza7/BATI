@@ -2,12 +2,18 @@
 //
 // Stratégie : pour chaque transaction non rapprochée, on cherche
 //   - Débit (sortie de compte) → une dépense avec montant TTC == |amount| et date proche
-//   - Crédit (entrée) → une facture payée avec total_ttc == amount et date proche
+//   - Crédit (entrée) → une facture dont le montant brut OU le net d'avoirs
+//     == amount, et dont la date est proche
 //
 // Si un seul candidat correspond, on l'attribue automatiquement (confidence = 1.0).
 // Sinon on laisse la transaction orpheline pour la passe IA ou le traitement manuel.
+//
+// Les avoirs sont hors jeu de bout en bout : ils remboursent le client, ne
+// s'encaissent pas, et les rapprocher les passerait à « payée » (cf.
+// lib/invoices/credit-notes.ts).
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchCreditNotesByInvoice, isCreditNote, netDueTtc } from '@/lib/invoices/credit-notes';
 
 const DATE_WINDOW_DEBIT_DAYS = 7; // dépense saisie peut précéder/suivre le débit bancaire
 const DATE_WINDOW_CREDIT_DAYS = 7; // idem pour les paiements de factures
@@ -43,6 +49,7 @@ interface InvoiceRow {
   issued_at: string | null;
   due_date: string | null;
   status: string | null;
+  invoice_type: string | null;
   bank_transaction_id: string | null;
 }
 
@@ -87,14 +94,24 @@ export async function autoMatchTransactions(
   if (expErr) throw expErr;
   const expenses = (expData || []) as ExpenseRow[];
 
-  // Factures non encore liées
+  // Factures non encore liées. Les avoirs sont écartés : leur montant est
+  // négatif et aucune entrée bancaire ne leur correspond.
   const { data: invData, error: invErr } = await sb
     .from('invoices')
-    .select('id, total_ttc, paid_at, issued_at, due_date, status, bank_transaction_id')
+    .select('id, total_ttc, paid_at, issued_at, due_date, status, invoice_type, bank_transaction_id')
     .eq('user_id', userId)
     .is('bank_transaction_id', null);
   if (invErr) throw invErr;
-  const invoices = (invData || []) as InvoiceRow[];
+  const invoices = ((invData || []) as InvoiceRow[]).filter((i) => !isCreditNote(i));
+
+  // Avoirs émis sur ces factures : une facture créditée avant paiement est
+  // réglée pour son net, c'est ce montant-là qui apparaît alors sur le relevé
+  // — sans faire disparaître le brut, qui reste valable si l'avoir a suivi le
+  // virement.
+  const creditNotesByInvoice = await fetchCreditNotesByInvoice(
+    sb,
+    invoices.map((i) => i.id),
+  );
 
   let matched = 0;
   let ambiguous = 0;
@@ -130,7 +147,18 @@ export async function autoMatchTransactions(
       const candidates = invoices.filter((i) => {
         if (usedInvoiceIds.has(i.id)) return false;
         if (i.total_ttc == null) return false;
-        if (Math.abs(Number(i.total_ttc) - target) >= 0.01) return false;
+        // Deux montants sont acceptables sur le relevé :
+        //  - le net d'avoirs, quand le client règle une facture déjà créditée ;
+        //  - le brut, quand le virement a eu lieu AVANT l'émission de l'avoir
+        //    (facture réglée en totalité, puis remboursement séparé).
+        // Ne chercher que le net perdrait ce second cas, pourtant le plus
+        // fréquent : un avoir se constate presque toujours après coup.
+        const gross = Number(i.total_ttc);
+        const net = netDueTtc(i, creditNotesByInvoice.get(i.id) || []);
+        const amountMatches =
+          (net > 0 && Math.abs(net - target) < 0.01) ||
+          (gross > 0 && Math.abs(gross - target) < 0.01);
+        if (!amountMatches) return false;
         const refDate = i.paid_at || i.issued_at || i.due_date;
         if (!refDate) return true;
         return dateWithinDays(refDate.slice(0, 10), tx.transaction_date, DATE_WINDOW_CREDIT_DAYS);
@@ -160,6 +188,34 @@ export async function applyMatch(
   method: 'auto' | 'ai' | 'manual' = 'auto',
   confidence: number = 1.0,
 ): Promise<void> {
+  // Garde avoirs + contrôle de direction : on lit la cible et la transaction
+  // AVANT toute écriture, pour refuser un rapprochement interdit sans avoir
+  // laissé de lien à moitié posé derrière soi.
+  let invoice: Pick<InvoiceRow, 'paid_at' | 'status' | 'invoice_type'> | null = null;
+  let txDirection: string | null = null;
+  let txDate: string | null = null;
+
+  if (kind === 'invoice') {
+    const { data: invRow } = await sb
+      .from('invoices')
+      .select('paid_at, status, invoice_type')
+      .eq('id', targetId)
+      .maybeSingle();
+    invoice = (invRow as Pick<InvoiceRow, 'paid_at' | 'status' | 'invoice_type'> | null) || null;
+
+    if (isCreditNote(invoice)) {
+      throw new Error("Un avoir ne peut pas être rapproché d'une transaction bancaire");
+    }
+
+    const { data: txRow } = await sb
+      .from('bank_transactions')
+      .select('direction, transaction_date')
+      .eq('id', bankTransactionId)
+      .maybeSingle();
+    txDirection = (txRow?.direction as string | null) ?? null;
+    txDate = (txRow?.transaction_date as string | null) ?? null;
+  }
+
   const update: Record<string, unknown> = {
     matched_at: new Date().toISOString(),
     matched_kind: kind,
@@ -182,26 +238,21 @@ export async function applyMatch(
     .eq('id', targetId);
   if (linkErr) throw linkErr;
 
-  // Si c'est une facture rapprochée à une transaction "credit", on la marque payée
-  if (kind === 'invoice') {
-    const { data: inv } = await sb
+  // Si c'est une facture rapprochée à une transaction "credit", on la marque
+  // payée. Un débit (sortie de compte) ne solde jamais une facture : ce serait
+  // un remboursement, qui passe par un avoir et non par ce chemin.
+  if (
+    kind === 'invoice' &&
+    invoice &&
+    !invoice.paid_at &&
+    invoice.status !== 'annulee' &&
+    txDirection === 'credit' &&
+    txDate
+  ) {
+    await sb
       .from('invoices')
-      .select('paid_at, status')
-      .eq('id', targetId)
-      .maybeSingle();
-    if (inv && !inv.paid_at) {
-      const { data: tx } = await sb
-        .from('bank_transactions')
-        .select('transaction_date')
-        .eq('id', bankTransactionId)
-        .maybeSingle();
-      if (tx?.transaction_date) {
-        await sb
-          .from('invoices')
-          .update({ paid_at: tx.transaction_date, status: 'payee' })
-          .eq('id', targetId);
-      }
-    }
+      .update({ paid_at: txDate, status: 'payee' })
+      .eq('id', targetId);
   }
 }
 

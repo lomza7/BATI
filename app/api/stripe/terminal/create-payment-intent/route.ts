@@ -2,8 +2,17 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  claimedTtc,
+  fetchCreditNotesByInvoice,
+  fetchDepositsNetTtc,
+  isCreditNote,
+  netDueTtc,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
+
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -44,28 +53,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Facture introuvable' }, { status: 404 });
   }
 
-  if (invoice.status === 'payee') {
-    return NextResponse.json({ error: 'Cette facture est déjà payée' }, { status: 400 });
+  // Un avoir rembourse le client : il ne peut pas être encaissé au terminal.
+  if (isCreditNote(invoice)) {
+    return NextResponse.json(
+      { error: 'Un avoir ne peut pas être encaissé' },
+      { status: 400 },
+    );
   }
 
-  // Pour les factures de solde : déduire les acomptes non annulés
-  let effectiveTotalTtc = Number(invoice.total_ttc);
-  if (invoice.invoice_type === 'solde' && invoice.quote_id) {
-    const { data: deposits } = await supabaseAdmin
-      .from('invoices')
-      .select('total_ttc')
-      .eq('quote_id', invoice.quote_id)
-      .eq('invoice_type', 'acompte')
-      .neq('status', 'annulee');
-    const deducted = (deposits || []).reduce(
-      (sum, d) => sum + Number(d.total_ttc || 0),
-      0,
+  if (invoice.status === 'payee' || invoice.status === 'annulee') {
+    return NextResponse.json(
+      { error: 'Cette facture est déjà payée ou annulée' },
+      { status: 400 },
     );
-    effectiveTotalTtc = Math.max(0, Number(invoice.total_ttc) - deducted);
   }
+
+  // Pour les factures de solde : déduire les acomptes non annulés, nets de
+  // leurs propres avoirs.
+  const depositsTtc =
+    invoice.invoice_type === 'solde' && invoice.quote_id
+      ? await fetchDepositsNetTtc(supabaseAdmin, invoice.quote_id)
+      : 0;
+
+  // Avoirs émis sur cette facture : on encaisse le net, pas le brut. Même
+  // enchaînement que les autres routes d'encaissement — ce que la facture
+  // réclame vraiment (claimedTtc), puis déduction de ses avoirs.
+  const creditNotes = (await fetchCreditNotesByInvoice(supabaseAdmin, [invoice.id])).get(invoice.id) || [];
+  const creditedTtc = sumCreditNotesTtc(creditNotes);
+  const effectiveTotalTtc = netDueTtc(
+    { total_ttc: claimedTtc(invoice, depositsTtc) },
+    creditNotes,
+  );
 
   if (effectiveTotalTtc <= 0) {
-    return NextResponse.json({ error: 'Cette facture ne comporte aucun montant à régler' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: creditedTtc < 0
+          ? 'Cette facture a été intégralement créditée par un avoir'
+          : 'Cette facture ne comporte aucun montant à régler',
+      },
+      { status: 400 },
+    );
   }
 
   // Fetch artisan's Stripe connection

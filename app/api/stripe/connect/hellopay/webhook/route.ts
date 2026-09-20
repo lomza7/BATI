@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -52,6 +53,23 @@ export async function POST(request: Request) {
     // Mark invoice as paid
     const invoiceId = pi.metadata?.invoice_id;
     if (invoiceId) {
+      // Ce webhook écrit le statut en direct (il ne passe pas par la RPC
+      // mark_invoice_paid, qui refuse déjà les avoirs côté base) : on vérifie
+      // donc ici qu'on ne solde pas une facture rectificative.
+      const { data: invoice } = await supabaseAdmin
+        .from('invoices')
+        .select('id, invoice_type')
+        .eq('id', invoiceId)
+        .maybeSingle();
+
+      if (!invoice || isCreditNote(invoice)) {
+        console.warn(
+          '[stripe/hellopay/webhook] paiement ignoré, facture absente ou avoir',
+          invoiceId,
+        );
+        return NextResponse.json({ received: true });
+      }
+
       await supabaseAdmin
         .from('invoices')
         .update({

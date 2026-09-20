@@ -4,6 +4,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { buildPaymentReminderEmail } from '@/lib/email-templates';
 import { formatCurrency, formatDate } from '@/lib/constants';
 import { resolveFromEmail } from '@/lib/email-from';
+import {
+  fetchCreditNotesByInvoice,
+  isFullyCredited,
+  isIssuedCreditNote,
+  netDueTtc,
+  sumCreditNotesTtc,
+  type CreditNoteRef,
+} from '@/lib/invoices/credit-notes';
 
 export const runtime = 'nodejs';
 
@@ -51,12 +59,16 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  // Fetch overdue invoices with reminders enabled
+  // Fetch overdue invoices with reminders enabled.
+  // Les avoirs sont exclus : ils ne sont ni dus ni encaissables, donc jamais
+  // relançables. `invoice_type` est NOT NULL DEFAULT 'standard', `.neq` ne
+  // peut donc pas écarter de lignes à NULL au passage.
   const invoicesRes = await supabaseAdmin
     .from('invoices')
     .select('id, user_id, invoice_number, title, total_ttc, due_date, clients(name, email)')
     .eq('status', 'envoyee')
     .eq('reminders_enabled', true)
+    .neq('invoice_type', 'avoir')
     .not('due_date', 'is', null)
     .lt('due_date', today);
 
@@ -72,7 +84,9 @@ export async function POST(request: Request) {
   const userIds = Array.from(userIdSet);
   const invoiceIds = invoices.map((i) => i.id);
 
-  const [settingsRes, logsRes] = await Promise.all([
+  // Les avoirs émis sur ces factures : ils réduisent le montant dû et peuvent
+  // même l'annuler entièrement. Un seul aller-retour pour tout le lot.
+  const [settingsRes, logsRes, creditNotesByInvoice] = await Promise.all([
     supabaseAdmin
       .from('payment_reminder_settings')
       .select('*')
@@ -81,6 +95,7 @@ export async function POST(request: Request) {
       .from('invoice_reminder_log')
       .select('invoice_id, reminder_level')
       .in('invoice_id', invoiceIds),
+    fetchCreditNotesByInvoice(supabaseAdmin, invoiceIds),
   ]);
 
   const settingsMap = new Map<string, ReminderSettings>();
@@ -132,6 +147,21 @@ export async function POST(request: Request) {
       const clientEmail = invoice.clients?.email;
       if (!clientEmail) continue;
 
+      // Avoirs émis sur cette facture. Une facture intégralement créditée
+      // n'est plus due : la relancer reviendrait à réclamer au client un
+      // montant qu'on lui a déjà crédité.
+      const creditNotes: CreditNoteRef[] = creditNotesByInvoice.get(invoice.id) || [];
+      const netDue = netDueTtc(invoice, creditNotes);
+      if (isFullyCredited(invoice, creditNotes) || netDue <= 0.01) continue;
+
+      const issuedCreditNotes = creditNotes.filter(isIssuedCreditNote);
+      const creditedTtc = sumCreditNotesTtc(creditNotes);
+      const plural = issuedCreditNotes.length > 1 ? 's' : '';
+      const creditNoteMention =
+        issuedCreditNotes.length > 0 && creditedTtc < 0
+          ? `Facture de ${formatCurrency(invoice.total_ttc)}, avoir${plural} de ${formatCurrency(Math.abs(creditedTtc))} déduit${plural}.`
+          : null;
+
       const dueDate = new Date(invoice.due_date);
       const daysPastDue = Math.floor(
         (Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
@@ -165,10 +195,12 @@ export async function POST(request: Request) {
         const artisanName = profile?.company_name || profile?.full_name || 'Votre artisan';
         const hasOnlinePayment = stripeMap.get(invoice.user_id) === true;
 
+        // {montant} est le net restant dû, avoirs déduits — jamais le total
+        // brut de la facture.
         const vars: Record<string, string> = {
           client: invoice.clients?.name || '',
           numero: invoice.invoice_number,
-          montant: formatCurrency(invoice.total_ttc),
+          montant: formatCurrency(netDue),
           echeance: formatDate(invoice.due_date),
           artisan: artisanName,
         };
@@ -181,13 +213,14 @@ export async function POST(request: Request) {
           artisanName,
           invoiceNumber: invoice.invoice_number,
           invoiceTitle: invoice.title,
-          totalTtc: formatCurrency(invoice.total_ttc),
+          totalTtc: formatCurrency(netDue),
           dueDate: formatDate(invoice.due_date),
           magicLink,
           pdfUrl,
           hasOnlinePayment,
           reminderLevel: lvl.level,
           bodyText: interpolatedBody,
+          creditNoteMention,
         });
 
         const result = await resend.emails.send({

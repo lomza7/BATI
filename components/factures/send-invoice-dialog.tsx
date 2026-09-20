@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 
 interface Props {
   invoice: {
@@ -21,6 +22,8 @@ interface Props {
     title: string;
     total_ttc: number;
     status: string;
+    /** 'avoir' bascule tout le dialog en mode avoir (ni relance, ni paiement) */
+    invoice_type?: string | null;
     clients?: { name: string; email?: string | null } | null;
   };
   onClose: () => void;
@@ -35,6 +38,9 @@ interface CompanyAttachmentRow {
 
 export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
   const { user } = useAuth();
+  // Un avoir n'est jamais encaissable ni relançable : on masque les options
+  // correspondantes et on les force à false côté requête.
+  const isAvoir = isCreditNote(invoice);
   const [clientName, setClientName] = useState(invoice.clients?.name || '');
   const [clientEmail, setClientEmail] = useState(invoice.clients?.email || '');
   const [expiresIn, setExpiresIn] = useState('30');
@@ -77,15 +83,15 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
       ]);
       if (!cancelled) {
         setAttachments((attRes.data as CompanyAttachmentRow[]) || []);
-        setRemindersEnabled(remRes.data?.reminders_enabled ?? false);
+        setRemindersEnabled(isAvoir ? false : (remRes.data?.reminders_enabled ?? false));
         const connected = Boolean(stripeRes.data?.charges_enabled);
         setStripeConnected(connected);
-        setEnableStripePayment(connected);
+        setEnableStripePayment(connected && !isAvoir);
         setConnectFeePercent(parseFloat(configRes.data?.value || '0.5'));
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [isAvoir]);
 
   function toggleAttachment(id: string) {
     setExcludedAttachmentIds(prev => {
@@ -121,15 +127,18 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
           client_email: clientEmail.trim() || undefined,
           expires_in_days: parseInt(expiresIn),
           excluded_attachment_ids: Array.from(excludedAttachmentIds),
-          reminders_enabled: remindersEnabled,
-          enable_stripe_payment: enableStripePayment,
+          reminders_enabled: isAvoir ? false : remindersEnabled,
+          enable_stripe_payment: isAvoir ? false : enableStripePayment,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setSendError(data.error || 'Erreur lors de l\'envoi de la facture');
+        setSendError(
+          data.error ||
+            (isAvoir ? "Erreur lors de l'envoi de l'avoir" : "Erreur lors de l'envoi de la facture"),
+        );
         setSending(false);
         return;
       }
@@ -156,7 +165,7 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogTitle className="flex items-center gap-2">
           <Send className="h-5 w-5 text-primary" />
-          Envoyer la facture
+          {isAvoir ? "Envoyer l'avoir" : 'Envoyer la facture'}
         </DialogTitle>
 
         {magicLink ? (
@@ -166,7 +175,9 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
                 <Check className="h-5 w-5 text-emerald-600" />
               </div>
-              <p className="font-semibold text-emerald-800 text-sm">Facture envoyée !</p>
+              <p className="font-semibold text-emerald-800 text-sm">
+                {isAvoir ? 'Avoir envoyé !' : 'Facture envoyée !'}
+              </p>
               {emailSent && (
                 <p className="text-xs text-emerald-600 mt-1">
                   <Mail className="inline h-3 w-3 mr-1" />
@@ -176,7 +187,9 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Lien de la facture</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {isAvoir ? "Lien de l'avoir" : 'Lien de la facture'}
+              </label>
               <div className="flex gap-2 mt-1">
                 <Input value={magicLink} readOnly className="text-xs" />
                 <Button variant="outline" size="icon" onClick={copyLink}>
@@ -193,16 +206,25 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
           /* Form state */
           <div className="space-y-4 mt-2">
             <div className="rounded-lg bg-muted/50 p-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{invoice.invoice_number}</p>
-                  <p className="text-xs text-muted-foreground">{invoice.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{invoice.title}</p>
                 </div>
-                <p className="text-sm font-semibold text-primary">
+                <p className="text-sm font-semibold text-primary whitespace-nowrap">
                   {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(invoice.total_ttc)}
                 </p>
               </div>
             </div>
+
+            {isAvoir && (
+              <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 p-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Un avoir n&apos;est pas payable : l&apos;email adressé au client ne contiendra ni
+                  bouton de paiement, ni échéance, ni RIB. Aucune relance ne sera déclenchée.
+                </p>
+              </div>
+            )}
 
             {sendError && (
               <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{sendError}</p>
@@ -270,16 +292,18 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               </div>
             )}
 
-            <div className="flex items-center justify-between rounded-xl border border-border p-3">
-              <div className="flex items-center gap-2.5">
-                <Bell className="h-4 w-4 text-[#d35400]" />
-                <div>
-                  <p className="text-sm font-medium">Relances automatiques</p>
-                  <p className="text-xs text-muted-foreground">Envoyer des rappels si la facture n&apos;est pas payée</p>
+            {!isAvoir && (
+              <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                <div className="flex items-center gap-2.5">
+                  <Bell className="h-4 w-4 text-[#d35400]" />
+                  <div>
+                    <p className="text-sm font-medium">Relances automatiques</p>
+                    <p className="text-xs text-muted-foreground">Envoyer des rappels si la facture n&apos;est pas payée</p>
+                  </div>
                 </div>
+                <Switch checked={remindersEnabled} onCheckedChange={setRemindersEnabled} />
               </div>
-              <Switch checked={remindersEnabled} onCheckedChange={setRemindersEnabled} />
-            </div>
+            )}
 
             <div>
               <label className="text-sm font-medium">Validité du lien</label>
@@ -294,91 +318,93 @@ export function SendInvoiceDialog({ invoice, onClose, onSent }: Props) {
               </select>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-xl border border-border p-3">
-                <div className="flex items-center gap-2.5">
-                  <CreditCard className="h-4 w-4 text-[#d35400]" />
-                  <div>
-                    <p className="text-sm font-medium">Paiement en ligne</p>
-                    <p className="text-xs text-muted-foreground">Le client pourra payer par carte, Apple Pay ou Google Pay</p>
-                  </div>
-                </div>
-                <Switch
-                  checked={enableStripePayment}
-                  onCheckedChange={(checked) => {
-                    if (checked && !stripeConnected) {
-                      setShowStripePrompt(true);
-                    } else {
-                      setEnableStripePayment(checked);
-                    }
-                  }}
-                />
-              </div>
-              {enableStripePayment && stripeConnected && (
-                <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3">
-                  <p className="text-xs text-amber-800 font-medium mb-1">Frais de paiement en ligne</p>
-                  <p className="text-[11px] text-amber-700 leading-relaxed">
-                    Commission Hellobat : {connectFeePercent}% · Frais Stripe : ~1,5% + 0,25 €
-                  </p>
-                  <p className="text-[11px] text-amber-700 mt-1">
-                    Estimation sur 500 € :{' '}
-                    <span className="font-semibold">
-                      {(500 * connectFeePercent / 100 + 500 * 0.015 + 0.25).toFixed(2)} € de frais
-                    </span>
-                    {' '}→ vous recevez{' '}
-                    <span className="font-semibold">
-                      {(500 - 500 * connectFeePercent / 100 - 500 * 0.015 - 0.25).toFixed(2)} €
-                    </span>
-                  </p>
-                </div>
-              )}
-              {showStripePrompt && !stripeConnected && (
-                <div className="rounded-xl border border-[#d35400]/30 bg-orange-50/70 p-4 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="h-9 w-9 rounded-full bg-[#d35400]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <CreditCard className="h-4 w-4 text-[#d35400]" />
-                    </div>
+            {!isAvoir && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl border border-border p-3">
+                  <div className="flex items-center gap-2.5">
+                    <CreditCard className="h-4 w-4 text-[#d35400]" />
                     <div>
-                      <p className="text-sm font-semibold text-[#d35400]">Activez le paiement en ligne</p>
-                      <p className="text-xs text-[#a04000] mt-1 leading-relaxed">
-                        Recevez vos paiements en quelques secondes. Vos clients pourront payer par carte bancaire, Apple Pay ou Google Pay directement depuis leur facture.
-                      </p>
+                      <p className="text-sm font-medium">Paiement en ligne</p>
+                      <p className="text-xs text-muted-foreground">Le client pourra payer par carte, Apple Pay ou Google Pay</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      className="gap-1.5 bg-[#d35400] hover:bg-[#b84800] text-white"
-                      onClick={async () => {
-                        const { data: { session } } = await supabase.auth.getSession();
-                        if (!session?.access_token) return;
-                        const res = await fetch('/api/stripe/connect', {
-                          method: 'POST',
-                          headers: {
-                            Authorization: `Bearer ${session.access_token}`,
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({ return_to: '/factures' }),
-                        });
-                        const json = await res.json();
-                        if (json.redirect_url) window.location.href = json.redirect_url;
-                      }}
-                    >
-                      <CreditCard className="h-3.5 w-3.5" />
-                      Connecter Stripe
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs text-muted-foreground"
-                      onClick={() => setShowStripePrompt(false)}
-                    >
-                      Plus tard
-                    </Button>
-                  </div>
+                  <Switch
+                    checked={enableStripePayment}
+                    onCheckedChange={(checked) => {
+                      if (checked && !stripeConnected) {
+                        setShowStripePrompt(true);
+                      } else {
+                        setEnableStripePayment(checked);
+                      }
+                    }}
+                  />
                 </div>
-              )}
-            </div>
+                {enableStripePayment && stripeConnected && (
+                  <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3">
+                    <p className="text-xs text-amber-800 font-medium mb-1">Frais de paiement en ligne</p>
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                      Commission Hellobat : {connectFeePercent}% · Frais Stripe : ~1,5% + 0,25 €
+                    </p>
+                    <p className="text-[11px] text-amber-700 mt-1">
+                      Estimation sur 500 € :{' '}
+                      <span className="font-semibold">
+                        {(500 * connectFeePercent / 100 + 500 * 0.015 + 0.25).toFixed(2)} € de frais
+                      </span>
+                      {' '}→ vous recevez{' '}
+                      <span className="font-semibold">
+                        {(500 - 500 * connectFeePercent / 100 - 500 * 0.015 - 0.25).toFixed(2)} €
+                      </span>
+                    </p>
+                  </div>
+                )}
+                {showStripePrompt && !stripeConnected && (
+                  <div className="rounded-xl border border-[#d35400]/30 bg-orange-50/70 p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-full bg-[#d35400]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <CreditCard className="h-4 w-4 text-[#d35400]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#d35400]">Activez le paiement en ligne</p>
+                        <p className="text-xs text-[#a04000] mt-1 leading-relaxed">
+                          Recevez vos paiements en quelques secondes. Vos clients pourront payer par carte bancaire, Apple Pay ou Google Pay directement depuis leur facture.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-[#d35400] hover:bg-[#b84800] text-white"
+                        onClick={async () => {
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (!session?.access_token) return;
+                          const res = await fetch('/api/stripe/connect', {
+                            method: 'POST',
+                            headers: {
+                              Authorization: `Bearer ${session.access_token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ return_to: '/factures' }),
+                          });
+                          const json = await res.json();
+                          if (json.redirect_url) window.location.href = json.redirect_url;
+                        }}
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        Connecter Stripe
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs text-muted-foreground"
+                        onClick={() => setShowStripePrompt(false)}
+                      >
+                        Plus tard
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Annuler</Button>

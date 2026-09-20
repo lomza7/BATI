@@ -15,9 +15,21 @@ import {
   PartyPopper,
   XCircle,
   Landmark,
+  Undo2,
+  ReceiptText,
 } from 'lucide-react';
 import { parseTvaBreakdown, formatTvaRate, type TvaBreakdownEntry } from '@/lib/tva';
 import { formatIban } from '@/lib/banks';
+import {
+  buildCreditNoteLegalMention,
+  creditReasonLabel,
+  invoiceTypeLabel,
+  isCreditNote,
+  isFullyCredited,
+  netDueTtc,
+  sumCreditNotesTtc,
+  type InvoiceType,
+} from '@/lib/invoices/credit-notes';
 import { InsuranceFooter } from '@/components/shared/insurance-footer';
 import { PublicDocumentDownloadButton } from '@/components/shared/public-document-download-button';
 
@@ -51,9 +63,12 @@ interface InvoiceData {
   created_at: string;
   payment_method: string;
   bank_account_id: string | null;
-  invoice_type: 'standard' | 'acompte' | 'solde';
+  invoice_type: InvoiceType;
   deposit_percentage: number | null;
   quote_id: string | null;
+  /** Renseigné uniquement sur un avoir : la facture qu'il rectifie. */
+  credited_invoice_id: string | null;
+  credit_reason: string | null;
   clients: {
     name: string;
     email: string | null;
@@ -72,6 +87,31 @@ interface LinkedDeposit {
   created_at: string;
   status: string;
   deposit_percentage: number | null;
+}
+
+/** Facture rectifiée par l'avoir consulté (mention légale obligatoire). */
+interface CreditedInvoiceRef {
+  id: string;
+  invoice_number: string;
+  title: string | null;
+  issued_at: string | null;
+  created_at: string;
+  total_ttc: number;
+}
+
+/**
+ * Avoir émis sur la facture consultée. La RPC exclut déjà les brouillons :
+ * tout ce qui arrive ici est émis, donc déductible. On porte quand même un
+ * `status` car les helpers de calcul distinguent émis et brouillon.
+ */
+interface PublicCreditNote {
+  id: string;
+  invoice_number: string;
+  /** Négatif. */
+  total_ttc: number;
+  issued_at: string | null;
+  created_at: string;
+  status: string;
 }
 
 interface BankAccountData {
@@ -167,6 +207,8 @@ export default function PublicInvoicePage() {
   const [isPaid, setIsPaid] = useState(false);
   const [linkedDeposits, setLinkedDeposits] = useState<LinkedDeposit[]>([]);
   const [linkedQuoteNumber, setLinkedQuoteNumber] = useState<string | null>(null);
+  const [creditedInvoice, setCreditedInvoice] = useState<CreditedInvoiceRef | null>(null);
+  const [creditNotes, setCreditNotes] = useState<PublicCreditNote[]>([]);
 
   const paymentStatus = searchParams.get('payment');
 
@@ -200,6 +242,22 @@ export default function PublicInvoicePage() {
 
       if (payload.linked_quote_number) setLinkedQuoteNumber(payload.linked_quote_number);
       if (payload.linked_deposits) setLinkedDeposits(payload.linked_deposits as LinkedDeposit[]);
+
+      if (payload.credited_invoice) setCreditedInvoice(payload.credited_invoice as CreditedInvoiceRef);
+      if (payload.credit_notes) {
+        // La RPC ne renvoie que les avoirs émis : on leur donne un statut
+        // explicite pour que les helpers les comptent comme déductibles.
+        const rawNotes = (payload.credit_notes || []) as Array<
+          Omit<PublicCreditNote, 'status'> & { status?: string | null }
+        >;
+        setCreditNotes(
+          rawNotes.map((note) => ({
+            ...note,
+            total_ttc: Number(note.total_ttc || 0),
+            status: note.status || 'envoyee',
+          })),
+        );
+      }
 
       setLines((payload.lines || []) as InvoiceLine[]);
       if (payload.artisan) setArtisan(payload.artisan as ArtisanProfile);
@@ -248,7 +306,7 @@ export default function PublicInvoicePage() {
           <div className="w-10 h-10 bg-[#d35400] rounded-lg flex items-center justify-center">
             <Hexagon className="h-5 w-5 text-white animate-nut-ratchet" />
           </div>
-          <p className="text-sm text-[#6b6560]">Chargement de la facture...</p>
+          <p className="text-sm text-[#6b6560]">Chargement du document...</p>
         </div>
       </div>
     );
@@ -297,11 +355,16 @@ export default function PublicInvoicePage() {
 
   const isDepositInvoice = invoice.invoice_type === 'acompte';
   const isFinalInvoice = invoice.invoice_type === 'solde';
-  const documentLabel = isDepositInvoice
-    ? "FACTURE D'ACOMPTE"
-    : isFinalInvoice
-      ? 'FACTURE DE SOLDE'
-      : 'FACTURE';
+  // Un avoir est une facture rectificative (art. 289 CGI) : il se lit, se
+  // télécharge et s'archive comme une facture, mais il n'est jamais payable.
+  const isCredit = isCreditNote(invoice);
+  const documentLabel = isCredit
+    ? 'AVOIR'
+    : isDepositInvoice
+      ? "FACTURE D'ACOMPTE"
+      : isFinalInvoice
+        ? 'FACTURE DE SOLDE'
+        : 'FACTURE';
   const depositPercentageLabel = invoice.deposit_percentage
     ? Number.isInteger(invoice.deposit_percentage)
       ? String(invoice.deposit_percentage)
@@ -311,10 +374,39 @@ export default function PublicInvoicePage() {
   // Montant à déduire (calcul au rendu pour rester cohérent si un acompte est
   // annulé après coup). Ne compte que les acomptes non annulés (déjà filtré).
   const deductedTtc = linkedDeposits.reduce((sum, d) => sum + Number(d.total_ttc || 0), 0);
-  const finalRemainingTtc = Math.max(0, invoice.total_ttc - deductedTtc);
-  // Montant réellement à encaisser en ligne : pour un solde c'est le reste,
-  // sinon c'est le total de la facture courante.
-  const payableAmount = isFinalInvoice ? finalRemainingTtc : invoice.total_ttc;
+
+  // ── Avoirs portés par cette facture ──────────────────────────────────
+  // `credit_notes` n'est rempli que pour une facture ordinaire (un avoir ne
+  // peut pas être crédité). Somme négative ou nulle.
+  const creditedTtc = sumCreditNotesTtc(creditNotes);
+  const hasCreditNotes = creditNotes.length > 0 && creditedTtc < 0;
+  // Net réellement dû après avoirs : c'est cette valeur, jamais `total_ttc`,
+  // qui sert de base à ce qu'on réclame au client.
+  const netAfterCreditsTtc = netDueTtc(invoice, creditNotes);
+  const fullyCredited = isFullyCredited(invoice, creditNotes);
+
+  const finalRemainingTtc = Math.max(0, netAfterCreditsTtc - deductedTtc);
+  // Montant réellement à encaisser en ligne : jamais rien sur un avoir, le
+  // reste après acomptes sur un solde, le net après avoirs sinon.
+  const payableAmount = isCredit
+    ? 0
+    : isFinalInvoice
+      ? finalRemainingTtc
+      : netAfterCreditsTtc;
+
+  // Montant positif à afficher au client sur un avoir (« à votre crédit »).
+  const creditAmountTtc = Math.abs(invoice.total_ttc);
+  const creditedInvoiceDate = creditedInvoice?.issued_at || creditedInvoice?.created_at || null;
+  const creditNoteLegalMention = creditedInvoice
+    ? buildCreditNoteLegalMention({
+        creditedInvoiceNumber: creditedInvoice.invoice_number,
+        creditedInvoiceDate,
+      })
+    : "Avoir émis en rectification d'une facture. TVA régularisée conformément à l'article 272-1 du Code général des impôts. Ce document ne donne lieu à aucun paiement de votre part.";
+  const creditReason = isCredit ? creditReasonLabel(invoice.credit_reason) : '';
+
+  // Les bannières de paiement n'ont aucun sens sur un avoir.
+  const showPaymentBanners = !isCredit;
 
   return (
     <div className={`min-h-screen bg-[#faf9f7] ${fontClass}`}>
@@ -333,7 +425,7 @@ export default function PublicInvoicePage() {
           </div>
           <PublicDocumentDownloadButton
             documentId="public-invoice-document"
-            filename={`Facture-${invoice.invoice_number}`}
+            filename={`${isCredit ? invoiceTypeLabel(invoice.invoice_type) : 'Facture'}-${invoice.invoice_number}`}
             accentColor={accent}
             directUrl={`/api/public/factures/${token}/pdf`}
           />
@@ -341,8 +433,44 @@ export default function PublicInvoicePage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        {/* Bandeau avoir — aucun paiement attendu */}
+        {isCredit && (
+          <div className="mb-6 p-5 rounded-2xl bg-sky-50 border border-sky-100 flex items-start gap-4 animate-fade-up">
+            <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0">
+              <Undo2 className="h-5 w-5 text-sky-600" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-sky-900">
+                Cet avoir est à votre crédit. Aucun paiement n&apos;est attendu.
+              </h3>
+              <p className="text-xs text-sky-700 mt-1 leading-relaxed">
+                Montant à votre crédit : <span className="font-semibold">{formatCurrency(creditAmountTtc)}</span>
+                {creditedInvoice ? ` sur la facture ${creditedInvoice.invoice_number}` : ''}.
+                {creditReason ? ` Motif : ${creditReason}.` : ''}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Bandeau facture intégralement créditée */}
+        {!isCredit && fullyCredited && (
+          <div className="mb-6 p-5 rounded-2xl bg-sky-50 border border-sky-100 flex items-start gap-4 animate-fade-up">
+            <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0">
+              <Undo2 className="h-5 w-5 text-sky-600" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-sky-900">Facture intégralement créditée</h3>
+              <p className="text-xs text-sky-700 mt-1 leading-relaxed">
+                {isPaid
+                  ? "Un ou plusieurs avoirs annulent le montant de cette facture. Votre règlement vous sera remboursé ou porté à votre crédit."
+                  : "Un ou plusieurs avoirs annulent le montant de cette facture. Plus rien n'est à régler."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Payment success banner */}
-        {paymentStatus === 'success' && (
+        {showPaymentBanners && paymentStatus === 'success' && (
           <div className="mb-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-start gap-4 animate-fade-up">
             <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <PartyPopper className="h-5 w-5 text-emerald-600" />
@@ -357,7 +485,7 @@ export default function PublicInvoicePage() {
         )}
 
         {/* Payment cancelled banner */}
-        {paymentStatus === 'cancel' && !isPaid && (
+        {showPaymentBanners && paymentStatus === 'cancel' && !isPaid && (
           <div className="mb-6 p-5 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-4 animate-fade-up">
             <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
               <XCircle className="h-5 w-5 text-amber-600" />
@@ -372,7 +500,7 @@ export default function PublicInvoicePage() {
         )}
 
         {/* Paid banner */}
-        {isPaid && paymentStatus !== 'success' && (
+        {showPaymentBanners && isPaid && paymentStatus !== 'success' && (
           <div className="mb-6 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-start gap-4 animate-fade-up">
             <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <CheckCircle className="h-5 w-5 text-emerald-600" />
@@ -421,16 +549,24 @@ export default function PublicInvoicePage() {
               <div className="sm:text-right flex-shrink-0">
                 <p className="text-2xl sm:text-3xl font-bold" style={{ color: accent }}>{documentLabel}</p>
                 <p className="text-sm font-medium mt-1" style={{ color: textColor }}>{invoice.invoice_number}</p>
-                {(isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
+                {!isCredit && (isDepositInvoice || isFinalInvoice) && linkedQuoteNumber && (
                   <p className="text-xs mt-1" style={{ color: accent }}>
                     {isDepositInvoice
                       ? `Acompte${depositPercentageLabel ? ` ${depositPercentageLabel}%` : ''} sur devis ${linkedQuoteNumber}`
                       : `Solde du devis ${linkedQuoteNumber}`}
                   </p>
                 )}
+                {/* Référence à la facture rectifiée — obligatoire sur un avoir */}
+                {isCredit && creditedInvoice && (
+                  <p className="text-xs mt-1 break-words" style={{ color: accent }}>
+                    Rectifie la facture {creditedInvoice.invoice_number}
+                    {creditedInvoiceDate ? ` du ${formatDate(creditedInvoiceDate)}` : ''}
+                  </p>
+                )}
                 <div className="text-xs text-[#6b6560] mt-2 space-y-0.5">
                   <p>Date : {formatDate(invoice.created_at)}</p>
-                  {invoice.due_date && (
+                  {/* Un avoir n'a pas d'échéance : il n'y a rien à régler. */}
+                  {!isCredit && invoice.due_date && (
                     <p>Échéance : {formatDate(invoice.due_date)}</p>
                   )}
                 </div>
@@ -461,6 +597,48 @@ export default function PublicInvoicePage() {
           <div className="px-5 sm:px-8 py-5 border-b border-[#e5e1da]">
             <h2 className="text-lg font-semibold" style={{ color: textColor }}>{invoice.title}</h2>
           </div>
+
+          {/* Avoir — référence à la facture rectifiée et motif */}
+          {isCredit && (
+            <div className="px-5 sm:px-8 py-4 border-b border-[#e5e1da] bg-[#faf9f7]">
+              <div className="flex items-center gap-2 mb-2">
+                <ReceiptText className="h-4 w-4" style={{ color: accent }} />
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
+                  Facture rectifiée
+                </p>
+              </div>
+              {creditedInvoice ? (
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium" style={{ color: textColor }}>
+                      {creditedInvoice.invoice_number}
+                      {creditedInvoiceDate ? (
+                        <span className="text-xs text-[#6b6560] font-normal"> du {formatDate(creditedInvoiceDate)}</span>
+                      ) : null}
+                    </p>
+                    {creditedInvoice.title && (
+                      <p className="text-xs text-[#6b6560] mt-0.5 break-words">{creditedInvoice.title}</p>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#6b6560] sm:text-right flex-shrink-0">
+                    Montant initial
+                    <span className="block text-sm font-medium tabular-nums" style={{ color: textColor }}>
+                      {formatCurrency(Number(creditedInvoice.total_ttc || 0))}
+                    </span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-[#6b6560]">
+                  Avoir émis en rectification d&apos;une facture précédente.
+                </p>
+              )}
+              {creditReason && (
+                <p className="text-xs text-[#6b6560] mt-2">
+                  Motif : <span className="font-medium" style={{ color: textColor }}>{creditReason}</span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Lines — Desktop table */}
           <div className="hidden sm:block overflow-x-auto">
@@ -543,11 +721,67 @@ export default function PublicInvoicePage() {
                 </>
               )}
               <div className="flex items-center justify-between w-full sm:w-72 pt-2 border-t border-[#e5e1da] mt-1">
-                <span className="text-base font-semibold" style={{ color: textColor }}>Total TTC</span>
-                <span className="text-xl font-bold" style={{ color: accent }}>{formatCurrency(invoice.total_ttc)}</span>
+                <span className="text-base font-semibold" style={{ color: textColor }}>
+                  {isCredit ? "Total TTC de l'avoir" : 'Total TTC'}
+                </span>
+                <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>{formatCurrency(invoice.total_ttc)}</span>
               </div>
+              {/* Les montants d'un avoir sont négatifs : on rappelle en clair
+                  le montant porté au crédit du client. */}
+              {isCredit && (
+                <div className="flex items-center justify-between w-full sm:w-72 pt-1.5">
+                  <span className="text-xs text-[#6b6560]">Montant à votre crédit</span>
+                  <span className="text-sm font-semibold tabular-nums" style={{ color: textColor }}>
+                    {formatCurrency(creditAmountTtc)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Avoirs émis sur cette facture — déduits de ce qui reste dû */}
+          {!isCredit && hasCreditNotes && (
+            <div className="border-t-2 border-dashed px-5 sm:px-8 py-5" style={{ borderColor: accent + '4d' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Undo2 className="h-4 w-4" style={{ color: accent }} />
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: accent }}>
+                  Avoirs déduits
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                {creditNotes.map((note) => {
+                  const noteDate = note.issued_at || note.created_at;
+                  return (
+                    <div key={note.id} className="flex items-center justify-between w-full sm:w-[22rem] text-sm">
+                      <span className="text-[#6b6560] truncate mr-2">
+                        {note.invoice_number}
+                        {noteDate && (
+                          <span className="text-[11px] ml-1">({formatDate(noteDate)})</span>
+                        )}
+                      </span>
+                      <span className="font-medium tabular-nums" style={{ color: textColor }}>
+                        − {formatCurrency(Math.abs(Number(note.total_ttc || 0)))}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t border-dashed border-[#e5e1da] mt-1">
+                  <span className="text-sm text-[#6b6560]">Total des avoirs</span>
+                  <span className="text-sm font-medium tabular-nums" style={{ color: textColor }}>
+                    − {formatCurrency(Math.abs(creditedTtc))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between w-full sm:w-[22rem] pt-2 border-t-2 mt-1" style={{ borderColor: accent }}>
+                  <span className="text-base font-semibold" style={{ color: textColor }}>
+                    {isFinalInvoice ? 'Net après avoirs' : 'Net à payer'}
+                  </span>
+                  <span className="text-xl font-bold tabular-nums" style={{ color: accent }}>
+                    {formatCurrency(netAfterCreditsTtc)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Acomptes déduits — factures de solde uniquement */}
           {isFinalInvoice && linkedDeposits.length > 0 && (
@@ -596,8 +830,8 @@ export default function PublicInvoicePage() {
             </div>
           )}
 
-          {/* Coordonnees bancaires */}
-          {bankAccount && (
+          {/* Coordonnees bancaires — jamais sur un avoir : rien à virer */}
+          {!isCredit && bankAccount && (
             <div className="border-t border-[#e5e1da] px-5 sm:px-8 py-5">
               <div className="flex items-center gap-2 mb-3">
                 <Landmark className="h-4 w-4" style={{ color: accent }} />
@@ -629,8 +863,8 @@ export default function PublicInvoicePage() {
             </div>
           )}
 
-          {/* Payment section */}
-          {!isPaid && stripeAvailable && stripeEnabledForSend && payableAmount > 0 && (
+          {/* Payment section — jamais sur un avoir, jamais si tout est crédité */}
+          {!isCredit && !isPaid && stripeAvailable && stripeEnabledForSend && payableAmount > 0 && (
             <div data-pdf-exclude className="border-t-2 border-[#e5e1da] px-5 sm:px-8 py-6">
               <div className="flex items-center gap-2 mb-4">
                 <CreditCard className="h-4 w-4 text-[#6b6560]" />
@@ -642,6 +876,7 @@ export default function PublicInvoicePage() {
                 {isDepositInvoice
                   ? 'Réglez cet acompte en ligne de manière sécurisée pour démarrer les travaux.'
                   : 'Payez cette facture en ligne de manière sécurisée par carte bancaire, Apple Pay ou Google Pay.'}
+                {hasCreditNotes && ' Le montant proposé tient compte des avoirs déjà émis.'}
               </p>
               <button
                 onClick={handlePay}
@@ -668,16 +903,27 @@ export default function PublicInvoicePage() {
             <div className="flex items-start gap-2">
               <Shield className="h-3.5 w-3.5 text-[#6b6560]/50 mt-0.5 flex-shrink-0" />
               <p className="text-[11px] text-[#6b6560]/60 leading-relaxed">
-                {mentionsLegales || (
-                  <>
-                    {invoice.due_date
-                      ? `Échéance de paiement : ${formatDate(invoice.due_date)}. `
-                      : ''}
-                    En cas de retard de paiement, des pénalités seront exigibles (taux directeur BCE + 10 points). Indemnité forfaitaire de recouvrement : 40 EUR.
-                  </>
-                )}
+                {/* Sur un avoir : ni échéance ni pénalités de retard, mais la
+                    référence à la facture rectifiée et la régularisation de
+                    TVA, toutes deux obligatoires. */}
+                {isCredit
+                  ? creditNoteLegalMention
+                  : mentionsLegales || (
+                      <>
+                        {invoice.due_date
+                          ? `Échéance de paiement : ${formatDate(invoice.due_date)}. `
+                          : ''}
+                        En cas de retard de paiement, des pénalités seront exigibles (taux directeur BCE + 10 points). Indemnité forfaitaire de recouvrement : 40 EUR.
+                      </>
+                    )}
               </p>
             </div>
+            {/* Mentions personnalisées de l'artisan : conservées sous l'avoir
+                (elles portent parfois d'autres mentions obligatoires), jamais
+                à la place de la mention de rectification. */}
+            {isCredit && mentionsLegales && (
+              <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5">{mentionsLegales}</p>
+            )}
             {isDepositInvoice && (
               <p className="text-[11px] text-[#6b6560]/60 leading-relaxed mt-1.5 pl-5 italic">
                 TVA exigible à l&apos;encaissement conformément à l&apos;article 269-2 du CGI.

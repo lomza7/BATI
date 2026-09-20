@@ -26,6 +26,7 @@ import {
   Bot,
   FileText,
   FileCheck2,
+  FileMinus2,
   FileX2,
   Download,
   Filter,
@@ -106,6 +107,11 @@ import {
   type AccountantInviteValues,
 } from '@/components/comptabilite/accountant-invite-dialog';
 import { BankReconciliationTab } from '@/components/comptabilite/bank-reconciliation-tab';
+import {
+  creditReasonLabel,
+  isCreditNote,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 interface ExpenseRow {
   id: string;
@@ -155,6 +161,8 @@ interface InvoiceRow {
   bank_transaction_id: string | null;
   invoice_type?: string | null;
   quote_id?: string | null;
+  credited_invoice_id?: string | null;
+  credit_reason?: string | null;
 }
 
 interface AccessRow {
@@ -186,6 +194,7 @@ type FluxStatusKey =
   | 'upcoming'
   | 'late'
   | 'paid'
+  | 'credit'
   | 'justified'
   | 'missing';
 
@@ -194,6 +203,7 @@ const FLUX_STATUS_LABELS: Record<FluxStatusKey, { label: string; color: string }
   upcoming: { label: 'À venir', color: 'bg-blue-100 text-blue-800 border-blue-200' },
   late: { label: 'En retard', color: 'bg-red-100 text-red-800 border-red-200' },
   paid: { label: 'Payée', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  credit: { label: 'Avoir émis', color: 'bg-violet-100 text-violet-800 border-violet-200' },
   justified: { label: 'Justifiée', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   missing: { label: 'Justificatif manquant', color: 'bg-red-100 text-red-800 border-red-200' },
 };
@@ -240,6 +250,34 @@ function getClientName(c: InvoiceRow['clients']): string {
   if (!c) return '—';
   if (Array.isArray(c)) return c[0]?.name || '—';
   return c.name || '—';
+}
+
+/**
+ * Date à laquelle un document pèse sur la comptabilité de la période.
+ *
+ * Un avoir n'est jamais encaissé : sa TVA se régularise dès son émission
+ * (art. 272-1 CGI). On le rattache donc toujours à sa date d'émission, même
+ * quand l'artisan déclare la TVA sur les encaissements — sinon son `paid_at`
+ * vide le ferait disparaître de tous les agrégats.
+ */
+function invoiceRefDate(
+  inv: Pick<InvoiceRow, 'invoice_type' | 'paid_at' | 'issued_at' | 'created_at'>,
+  method: 'encaissements' | 'debits',
+): string | null {
+  if (isCreditNote(inv)) return inv.issued_at || inv.created_at;
+  return method === 'encaissements' ? inv.paid_at : inv.issued_at || inv.created_at;
+}
+
+/**
+ * Le document entre-t-il dans les recettes ? Une facture doit être encaissée ;
+ * un avoir émis compte toujours — ses montants étant négatifs, il vient
+ * mécaniquement en déduction du chiffre d'affaires.
+ */
+function countsInRevenue(
+  inv: Pick<InvoiceRow, 'invoice_type' | 'status' | 'paid_at'>,
+): boolean {
+  if (isCreditNote(inv)) return true;
+  return inv.status === 'paid' || Boolean(inv.paid_at);
 }
 
 // ───────────────── Period helpers (Dashboard) ─────────────────
@@ -403,7 +441,7 @@ export default function ComptabilitePage() {
   const [fluxSearch, setFluxSearch] = useState('');
   const [fluxType, setFluxType] = useState<'all' | 'expense' | 'invoice'>('all');
   const [fluxSubTab, setFluxSubTab] = useState<
-    'all' | 'draft' | 'upcoming' | 'late' | 'paid' | 'missing'
+    'all' | 'draft' | 'upcoming' | 'late' | 'paid' | 'credit' | 'missing'
   >('all');
   const [fluxSortKey, setFluxSortKey] = useState<'date' | 'amountHt' | 'amountTtc'>('date');
   const [fluxSortDir, setFluxSortDir] = useState<'asc' | 'desc'>('desc');
@@ -440,7 +478,7 @@ export default function ComptabilitePage() {
           .select(
             `id, invoice_number, title, status, total_ht, total_ttc, tva_rate, tva_breakdown,
              paid_at, issued_at, due_date, created_at, clients(name), bank_transaction_id,
-             invoice_type, quote_id`,
+             invoice_type, quote_id, credited_invoice_id, credit_reason`,
           )
           .neq('status', 'brouillon')
           .order('issued_at', { ascending: false, nullsFirst: false }),
@@ -463,6 +501,16 @@ export default function ComptabilitePage() {
       // le dashboard). Le total brut reste en base, seul l'affichage comptable
       // utilise le montant net.
       const rawInvoices = (invRes.data as InvoiceRow[]) || [];
+      // Avoirs rattachés à chaque facture (montants négatifs). Un acompte
+      // crédité par un avoir ne doit plus être déduit du solde à hauteur de ce
+      // qui a été crédité : l'avoir porte déjà la déduction, la retrancher une
+      // seconde fois du solde amputerait le CA deux fois.
+      const creditedTtcByInvoice = new Map<string, number>();
+      for (const inv of rawInvoices) {
+        if (!isCreditNote(inv) || !inv.credited_invoice_id) continue;
+        const prev = creditedTtcByInvoice.get(inv.credited_invoice_id) || 0;
+        creditedTtcByInvoice.set(inv.credited_invoice_id, prev + Number(inv.total_ttc || 0));
+      }
       const depositsByQuote = new Map<string, number>();
       for (const inv of rawInvoices) {
         if (
@@ -471,7 +519,11 @@ export default function ComptabilitePage() {
           inv.status !== 'annulee'
         ) {
           const prev = depositsByQuote.get(inv.quote_id) || 0;
-          depositsByQuote.set(inv.quote_id, prev + Number(inv.total_ttc || 0));
+          const netTtc = Math.max(
+            0,
+            Number(inv.total_ttc || 0) + (creditedTtcByInvoice.get(inv.id) || 0),
+          );
+          depositsByQuote.set(inv.quote_id, prev + netTtc);
         }
       }
       const normalizedInvoices: InvoiceRow[] = rawInvoices.map((inv) => {
@@ -944,13 +996,11 @@ export default function ComptabilitePage() {
   );
 
   const periodInvoices = useMemo(() => {
-    return invoices.filter((i) => {
-      // Méthode encaissements : on prend la date de paiement
-      // Méthode débits      : on prend la date d'émission
-      const refDate =
-        tvaMethod === 'encaissements' ? i.paid_at : i.issued_at || i.created_at;
-      return isInPeriod(refDate, dashboardPeriod);
-    });
+    return invoices.filter((i) =>
+      // Méthode encaissements : date de paiement — méthode débits : date
+      // d'émission. Un avoir passe toujours par sa date d'émission.
+      isInPeriod(invoiceRefDate(i, tvaMethod), dashboardPeriod),
+    );
   }, [invoices, dashboardPeriod, tvaMethod]);
 
   const dashboardMetrics = useMemo(() => {
@@ -966,16 +1016,23 @@ export default function ComptabilitePage() {
     );
     const deductibleCount = periodExpenses.filter((e) => !e.is_autoliquidation).length;
 
-    // Recettes (factures encaissées dans la période, selon tvaMethod)
-    const paidInvoices = periodInvoices.filter(
-      (i) => i.status === 'paid' || Boolean(i.paid_at),
+    // Recettes (factures encaissées dans la période, selon tvaMethod) et avoirs
+    // émis. Les montants d'un avoir sont négatifs : la somme additive suffit à
+    // le déduire du chiffre d'affaires, sans traitement particulier.
+    const revenueInvoices = periodInvoices.filter(countsInRevenue);
+    const creditNotes = revenueInvoices.filter(isCreditNote);
+    const revHt = revenueInvoices.reduce((s, i) => s + Number(i.total_ht || 0), 0);
+    const revTtc = revenueInvoices.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
+    const revCount = revenueInvoices.length - creditNotes.length;
+    const creditCount = creditNotes.length;
+    const creditTtc = sumCreditNotesTtc(
+      creditNotes.map((i) => ({ total_ttc: Number(i.total_ttc || 0), status: i.status })),
     );
-    const revHt = paidInvoices.reduce((s, i) => s + Number(i.total_ht || 0), 0);
-    const revTtc = paidInvoices.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
-    const revCount = paidInvoices.length;
 
-    // TVA collectée = différence TTC - HT sur les factures payées
-    const tvaCollected = Math.max(0, revTtc - revHt);
+    // TVA collectée = différence TTC − HT sur les recettes de la période.
+    // Jamais bornée à 0 : si les avoirs de la période dépassent les factures,
+    // la TVA collectée est négative — c'est un crédit de TVA légitime.
+    const tvaCollected = revTtc - revHt;
 
     // TVA à reverser
     const tvaToPay = tvaCollected - tvaDeductible;
@@ -989,10 +1046,13 @@ export default function ComptabilitePage() {
     const compliance =
       expCount === 0 ? 100 : Math.round(((expCount - missingCount) / expCount) * 100);
 
-    // Pointage banque (sur dépenses + factures de la période)
-    const totalActive = periodExpenses.length + paidInvoices.length;
+    // Pointage banque (sur dépenses + factures de la période). Les avoirs en
+    // sont exclus : ils n'ont pas d'encaissement à rapprocher, les compter
+    // ferait chuter le taux de pointage sans raison.
+    const pointableInvoices = revenueInvoices.filter((i) => !isCreditNote(i));
+    const totalActive = periodExpenses.length + pointableInvoices.length;
     const pointedExp = periodExpenses.filter((e) => e.bank_transaction_id).length;
-    const pointedInv = paidInvoices.filter((i) => i.bank_transaction_id).length;
+    const pointedInv = pointableInvoices.filter((i) => i.bank_transaction_id).length;
     const pointedCount = pointedExp + pointedInv;
     const pointedRatio =
       totalActive === 0 ? 100 : Math.round((pointedCount / totalActive) * 100);
@@ -1004,6 +1064,8 @@ export default function ComptabilitePage() {
       revHt,
       revTtc,
       revCount,
+      creditCount,
+      creditTtc,
       tvaCollected,
       tvaDeductible,
       deductibleCount,
@@ -1030,9 +1092,20 @@ export default function ComptabilitePage() {
         .reduce((s, e) => s + Number(e.amount_ht || 0), 0);
       const recettes = invoices
         .filter((i) => {
-          const ref = tvaMethod === 'encaissements' ? i.paid_at : i.issued_at;
+          // Un avoir n'est jamais encaissé : il est rattaché au mois de son
+          // émission et y pèse en négatif.
+          const credit = isCreditNote(i);
+          const ref = credit
+            ? i.issued_at || i.created_at
+            : tvaMethod === 'encaissements'
+            ? i.paid_at
+            : i.issued_at;
           if (!ref) return false;
-          if (tvaMethod === 'encaissements' && !(i.status === 'paid' || i.paid_at)) {
+          if (
+            tvaMethod === 'encaissements' &&
+            !credit &&
+            !(i.status === 'paid' || i.paid_at)
+          ) {
             return false;
           }
           return ref.startsWith(key);
@@ -1082,22 +1155,31 @@ export default function ComptabilitePage() {
   const isFranchise = vatRegime === 'franchise_en_base';
   const periodOptionGroups = useMemo(() => buildDashboardPeriodOptions(), []);
 
-  // Recettes (paid invoices)
+  // Recettes : factures encaissées + avoirs émis (qui viennent en déduction)
   const revenueRows = useMemo(
     () =>
-      invoices.filter(
-        (i) =>
-          (i.status === 'paid' || i.paid_at) &&
-          (filterYear === 'all' ||
-            (i.paid_at &&
-              new Date(i.paid_at).getFullYear() === Number(filterYear)) ||
-            (i.issued_at &&
-              new Date(i.issued_at).getFullYear() === Number(filterYear))),
-      ),
+      invoices.filter((i) => {
+        if (!countsInRevenue(i)) return false;
+        if (filterYear === 'all') return true;
+        const year = Number(filterYear);
+        const matchesYear = (d: string | null | undefined) =>
+          Boolean(d) && new Date(d as string).getFullYear() === year;
+        return (
+          matchesYear(i.paid_at) ||
+          matchesYear(i.issued_at) ||
+          // Un avoir non daté retombe sur sa date de création
+          (isCreditNote(i) && !i.issued_at && matchesYear(i.created_at))
+        );
+      }),
     [invoices, filterYear],
   );
+  const revenueCreditRows = useMemo(() => revenueRows.filter(isCreditNote), [revenueRows]);
+  const revenueInvoiceCount = revenueRows.length - revenueCreditRows.length;
   const revenueHt = revenueRows.reduce((s, i) => s + Number(i.total_ht || 0), 0);
   const revenueTtc = revenueRows.reduce((s, i) => s + Number(i.total_ttc || 0), 0);
+  const revenueCreditTtc = sumCreditNotesTtc(
+    revenueCreditRows.map((i) => ({ total_ttc: Number(i.total_ttc || 0), status: i.status })),
+  );
   const revenueTva = revenueTtc - revenueHt;
 
   // Available years for filter
@@ -1128,6 +1210,12 @@ export default function ComptabilitePage() {
     categoryName: string | null;
     hasReceipt: boolean;
     pointed: boolean;
+    /** Le document est un avoir : montants négatifs, jamais encaissable. */
+    isCredit: boolean;
+    /** Numéro de la facture rectifiée par l'avoir. */
+    creditedNumber: string | null;
+    /** Motif de l'avoir, déjà traduit en libellé lisible. */
+    creditReason: string | null;
     expenseId?: string;
     invoiceId?: string;
     receiptFilename?: string;
@@ -1161,18 +1249,32 @@ export default function ComptabilitePage() {
         categoryName: catName,
         hasReceipt,
         pointed: Boolean(e.bank_transaction_id),
+        isCredit: false,
+        creditedNumber: null,
+        creditReason: null,
         expenseId: e.id,
         receiptFilename,
       });
     }
 
+    // Index des numéros, pour afficher sur un avoir la facture qu'il rectifie
+    // sans requête supplémentaire.
+    const invoiceNumberById = new Map(
+      invoices.map((i) => [i.id, i.invoice_number] as const),
+    );
+
     for (const i of invoices) {
-      const isPaid = i.status === 'paid' || Boolean(i.paid_at);
+      // Un avoir n'est ni payable ni relançable : il n'a ni échéance, ni
+      // statut de paiement. Il porte son propre statut « Avoir émis ».
+      const isCredit = isCreditNote(i);
+      const isPaid = !isCredit && (i.status === 'paid' || Boolean(i.paid_at));
       const isDraft = i.status === 'draft' || i.status === 'brouillon';
-      const isLate = !isPaid && !isDraft && i.due_date != null && i.due_date < today;
+      const isLate =
+        !isCredit && !isPaid && !isDraft && i.due_date != null && i.due_date < today;
       let statusKey: FluxStatusKey;
-      if (isPaid) statusKey = 'paid';
-      else if (isDraft) statusKey = 'draft';
+      if (isDraft) statusKey = 'draft';
+      else if (isCredit) statusKey = 'credit';
+      else if (isPaid) statusKey = 'paid';
       else if (isLate) statusKey = 'late';
       else statusKey = 'upcoming';
 
@@ -1183,7 +1285,7 @@ export default function ComptabilitePage() {
         key: `inv-${i.id}`,
         kind: 'invoice',
         date: i.issued_at || i.created_at,
-        deadline: i.due_date,
+        deadline: isCredit ? null : i.due_date,
         label: i.invoice_number,
         sublabel: `${i.title} — ${getClientName(i.clients)}`,
         amountHt: Number(i.total_ht || 0),
@@ -1193,10 +1295,15 @@ export default function ComptabilitePage() {
         statusLabel: FLUX_STATUS_LABELS[statusKey].label,
         statusColor: FLUX_STATUS_LABELS[statusKey].color,
         sending,
-        source: 'Émise',
+        source: isCredit ? 'Avoir' : 'Émise',
         categoryName: null,
         hasReceipt: false,
         pointed: Boolean(i.bank_transaction_id),
+        isCredit,
+        creditedNumber: i.credited_invoice_id
+          ? invoiceNumberById.get(i.credited_invoice_id) || null
+          : null,
+        creditReason: creditReasonLabel(i.credit_reason) || null,
         invoiceId: i.id,
       });
     }
@@ -1210,10 +1317,16 @@ export default function ComptabilitePage() {
     const upcoming = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'upcoming').length;
     const late = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'late').length;
     const paid = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'paid').length;
+    const credit = flux.filter((f) => f.kind === 'invoice' && f.statusKey === 'credit').length;
     const missing = flux.filter((f) => f.kind === 'expense' && f.statusKey === 'missing').length;
     const expCount = flux.filter((f) => f.kind === 'expense').length;
-    const invCount = flux.filter((f) => f.kind === 'invoice').length;
-    return { all, draft, upcoming, late, paid, missing, expCount, invCount };
+    // Les avoirs sont comptés à part : ce sont des recettes négatives, les
+    // mélanger au nombre de factures émises rendrait le compteur trompeur.
+    const invCount = flux.filter((f) => f.kind === 'invoice' && !f.isCredit).length;
+    const creditTtc = flux
+      .filter((f) => f.isCredit)
+      .reduce((s, f) => s + f.amountTtc, 0);
+    return { all, draft, upcoming, late, paid, credit, creditTtc, missing, expCount, invCount };
   }, [flux]);
 
   const filteredFlux = useMemo(() => {
@@ -1537,6 +1650,14 @@ export default function ComptabilitePage() {
                 TTC&nbsp;: {fmtEur(dashboardMetrics.revTtc)} · {dashboardMetrics.revCount} facture
                 {dashboardMetrics.revCount > 1 ? 's' : ''}
               </p>
+              {dashboardMetrics.creditCount > 0 && (
+                <p className="text-[11px] font-medium text-red-600">
+                  Dont {dashboardMetrics.creditCount} avoir
+                  {dashboardMetrics.creditCount > 1 ? 's' : ''} déduit
+                  {dashboardMetrics.creditCount > 1 ? 's' : ''}&nbsp;:{' '}
+                  <span className="tabular-nums">{fmtEur(dashboardMetrics.creditTtc)}</span> TTC
+                </p>
+              )}
             </Card>
 
             {isFranchise ? (
@@ -1607,6 +1728,12 @@ export default function ComptabilitePage() {
                     Collectée {fmtEur(dashboardMetrics.tvaCollected)} −{' '}
                     {fmtEur(dashboardMetrics.tvaDeductible)}
                   </p>
+                  {dashboardMetrics.tvaCollected < 0 && (
+                    <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                      TVA collectée négative&nbsp;: sur cette période, vos avoirs dépassent vos
+                      factures. Cette TVA est à récupérer, pas à reverser.
+                    </p>
+                  )}
                 </Card>
 
                 <Card className="p-4">
@@ -2103,6 +2230,13 @@ export default function ComptabilitePage() {
                 <FileCheck2 className="h-3.5 w-3.5 text-blue-500" /> Factures émises
               </div>
               <p className="mt-1 text-xl font-bold tabular-nums">{fluxStats.invCount}</p>
+              {fluxStats.credit > 0 && (
+                <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-violet-700">
+                  <FileMinus2 className="h-3 w-3" />
+                  {fluxStats.credit} avoir{fluxStats.credit > 1 ? 's' : ''}
+                  <span className="tabular-nums text-red-600">{fmtEur(fluxStats.creditTtc)}</span>
+                </p>
+              )}
             </Card>
             <Card className={cn('p-3', fluxStats.missing > 0 && 'border-red-200 bg-red-50/40')}>
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -2123,6 +2257,7 @@ export default function ComptabilitePage() {
               { key: 'upcoming', label: 'À venir', count: fluxStats.upcoming, tone: 'neutral' },
               { key: 'late', label: 'En retard', count: fluxStats.late, tone: 'red' },
               { key: 'paid', label: 'Payées', count: fluxStats.paid, tone: 'green' },
+              { key: 'credit', label: 'Avoirs', count: fluxStats.credit, tone: 'neutral' },
               { key: 'missing', label: 'Justificatifs manquants', count: fluxStats.missing, tone: 'red' },
             ] as const).map((t) => {
               const active = fluxSubTab === t.key;
@@ -2173,7 +2308,7 @@ export default function ComptabilitePage() {
                 <SelectContent>
                   <SelectItem value="all">Tous les types</SelectItem>
                   <SelectItem value="expense">Dépenses</SelectItem>
-                  <SelectItem value="invoice">Factures émises</SelectItem>
+                  <SelectItem value="invoice">Factures et avoirs</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={fluxPeriod} onValueChange={setFluxPeriod}>
@@ -2439,6 +2574,8 @@ export default function ComptabilitePage() {
                           <div className="flex items-center gap-2">
                             {f.kind === 'expense' ? (
                               <Receipt className="h-3.5 w-3.5 shrink-0 text-[#D35400]" />
+                            ) : f.isCredit ? (
+                              <FileMinus2 className="h-3.5 w-3.5 shrink-0 text-violet-600" />
                             ) : (
                               <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                             )}
@@ -2446,6 +2583,14 @@ export default function ComptabilitePage() {
                               <p className="line-clamp-1 font-medium text-foreground">{f.label}</p>
                               {f.sublabel && (
                                 <p className="line-clamp-1 text-[11px] text-muted-foreground">{f.sublabel}</p>
+                              )}
+                              {f.isCredit && (
+                                <p className="line-clamp-1 text-[11px] font-medium text-violet-700">
+                                  {f.creditedNumber
+                                    ? `Rectifie la facture ${f.creditedNumber}`
+                                    : 'Facture rectificative'}
+                                  {f.creditReason ? ` · ${f.creditReason}` : ''}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -2459,13 +2604,28 @@ export default function ComptabilitePage() {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+                        <td
+                          className={cn(
+                            'whitespace-nowrap px-3 py-2.5 text-right tabular-nums',
+                            f.isCredit && 'font-medium text-red-600',
+                          )}
+                        >
                           {fmtEur(f.amountHt)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground">
+                        <td
+                          className={cn(
+                            'whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-muted-foreground',
+                            f.isCredit && 'text-red-600',
+                          )}
+                        >
                           {fmtEur(f.tva)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums">
+                        <td
+                          className={cn(
+                            'whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums',
+                            f.isCredit && 'text-red-600',
+                          )}
+                        >
                           {fmtEur(f.amountTtc)}
                         </td>
                         <td className="px-3 py-2.5 text-[11px] text-muted-foreground">{f.source}</td>
@@ -2570,6 +2730,10 @@ export default function ComptabilitePage() {
                           <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-medium text-[#D35400]">
                             <Receipt className="h-2.5 w-2.5" /> Dépense
                           </span>
+                        ) : f.isCredit ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-700">
+                            <FileMinus2 className="h-2.5 w-2.5" /> Avoir
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
                             <FileText className="h-2.5 w-2.5" /> Facture
@@ -2597,6 +2761,14 @@ export default function ComptabilitePage() {
                       {f.sublabel && (
                         <p className="truncate text-[11px] text-muted-foreground">{f.sublabel}</p>
                       )}
+                      {f.isCredit && (
+                        <p className="truncate text-[11px] font-medium text-violet-700">
+                          {f.creditedNumber
+                            ? `Rectifie la facture ${f.creditedNumber}`
+                            : 'Facture rectificative'}
+                          {f.creditReason ? ` · ${f.creditReason}` : ''}
+                        </p>
+                      )}
                       <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                         <span>{fmtDate(f.date)}</span>
                         {f.deadline && (
@@ -2616,8 +2788,22 @@ export default function ComptabilitePage() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-bold tabular-nums">{fmtEur(f.amountTtc)}</p>
-                      <p className="text-[10px] text-muted-foreground tabular-nums">HT {fmtEur(f.amountHt)}</p>
+                      <p
+                        className={cn(
+                          'text-sm font-bold tabular-nums',
+                          f.isCredit && 'text-red-600',
+                        )}
+                      >
+                        {fmtEur(f.amountTtc)}
+                      </p>
+                      <p
+                        className={cn(
+                          'text-[10px] tabular-nums',
+                          f.isCredit ? 'text-red-600' : 'text-muted-foreground',
+                        )}
+                      >
+                        HT {fmtEur(f.amountHt)}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2">
@@ -2670,7 +2856,7 @@ export default function ComptabilitePage() {
                         onClick={() => window.open(`/factures?open=${f.invoiceId}`, '_self')}
                         className="h-7 flex-1 gap-1 text-[11px]"
                       >
-                        <ExternalLink className="h-3 w-3" /> Ouvrir la facture
+                        <ExternalLink className="h-3 w-3" /> {f.isCredit ? "Ouvrir l'avoir" : 'Ouvrir la facture'}
                       </Button>
                     )}
                   </div>
@@ -2788,7 +2974,17 @@ export default function ComptabilitePage() {
                 <TrendingUp className="h-4 w-4 text-emerald-500" /> Chiffre d&apos;affaires HT
               </div>
               <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">{fmtEur(revenueHt)}</p>
-              <p className="text-[11px] text-muted-foreground">{revenueRows.length} factures payées</p>
+              <p className="text-[11px] text-muted-foreground">
+                {revenueInvoiceCount} facture{revenueInvoiceCount > 1 ? 's' : ''} payée
+                {revenueInvoiceCount > 1 ? 's' : ''}
+              </p>
+              {revenueCreditRows.length > 0 && (
+                <p className="text-[11px] font-medium text-red-600">
+                  Dont {revenueCreditRows.length} avoir{revenueCreditRows.length > 1 ? 's' : ''}{' '}
+                  déduit{revenueCreditRows.length > 1 ? 's' : ''}&nbsp;:{' '}
+                  <span className="tabular-nums">{fmtEur(revenueCreditTtc)}</span> TTC
+                </p>
+              )}
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -2802,15 +2998,25 @@ export default function ComptabilitePage() {
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Receipt className="h-4 w-4 text-[#D35400]" /> TVA collectée
               </div>
-              <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">
+              <p
+                className={cn(
+                  'mt-2 text-xl font-bold tabular-nums sm:text-2xl',
+                  revenueTva < 0 && 'text-emerald-700',
+                )}
+              >
                 {fmtEur(revenueTva)}
               </p>
+              {revenueTva < 0 && (
+                <p className="text-[11px] font-medium text-emerald-700">
+                  Montant négatif&nbsp;: crédit de TVA à récupérer (avoirs supérieurs aux factures)
+                </p>
+              )}
             </Card>
           </div>
 
           <Card className="overflow-hidden">
             <div className="border-b border-border bg-muted/30 px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">
-              Factures payées ({revenueRows.length})
+              Factures payées et avoirs ({revenueRows.length})
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -2818,23 +3024,57 @@ export default function ComptabilitePage() {
                   <tr className="border-b border-border text-xs text-muted-foreground">
                     <th className="px-3 py-2 text-left font-medium">Numéro</th>
                     <th className="px-3 py-2 text-left font-medium">Client</th>
-                    <th className="px-3 py-2 text-left font-medium">Payée le</th>
+                    <th className="px-3 py-2 text-left font-medium">Payée / émise le</th>
                     <th className="px-3 py-2 text-right font-medium">HT</th>
                     <th className="px-3 py-2 text-right font-medium">TTC</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {revenueRows.map((inv) => (
-                    <tr key={inv.id} className="border-b border-border/60">
-                      <td className="px-3 py-2 font-medium">{inv.invoice_number}</td>
-                      <td className="px-3 py-2">{getClientName(inv.clients)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.paid_at)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtEur(inv.total_ht)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold">
-                        {fmtEur(inv.total_ttc)}
-                      </td>
-                    </tr>
-                  ))}
+                  {revenueRows.map((inv) => {
+                    const credit = isCreditNote(inv);
+                    return (
+                      <tr key={inv.id} className="border-b border-border/60">
+                        <td className="px-3 py-2 font-medium">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {inv.invoice_number}
+                            {credit && (
+                              <Badge
+                                variant="outline"
+                                className="border-violet-200 bg-violet-50 text-[10px] font-medium text-violet-700"
+                              >
+                                Avoir
+                              </Badge>
+                            )}
+                          </div>
+                          {credit && inv.credit_reason && (
+                            <p className="text-[10px] text-muted-foreground">
+                              {creditReasonLabel(inv.credit_reason)}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">{getClientName(inv.clients)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {fmtDate(credit ? inv.issued_at || inv.created_at : inv.paid_at)}
+                        </td>
+                        <td
+                          className={cn(
+                            'px-3 py-2 text-right tabular-nums',
+                            credit && 'font-medium text-red-600',
+                          )}
+                        >
+                          {fmtEur(inv.total_ht)}
+                        </td>
+                        <td
+                          className={cn(
+                            'px-3 py-2 text-right font-semibold tabular-nums',
+                            credit && 'text-red-600',
+                          )}
+                        >
+                          {fmtEur(inv.total_ttc)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {revenueRows.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-3 py-6 text-center text-xs text-muted-foreground">
@@ -2848,7 +3088,9 @@ export default function ComptabilitePage() {
           </Card>
           <p className="text-[11px] text-muted-foreground">
             Les recettes sont alimentées automatiquement par vos factures Hellobat dès qu&apos;elles sont
-            marquées comme payées.
+            marquées comme payées. Les avoirs émis y figurent en négatif&nbsp;: ils viennent en
+            déduction du chiffre d&apos;affaires dès leur émission, sans jamais modifier la facture
+            qu&apos;ils rectifient.
           </p>
         </TabsContent>
 
@@ -2870,6 +3112,7 @@ export default function ComptabilitePage() {
               total_ttc: i.total_ttc,
               tva_rate: i.tva_rate,
               tva_breakdown: i.tva_breakdown,
+              invoice_type: i.invoice_type,
             }))}
             tvaMethod={tvaMethod}
             vatRegime={vatRegime}

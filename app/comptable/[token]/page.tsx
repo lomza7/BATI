@@ -16,6 +16,7 @@ import {
   Sparkles,
   Eye,
   FileX2,
+  FileMinus2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,12 @@ import {
   TabsContent,
 } from '@/components/ui/tabs';
 import { parseTvaBreakdown, formatTvaRate } from '@/lib/tva';
+import {
+  creditReasonLabel,
+  isCreditNote,
+  isIssuedCreditNote,
+  sumCreditNotesTtc,
+} from '@/lib/invoices/credit-notes';
 
 interface SummaryPayload {
   artisan: {
@@ -50,6 +57,11 @@ interface SummaryPayload {
     expenses_count: number;
     invoices_count: number;
     paid_invoices_count: number;
+    /** Avoirs émis sur la période — montants négatifs, CA et TVA déjà nets. */
+    credit_notes_count?: number;
+    total_credit_notes_ht?: number;
+    total_credit_notes_ttc?: number;
+    total_credit_notes_tva?: number;
     total_expenses_ht: number;
     total_expenses_ttc: number;
     total_revenue_ht: number;
@@ -85,12 +97,20 @@ interface InvoiceRow {
   issued_at: string | null;
   due_date: string | null;
   paid_at: string | null;
+  created_at?: string | null;
   total_ht: number | null;
   total_ttc: number | null;
   tva_rate: number | null;
   total_tva: number | null;
   tva_breakdown: unknown;
   clients: { name: string } | { name: string }[] | null;
+  /** 'standard' | 'acompte' | 'solde' | 'avoir' */
+  invoice_type?: string | null;
+  /** Facture rectifiée, renseignée uniquement sur un avoir. */
+  credited_invoice_id?: string | null;
+  /** Numéro de la facture rectifiée, résolu côté API même hors période. */
+  credited_invoice_number?: string | null;
+  credit_reason?: string | null;
 }
 
 function fmtEur(n: number | null | undefined) {
@@ -236,6 +256,39 @@ export default function ComptablePortalPage() {
 
   const artisanName = data.artisan.company_name || data.artisan.full_name || 'Artisan';
 
+  // Avoirs du périmètre partagé. Leurs montants sont négatifs en base : les
+  // totaux de la synthèse en tiennent donc compte sans retraitement.
+  const creditNotes = invoices.filter(isCreditNote);
+  // Les agrégats de la synthèse font foi (ils filtrent les brouillons côté
+  // serveur) ; on retombe sur la liste chargée si l'API est plus ancienne.
+  const creditNotesCount = data.summary.credit_notes_count ?? creditNotes.length;
+  const creditNotesTtc =
+    data.summary.total_credit_notes_ttc ??
+    sumCreditNotesTtc(
+      creditNotes.map((i) => ({ total_ttc: Number(i.total_ttc || 0), status: i.status })),
+    );
+  const creditNotesTva =
+    data.summary.total_credit_notes_tva ??
+    creditNotes
+      .filter(isIssuedCreditNote)
+      .reduce(
+        (s, i) =>
+          s +
+          (i.total_tva != null
+            ? Number(i.total_tva)
+            : Number(i.total_ttc || 0) - Number(i.total_ht || 0)),
+        0,
+      );
+  const invoiceById = new Map(invoices.map((i) => [i.id, i] as const));
+  // Avoirs rattachés à chaque facture, pour signaler une facture rectifiée.
+  const creditNotesByInvoice = new Map<string, InvoiceRow[]>();
+  for (const note of creditNotes) {
+    if (!note.credited_invoice_id) continue;
+    const list = creditNotesByInvoice.get(note.credited_invoice_id) || [];
+    list.push(note);
+    creditNotesByInvoice.set(note.credited_invoice_id, list);
+  }
+
   return (
     <div className="min-h-screen bg-[#faf8f5]">
       {/* Header */}
@@ -298,6 +351,13 @@ export default function ComptablePortalPage() {
                   {data.summary.invoices_count} facture{data.summary.invoices_count > 1 ? 's' : ''}
                   {data.summary.paid_invoices_count > 0 && ` · ${data.summary.paid_invoices_count} payée${data.summary.paid_invoices_count > 1 ? 's' : ''}`}
                 </p>
+                {creditNotesCount > 0 && (
+                  <p className="mt-0.5 text-[11px] font-medium text-red-600">
+                    Dont {creditNotesCount} avoir{creditNotesCount > 1 ? 's' : ''} déduit
+                    {creditNotesCount > 1 ? 's' : ''}&nbsp;:{' '}
+                    <span className="tabular-nums">{fmtEur(creditNotesTtc)}</span> TTC
+                  </p>
+                )}
               </Card>
               <Card className="p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -344,8 +404,14 @@ export default function ComptablePortalPage() {
               <h2 className="text-sm font-semibold">Détail TVA</h2>
               <div className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <span className="text-muted-foreground">TVA collectée (recettes)</span>
-                  <span className="font-semibold tabular-nums">
+                  <span className="text-muted-foreground">
+                    TVA collectée (recettes, nette des avoirs)
+                  </span>
+                  <span
+                    className={`font-semibold tabular-nums ${
+                      data.summary.total_tva_collectee < 0 ? 'text-emerald-700' : ''
+                    }`}
+                  >
                     {fmtEur(data.summary.total_tva_collectee)}
                   </span>
                 </div>
@@ -355,10 +421,29 @@ export default function ComptablePortalPage() {
                     {fmtEur(data.summary.total_tva_deductible)}
                   </span>
                 </div>
+                {creditNotesCount > 0 && (
+                  <div className="flex items-center justify-between rounded-md border border-violet-200 bg-violet-50/60 px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-violet-800">
+                      <FileMinus2 className="h-3.5 w-3.5" />
+                      TVA régularisée par les avoirs
+                    </span>
+                    <span className="font-semibold tabular-nums text-red-600">
+                      {fmtEur(creditNotesTva)}
+                    </span>
+                  </div>
+                )}
               </div>
               <p className="mt-3 text-[11px] text-muted-foreground">
                 Estimation indicative à confirmer par vos soins. Les dépenses en autoliquidation
                 ne sont pas comptées en TVA déductible côté artisan.
+                {creditNotesCount > 0 && (
+                  <>
+                    {' '}
+                    Les avoirs portent des montants négatifs et viennent en diminution des recettes
+                    et de la TVA collectée dès leur date d&apos;émission (art. 272-1 CGI)&nbsp;; la
+                    facture rectifiée conserve son statut et son montant d&apos;origine.
+                  </>
+                )}
               </p>
             </Card>
           </TabsContent>
@@ -482,7 +567,14 @@ export default function ComptablePortalPage() {
           <TabsContent value="factures" className="mt-4">
             <Card className="overflow-hidden">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <h2 className="text-sm font-semibold">Factures ({invoices.length})</h2>
+                <h2 className="text-sm font-semibold">
+                  Factures et avoirs ({invoices.length})
+                  {creditNotes.length > 0 && (
+                    <span className="ml-2 text-[11px] font-normal text-violet-700">
+                      dont {creditNotes.length} avoir{creditNotes.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </h2>
                 <Button variant="outline" size="sm" onClick={() => downloadCsv('invoices')} className="gap-2">
                   <Download className="h-4 w-4" />
                   CSV
@@ -503,11 +595,26 @@ export default function ComptablePortalPage() {
                   </thead>
                   <tbody>
                     {invoices.map((inv) => {
+                      // Un avoir porte des montants négatifs : le garde-fou
+                      // Math.max(0, …) effacerait la TVA régularisée.
+                      const credit = isCreditNote(inv);
+                      const creditedInvoice = inv.credited_invoice_id
+                        ? invoiceById.get(inv.credited_invoice_id)
+                        : undefined;
+                      // L'API résout le numéro même quand la facture rectifiée
+                      // est hors du périmètre partagé (cas le plus courant :
+                      // avoir émis en N sur une facture de N-1).
+                      const creditedNumber =
+                        inv.credited_invoice_number || creditedInvoice?.invoice_number || null;
+                      const linkedNotes = creditNotesByInvoice.get(inv.id) || [];
                       const breakdown = parseTvaBreakdown(inv.tva_breakdown);
+                      const rawTva = Number(inv.total_ttc || 0) - Number(inv.total_ht || 0);
                       const totalTva =
                         inv.total_tva != null
                           ? Number(inv.total_tva)
-                          : Math.max(0, Number(inv.total_ttc || 0) - Number(inv.total_ht || 0));
+                          : credit
+                            ? rawTva
+                            : Math.max(0, rawTva);
                       const tvaLabel =
                         breakdown.length > 1
                           ? `Multi (${breakdown.map((b) => `${b.rate}%`).join(' + ')})`
@@ -525,7 +632,48 @@ export default function ComptablePortalPage() {
                           : undefined;
                       return (
                         <tr key={inv.id} className="border-t border-border/60">
-                          <td className="px-3 py-2 font-medium">{inv.invoice_number}</td>
+                          <td className="px-3 py-2 font-medium">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {inv.invoice_number}
+                              {credit && (
+                                <Badge
+                                  variant="outline"
+                                  className="gap-1 border-violet-200 bg-violet-50 text-[10px] font-medium text-violet-700"
+                                >
+                                  <FileMinus2 className="h-3 w-3" />
+                                  Avoir
+                                </Badge>
+                              )}
+                            </div>
+                            {credit && (
+                              <div className="mt-0.5 text-[11px] font-medium text-violet-700">
+                                {creditedNumber
+                                  ? `Rectifie la facture ${creditedNumber}${
+                                      creditedInvoice?.issued_at
+                                        ? ` du ${fmtDate(creditedInvoice.issued_at)}`
+                                        : ''
+                                    }`
+                                  : 'Facture rectificative'}
+                                {creditedNumber && !creditedInvoice && (
+                                  <span className="font-normal text-muted-foreground">
+                                    {' '}
+                                    (hors du périmètre partagé)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {credit && inv.credit_reason && (
+                              <div className="text-[11px] text-muted-foreground">
+                                Motif&nbsp;: {creditReasonLabel(inv.credit_reason)}
+                              </div>
+                            )}
+                            {!credit && linkedNotes.length > 0 && (
+                              <div className="mt-0.5 text-[11px] text-violet-700">
+                                Rectifiée par{' '}
+                                {linkedNotes.map((n) => n.invoice_number).join(', ')}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <div>{getClientName(inv.clients)}</div>
                             {inv.title && (
@@ -534,24 +682,47 @@ export default function ComptablePortalPage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.issued_at)}</td>
-                          <td className="px-3 py-2">
-                            <Badge
-                              variant={inv.paid_at || inv.status === 'paid' ? 'default' : 'secondary'}
-                              className="text-[10px]"
-                            >
-                              {inv.paid_at || inv.status === 'paid' ? 'Payée' : inv.status}
-                            </Badge>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {fmtDate(inv.issued_at || inv.created_at)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{fmtEur(inv.total_ht)}</td>
+                          <td className="px-3 py-2">
+                            {credit ? (
+                              <Badge
+                                variant="outline"
+                                className="border-violet-200 bg-violet-50 text-[10px] text-violet-700"
+                              >
+                                Avoir émis
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant={inv.paid_at || inv.status === 'paid' ? 'default' : 'secondary'}
+                                className="text-[10px]"
+                              >
+                                {inv.paid_at || inv.status === 'paid' ? 'Payée' : inv.status}
+                              </Badge>
+                            )}
+                          </td>
                           <td
-                            className="px-3 py-2 text-right tabular-nums text-muted-foreground"
+                            className={`px-3 py-2 text-right tabular-nums ${
+                              credit ? 'font-medium text-red-600' : ''
+                            }`}
+                          >
+                            {fmtEur(inv.total_ht)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right tabular-nums ${
+                              credit ? 'text-red-600' : 'text-muted-foreground'
+                            }`}
                             title={tvaTitle}
                           >
                             {fmtEur(totalTva)}
                             <span className="ml-1 text-[10px]">({tvaLabel})</span>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                          <td
+                            className={`px-3 py-2 text-right font-semibold tabular-nums ${
+                              credit ? 'text-red-600' : ''
+                            }`}
+                          >
                             {fmtEur(inv.total_ttc)}
                           </td>
                         </tr>
@@ -568,6 +739,14 @@ export default function ComptablePortalPage() {
                 </table>
               </div>
             </Card>
+            {creditNotes.length > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Les avoirs (série AV-) apparaissent avec des montants négatifs et la référence de la
+                facture qu&apos;ils rectifient. Conformément à l&apos;article 289 du CGI, la facture
+                d&apos;origine n&apos;est jamais modifiée&nbsp;: elle conserve son numéro, son statut
+                et son montant, la régularisation étant portée par l&apos;avoir.
+              </p>
+            )}
           </TabsContent>
 
           {/* EXPORTS */}

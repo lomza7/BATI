@@ -10,6 +10,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { moveEntityToTrash } from '@/lib/recycle-bin';
+import { isCreditNote } from '@/lib/invoices/credit-notes';
 import { formatCurrency, formatDate, CONTACT_TYPES } from '@/lib/constants';
 import { DEFAULT_LEAD_SOURCES } from '@/lib/lead-sources';
 import { TODO_PRIORITIES, TODO_CATEGORIES, type Todo } from '@/lib/todo-constants';
@@ -49,7 +50,7 @@ interface Client {
 }
 
 interface ClientQuote { id: string; quote_number: string; title: string; status: string; total_ttc: number; created_at: string; }
-interface ClientInvoice { id: string; invoice_number: string; title: string; status: string; total_ttc: number; created_at: string; }
+interface ClientInvoice { id: string; invoice_number: string; title: string; status: string; total_ttc: number; created_at: string; invoice_type: string; credited_invoice_id: string | null; }
 interface ClientProject { id: string; name: string; status: string; city: string; progress: number; }
 
 const emptyForm = { name: '', email: '', phone: '', address: '', city: '', postal_code: '', notes: '', contact_type: 'client' as ContactType, source: '' };
@@ -88,7 +89,7 @@ export default function ClientsPage() {
     setSelectedId(id);
     const [q, inv, proj, td] = await Promise.all([
       supabase.from('quotes').select('id, quote_number, title, status, total_ttc, created_at').eq('client_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.from('invoices').select('id, invoice_number, title, status, total_ttc, created_at').eq('client_id', id).order('created_at', { ascending: false }),
+      supabase.from('invoices').select('id, invoice_number, title, status, total_ttc, created_at, invoice_type, credited_invoice_id').eq('client_id', id).order('created_at', { ascending: false }),
       supabase.from('projects').select('id, name, status, city, progress').eq('client_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('todos').select('*').eq('client_id', id).is('deleted_at', null).order('completed', { ascending: true }).order('created_at', { ascending: false }),
     ]);
@@ -153,10 +154,21 @@ export default function ClientsPage() {
 
   const selected = clients.find(c => c.id === selectedId);
 
-  // Stats du client sélectionné
+  // Stats du client sélectionné.
+  // Les avoirs sont dans la liste avec un TTC négatif : le total facturé les
+  // déduit de lui-même. En revanche le compteur de pièces ne compte que les
+  // factures, et l'encaissé retire les avoirs émis sur une facture déjà réglée
+  // (un remboursement), puisqu'un avoir n'est jamais marqué « payée ».
   const totalDevis = quotes.reduce((s, q) => s + (q.total_ttc || 0), 0);
+  const realInvoices = invoices.filter(inv => !isCreditNote(inv));
+  const creditNotes = invoices.filter(isCreditNote);
   const totalFactures = invoices.reduce((s, inv) => s + (inv.total_ttc || 0), 0);
-  const totalPaye = invoices.filter(inv => inv.status === 'payee').reduce((s, inv) => s + (inv.total_ttc || 0), 0);
+  const paidInvoiceIds = new Set(realInvoices.filter(inv => inv.status === 'payee').map(inv => inv.id));
+  const totalPaye =
+    realInvoices.filter(inv => inv.status === 'payee').reduce((s, inv) => s + (inv.total_ttc || 0), 0)
+    + creditNotes
+      .filter(inv => inv.credited_invoice_id !== null && paidInvoiceIds.has(inv.credited_invoice_id))
+      .reduce((s, inv) => s + (inv.total_ttc || 0), 0);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -331,7 +343,12 @@ export default function ClientsPage() {
                     </div>
                     <div className="rounded-lg bg-muted/50 p-3">
                       <p className="text-xs text-muted-foreground">Factures</p>
-                      <p className="text-sm font-semibold mt-0.5">{invoices.length} — {formatCurrency(totalFactures)}</p>
+                      <p className="text-sm font-semibold mt-0.5">{realInvoices.length} — {formatCurrency(totalFactures)}</p>
+                      {creditNotes.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          dont {creditNotes.length} avoir{creditNotes.length > 1 ? 's' : ''}
+                        </p>
+                      )}
                     </div>
                     <div className="rounded-lg bg-muted/50 p-3">
                       <p className="text-xs text-muted-foreground">Payé</p>
@@ -407,18 +424,26 @@ export default function ClientsPage() {
                         {invoices.map(inv => (
                           <div key={inv.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                             <div>
-                              <p className="text-sm font-medium">{inv.title || inv.invoice_number}</p>
+                              <p className="text-sm font-medium flex items-center gap-1.5">
+                                {inv.title || inv.invoice_number}
+                                {isCreditNote(inv) && (
+                                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700">Avoir</span>
+                                )}
+                              </p>
                               <p className="text-xs text-muted-foreground">{inv.invoice_number} — {formatDate(inv.created_at)}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-semibold">{formatCurrency(inv.total_ttc || 0)}</p>
-                              <span className={cn('text-[10px]',
-                                inv.status === 'payee' ? 'text-emerald-600' :
-                                inv.status === 'en_retard' ? 'text-red-600' :
-                                'text-muted-foreground'
-                              )}>
-                                {inv.status === 'payee' ? 'Payée' : inv.status === 'en_retard' ? 'En retard' : inv.status === 'envoyee' ? 'Envoyée' : 'Brouillon'}
-                              </span>
+                              {/* Un avoir n'attend aucun paiement : on n'affiche pas d'état d'encaissement. */}
+                              {!isCreditNote(inv) && (
+                                <span className={cn('text-[10px]',
+                                  inv.status === 'payee' ? 'text-emerald-600' :
+                                  inv.status === 'en_retard' ? 'text-red-600' :
+                                  'text-muted-foreground'
+                                )}>
+                                  {inv.status === 'payee' ? 'Payée' : inv.status === 'en_retard' ? 'En retard' : inv.status === 'envoyee' ? 'Envoyée' : 'Brouillon'}
+                                </span>
+                              )}
                             </div>
                           </div>
                         ))}

@@ -8,10 +8,13 @@
  * - Une ligne d'en-tête + une ligne par mouvement
  * - Pour une dépense : 2 lignes (charge HT + TVA déductible) côté débit, 1 ligne fournisseur côté crédit
  * - Pour une facture payée : 1 ligne banque débit + 1 ligne client crédit + ligne(s) vente HT + TVA collectée
+ * - Pour un avoir : l'écriture de vente strictement inversée, en montants
+ *   positifs (le format interdit les négatifs) — cf. le bloc VENTES plus bas
  */
 
 import { getPcgAccountForCategorySlug, PCG_ACCOUNTS, getPcgTvaAccount } from './pcg-accounts';
 import { parseTvaBreakdown, type TvaBreakdownEntry } from '../tva';
+import { isCreditNote } from '../invoices/credit-notes';
 
 interface FecExpense {
   id: string;
@@ -38,6 +41,10 @@ interface FecInvoice {
   paid_at: string | null;
   issued_at?: string | null;
   created_at: string;
+  /** 'standard' | 'acompte' | 'solde' | 'avoir' — seul 'avoir' inverse l'écriture. */
+  invoice_type?: string | null;
+  /** Numéro de la facture rectifiée, repris dans le libellé d'écriture d'un avoir. */
+  credited_invoice_number?: string | null;
 }
 
 interface FecOptions {
@@ -78,10 +85,23 @@ function fmtDate(d: string | null | undefined): string {
   return `${y}${m}${dd}`;
 }
 
+/**
+ * Montant FEC : virgule décimale, pas de séparateur de milliers, et **jamais
+ * de signe négatif**. Le format n'accepte que des montants positifs dans les
+ * colonnes Debit et Credit (arrêté du 29/07/2013, art. A.47 A-1 LPF) : le
+ * sens d'une écriture se porte par la colonne choisie, pas par le signe.
+ *
+ * La valeur absolue appliquée ici est un garde-fou, pas une politique : c'est
+ * à l'appelant de placer le montant du bon côté (cf. le traitement des avoirs
+ * dans le journal VE). Elle garantit qu'un montant négatif oublié quelque part
+ * ne rend pas le fichier entier irrecevable, tout en préservant l'équilibre
+ * débit / crédit de l'écriture — ce qu'un écrasement à 0 casserait.
+ */
 function fmtAmount(n: number | null | undefined): string {
-  if (n === null || n === undefined || isNaN(n)) return '0,00';
-  // FEC : virgule décimale, pas de séparateur de milliers
-  return n.toFixed(2).replace('.', ',');
+  if (n === null || n === undefined || !Number.isFinite(Number(n))) return '0,00';
+  // Math.abs ramène aussi -0 et les résidus d'arrondi négatifs (-0,004) à du
+  // positif, donc toFixed ne peut plus produire un « -0,00 ».
+  return Math.abs(Number(n)).toFixed(2).replace('.', ',');
 }
 
 function clean(s: string | null | undefined): string {
@@ -188,10 +208,34 @@ export function buildFecFile(opts: FecOptions): string {
     const num = `VE${String(ecritureCounter).padStart(6, '0')}`;
     ecritureCounter += 1;
 
+    // Un avoir est une facture rectificative (art. 289 CGI), pas une
+    // annulation : l'app stocke ses montants en négatif, ce qui rend justes
+    // par simple somme tous les agrégats. Mais le FEC interdit les montants
+    // négatifs dans les colonnes Debit et Credit. On n'écrit donc jamais de
+    // signe moins : on passe l'écriture STRICTEMENT INVERSE en valeur absolue.
+    //
+    //   facture : débit 411 Clients (TTC) / crédit 706 (HT par taux) + crédit 44571 (TVA)
+    //   avoir   : débit 706 (HT par taux) + débit 44571 (TVA) / crédit 411 Clients (TTC)
+    //
+    // C'est la saisie standard d'un expert-comptable, et c'est elle qui
+    // régularise la TVA collectée (art. 272-1 CGI). Le journal reste VE : un
+    // avoir est une écriture de vente, pas un journal à part.
+    const isAvoir = isCreditNote(inv);
+
     const ht = Number(inv.total_ht || 0);
     const ttc = Number(inv.total_ttc || 0);
-    const totalTvaSimple = Math.max(0, ttc - ht);
-    const lib = clean(`${inv.client_name || 'Client'} - ${inv.title || ''}`).slice(0, 200);
+    // La TVA déduite du couple (TTC − HT) suit le signe du document : sur un
+    // avoir, la borner à 0 effacerait la TVA à régulariser.
+    const totalTvaSimple = isAvoir ? Math.min(0, ttc - ht) : Math.max(0, ttc - ht);
+    const docLib = `${inv.client_name || 'Client'} - ${inv.title || ''}`;
+    // La référence à la facture rectifiée est obligatoire sur un avoir : on la
+    // fait aussi apparaître dans le libellé d'écriture, le FEC étant souvent
+    // relu tel quel par le contrôleur.
+    const lib = clean(
+      isAvoir
+        ? `Avoir${inv.credited_invoice_number ? ` sur facture ${inv.credited_invoice_number}` : ''} - ${docLib}`
+        : docLib,
+    ).slice(0, 200);
     const piece = clean(inv.invoice_number);
 
     // Rebuild per-rate breakdown — prefer stored JSONB, fallback to single legacy rate
@@ -204,7 +248,7 @@ export function buildFecFile(opts: FecOptions): string {
           tva_amount: totalTvaSimple,
         }];
 
-    // Ligne 1 : débit client TTC
+    // Ligne 1 : compte client — débit TTC sur une facture, crédit sur un avoir
     lines.push([
       'VE',
       'Ventes',
@@ -217,8 +261,8 @@ export function buildFecFile(opts: FecOptions): string {
       piece,
       dt,
       lib,
-      fmtAmount(ttc),
-      '0,00',
+      isAvoir ? '0,00' : fmtAmount(ttc),
+      isAvoir ? fmtAmount(ttc) : '0,00',
       '',
       '',
       dt,
@@ -226,9 +270,10 @@ export function buildFecFile(opts: FecOptions): string {
       '',
     ]);
 
-    // Une paire de lignes (ventes HT + TVA collectée) par taux de TVA
+    // Une paire de lignes (ventes HT + TVA collectée) par taux de TVA.
+    // Au crédit sur une facture, au débit sur un avoir.
     for (const g of rateGroups) {
-      // Crédit prestations HT (par taux)
+      // Prestations HT (par taux)
       lines.push([
         'VE',
         'Ventes',
@@ -241,8 +286,8 @@ export function buildFecFile(opts: FecOptions): string {
         piece,
         dt,
         lib,
-        '0,00',
-        fmtAmount(g.base_ht),
+        isAvoir ? fmtAmount(g.base_ht) : '0,00',
+        isAvoir ? '0,00' : fmtAmount(g.base_ht),
         '',
         '',
         dt,
@@ -250,8 +295,12 @@ export function buildFecFile(opts: FecOptions): string {
         '',
       ]);
 
-      // Crédit TVA collectée (le libellé FEC intègre le taux pour lecture humaine)
-      if (g.tva_amount > 0) {
+      // TVA collectée (le libellé FEC intègre le taux pour lecture humaine).
+      // Sur un avoir, tva_amount est négatif : on borne dans le sens du
+      // document, sinon la régularisation de TVA disparaîtrait du fichier.
+      // Une ligne à 0 (franchise en base, art. 293 B CGI) reste omise.
+      const groupTva = isAvoir ? Math.min(0, g.tva_amount) : Math.max(0, g.tva_amount);
+      if (groupTva !== 0) {
         const tvaLibWithRate = `${PCG_ACCOUNTS.tva_collectee.label} (${g.rate}%)`.slice(0, 200);
         lines.push([
           'VE',
@@ -265,8 +314,8 @@ export function buildFecFile(opts: FecOptions): string {
           piece,
           dt,
           lib,
-          '0,00',
-          fmtAmount(g.tva_amount),
+          isAvoir ? fmtAmount(groupTva) : '0,00',
+          isAvoir ? '0,00' : fmtAmount(groupTva),
           '',
           '',
           dt,
@@ -277,7 +326,12 @@ export function buildFecFile(opts: FecOptions): string {
     }
 
     // === ENCAISSEMENT (Journal BQ) si payée ===
-    if (inv.paid_at) {
+    // Jamais pour un avoir : un avoir n'est pas encaissable. Tant qu'il n'a
+    // pas été remboursé au client, il reste une dette au crédit du compte 411
+    // et ne produit aucun mouvement de trésorerie. Le remboursement effectif
+    // (décaissement 411 → 512) est HORS SCOPE ici : l'application ne trace pas
+    // encore ce flux, il n'y a donc rien à écrire au journal BQ.
+    if (inv.paid_at && !isAvoir) {
       const payDt = fmtDate(inv.paid_at);
       const payNum = `BQ${String(ecritureCounter).padStart(6, '0')}`;
       ecritureCounter += 1;

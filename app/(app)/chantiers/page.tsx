@@ -35,6 +35,14 @@ import {
 import { supabase } from '@/lib/supabase';
 import { INVOICE_STATUSES, DEFAULT_PROJECT_PHASES, MEMBER_TYPES, PROJECT_STATUSES, QUOTE_STATUSES, formatCurrency, formatDate, type ProjectPhase } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import {
+  creditReasonLabel,
+  fetchCreditNotesByInvoice,
+  isCreditNote,
+  isFullyCredited,
+  isIssuedCreditNote,
+  netDueTtc,
+} from '@/lib/invoices/credit-notes';
 import { extractProjectPhotoPath, moveProjectToTrash as moveProjectToTrashRecord } from '@/lib/project-trash';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkspace } from '@/hooks/use-workspace';
@@ -108,6 +116,10 @@ interface ProjectInvoice {
   due_date: string | null;
   paid_at: string | null;
   issued_at: string | null;
+  /** 'standard' | 'acompte' | 'solde' | 'avoir'. */
+  invoice_type: string;
+  /** Renseigné uniquement sur un avoir : la facture qu'il rectifie. */
+  credited_invoice_id: string | null;
 }
 
 interface OrphanInvoice {
@@ -245,6 +257,53 @@ function formatTrackedHours(hours: number) {
   return `${wholeHours} h ${minutes.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Complète la liste des factures d'un chantier par les avoirs émis sur
+ * celles-ci. Un avoir peut ne porter ni project_id ni quote_id : sans ce
+ * rattrapage, le chantier afficherait le CA brut sans la régularisation, donc
+ * une marge surévaluée. Les avoirs déjà présents (rattachés directement) ne
+ * sont pas dupliqués.
+ *
+ * Un avoir en **brouillon** n'est pas émis : il ne déduit rien, nulle part. On
+ * l'écarte ici — à la source — pour que le facturé, l'encaissé, le reste à
+ * encaisser et la marge du chantier s'accordent tous sur la même règle, celle
+ * qu'appliquent déjà `netDueTtc` et `isFullyCredited`.
+ */
+async function withCreditNotes(invoices: ProjectInvoice[]): Promise<ProjectInvoice[]> {
+  if (invoices.length === 0) return invoices;
+  const issued = invoices.filter((inv) => !isCreditNote(inv) || isIssuedCreditNote(inv));
+  const known = new Set(issued.map((inv) => inv.id));
+  const notesByInvoice = await fetchCreditNotesByInvoice(
+    supabase,
+    issued.filter((inv) => !isCreditNote(inv)).map((inv) => inv.id),
+  );
+
+  const extra: ProjectInvoice[] = [];
+  notesByInvoice.forEach((notes) => {
+    notes.forEach((note) => {
+      if (!isIssuedCreditNote(note)) return;
+      if (known.has(note.id)) return;
+      known.add(note.id);
+      extra.push({
+        id: note.id,
+        invoice_number: note.invoice_number,
+        title: creditReasonLabel(note.credit_reason) || 'Avoir',
+        status: note.status,
+        total_ht: note.total_ht,
+        total_ttc: note.total_ttc,
+        // Un avoir n'a ni échéance ni encaissement : ces colonnes restent vides.
+        due_date: null,
+        paid_at: null,
+        issued_at: note.issued_at ?? note.created_at ?? null,
+        invoice_type: 'avoir',
+        credited_invoice_id: note.credited_invoice_id,
+      });
+    });
+  });
+
+  return [...issued, ...extra];
+}
+
 export default function ChantiersPage() {
   const { user } = useAuth();
   const { workspaceUserId } = useWorkspace();
@@ -293,14 +352,38 @@ export default function ChantiersPage() {
 
   // Synthese financiere du chantier ouvert (boussole de marge)
   const projectFinance = useMemo(() => {
+    // Les avoirs font partie de projectInvoices, montants négatifs : toutes
+    // les sommes additives (facturé, CA HT) les déduisent d'elles-mêmes. Seuls
+    // l'encaissé et le reste à encaisser demandent un traitement explicite,
+    // puisqu'un avoir n'est jamais « payé » ni encaissable.
+    const creditNotesByInvoice = new Map<string, ProjectInvoice[]>();
+    projectInvoices.forEach((inv) => {
+      if (!isCreditNote(inv) || !inv.credited_invoice_id) return;
+      const list = creditNotesByInvoice.get(inv.credited_invoice_id) || [];
+      list.push(inv);
+      creditNotesByInvoice.set(inv.credited_invoice_id, list);
+    });
+    const notesFor = (invoiceId: string): ProjectInvoice[] => creditNotesByInvoice.get(invoiceId) || [];
+    const paidInvoiceIds = new Set(
+      projectInvoices.filter((i) => !isCreditNote(i) && i.status === 'payee').map((i) => i.id),
+    );
+
     const totalDevis = projectQuotes.reduce((s, q) => s + q.total_ttc, 0);
     const totalFacture = projectInvoices.reduce((s, i) => s + i.total_ttc, 0);
+    // Encaissé = factures réglées, moins les avoirs émis sur une facture déjà
+    // réglée (ils valent remboursement).
     const totalEncaisse = projectInvoices
-      .filter((i) => i.status === 'payee')
-      .reduce((s, i) => s + i.total_ttc, 0);
+      .filter((i) => !isCreditNote(i) && i.status === 'payee')
+      .reduce((s, i) => s + i.total_ttc, 0)
+      + projectInvoices
+        .filter((i) => isCreditNote(i) && i.credited_invoice_id !== null && paidInvoiceIds.has(i.credited_invoice_id))
+        .reduce((s, i) => s + i.total_ttc, 0);
+    // En attente = ce qui reste réellement dû, avoirs déduits. Une facture
+    // intégralement créditée n'est plus attendue.
     const totalEnAttente = projectInvoices
-      .filter((i) => i.status === 'envoyee' || i.status === 'en_retard')
-      .reduce((s, i) => s + i.total_ttc, 0);
+      .filter((i) => !isCreditNote(i) && (i.status === 'envoyee' || i.status === 'en_retard'))
+      .filter((i) => !isFullyCredited(i, notesFor(i.id)))
+      .reduce((s, i) => s + netDueTtc(i, notesFor(i.id)), 0);
     const totalMainOeuvre = projectAssignments.reduce((s, a) => s + a.total_cost, 0);
     const totalDepensesHT = projectExpenses.reduce((s, e) => s + e.amount_ht, 0);
     const totalDepensesTTC = projectExpenses.reduce((s, e) => s + e.amount, 0);
@@ -426,7 +509,9 @@ export default function ChantiersPage() {
     geocodeMissing(mappedProjects);
 
     // Check for orphan invoices (no project linked) — exclude acompte/solde
-    // which legitimately have no project (they belong to a quote's project)
+    // which legitimately have no project (they belong to a quote's project).
+    // Le filtre sur invoice_type écarte aussi les avoirs : un avoir suit la
+    // facture qu'il rectifie, il n'ouvre jamais de chantier à lui seul.
     supabase
       .from('invoices')
       .select('id', { count: 'exact', head: true })
@@ -693,10 +778,10 @@ export default function ChantiersPage() {
       const quoteIds = loadedQuotes.map(q => q.id);
       const { data: invoices } = await supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, invoice_type, credited_invoice_id')
         .in('quote_id', quoteIds)
         .order('created_at', { ascending: false });
-      setProjectInvoices((invoices as ProjectInvoice[]) || []);
+      setProjectInvoices(await withCreditNotes((invoices as ProjectInvoice[]) || []));
     }
 
     // Agréger les affectations par membre (team_assignments = heures pointées)
@@ -1053,7 +1138,7 @@ export default function ChantiersPage() {
     const quoteIds = loadedQuotes.map(q => q.id);
     const invQuery = supabase
       .from('invoices')
-      .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at')
+      .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, invoice_type, credited_invoice_id')
       .order('created_at', { ascending: false });
 
     const [viaQuotes, viaProject] = await Promise.all([
@@ -1062,7 +1147,7 @@ export default function ChantiersPage() {
         : Promise.resolve({ data: [] }),
       supabase
         .from('invoices')
-        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at')
+        .select('id, invoice_number, title, status, total_ht, total_ttc, due_date, paid_at, issued_at, invoice_type, credited_invoice_id')
         .eq('project_id', projectId)
         .is('quote_id', null)
         .order('created_at', { ascending: false }),
@@ -1071,7 +1156,7 @@ export default function ChantiersPage() {
     const seen = new Set<string>();
     const merged = [...((viaQuotes.data as ProjectInvoice[]) || []), ...((viaProject.data as ProjectInvoice[]) || [])]
       .filter(inv => { if (seen.has(inv.id)) return false; seen.add(inv.id); return true; });
-    setProjectInvoices(merged);
+    setProjectInvoices(await withCreditNotes(merged));
   }
 
   async function togglePhase(projectId: string, phaseKey: string, currentPhases: CompletedPhase[]) {
@@ -2044,7 +2129,7 @@ export default function ChantiersPage() {
                       <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
                         <p className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wide text-muted-foreground">CA facturé HT</p>
                         <p className="mt-0.5 text-xs sm:text-sm font-bold text-foreground tabular-nums truncate">
-                          {detailsLoading ? '…' : caHT > 0 ? formatCurrency(caHT) : '—'}
+                          {detailsLoading ? '…' : caHT !== 0 ? formatCurrency(caHT) : '—'}
                         </p>
                       </div>
                       <div className="rounded-xl bg-background/60 border border-border/60 p-2.5 sm:p-3">
@@ -2066,7 +2151,7 @@ export default function ChantiersPage() {
                           'mt-0.5 text-xs sm:text-sm font-bold tabular-nums truncate',
                           margeBrute < 0 ? 'text-red-700' : margeBrute > 0 ? 'text-emerald-700' : 'text-foreground'
                         )}>
-                          {detailsLoading ? '…' : caHT > 0 ? formatCurrency(margeBrute) : '—'}
+                          {detailsLoading ? '…' : caHT !== 0 ? formatCurrency(margeBrute) : '—'}
                         </p>
                       </div>
                     </div>
@@ -2379,7 +2464,7 @@ export default function ChantiersPage() {
                       </div>
                       <div className="rounded-xl border border-border bg-muted/25 p-4">
                         <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"><CircleCheck className="h-3 w-3 text-emerald-500" /> Encaissé</div>
-                        <p className="mt-1 text-lg font-semibold text-emerald-600">{totalEncaisse > 0 ? formatCurrency(totalEncaisse) : '—'}</p>
+                        <p className="mt-1 text-lg font-semibold text-emerald-600">{totalEncaisse !== 0 ? formatCurrency(totalEncaisse) : '—'}</p>
                       </div>
                       <div className="rounded-xl border border-border bg-muted/25 p-4">
                         <div className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"><Clock className="h-3 w-3 text-blue-500" /> En attente</div>
@@ -2486,7 +2571,7 @@ export default function ChantiersPage() {
                       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
                         <Receipt className="h-4 w-4 text-muted-foreground" />
                         <p className="text-sm font-semibold text-foreground">Factures ({projectInvoices.length})</p>
-                        {totalFacture > 0 && (
+                        {totalFacture !== 0 && (
                           <span className="ml-auto text-sm font-medium text-foreground">{formatCurrency(totalFacture)} facturés</span>
                         )}
                       </div>
@@ -2512,6 +2597,9 @@ export default function ChantiersPage() {
                                   <td className="px-4 py-2 text-muted-foreground">{inv.title}</td>
                                   <td className="px-4 py-2">
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${st.color}`}>{st.label}</span>
+                                    {isCreditNote(inv) && (
+                                      <span className="ml-1.5 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Avoir</span>
+                                    )}
                                   </td>
                                   <td className="px-4 py-2 text-muted-foreground">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
                                   <td className="px-4 py-2 text-right font-semibold text-foreground">{formatCurrency(inv.total_ttc)}</td>

@@ -27,12 +27,20 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   XAxis,
   YAxis,
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
 import { getNextInvoiceNumber } from '@/lib/document-numbers';
 import { useAuth } from '@/lib/auth-context';
+import {
+  fetchCreditNotesByInvoice,
+  isFullyCredited,
+  isIssuedCreditNote,
+  netDueTtc,
+  type CreditNoteRef,
+} from '@/lib/invoices/credit-notes';
 import { formatCurrency, formatDate, INVOICE_STATUSES, QUOTE_STATUSES } from '@/lib/constants';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -201,6 +209,11 @@ export default function ContratsPage() {
   const [wizardInitial, setWizardInitial] = useState<Partial<ContractWizardValues> | undefined>(undefined);
   const [sendTarget, setSendTarget] = useState<Contract | null>(null);
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
+  // Avoirs émis sur les factures de contrat, indexés par facture créditée.
+  // Ils ne figurent pas dans contract_invoices (un avoir n'est pas une
+  // échéance de contrat) : sans ce chargement, les revenus récurrents
+  // ignoreraient les régularisations.
+  const [creditNotesByInvoice, setCreditNotesByInvoice] = useState<Map<string, CreditNoteRef[]>>(new Map());
 
   useEffect(() => { loadContracts(); }, []);
 
@@ -272,6 +285,13 @@ export default function ContratsPage() {
       } as Contract;
     }));
     setLoading(false);
+
+    // Avoirs des factures de contrat : un seul aller-retour pour tout l'écran.
+    const invoiceIds = (((data as unknown as Array<Record<string, unknown>>) || []))
+      .flatMap((contract) => (contract.contract_invoices as ContractInvoice[] | null) || [])
+      .map((ci) => ci.invoices?.id)
+      .filter((id): id is string => Boolean(id));
+    setCreditNotesByInvoice(await fetchCreditNotesByInvoice(supabase, invoiceIds));
   }
 
   async function saveContract() {
@@ -543,10 +563,20 @@ export default function ContratsPage() {
     return diff >= 0 && diff <= 7;
   });
 
+  // Avoirs d'une facture de contrat. Les montants sont négatifs.
+  const notesFor = (invoiceId: string | undefined): CreditNoteRef[] =>
+    (invoiceId ? creditNotesByInvoice.get(invoiceId) : undefined) || [];
+  const isCreditedInFull = (inv: ContractInvoice['invoices']): boolean =>
+    Boolean(inv) && isFullyCredited(inv!, notesFor(inv!.id));
+
   const allContractInvoices = contracts.flatMap(c => c.contract_invoices || []);
+  // Taux d'encaissement : une facture intégralement créditée n'est plus à
+  // encaisser, elle sort des deux termes du ratio au lieu de le plomber.
+  const collectableInvoices = allContractInvoices.filter(ci => ci.invoices && !isCreditedInFull(ci.invoices));
   const paidInvoices = allContractInvoices.filter(ci => ci.invoices?.status === 'payee');
-  const collectionRate = allContractInvoices.length > 0
-    ? Math.round((paidInvoices.length / allContractInvoices.length) * 100)
+  const paidCollectableInvoices = collectableInvoices.filter(ci => ci.invoices?.status === 'payee');
+  const collectionRate = collectableInvoices.length > 0
+    ? Math.round((paidCollectableInvoices.length / collectableInvoices.length) * 100)
     : 0;
 
   const avgContractValue = activeContracts.length > 0
@@ -558,8 +588,12 @@ export default function ContratsPage() {
       }, 0) / activeContracts.length
     : 0;
 
-  // MRR chart data (last 12 months from paid contract invoices)
+  // MRR chart data (last 12 months from paid contract invoices).
+  // Un avoir émis sur une facture déjà réglée vaut remboursement : il se
+  // déduit des revenus collectés du mois où il a été émis, pas du mois de la
+  // facture d'origine, qui est clos.
   const mrrChartData = useMemo(() => {
+    const paidCreditNotes = paidInvoices.flatMap(ci => notesFor(ci.invoices?.id));
     const months: { month: string; mrr: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date();
@@ -569,10 +603,15 @@ export default function ContratsPage() {
       const monthPaid = paidInvoices
         .filter(ci => ci.invoices?.paid_at?.startsWith(key))
         .reduce((s, ci) => s + (ci.invoices?.total_ttc || 0), 0);
-      months.push({ month: label, mrr: monthPaid });
+      const monthCredited = paidCreditNotes
+        .filter(isIssuedCreditNote)
+        .filter(note => (note.issued_at || note.created_at || '').startsWith(key))
+        .reduce((s, note) => s + (note.total_ttc || 0), 0);
+      months.push({ month: label, mrr: monthPaid + monthCredited });
     }
     return months;
-  }, [paidInvoices]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paidInvoices, creditNotesByInvoice]);
 
   // Filtered contracts
   const filtered = contracts.filter(c => {
@@ -624,7 +663,7 @@ export default function ContratsPage() {
         <KpiCard
           title="Taux d'encaissement"
           value={`${collectionRate}%`}
-          subtitle={`${paidInvoices.length}/${allContractInvoices.length} factures payées`}
+          subtitle={`${paidCollectableInvoices.length}/${collectableInvoices.length} factures payées`}
           icon={Percent}
         />
         <KpiCard
@@ -636,7 +675,7 @@ export default function ContratsPage() {
       </div>
 
       {/* MRR Chart */}
-      {mrrChartData.some(d => d.mrr > 0) && (
+      {mrrChartData.some(d => d.mrr !== 0) && (
         <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
           <h2 className="text-base font-semibold text-foreground">Revenus récurrents collectés</h2>
           <p className="text-sm text-muted-foreground mt-1">Encaissements des contrats sur les 12 derniers mois</p>
@@ -647,6 +686,8 @@ export default function ContratsPage() {
                 <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={v => `${v}€`} width={50} />
                 <ChartTooltip content={<ChartTooltipContent />} />
+                {/* Ligne de zéro : un mois de remboursements net passe sous l'axe. */}
+                <ReferenceLine y={0} stroke="hsl(var(--border))" />
                 <Area
                   type="monotone"
                   dataKey="mrr"
@@ -845,9 +886,21 @@ export default function ContratsPage() {
                     {/* Payment summary */}
                     {invoices.length > 0 && (() => {
                       const paid = invoices.filter(ci => ci.invoices?.status === 'payee');
-                      const pending = invoices.filter(ci => ci.invoices && ci.invoices.status !== 'payee');
-                      const totalPaid = paid.reduce((s, ci) => s + (ci.invoices?.total_ttc || 0), 0);
-                      const totalPending = pending.reduce((s, ci) => s + (ci.invoices?.total_ttc || 0), 0);
+                      // En attente : les factures encore dues, au net des avoirs.
+                      // Une facture intégralement créditée n'attend plus rien.
+                      const pending = invoices.filter(
+                        ci => ci.invoices && ci.invoices.status !== 'payee' && !isCreditedInFull(ci.invoices)
+                      );
+                      const totalPaid =
+                        paid.reduce((s, ci) => s + (ci.invoices?.total_ttc || 0), 0)
+                        + paid
+                          .flatMap(ci => notesFor(ci.invoices?.id))
+                          .filter(isIssuedCreditNote)
+                          .reduce((s, note) => s + (note.total_ttc || 0), 0);
+                      const totalPending = pending.reduce(
+                        (s, ci) => s + netDueTtc(ci.invoices!, notesFor(ci.invoices!.id)),
+                        0
+                      );
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="rounded-lg border border-border bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2">
@@ -888,6 +941,9 @@ export default function ContratsPage() {
                             const inv = ci.invoices;
                             if (!inv) return null;
                             const st = INVOICE_STATUSES[inv.status] || INVOICE_STATUSES.brouillon;
+                            const invoiceNotes = notesFor(inv.id).filter(isIssuedCreditNote);
+                            const creditedInFull = isFullyCredited(inv, invoiceNotes);
+                            const netTtc = netDueTtc(inv, invoiceNotes);
                             return (
                               <div key={ci.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2">
                                 <div className="flex items-center gap-3">
@@ -901,8 +957,19 @@ export default function ContratsPage() {
                                 </div>
                                 <div className="flex items-center gap-3 justify-between sm:justify-end">
                                   <span className="text-sm font-medium text-foreground">{formatCurrency(inv.total_ttc)}</span>
+                                  {/* L'avoir ne modifie pas la facture : on affiche
+                                      le montant d'origine et, à côté, ce qui reste dû. */}
+                                  {invoiceNotes.length > 0 && (
+                                    <span className="text-xs font-medium text-violet-700">
+                                      {inv.status === 'payee'
+                                        ? 'Avoir émis'
+                                        : creditedInFull
+                                          ? 'Créditée'
+                                          : `Reste ${formatCurrency(netTtc)}`}
+                                    </span>
+                                  )}
                                   <StatusBadge label={st.label} color={st.color} />
-                                  {inv.status !== 'payee' && (
+                                  {inv.status !== 'payee' && !creditedInFull && (
                                     <Button
                                       variant="ghost"
                                       size="sm"

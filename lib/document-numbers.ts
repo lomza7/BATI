@@ -16,7 +16,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type DocumentTable = 'quotes' | 'invoices';
-export type DocumentPrefix = 'D' | 'F';
+/**
+ * `AV` est la série des avoirs. Elle vit dans la même table que les factures
+ * mais reste une séquence distincte : l'unicité est `(user_id,
+ * invoice_number)`, donc AV-2026-001 et F-2026-001 cohabitent, et chaque
+ * série reste continue — ce qu'exige l'administration fiscale.
+ */
+export type DocumentPrefix = 'D' | 'F' | 'AV';
 
 interface NextNumberOptions {
   supabase: SupabaseClient;
@@ -100,6 +106,28 @@ export function getNextInvoiceNumber(
     table: 'invoices',
     column: 'invoice_number',
     prefix: 'F',
+    userId,
+    year,
+  });
+}
+
+/**
+ * Numéro d'avoir : série `AV-YYYY-NNN`, indépendante de la série `F-`.
+ *
+ * Le filtre `LIKE 'AV-YYYY-%'` de `getNextDocumentNumber` ne matche aucune
+ * facture, donc les deux compteurs n'interfèrent pas et la séquence des
+ * factures ne saute pas quand un avoir est émis.
+ */
+export function getNextCreditNoteNumber(
+  supabase: SupabaseClient,
+  userId: string,
+  year?: number,
+): Promise<string> {
+  return getNextDocumentNumber({
+    supabase,
+    table: 'invoices',
+    column: 'invoice_number',
+    prefix: 'AV',
     userId,
     year,
   });
